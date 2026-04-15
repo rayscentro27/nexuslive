@@ -500,3 +500,65 @@ export async function updateDocumentStatus(docId: string, status: 'pending' | 'v
     .single();
   return { data: data as Document | null, error };
 }
+
+export async function getAllCreditReports() {
+  const { data, error } = await supabase
+    .from('credit_reports')
+    .select('*')
+    .order('created_at', { ascending: false });
+  return { data: (data ?? []) as CreditReport[], error };
+}
+
+export async function getAllCreditDisputes() {
+  const { data, error } = await supabase
+    .from('credit_disputes')
+    .select('*')
+    .order('created_at', { ascending: false });
+  return { data: (data ?? []) as CreditDispute[], error };
+}
+
+// ─── Business Opportunities ───────────────────────────────────────────────────
+
+export interface BusinessOpportunity {
+  id: string;
+  created_by: string | null;
+  title: string;
+  description: string | null;
+  type: string;
+  source: string | null;
+  value_min: number | null;
+  value_max: number | null;
+  deadline: string | null;
+  eligibility: string | null;
+  status: 'active' | 'archived' | 'applied';
+  is_client_facing: boolean;
+  linked_user_id: string | null;
+  created_at: string;
+}
+
+export async function getBusinessOpportunities() {
+  const { data, error } = await supabase
+    .from('business_opportunities')
+    .select('*')
+    .order('created_at', { ascending: false });
+  return { data: (data ?? []) as BusinessOpportunity[], error };
+}
+
+export async function createBusinessOpportunity(opp: Partial<BusinessOpportunity>) {
+  const { data, error } = await supabase
+    .from('business_opportunities')
+    .insert(opp)
+    .select()
+    .single();
+  return { data: data as BusinessOpportunity | null, error };
+}
+
+export async function updateBusinessOpportunity(id: string, updates: Partial<BusinessOpportunity>) {
+  const { data, error } = await supabase
+    .from('business_opportunities')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  return { data: data as BusinessOpportunity | null, error };
+}
