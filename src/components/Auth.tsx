@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
-import { 
-  Mail, 
-  Lock, 
-  User, 
-  Github, 
-  Chrome, 
-  Facebook, 
+import {
+  Mail,
+  Lock,
+  User,
+  Github,
+  Chrome,
+  Facebook,
   Apple,
   ArrowRight,
   CheckCircle2,
   Eye,
-  EyeOff
+  EyeOff,
+  AlertCircle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { BotAvatar } from './BotAvatar';
-import { useAuth } from './AuthProvider';
+import { supabase } from '../lib/supabase';
 
 interface AuthProps {
   onShowLegal?: () => void;
@@ -22,19 +23,96 @@ interface AuthProps {
 }
 
 export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
-  const [isLogin, setIsLogin] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const { mockLogin } = useAuth();
+  const [signUpLoading, setSignUpLoading] = useState(false);
+  const [signInLoading, setSignInLoading] = useState(false);
+  const [signUpError, setSignUpError] = useState<string | null>(null);
+  const [signInError, setSignInError] = useState<string | null>(null);
+  const [signUpSuccess, setSignUpSuccess] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Sign Up form state
+  const [signUpName, setSignUpName] = useState('');
+  const [signUpEmail, setSignUpEmail] = useState('');
+  const [signUpPassword, setSignUpPassword] = useState('');
+
+  // Sign In form state
+  const [signInEmail, setSignInEmail] = useState('');
+  const [signInPassword, setSignInPassword] = useState('');
+
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    mockLogin();
+    setSignUpError(null);
+    setSignUpLoading(true);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email: signUpEmail,
+        password: signUpPassword,
+        options: {
+          data: { full_name: signUpName }
+        }
+      });
+      if (error) throw error;
+      setSignUpSuccess(true);
+    } catch (err: any) {
+      setSignUpError(err.message || 'Sign up failed. Please try again.');
+    } finally {
+      setSignUpLoading(false);
+    }
   };
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSignInError(null);
+    setSignInLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: signInEmail,
+        password: signInPassword
+      });
+      if (error) throw error;
+      // AuthProvider's onAuthStateChange will handle the redirect
+    } catch (err: any) {
+      setSignInError(err.message || 'Sign in failed. Please check your credentials.');
+    } finally {
+      setSignInLoading(false);
+    }
+  };
+
+  const handleOAuth = async (provider: 'google' | 'github') => {
+    await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: window.location.origin }
+    });
+  };
+
+  if (signUpSuccess) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-4 font-sans">
+        <div className="max-w-md w-full glass-card p-10 text-center space-y-6">
+          <div className="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center mx-auto">
+            <CheckCircle2 className="w-8 h-8 text-green-500" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-[#1A2244]">Check Your Email</h2>
+            <p className="text-sm text-slate-500 font-medium mt-2">
+              We sent a confirmation link to <strong>{signUpEmail}</strong>. Click it to activate your account.
+            </p>
+          </div>
+          <button
+            onClick={() => setSignUpSuccess(false)}
+            className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#5B7CFA]"
+          >
+            Back to Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-4 font-sans overflow-hidden relative">
       {onBackToDashboard && (
-        <button 
+        <button
           onClick={onBackToDashboard}
           className="absolute top-8 left-8 z-50 flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#5B7CFA] transition-all group"
         >
@@ -43,11 +121,11 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
         </button>
       )}
       <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-        
+
         {/* Left Side: Sign Up Form */}
         <div className="glass-card p-8 space-y-6 relative overflow-hidden">
           <div className="absolute -top-10 -left-10 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl" />
-          
+
           <div className="text-center space-y-2 relative z-10">
             <div className="flex justify-center mb-4">
               <BotAvatar type="dashboard" size="lg" />
@@ -56,14 +134,16 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
             <p className="text-xs text-slate-500 font-medium">Welcome! Create your Nexus account.</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4 relative z-10">
+          <form onSubmit={handleSignUp} className="space-y-4 relative z-10">
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
+                  value={signUpName}
+                  onChange={e => setSignUpName(e.target.value)}
                   placeholder="John Doe"
                   className="w-full bg-white border border-slate-100 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all shadow-sm"
                 />
@@ -74,9 +154,11 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input 
-                  type="email" 
+                <input
+                  type="email"
                   required
+                  value={signUpEmail}
+                  onChange={e => setSignUpEmail(e.target.value)}
                   placeholder="name@company.com"
                   className="w-full bg-white border border-slate-100 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all shadow-sm"
                 />
@@ -87,13 +169,16 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input 
-                  type={showPassword ? "text" : "password"} 
+                <input
+                  type={showPassword ? "text" : "password"}
                   required
+                  value={signUpPassword}
+                  onChange={e => setSignUpPassword(e.target.value)}
                   placeholder="••••••••"
+                  minLength={6}
                   className="w-full bg-white border border-slate-100 rounded-xl pl-10 pr-10 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all shadow-sm"
                 />
-                <button 
+                <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#5B7CFA]"
@@ -103,8 +188,19 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
               </div>
             </div>
 
-            <button type="submit" className="w-full bg-[#5B7CFA] text-white py-3.5 rounded-xl font-black shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all transform hover:-translate-y-0.5 active:scale-95">
-              Sign Up
+            {signUpError && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-100 text-red-700">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <p className="text-xs font-medium">{signUpError}</p>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={signUpLoading}
+              className="w-full bg-[#5B7CFA] text-white py-3.5 rounded-xl font-black shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all transform hover:-translate-y-0.5 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {signUpLoading ? 'Creating Account...' : 'Sign Up'}
             </button>
           </form>
 
@@ -116,20 +212,32 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
             </div>
 
             <div className="grid grid-cols-4 gap-3">
-              {[Chrome, Github, Facebook, Apple].map((Icon, i) => (
-                <button 
-                  key={i} 
-                  onClick={mockLogin}
-                  className="flex items-center justify-center p-2.5 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-all shadow-sm group"
+              <button
+                onClick={() => handleOAuth('google')}
+                className="flex items-center justify-center p-2.5 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-all shadow-sm group"
+              >
+                <Chrome className="w-5 h-5 text-slate-400 group-hover:text-[#1A2244]" />
+              </button>
+              <button
+                onClick={() => handleOAuth('github')}
+                className="flex items-center justify-center p-2.5 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-all shadow-sm group"
+              >
+                <Github className="w-5 h-5 text-slate-400 group-hover:text-[#1A2244]" />
+              </button>
+              {[Facebook, Apple].map((Icon, i) => (
+                <button
+                  key={i}
+                  className="flex items-center justify-center p-2.5 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-all shadow-sm group opacity-40 cursor-not-allowed"
+                  disabled
                 >
-                  <Icon className="w-5 h-5 text-slate-400 group-hover:text-[#1A2244]" />
+                  <Icon className="w-5 h-5 text-slate-400" />
                 </button>
               ))}
             </div>
           </div>
 
           <div className="pt-4 border-t border-slate-50">
-            <button 
+            <button
               onClick={onBackToDashboard}
               className="w-full glass-card p-4 bg-blue-50/30 border-blue-100/50 flex items-center justify-between group cursor-pointer text-left"
             >
@@ -149,47 +257,73 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
         <div className="space-y-8">
           <div className="glass-card p-8 space-y-6 relative overflow-hidden">
             <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl" />
-            
+
             <div className="flex items-center gap-4 mb-2">
               <BotAvatar type="referral" size="md" />
               <div>
-                <h2 className="text-2xl font-black text-[#1A2244]">Sign Up <span className="text-slate-300">&</span> Log In</h2>
-                <p className="text-xs text-slate-500 font-medium">Welcome Back! Sign in to your Nexus account.</p>
+                <h2 className="text-2xl font-black text-[#1A2244]">Welcome Back</h2>
+                <p className="text-xs text-slate-500 font-medium">Sign in to your Nexus account.</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-6">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <h3 className="text-sm font-bold text-[#1A2244]">Log In to Nexus</h3>
-                <div className="space-y-3">
-                  <input 
-                    type="email" 
-                    required
-                    placeholder="Email Address"
-                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all"
-                  />
-                  <input 
-                    type="password" 
-                    required
-                    placeholder="Password"
-                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all"
-                  />
-                  <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 cursor-pointer group">
-                      <div className="w-4 h-4 rounded border border-slate-200 bg-white flex items-center justify-center group-hover:border-[#5B7CFA] transition-all">
-                        <div className="w-2 h-2 bg-[#5B7CFA] rounded-sm opacity-0 group-hover:opacity-100 transition-all" />
-                      </div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Remember me</span>
-                    </label>
-                    <button type="button" className="text-[10px] font-bold text-[#5B7CFA] uppercase tracking-widest hover:underline">Forgot Password?</button>
-                  </div>
-                  <button type="submit" className="w-full bg-[#5B7CFA] text-white py-3 rounded-xl font-black shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all">
-                    Log In
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <h3 className="text-sm font-bold text-[#1A2244]">Log In to Nexus</h3>
+              <div className="space-y-3">
+                <input
+                  type="email"
+                  required
+                  value={signInEmail}
+                  onChange={e => setSignInEmail(e.target.value)}
+                  placeholder="Email Address"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all"
+                />
+                <input
+                  type="password"
+                  required
+                  value={signInPassword}
+                  onChange={e => setSignInPassword(e.target.value)}
+                  placeholder="Password"
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all"
+                />
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 cursor-pointer group">
+                    <div className="w-4 h-4 rounded border border-slate-200 bg-white flex items-center justify-center group-hover:border-[#5B7CFA] transition-all">
+                      <div className="w-2 h-2 bg-[#5B7CFA] rounded-sm opacity-0 group-hover:opacity-100 transition-all" />
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Remember me</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!signInEmail) return;
+                      await supabase.auth.resetPasswordForEmail(signInEmail, {
+                        redirectTo: `${window.location.origin}/reset-password`
+                      });
+                      alert('Password reset email sent!');
+                    }}
+                    className="text-[10px] font-bold text-[#5B7CFA] uppercase tracking-widest hover:underline"
+                  >
+                    Forgot Password?
                   </button>
                 </div>
-              </form>
-            </div>
-            
+
+                {signInError && (
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-100 text-red-700">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <p className="text-xs font-medium">{signInError}</p>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={signInLoading}
+                  className="w-full bg-[#5B7CFA] text-white py-3 rounded-xl font-black shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {signInLoading ? 'Signing In...' : 'Log In'}
+                </button>
+              </div>
+            </form>
+
             <div className="pt-4 border-t border-slate-50">
               <p className="text-[9px] text-slate-400 font-medium leading-relaxed text-center">
                 By continuing, you agree to our <span onClick={onShowLegal} className="text-[#5B7CFA] font-bold cursor-pointer hover:underline">Terms of Service</span> and <span onClick={onShowLegal} className="text-[#5B7CFA] font-bold cursor-pointer hover:underline">Privacy Policy</span>.
