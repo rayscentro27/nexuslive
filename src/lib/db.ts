@@ -470,7 +470,7 @@ export async function getAllClients() {
   const { data, error } = await supabase
     .from('user_profiles')
     .select('*')
-    .eq('role', 'client')
+    .in('role', ['client', 'admin'])
     .order('created_at', { ascending: false });
   return { data: (data ?? []) as UserProfile[], error };
 }
@@ -481,4 +481,22 @@ export async function getAllDocuments() {
     .select('*')
     .order('created_at', { ascending: false });
   return { data: (data ?? []) as Document[], error };
+}
+
+export async function getAllFundingApplications() {
+  const { data, error } = await supabase
+    .from('funding_applications')
+    .select('*')
+    .order('created_at', { ascending: false });
+  return { data: (data ?? []) as FundingApplication[], error };
+}
+
+export async function updateDocumentStatus(docId: string, status: 'pending' | 'verified' | 'attention') {
+  const { data, error } = await supabase
+    .from('documents')
+    .update({ status })
+    .eq('id', docId)
+    .select()
+    .single();
+  return { data: data as Document | null, error };
 }
