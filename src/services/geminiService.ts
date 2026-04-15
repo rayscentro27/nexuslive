@@ -1,11 +1,18 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let ai: GoogleGenAI | null = null;
+
+function getAI(): GoogleGenAI {
+  if (!ai) {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) throw new Error('VITE_GEMINI_API_KEY is not set');
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
+}
 
 export async function getChatResponse(message: string, botType: string, history: { role: 'user' | 'model', parts: { text: string }[] }[] = []) {
   try {
-    // Convert history to the format expected by the new SDK if necessary
-    // The new SDK uses 'contents' which can be an array of Content objects
     const contents = [
       ...history.map(h => ({
         role: h.role,
@@ -17,13 +24,13 @@ export async function getChatResponse(message: string, botType: string, history:
       }
     ];
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+    const response = await getAI().models.generateContent({
+      model: "gemini-2.0-flash",
       contents: contents,
       config: {
-        systemInstruction: `You are the ${botType} for Nexus, a business growth platform. 
+        systemInstruction: `You are the ${botType} for Nexus, a business growth platform.
         Your goal is to help users scale their business, find funding, and manage operations.
-        Be professional, encouraging, and highly practical. 
+        Be professional, encouraging, and highly practical.
         If you are the Funding Bot, focus on capital and grants.
         If you are the Advisor, focus on strategy and growth.
         If you are the Setup Bot, focus on business formation and compliance.
