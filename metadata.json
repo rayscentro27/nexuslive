@@ -1,0 +1,11 @@
+{
+  "name": "Nexus Client Portal",
+  "description": "A high-end, glassmorphic client portal for funding, document management, and secure messaging.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "authentication",
+    "database",
+    "storage",
+    "messaging"
+  ]
+}

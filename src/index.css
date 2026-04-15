@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-nexus-50: #f8fafc;
+  --color-nexus-100: #f1f5f9;
+  --color-nexus-200: #e2e8f0;
+  --color-nexus-300: #cbd5e1;
+  --color-nexus-400: #94a3b8;
+  --color-nexus-500: #5B7CFA;
+  --color-nexus-600: #3A5EE5;
+  --color-nexus-700: #1e293b;
+  --color-nexus-800: #0f172a;
+  --color-nexus-900: #020617;
+  --color-nexus-950: #1A2244;
+}
+
+@layer base {
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: #f8fafc;
+    @apply text-slate-900 antialiased relative overflow-x-hidden;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white border border-slate-200 shadow-sm rounded-2xl relative z-10;
+  }
+
+  .glass-panel {
+    @apply bg-slate-50 border border-slate-100 rounded-xl;
+  }
+
+  .nexus-gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#5B7CFA] to-[#3A5EE5];
+  }
+
+  .nexus-button-primary {
+    @apply bg-[#5B7CFA] text-white transition-all duration-300 active:scale-95 rounded-xl px-6 py-2.5 font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20;
+  }
+
+  .nexus-button-primary:hover {
+    @apply bg-[#4A6BEB] shadow-xl shadow-blue-500/30;
+  }
+
+  .nexus-button-secondary {
+    @apply bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 transition-all duration-300 active:scale-95 rounded-xl px-6 py-2.5 font-bold flex items-center justify-center gap-2 shadow-sm;
+  }
+}
