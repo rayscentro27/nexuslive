@@ -650,6 +650,38 @@ INSERT INTO task_templates (stage_number, title, description, category, priority
 ON CONFLICT DO NOTHING;
 
 -- =============================================================================
+-- STORAGE BUCKET: documents
+-- Creates the public bucket for client document uploads
+-- =============================================================================
+
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'documents',
+  'documents',
+  true,
+  52428800,  -- 50 MB per file
+  ARRAY['application/pdf','image/jpeg','image/png','image/webp','application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+) ON CONFLICT (id) DO NOTHING;
+
+-- RLS on storage objects: users can upload to their own folder, read their own files
+CREATE POLICY "users_upload_own_docs"
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'documents' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+CREATE POLICY "users_read_own_docs"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'documents' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+CREATE POLICY "admin_read_all_docs"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'documents' AND is_admin());
+
+CREATE POLICY "users_delete_own_docs"
+  ON storage.objects FOR DELETE
+  USING (bucket_id = 'documents' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+-- =============================================================================
 -- ADMIN ACCOUNT SCAFFOLD
 -- Note: Create the auth user for rayscentro@yahoo.com via Supabase Dashboard
 -- (Authentication → Users → Invite User), then run this to set super_admin role:
