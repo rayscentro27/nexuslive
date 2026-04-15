@@ -405,6 +405,39 @@ export async function upsertBusinessEntity(userId: string, updates: Partial<Busi
   return { data: data as BusinessEntity | null, error };
 }
 
+// ─── User Settings ────────────────────────────────────────────────────────────
+
+export interface UserSettings {
+  user_id: string;
+  notification_email: boolean;
+  notification_sms: boolean;
+  notification_push: boolean;
+  two_factor_enabled: boolean;
+  profile_visibility: string;
+  ai_communication_style: string;
+  language: string;
+  timezone: string;
+  updated_at: string;
+}
+
+export async function getSettings(userId: string) {
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+  return { data: data as UserSettings | null, error };
+}
+
+export async function updateSettings(userId: string, updates: Partial<UserSettings>) {
+  const { data, error } = await supabase
+    .from('user_settings')
+    .upsert({ user_id: userId, ...updates, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+    .select()
+    .single();
+  return { data: data as UserSettings | null, error };
+}
+
 // ─── Admin ────────────────────────────────────────────────────────────────────
 
 export async function getAllClients() {
