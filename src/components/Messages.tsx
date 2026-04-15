@@ -1,8 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, Send, MoreVertical, Phone, Video, Paperclip, Smile, Loader2, TrendingUp, Target, Zap, ArrowRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { getChatResponse } from '../services/geminiService';
 import { botConfig, BotType } from './BotAvatar';
+import { useAuth } from './AuthProvider';
+import { getOrCreateConversation, getMessages, sendMessage, ChatMessage } from '../lib/db';
 
 interface Message {
   id: string;
@@ -19,16 +21,65 @@ const initialContacts = [
   { id: 'trading', name: 'Trading Bot', role: 'Strategy & Signals', avatar: 'https://picsum.photos/seed/trading/400/400', active: true, type: 'trading' as BotType },
 ];
 
+function dbMsgToUI(msg: ChatMessage, contactName: string): Message {
+  return {
+    id: msg.id,
+    sender: msg.is_user_message ? 'Me' : contactName,
+    text: msg.content,
+    time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    isMe: msg.is_user_message,
+  };
+}
+
 export function Messages() {
+  const { user } = useAuth();
   const [selectedContact, setSelectedContact] = useState(initialContacts[0]);
   const [msgInput, setMsgInput] = useState('');
-  const [chatHistory, setChatHistory] = useState<Record<string, Message[]>>({
-    advisor: [
-      { id: '1', sender: 'James Mitchell', text: 'Hello! I\'m James, your Capital Strategist. How can I help you scale today?', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), isMe: false }
-    ]
-  });
+  const [chatHistory, setChatHistory] = useState<Record<string, Message[]>>({});
+  const [conversationIds, setConversationIds] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingMessages, setIsFetchingMessages] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Initialize all conversations on mount
+  useEffect(() => {
+    if (!user) return;
+    initialContacts.forEach(async (contact) => {
+      const { data } = await getOrCreateConversation(user.id, contact.id, contact.name, contact.role);
+      if (data) {
+        setConversationIds(prev => ({ ...prev, [contact.id]: data.id }));
+      }
+    });
+  }, [user]);
+
+  // Load messages when conversation ID is available or contact changes
+  useEffect(() => {
+    const convId = conversationIds[selectedContact.id];
+    if (!convId) return;
+
+    setIsFetchingMessages(true);
+    getMessages(convId).then(({ data }) => {
+      if (data && data.length > 0) {
+        setChatHistory(prev => ({
+          ...prev,
+          [selectedContact.id]: data.map(m => dbMsgToUI(m, selectedContact.name))
+        }));
+      } else if (!chatHistory[selectedContact.id]) {
+        // No history yet — show welcome message (not persisted)
+        setChatHistory(prev => ({
+          ...prev,
+          [selectedContact.id]: [{
+            id: 'welcome',
+            sender: selectedContact.name,
+            text: `Hello! I'm your ${selectedContact.role}. How can I help you today?`,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isMe: false
+          }]
+        }));
+      }
+      setIsFetchingMessages(false);
+    });
+  }, [conversationIds, selectedContact.id]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -37,7 +88,10 @@ export function Messages() {
   }, [chatHistory, selectedContact.id]);
 
   const handleSend = async () => {
-    if (!msgInput.trim() || isLoading) return;
+    if (!msgInput.trim() || isLoading || !user) return;
+
+    const convId = conversationIds[selectedContact.id];
+    const currentHistory = chatHistory[selectedContact.id] || [];
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -47,19 +101,22 @@ export function Messages() {
       isMe: true
     };
 
-    const currentHistory = chatHistory[selectedContact.id] || [];
-    setChatHistory(prev => ({
-      ...prev,
-      [selectedContact.id]: [...currentHistory, userMsg]
-    }));
+    setChatHistory(prev => ({ ...prev, [selectedContact.id]: [...currentHistory, userMsg] }));
     setMsgInput('');
     setIsLoading(true);
 
-    // Format history for Gemini
-    const geminiHistory = currentHistory.map(m => ({
-      role: m.isMe ? 'user' as const : 'model' as const,
-      parts: [{ text: m.text }]
-    }));
+    // Persist user message
+    if (convId) {
+      await sendMessage(convId, user.id, 'Me', msgInput, true);
+    }
+
+    // Build Gemini history from non-welcome messages
+    const geminiHistory = currentHistory
+      .filter(m => m.id !== 'welcome')
+      .map(m => ({
+        role: m.isMe ? 'user' as const : 'model' as const,
+        parts: [{ text: m.text }]
+      }));
 
     const responseText = await getChatResponse(msgInput, selectedContact.role, geminiHistory);
 
@@ -75,6 +132,12 @@ export function Messages() {
       ...prev,
       [selectedContact.id]: [...(prev[selectedContact.id] || []), botMsg]
     }));
+
+    // Persist bot response
+    if (convId) {
+      await sendMessage(convId, selectedContact.id, selectedContact.name, responseText, false);
+    }
+
     setIsLoading(false);
   };
 
@@ -82,15 +145,15 @@ export function Messages() {
 
   return (
     <div className="p-4 h-full flex gap-4 overflow-hidden">
-      {/* Contacts List - Reduced width by ~20% */}
+      {/* Contacts List */}
       <div className="w-52 flex flex-col gap-3 shrink-0">
         <h2 className="text-lg font-black text-[#1A2244] px-1">Messages</h2>
-        
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder="Search" 
+          <input
+            type="text"
+            placeholder="Search"
             className="w-full bg-slate-50 border border-slate-100 rounded-xl py-1.5 pl-9 pr-3 text-[10px] font-bold focus:outline-none focus:ring-4 focus:ring-blue-500/5 transition-all"
           />
         </div>
@@ -110,11 +173,7 @@ export function Messages() {
                 )}
               >
                 <div className="w-7 h-7 rounded-lg bg-[#C5C9F7] overflow-hidden shrink-0 relative shadow-sm">
-                  <img 
-                    src={contact.avatar} 
-                    alt={contact.name} 
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={contact.avatar} alt={contact.name} className="w-full h-full object-cover" />
                   {contact.active && (
                     <div className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-green-500 border border-white rounded-full" />
                   )}
@@ -129,17 +188,12 @@ export function Messages() {
         </div>
       </div>
 
-      {/* Chat Area - Center Panel */}
+      {/* Chat Area */}
       <div className="flex-1 glass-card flex flex-col overflow-hidden border-slate-100">
-        {/* Chat Header */}
         <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-white">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-[#C5C9F7] overflow-hidden shadow-sm">
-              <img 
-                src={selectedContact.avatar} 
-                alt={selectedContact.name} 
-                className="w-full h-full object-cover"
-              />
+              <img src={selectedContact.avatar} alt={selectedContact.name} className="w-full h-full object-cover" />
             </div>
             <div>
               <p className="text-xs font-black text-[#1A2244] leading-tight">{selectedContact.name}</p>
@@ -153,34 +207,35 @@ export function Messages() {
           </div>
         </div>
 
-        {/* Messages Display */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30 no-scrollbar">
-          {currentMessages.map((msg) => (
-            <div key={msg.id} className={cn("flex gap-2.5 max-w-[85%]", msg.isMe ? "ml-auto flex-row-reverse" : "")}>
-              {!msg.isMe && (
-                <div className="w-7 h-7 rounded-lg bg-[#C5C9F7] overflow-hidden shrink-0 mt-auto shadow-sm">
-                  <img 
-                    src={selectedContact.avatar} 
-                    alt="Avatar" 
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-              <div className="space-y-1">
-                <div className={cn(
-                  "p-2.5 rounded-xl text-[11px] font-medium leading-relaxed shadow-sm",
-                  msg.isMe 
-                    ? "bg-[#5B7CFA] text-white rounded-tr-none" 
-                    : "bg-white text-[#1A2244] rounded-tl-none border border-slate-100"
-                )}>
-                  {msg.text}
-                </div>
-                <p className={cn("text-[7px] font-black text-slate-400 uppercase tracking-widest", msg.isMe ? "text-right" : "")}>
-                  {msg.time}
-                </p>
-              </div>
+          {isFetchingMessages ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />
             </div>
-          ))}
+          ) : (
+            currentMessages.map((msg) => (
+              <div key={msg.id} className={cn("flex gap-2.5 max-w-[85%]", msg.isMe ? "ml-auto flex-row-reverse" : "")}>
+                {!msg.isMe && (
+                  <div className="w-7 h-7 rounded-lg bg-[#C5C9F7] overflow-hidden shrink-0 mt-auto shadow-sm">
+                    <img src={selectedContact.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <div className={cn(
+                    "p-2.5 rounded-xl text-[11px] font-medium leading-relaxed shadow-sm",
+                    msg.isMe
+                      ? "bg-[#5B7CFA] text-white rounded-tr-none"
+                      : "bg-white text-[#1A2244] rounded-tl-none border border-slate-100"
+                  )}>
+                    {msg.text}
+                  </div>
+                  <p className={cn("text-[7px] font-black text-slate-400 uppercase tracking-widest", msg.isMe ? "text-right" : "")}>
+                    {msg.time}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
           {isLoading && (
             <div className="flex gap-2.5 max-w-[85%]">
               <div className="w-7 h-7 rounded-lg bg-[#C5C9F7] overflow-hidden shrink-0 mt-auto shadow-sm flex items-center justify-center">
@@ -197,23 +252,22 @@ export function Messages() {
           )}
         </div>
 
-        {/* Input Area - Sticky at bottom */}
-        <form 
+        <form
           onSubmit={(e) => { e.preventDefault(); handleSend(); }}
           className="p-3 bg-white border-t border-slate-100 shrink-0"
         >
           <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl p-1 pl-2 shadow-inner">
             <button type="button" className="text-slate-400 hover:text-[#5B7CFA] transition-colors"><Paperclip className="w-3.5 h-3.5" /></button>
-            <input 
-              type="text" 
-              placeholder="Write a message..." 
+            <input
+              type="text"
+              placeholder="Write a message..."
               value={msgInput}
               onChange={(e) => setMsgInput(e.target.value)}
               disabled={isLoading}
               className="flex-1 bg-transparent border-none focus:outline-none text-[11px] font-medium py-1.5 disabled:opacity-50"
             />
             <button type="button" className="text-slate-400 hover:text-[#5B7CFA] transition-colors"><Smile className="w-3.5 h-3.5" /></button>
-            <button 
+            <button
               type="submit"
               disabled={!msgInput.trim() || isLoading}
               className="bg-[#5B7CFA] text-white py-1.5 px-3 rounded-lg font-black shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:hover:bg-[#5B7CFA]"
@@ -225,7 +279,7 @@ export function Messages() {
         </form>
       </div>
 
-      {/* Context Panel - Right Panel */}
+      {/* Context Panel */}
       <div className="w-60 flex flex-col gap-4 shrink-0">
         <div className="glass-card p-4 space-y-4 border-slate-100 bg-gradient-to-br from-white to-blue-50/20">
           <div className="space-y-1">
