@@ -1,232 +1,319 @@
-import React from 'react';
-import { Shield, TrendingUp, AlertCircle, FileText, Upload, Download, ArrowRight, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, TrendingUp, AlertCircle, FileText, Upload, Download, ArrowRight, CheckCircle2, Clock, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useAuth } from './AuthProvider';
+import { getCreditReport, getDisputes, CreditReport, CreditDispute } from '../lib/db';
+
+function scoreBandColor(band: string | null) {
+  switch (band?.toLowerCase()) {
+    case 'excellent': return 'bg-green-50 text-green-600';
+    case 'good':      return 'bg-blue-50 text-blue-600';
+    case 'fair':      return 'bg-amber-50 text-amber-600';
+    case 'poor':      return 'bg-red-50 text-red-600';
+    default:          return 'bg-slate-50 text-slate-500';
+  }
+}
+
+function disputeStatusColor(status: CreditDispute['status']) {
+  switch (status) {
+    case 'submitted': return 'bg-blue-50 text-blue-600';
+    case 'resolved':  return 'bg-green-50 text-green-600';
+    case 'rejected':  return 'bg-red-50 text-red-600';
+    default:          return 'bg-amber-50 text-amber-600';
+  }
+}
+
+function formatCurrency(n: number | null) {
+  if (n === null) return '—';
+  return '$' + n.toLocaleString();
+}
+
+function formatRange(min: number | null, max: number | null) {
+  if (!min && !max) return 'N/A';
+  if (min && max) return `${formatCurrency(min)} – ${formatCurrency(max)}`;
+  return formatCurrency(min ?? max);
+}
 
 export function CreditAnalysis() {
-  const score = 742;
-  const fundingRange = "$13,000 – $75,000";
+  const { user } = useAuth();
+  const [report, setReport] = useState<CreditReport | null>(null);
+  const [disputes, setDisputes] = useState<CreditDispute[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    Promise.all([
+      getCreditReport(user.id),
+      getDisputes(user.id),
+    ]).then(([{ data: r }, { data: d }]) => {
+      setReport(r);
+      setDisputes(d);
+      setLoading(false);
+    });
+  }, [user]);
+
+  // Fallback values when no report exists
+  const score = report?.score ?? 0;
+  const scoreBand = report?.score_band ?? null;
+  const fundingRange = formatRange(report?.funding_range_min ?? null, report?.funding_range_max ?? null);
+  const utilization = report?.utilization_percent ?? 0;
+  const totalDebt = report?.total_debt ?? 0;
+  const lastUpdated = report?.report_date
+    ? new Date(report.report_date).toLocaleDateString()
+    : report?.created_at
+    ? new Date(report.created_at).toLocaleDateString()
+    : null;
+
+  const hasReport = report !== null;
+  const circumference = 226;
+  const scoreOffset = score > 0 ? circumference - (circumference * score) / 850 : circumference;
 
   return (
     <div className="p-4 max-w-6xl mx-auto space-y-4 h-full flex flex-col overflow-y-auto no-scrollbar">
       <div className="flex flex-col space-y-1 shrink-0">
         <h1 className="text-xl font-black text-[#1A2244]">Credit Analysis</h1>
         <div className="flex items-center gap-3">
-          <span className="px-2 py-0.5 bg-green-50 text-green-600 text-[10px] font-black uppercase rounded-md flex items-center gap-1.5">
-            <CheckCircle2 className="w-3 h-3" />
-            Good
-          </span>
-          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Funding Readiness: High</p>
+          {hasReport && scoreBand ? (
+            <span className={cn("px-2 py-0.5 text-[10px] font-black uppercase rounded-md flex items-center gap-1.5", scoreBandColor(scoreBand))}>
+              <CheckCircle2 className="w-3 h-3" />
+              {scoreBand}
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 bg-slate-50 text-slate-400 text-[10px] font-black uppercase rounded-md flex items-center gap-1.5">
+              <Clock className="w-3 h-3" />
+              No Report
+            </span>
+          )}
+          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+            {hasReport ? 'Funding Readiness: Active' : 'Upload a report to get started'}
+          </p>
         </div>
       </div>
 
-      <div className="flex-1 space-y-4">
-        {/* Main Stats Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Funding Range Card */}
-          <div className="lg:col-span-2 glass-card p-5 bg-gradient-to-br from-white to-blue-50/30">
-            <div className="flex items-center justify-between mb-4">
-              <div className="space-y-1">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estimated Funding Range</p>
-                <h2 className="text-2xl font-black text-[#1A2244]">{fundingRange}</h2>
-                <p className="text-[10px] text-slate-400 font-medium">Approval odds based on readiness</p>
-              </div>
-              <div className="text-right">
-                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Last Updated</p>
-                <p className="text-[10px] font-bold text-slate-600">2 hours ago</p>
-              </div>
-            </div>
-            
-            <div className="flex flex-wrap gap-2">
-              <button className="bg-[#5B7CFA] text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all flex items-center gap-2">
-                Generate Dispute Letters
-                <ArrowRight className="w-3 h-3" />
-              </button>
-              <button className="bg-white border border-slate-100 text-[#1A2244] px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2">
-                <Download className="w-3 h-3" />
-                Download
-              </button>
-            </div>
-          </div>
-
-          {/* Score Card */}
-          <div className="glass-card p-4 flex flex-col items-center justify-center text-center space-y-2">
-            <div className="relative w-20 h-20 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90">
-                <circle
-                  cx="40"
-                  cy="40"
-                  r="36"
-                  stroke="currentColor"
-                  strokeWidth="5"
-                  fill="transparent"
-                  className="text-slate-100"
-                />
-                <circle
-                  cx="40"
-                  cy="40"
-                  r="36"
-                  stroke="currentColor"
-                  strokeWidth="5"
-                  fill="transparent"
-                  strokeDasharray={226}
-                  strokeDashoffset={226 - (226 * score) / 850}
-                  className="text-[#5B7CFA]"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-xl font-black text-[#1A2244]">{score}</span>
-                <span className="text-[7px] font-black text-slate-400 uppercase">Experian</span>
-              </div>
-            </div>
-            <div className="space-y-0.5">
-              <h3 className="text-[11px] font-black text-[#1A2244]">Score Band: Good</h3>
-              <p className="text-[9px] text-green-600 font-bold">+12 points</p>
-            </div>
-          </div>
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-6 h-6 text-slate-300 animate-spin" />
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Negative Items */}
-          <div className="glass-card p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-red-50 text-red-600 rounded-lg">
-                  <AlertCircle className="w-4 h-4" />
+      ) : (
+        <div className="flex-1 space-y-4">
+          {/* Main Stats Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Funding Range Card */}
+            <div className="lg:col-span-2 glass-card p-5 bg-gradient-to-br from-white to-blue-50/30">
+              <div className="flex items-center justify-between mb-4">
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Estimated Funding Range</p>
+                  <h2 className="text-2xl font-black text-[#1A2244]">
+                    {hasReport ? fundingRange : 'Upload report to unlock'}
+                  </h2>
+                  <p className="text-[10px] text-slate-400 font-medium">Approval odds based on readiness</p>
                 </div>
-                <h3 className="text-sm font-bold text-slate-900">Negative Items</h3>
+                {lastUpdated && (
+                  <div className="text-right">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Last Updated</p>
+                    <p className="text-[10px] font-bold text-slate-600">{lastUpdated}</p>
+                  </div>
+                )}
               </div>
-              <span className="text-xl font-black text-red-600">3</span>
+              <div className="flex flex-wrap gap-2">
+                <button className="bg-[#5B7CFA] text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all flex items-center gap-2">
+                  Generate Dispute Letters
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+                {report?.report_file_url && (
+                  <a
+                    href={report.report_file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-white border border-slate-100 text-[#1A2244] px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
+                  >
+                    <Download className="w-3 h-3" />
+                    Download
+                  </a>
+                )}
+              </div>
             </div>
-            <p className="text-xs text-slate-500">Opportunities to dispute derogatory marks</p>
-            <ul className="space-y-1.5">
-              <li className="flex items-center gap-2 text-xs text-slate-600">
-                <div className="w-1 h-1 bg-red-400 rounded-full" />
-                Late payments, collections, or inquiries
-              </li>
-              <li className="flex items-center gap-2 text-xs text-slate-600">
-                <div className="w-1 h-1 bg-red-400 rounded-full" />
-                Late payments, inquiries
-              </li>
-            </ul>
-            <button className="w-full py-2 bg-slate-50 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-100 transition-all flex items-center justify-center gap-2">
-              View Disputes
-              <ArrowRight className="w-3 h-3" />
-            </button>
-          </div>
 
-          {/* Usage */}
-          <div className="glass-card p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">
-                  <TrendingUp className="w-4 h-4" />
+            {/* Score Card */}
+            <div className="glass-card p-4 flex flex-col items-center justify-center text-center space-y-2">
+              <div className="relative w-20 h-20 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="5" fill="transparent" className="text-slate-100" />
+                  <circle
+                    cx="40" cy="40" r="36"
+                    stroke="currentColor" strokeWidth="5" fill="transparent"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={scoreOffset}
+                    className={score >= 700 ? "text-[#5B7CFA]" : score >= 580 ? "text-amber-500" : "text-red-400"}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-xl font-black text-[#1A2244]">{score > 0 ? score : '—'}</span>
+                  <span className="text-[7px] font-black text-slate-400 uppercase">Score</span>
                 </div>
-                <h3 className="text-sm font-bold text-slate-900">Usage</h3>
               </div>
-              <span className="text-xl font-black text-amber-600">37%</span>
-            </div>
-            <p className="text-xs text-slate-500">Utilization across all accounts</p>
-            <div className="space-y-1.5">
-              <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-amber-500" style={{ width: '37%' }} />
-              </div>
-              <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
-                <span>Total Debt</span>
-                <span className="text-slate-600">$34,000</span>
+              <div className="space-y-0.5">
+                <h3 className="text-[11px] font-black text-[#1A2244]">
+                  {scoreBand ? `Score Band: ${scoreBand}` : 'No score on file'}
+                </h3>
+                {!hasReport && (
+                  <p className="text-[9px] text-slate-400 font-bold">Upload a report</p>
+                )}
               </div>
             </div>
-            <button className="w-full py-2 bg-slate-50 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-100 transition-all flex items-center justify-center gap-2">
-              View Utilization
-              <ArrowRight className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-
-        {/* History & Upload */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-2">
-            <h2 className="text-lg font-bold text-slate-900">History & Upload</h2>
-            <button className="text-xs font-bold text-nexus-600 hover:text-nexus-700 flex items-center gap-1">
-              View All <ArrowRight className="w-3 h-3" />
-            </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="glass-card p-6 border-dashed border-2 flex flex-col items-center justify-center text-center space-y-3 hover:bg-slate-50/50 transition-all cursor-pointer">
-              <div className="w-10 h-10 bg-nexus-50 text-nexus-600 rounded-full flex items-center justify-center">
-                <Upload className="w-5 h-5" />
-              </div>
-              <div className="space-y-0.5">
-                <h3 className="text-sm font-bold text-slate-900">Upload New Report</h3>
-                <p className="text-[10px] text-slate-500">Supported: PDF, JPG, PNG</p>
-              </div>
-            </div>
-
-            <div className="glass-card p-5 flex flex-col justify-between">
+            {/* Disputes / Negative Items */}
+            <div className="glass-card p-5 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                    <FileText className="w-5 h-5" />
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-red-50 text-red-600 rounded-lg">
+                    <AlertCircle className="w-4 h-4" />
                   </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900">Experian-Report.pdf</h3>
-                    <p className="text-[10px] text-slate-500">1.3 MB • Mar 22</p>
-                  </div>
+                  <h3 className="text-sm font-bold text-slate-900">Negative Items</h3>
                 </div>
-                <button className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400">
-                  <ArrowRight className="w-4 h-4" />
-                </button>
+                <span className="text-xl font-black text-red-600">{disputes.length}</span>
               </div>
-              <div className="mt-4 flex gap-2">
-                <button className="flex-1 py-1.5 bg-slate-50 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-slate-100">View</button>
-                <button className="flex-1 py-1.5 bg-slate-50 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-slate-100">Download</button>
-              </div>
+              <p className="text-xs text-slate-500">Opportunities to dispute derogatory marks</p>
+              {disputes.length > 0 ? (
+                <ul className="space-y-1.5">
+                  {disputes.slice(0, 3).map(d => (
+                    <li key={d.id} className="flex items-center gap-2 text-xs text-slate-600">
+                      <div className="w-1 h-1 bg-red-400 rounded-full shrink-0" />
+                      {d.creditor} — {d.reason}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-slate-400">No disputes on file.</p>
+              )}
+              <button className="w-full py-2 bg-slate-50 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-100 transition-all flex items-center justify-center gap-2">
+                View Disputes <ArrowRight className="w-3 h-3" />
+              </button>
             </div>
-          </div>
-        </div>
 
-        {/* Dispute Assistant */}
-        <div className="glass-card overflow-hidden">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-nexus-50 text-nexus-600 rounded-lg">
-                <Shield className="w-4 h-4" />
+            {/* Utilization */}
+            <div className="glass-card p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-900">Usage</h3>
+                </div>
+                <span className="text-xl font-black text-amber-600">
+                  {hasReport ? `${utilization}%` : '—'}
+                </span>
               </div>
-              <h2 className="text-base font-bold text-slate-900">Dispute Assistant</h2>
+              <p className="text-xs text-slate-500">Utilization across all accounts</p>
+              <div className="space-y-1.5">
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className={cn("h-full rounded-full transition-all", utilization > 50 ? "bg-red-400" : utilization > 30 ? "bg-amber-500" : "bg-green-500")}
+                    style={{ width: `${Math.min(utilization, 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
+                  <span>Total Debt</span>
+                  <span className="text-slate-600">{formatCurrency(totalDebt)}</span>
+                </div>
+              </div>
+              <button className="w-full py-2 bg-slate-50 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-100 transition-all flex items-center justify-center gap-2">
+                View Utilization <ArrowRight className="w-3 h-3" />
+              </button>
             </div>
-            <span className="text-xs font-bold text-nexus-600">5 Opportunities</span>
           </div>
-          <div className="divide-y divide-slate-100">
-            {[
-              { bank: 'Barclays Bank CC', reason: '180 Days Late ($437)', status: 'In Review' },
-              { bank: 'Chase Freedom', reason: 'Incorrect Balance ($1,200)', status: 'Pending' },
-            ].map((item, i) => (
-              <div key={i} className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-all">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
-                    <FileText className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900">{item.bank}</h4>
-                    <p className="text-xs text-slate-500">{item.reason}</p>
-                  </div>
+
+          {/* Upload */}
+          <div className="space-y-3">
+            <h2 className="text-lg font-bold text-slate-900 px-2">History & Upload</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="glass-card p-6 border-dashed border-2 flex flex-col items-center justify-center text-center space-y-3 hover:bg-slate-50/50 transition-all cursor-pointer">
+                <div className="w-10 h-10 bg-blue-50 text-[#5B7CFA] rounded-full flex items-center justify-center">
+                  <Upload className="w-5 h-5" />
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider",
-                    item.status === 'In Review' ? "bg-blue-50 text-blue-600" : "bg-amber-50 text-amber-600"
-                  )}>
-                    {item.status}
-                  </span>
-                  <button className="p-1.5 text-slate-300 hover:text-slate-600">
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                <div className="space-y-0.5">
+                  <h3 className="text-sm font-bold text-slate-900">Upload New Report</h3>
+                  <p className="text-[10px] text-slate-500">Supported: PDF, JPG, PNG</p>
                 </div>
               </div>
-            ))}
+
+              {report?.report_file_url ? (
+                <div className="glass-card p-5 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                        <FileText className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">Credit Report</h3>
+                        <p className="text-[10px] text-slate-500">{lastUpdated ?? 'On file'}</p>
+                      </div>
+                    </div>
+                    <a href={report.report_file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400">
+                      <ArrowRight className="w-4 h-4" />
+                    </a>
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <a href={report.report_file_url} target="_blank" rel="noopener noreferrer" className="flex-1 py-1.5 bg-slate-50 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-slate-100 text-center">View</a>
+                    <a href={report.report_file_url} download className="flex-1 py-1.5 bg-slate-50 text-slate-600 text-[10px] font-bold rounded-lg hover:bg-slate-100 text-center">Download</a>
+                  </div>
+                </div>
+              ) : (
+                <div className="glass-card p-5 flex items-center justify-center text-center opacity-50">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No report on file yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Dispute Assistant */}
+          <div className="glass-card overflow-hidden">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-blue-50 text-[#5B7CFA] rounded-lg">
+                  <Shield className="w-4 h-4" />
+                </div>
+                <h2 className="text-base font-bold text-slate-900">Dispute Assistant</h2>
+              </div>
+              <span className="text-xs font-bold text-[#5B7CFA]">{disputes.length} Items</span>
+            </div>
+            {disputes.length > 0 ? (
+              <div className="divide-y divide-slate-100">
+                {disputes.map(d => (
+                  <div key={d.id} className="p-4 flex items-center justify-between hover:bg-slate-50/50 transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
+                        <FileText className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900">{d.creditor}</h4>
+                        <p className="text-xs text-slate-500">
+                          {d.reason}{d.amount ? ` (${formatCurrency(d.amount)})` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={cn("px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider", disputeStatusColor(d.status))}>
+                        {d.status}
+                      </span>
+                      <button className="p-1.5 text-slate-300 hover:text-slate-600">
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No disputes on file</p>
+                <p className="text-xs text-slate-400 mt-1">Upload a credit report to identify dispute opportunities</p>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -383,6 +383,32 @@ export async function getCreditReport(userId: string) {
   return { data: data as CreditReport | null, error };
 }
 
+// ─── Credit Disputes ──────────────────────────────────────────────────────────
+
+export interface CreditDispute {
+  id: string;
+  user_id: string;
+  creditor: string;
+  account_number: string | null;
+  amount: number | null;
+  reason: string;
+  status: 'pending' | 'submitted' | 'resolved' | 'rejected';
+  letter_url: string | null;
+  notes: string | null;
+  submitted_at: string | null;
+  resolved_at: string | null;
+  created_at: string;
+}
+
+export async function getDisputes(userId: string) {
+  const { data, error } = await supabase
+    .from('credit_disputes')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  return { data: (data ?? []) as CreditDispute[], error };
+}
+
 // ─── Business Entity ──────────────────────────────────────────────────────────
 
 export async function getBusinessEntity(userId: string) {
