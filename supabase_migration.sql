@@ -6,14 +6,40 @@
 -- =============================================================================
 
 -- =============================================================================
--- CLEANUP: Drop any tables created by Google AI Studio or prior migrations
--- Safe to run on an empty project — all tables are empty at this point
+-- CLEANUP: Drop ALL tables from any previous or partial migrations
+-- Safe to run — cascades handle foreign key dependencies
 -- =============================================================================
 
+-- Previous partial migration tables
+DROP TABLE IF EXISTS admin_notes            CASCADE;
+DROP TABLE IF EXISTS business_opportunities CASCADE;
+DROP TABLE IF EXISTS activity_log           CASCADE;
+DROP TABLE IF EXISTS trading_performance    CASCADE;
+DROP TABLE IF EXISTS trading_journal        CASCADE;
+DROP TABLE IF EXISTS trading_strategies     CASCADE;
+DROP TABLE IF EXISTS chat_messages          CASCADE;
+DROP TABLE IF EXISTS chat_conversations     CASCADE;
+DROP TABLE IF EXISTS documents              CASCADE;
+DROP TABLE IF EXISTS tasks                  CASCADE;
+DROP TABLE IF EXISTS funding_applications   CASCADE;
+DROP TABLE IF EXISTS funding_actions        CASCADE;
+DROP TABLE IF EXISTS funding_stages         CASCADE;
+DROP TABLE IF EXISTS credit_disputes        CASCADE;
+DROP TABLE IF EXISTS credit_reports         CASCADE;
+DROP TABLE IF EXISTS business_details       CASCADE;
+DROP TABLE IF EXISTS business_entities      CASCADE;
+DROP TABLE IF EXISTS payment_methods        CASCADE;
+DROP TABLE IF EXISTS subscriptions          CASCADE;
+DROP TABLE IF EXISTS user_settings          CASCADE;
+DROP TABLE IF EXISTS user_profiles          CASCADE;
+DROP TABLE IF EXISTS bot_profiles           CASCADE;
+DROP TABLE IF EXISTS task_templates         CASCADE;
+DROP TABLE IF EXISTS funding_stage_templates CASCADE;
+
+-- Google AI Studio tables
 DROP TABLE IF EXISTS business_profiles CASCADE;
-DROP TABLE IF EXISTS documents CASCADE;
-DROP TABLE IF EXISTS referrals CASCADE;
-DROP TABLE IF EXISTS profiles CASCADE;
+DROP TABLE IF EXISTS referrals         CASCADE;
+DROP TABLE IF EXISTS profiles          CASCADE;
 
 -- =============================================================================
 -- EXTENSIONS
