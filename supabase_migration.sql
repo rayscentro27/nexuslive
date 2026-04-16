@@ -691,6 +691,11 @@ VALUES (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- RLS on storage objects: users can upload to their own folder, read their own files
+DROP POLICY IF EXISTS "users_upload_own_docs" ON storage.objects;
+DROP POLICY IF EXISTS "users_read_own_docs"   ON storage.objects;
+DROP POLICY IF EXISTS "admin_read_all_docs"   ON storage.objects;
+DROP POLICY IF EXISTS "users_delete_own_docs" ON storage.objects;
+
 CREATE POLICY "users_upload_own_docs"
   ON storage.objects FOR INSERT
   WITH CHECK (bucket_id = 'documents' AND (storage.foldername(name))[1] = auth.uid()::text);
