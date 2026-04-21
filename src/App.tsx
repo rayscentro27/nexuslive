@@ -23,46 +23,47 @@ import { Rewards } from './components/Rewards';
 import { AdminPortal } from './components/admin/AdminPortal';
 import { Lock, Zap } from 'lucide-react';
 
-function LockedPage({ title, requiredScore, onAction }: { title: string, requiredScore: number, onAction: () => void }) {
+function LockedPage({ title, requiredScore, onAction }: { title: string; requiredScore: number; onAction: () => void }) {
   return (
     <div className="h-full flex items-center justify-center p-6">
       <div className="max-w-md w-full glass-card p-10 text-center space-y-8">
-        <div className="w-20 h-20 bg-slate-100 rounded-3xl flex items-center justify-center mx-auto text-slate-400">
+        <div className="w-20 h-20 bg-nexus-50 rounded-3xl flex items-center justify-center mx-auto" style={{ color: '#8b8fa8' }}>
           <Lock className="w-10 h-10" />
         </div>
         <div className="space-y-2">
-          <h2 className="text-2xl font-black text-[#1A2244]">{title} is Locked</h2>
-          <p className="text-slate-500 font-medium">
-            Reach a <span className="text-[#5B7CFA] font-bold">{requiredScore}% Readiness Score</span> to unlock this feature.
+          <h2 className="text-2xl font-black" style={{ color: '#1a1c3a' }}>{title} is Locked</h2>
+          <p style={{ color: '#8b8fa8', fontWeight: 500 }}>
+            Reach a <span style={{ color: '#3d5af1', fontWeight: 700 }}>{requiredScore}% Readiness Score</span> to unlock this feature.
           </p>
         </div>
-        
+
         <div className="space-y-4">
-          <div className="w-full h-3 bg-nexus-100 rounded-full overflow-hidden p-0.5">
-            <div className="w-[65%] h-full bg-[#5B7CFA] rounded-full shadow-[0_0_8px_rgba(91,124,250,0.4)]" />
+          <div className="w-full h-3 rounded-full overflow-hidden" style={{ background: '#eaebf6' }}>
+            <div className="w-[65%] h-full rounded-full" style={{ background: 'linear-gradient(135deg, #3d5af1, #5b8ef5)' }} />
           </div>
-          <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
+          <div className="flex justify-between text-[10px] font-black uppercase tracking-widest" style={{ color: '#8b8fa8' }}>
             <span>Current: 65%</span>
             <span>Target: {requiredScore}%</span>
           </div>
         </div>
 
         <div className="pt-4 space-y-3">
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">How to unlock faster:</p>
-          <div className="flex items-center gap-3 p-4 rounded-2xl bg-blue-50/50 border border-blue-100 text-left">
-            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-[#5B7CFA] shadow-sm">
+          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#8b8fa8' }}>How to unlock faster:</p>
+          <div className="flex items-center gap-3 p-4 rounded-2xl text-left" style={{ background: '#eef0fd', border: '1px solid #c7d2fe' }}>
+            <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center shadow-sm" style={{ color: '#3d5af1' }}>
               <Zap className="w-4 h-4" />
             </div>
             <div>
-              <p className="text-[10px] font-black text-[#1A2244]">Complete Primary Task</p>
-              <p className="text-[8px] text-slate-500 font-bold uppercase tracking-widest">+8% Readiness Boost</p>
+              <p className="text-[10px] font-black" style={{ color: '#1a1c3a' }}>Complete Primary Task</p>
+              <p className="text-[8px] font-bold uppercase tracking-widest" style={{ color: '#8b8fa8' }}>+8% Readiness Boost</p>
             </div>
           </div>
         </div>
 
-        <button 
+        <button
           onClick={onAction}
-          className="w-full py-4 bg-[#5B7CFA] text-white font-black rounded-2xl shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all"
+          className="nexus-button-primary w-full py-4"
+          style={{ borderRadius: 16 }}
         >
           Go to Action Center
         </button>
@@ -70,14 +71,6 @@ function LockedPage({ title, requiredScore, onAction }: { title: string, require
     </div>
   );
 }
-
-// Placeholder components for other tabs
-const Placeholder = ({ title }: { title: string }) => (
-  <div className="p-8 flex flex-col items-center justify-center min-h-[60vh] text-nexus-400">
-    <h2 className="text-2xl font-bold mb-2">{title}</h2>
-    <p>This module is currently under development.</p>
-  </div>
-);
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -87,35 +80,34 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-nexus-50">
-        <div className="w-12 h-12 border-4 border-nexus-200 border-t-nexus-600 rounded-full animate-spin" />
+      <div className="h-screen w-screen flex items-center justify-center" style={{ background: '#eaebf6' }}>
+        <div className="w-12 h-12 border-4 border-t-[#3d5af1] rounded-full animate-spin" style={{ borderColor: '#c7d2fe', borderTopColor: '#3d5af1' }} />
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-nexus-50">
+      <div className="min-h-screen" style={{ background: '#eaebf6' }}>
         {publicView === 'pricing' && (
-          <Pricing 
-            onSelectPlan={() => setPublicView('auth')} 
-            onShowLegal={() => setPublicView('legal')} 
+          <Pricing
+            onSelectPlan={() => setPublicView('auth')}
+            onShowLegal={() => setPublicView('legal')}
           />
         )}
         {publicView === 'auth' && (
           <div className="relative">
-            <button 
+            <button
               onClick={() => setPublicView('pricing')}
-              className="absolute top-8 left-8 z-50 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#5B7CFA] transition-colors"
+              className="absolute top-8 left-8 z-50 text-[10px] font-black uppercase tracking-widest transition-colors"
+              style={{ color: '#8b8fa8' }}
             >
               ← Back to Pricing
             </button>
             <Auth onShowLegal={() => setPublicView('legal')} />
           </div>
         )}
-        {publicView === 'legal' && (
-          <Legal onBack={() => setPublicView('pricing')} />
-        )}
+        {publicView === 'legal' && <Legal onBack={() => setPublicView('pricing')} />}
       </div>
     );
   }
@@ -125,12 +117,12 @@ function AppContent() {
     return (
       <>
         <AdminPortal />
-        {/* Portal Switcher (Demo Only) */}
-        <button 
+        <button
           onClick={() => setPortal('client')}
-          className="fixed bottom-4 right-4 z-[100] bg-white text-[#1A2244] px-4 py-2 rounded-full shadow-2xl border border-slate-200 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
+          className="fixed bottom-4 right-4 z-[100] bg-white px-4 py-2 rounded-full shadow-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all hover:bg-nexus-50"
+          style={{ color: '#1a1c3a', border: '1px solid #e8e9f2' }}
         >
-          <Zap className="w-3 h-3 text-[#5B7CFA]" />
+          <Zap className="w-3 h-3" style={{ color: '#3d5af1' }} />
           Switch to Client Portal
         </button>
       </>
@@ -138,42 +130,47 @@ function AppContent() {
   }
 
   return (
-    <div className="flex h-screen bg-nexus-50 overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ background: '#eaebf6' }}>
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      
-      <main className="flex-1 ml-64 h-screen flex flex-col overflow-hidden">
-        <Header />
-        
-        <div className="flex-1 overflow-y-auto scrollbar-hide">
-          {activeTab === 'home' && <Dashboard />}
-          {activeTab === 'action-center' && <ActionCenter />}
+
+      {/* Main content — ml-52 matches the new w-52 sidebar */}
+      <main className="flex-1 h-screen flex flex-col overflow-hidden" style={{ marginLeft: 208 }}>
+        <Header onNavigate={setActiveTab} />
+
+        <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ padding: 24 }}>
+          {activeTab === 'home'           && <Dashboard />}
+          {activeTab === 'action-center'  && <ActionCenter />}
           {activeTab === 'business-setup' && <BusinessSetup />}
-          {activeTab === 'messages' && <Messages />}
-          {activeTab === 'documents' && <Documents />}
-          {activeTab === 'funding' && <Funding />}
-          {activeTab === 'roadmap' && <FundingRoadmap />}
-          {activeTab === 'grants' && <LockedPage title="Grants Finder" requiredScore={70} onAction={() => setActiveTab('action-center')} />}
-          {activeTab === 'trading' && <LockedPage title="Trading Lab" requiredScore={85} onAction={() => setActiveTab('action-center')} />}
-          {activeTab === 'referral' && <Referral />}
-          {activeTab === 'account' && <Account />}
-          {activeTab === 'settings' && <Settings />}
-          {activeTab === 'credit' && <CreditAnalysis />}
-          {activeTab === 'auth' && <Auth onBackToDashboard={() => setActiveTab('home')} />}
-          {activeTab === 'bots' && <Bots onInteract={() => setActiveTab('messages')} />}
-          {activeTab === 'rewards' && <Rewards />}
+          {activeTab === 'messages'       && <Messages />}
+          {activeTab === 'documents'      && <Documents />}
+          {activeTab === 'funding'        && <Funding />}
+          {activeTab === 'roadmap'        && <FundingRoadmap />}
+          {activeTab === 'grants'         && <GrantsFinder />}
+          {activeTab === 'trading'        && <TradingLab />}
+          {activeTab === 'referral'       && <Referral />}
+          {activeTab === 'account'        && <Account />}
+          {activeTab === 'settings'       && <Settings />}
+          {activeTab === 'credit'         && <CreditAnalysis />}
+          {activeTab === 'auth'           && <Auth onBackToDashboard={() => setActiveTab('home')} />}
+          {activeTab === 'bots'           && <Bots onInteract={() => setActiveTab('messages')} />}
+          {activeTab === 'rewards'        && <Rewards />}
         </div>
 
-        <footer className="p-3 text-center text-[8px] text-nexus-400 font-bold uppercase tracking-widest border-t border-nexus-100 shrink-0">
+        <footer
+          className="p-3 text-center text-[8px] font-bold uppercase tracking-widest shrink-0"
+          style={{ color: '#8b8fa8', borderTop: '1px solid #e8e9f2', background: '#fff' }}
+        >
           © 2025 Nexus. All rights reserved.
         </footer>
       </main>
 
-      {/* Portal Switcher (Demo Only) */}
-      <button 
+      {/* Admin switcher */}
+      <button
         onClick={() => setPortal('admin')}
-        className="fixed bottom-4 right-4 z-[100] bg-[#1A2244] text-white px-4 py-2 rounded-full shadow-2xl border border-slate-800 text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2"
+        className="fixed bottom-4 right-4 z-[100] px-4 py-2 rounded-full shadow-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all"
+        style={{ background: '#1a1c3a', color: '#fff', border: '1px solid #2d3748' }}
       >
-        <Zap className="w-3 h-3 text-indigo-400" />
+        <Zap className="w-3 h-3" style={{ color: '#818cf8' }} />
         Switch to Admin Portal
       </button>
     </div>

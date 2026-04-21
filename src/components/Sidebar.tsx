@@ -1,22 +1,21 @@
 import React from 'react';
-import { cn } from '../lib/utils';
-import { 
-  Home, 
-  Zap, 
-  FileText, 
-  MessageSquare, 
-  CreditCard, 
-  Map, 
-  PlusCircle, 
-  User, 
+import {
+  Home,
+  Zap,
+  FileText,
+  MessageSquare,
+  CreditCard,
+  Map,
+  PlusCircle,
+  User,
   Settings,
-  ChevronDown,
-  Shield,
   Building2,
-  Sparkles,
+  Shield,
   Trophy,
-  Lock
+  TrendingUp,
+  Lock,
 } from 'lucide-react';
+import { useAuth } from './AuthProvider';
 
 interface SidebarProps {
   activeTab: string;
@@ -24,74 +23,110 @@ interface SidebarProps {
 }
 
 const menuItems = [
-  { id: 'home', label: 'Home', icon: Home },
-  { id: 'action-center', label: 'Actions', icon: Zap, badge: '3' },
-  { id: 'messages', label: 'Messages', icon: MessageSquare },
-  { id: 'documents', label: 'Documents', icon: FileText },
-  { id: 'funding', label: 'Funding', icon: CreditCard },
-  { id: 'account', label: 'Account', icon: User },
-  { id: 'roadmap', label: 'Roadmap', icon: Map },
-  { id: 'settings', label: 'Settings', icon: Settings },
-  { id: 'divider', label: '', icon: Home, isDivider: true },
-  { id: 'business-setup', label: 'Business Setup', icon: Building2 },
-  { id: 'credit', label: 'Credit Analysis', icon: Shield },
-  { id: 'grants', label: 'Grants Finder', icon: PlusCircle, isLocked: true },
-  { id: 'trading', label: 'Trading Lab', icon: Zap, isLocked: true },
-  { id: 'referral', label: 'Refer & Earn', icon: Zap },
-  { id: 'rewards', label: 'Rewards', icon: Trophy },
-  { id: 'auth', label: 'Auth (Demo)', icon: Shield },
+  { id: 'home',           label: 'Home',           icon: Home },
+  { id: 'action-center',  label: 'Actions',         icon: Zap,          badge: '2' },
+  { id: 'documents',      label: 'Documents',       icon: FileText },
+  { id: 'messages',       label: 'Messages',        icon: MessageSquare },
+  { id: 'funding',        label: 'Funding',         icon: CreditCard },
+  { id: 'grants',         label: 'Grants',          icon: PlusCircle },
+  { id: 'trading',        label: 'Trading',         icon: TrendingUp },
+  { id: 'account',        label: 'Account',         icon: User },
+  { id: 'settings',       label: 'Settings',        icon: Settings },
+  { id: 'divider1',       label: '',                icon: Home,         isDivider: true },
+  { id: 'business-setup', label: 'Business Setup',  icon: Building2 },
+  { id: 'credit',         label: 'Credit Analysis', icon: Shield },
+  { id: 'roadmap',        label: 'Roadmap',         icon: Map },
+  { id: 'referral',       label: 'Refer & Earn',    icon: Trophy },
 ];
 
+function getInitials(user: { email?: string; user_metadata?: { full_name?: string } } | null): string {
+  if (!user) return 'N';
+  const name = user.user_metadata?.full_name;
+  if (name) return name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+  return (user.email ?? 'NX').slice(0, 2).toUpperCase();
+}
+
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
+  const { user } = useAuth();
+  const initials = getInitials(user);
+  const displayName = user?.user_metadata?.full_name ?? user?.email ?? 'Nexus User';
+
   return (
-    <div className="w-64 h-screen flex flex-col p-6 fixed left-0 top-0 z-50 bg-transparent">
+    <div
+      className="w-52 h-screen flex flex-col fixed left-0 top-0 z-50"
+      style={{
+        background: '#ffffff',
+        borderRight: '1px solid #e8e9f2',
+        padding: '20px 12px',
+      }}
+    >
       {/* Logo */}
-      <div className="flex items-center gap-3 mb-10 px-2">
-        <div className="w-10 h-10 bg-[#5B7CFA] rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-          <span className="text-white font-black text-2xl">N</span>
+      <div className="flex items-center gap-2.5 px-2 mb-7">
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: 'linear-gradient(135deg, #3d5af1, #5b8ef5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <span style={{ color: '#fff', fontWeight: 800, fontSize: 18, fontFamily: 'serif', letterSpacing: -1 }}>N</span>
         </div>
-        <span className="text-2xl font-bold tracking-tight text-[#1A2244]">Nexus</span>
+        <span style={{ fontWeight: 700, fontSize: 17, color: '#1a1c3a', letterSpacing: -0.5 }}>Nexus</span>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1 overflow-y-auto no-scrollbar">
+      <nav className="flex-1 overflow-y-auto no-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {menuItems.map((item) => {
           if ('isDivider' in item && item.isDivider) {
-            return <div key={item.id} className="h-px bg-slate-200/50 my-4 mx-4" />;
+            return <div key={item.id} style={{ height: 1, background: '#e8e9f2', margin: '8px 4px' }} />;
           }
 
           const isActive = activeTab === item.id;
           const Icon = item.icon;
-          const isLocked = 'isLocked' in item && item.isLocked;
-          
+
           return (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={cn(
-                "w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl transition-all duration-200 group relative",
-                isActive 
-                  ? "bg-white text-[#5B7CFA] shadow-[0_4px_12px_rgba(0,0,0,0.05)]" 
-                  : "text-[#4A5568] hover:bg-white/40",
-                isLocked && "opacity-60 grayscale-[0.5]"
-              )}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '9px 14px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                border: 'none',
+                background: isActive ? '#eef0fd' : 'transparent',
+                color: isActive ? '#3d5af1' : '#8b8fa8',
+                fontWeight: isActive ? 600 : 400,
+                fontSize: 14,
+                transition: 'background 0.15s',
+                width: '100%',
+                textAlign: 'left',
+                fontFamily: 'inherit',
+              }}
             >
-              <div className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center transition-colors",
-                isActive ? "bg-[#5B7CFA] text-white" : "text-[#5B7CFA]"
-              )}>
-                <Icon className="w-4 h-4" />
-              </div>
-              <span className={cn(
-                "font-semibold text-sm tracking-tight",
-                isActive ? "text-[#1A2244]" : "text-[#4A5568]"
-              )}>
-                {item.label}
-              </span>
-              {isLocked ? (
-                <Lock className="ml-auto w-3 h-3 text-slate-400" />
-              ) : 'badge' in item && item.badge && (
-                <span className="ml-auto bg-blue-100 text-[#5B7CFA] text-[10px] font-black px-2 py-0.5 rounded-lg">
+              <Icon
+                size={16}
+                style={{ color: isActive ? '#3d5af1' : '#8b8fa8', flexShrink: 0 }}
+              />
+              <span style={{ flex: 1 }}>{item.label}</span>
+              {'badge' in item && item.badge && (
+                <span
+                  style={{
+                    background: '#3d5af1',
+                    color: '#fff',
+                    borderRadius: 10,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    padding: '1px 6px',
+                  }}
+                >
                   {item.badge}
                 </span>
               )}
@@ -100,19 +135,32 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
         })}
       </nav>
 
-      {/* Nexus Pro Card */}
-      <div className="mt-auto pt-6">
-        <div className="bg-white/40 backdrop-blur-xl border border-white/60 p-5 rounded-[2rem] shadow-xl shadow-blue-500/5 space-y-4">
-          <div className="space-y-1">
-            <h3 className="text-lg font-bold text-[#1A2244]">Nexus Pro</h3>
-            <p className="text-[11px] font-bold text-[#5B7CFA]">You're on the Mo Plan</p>
+      {/* User Profile */}
+      <div style={{ borderTop: '1px solid #e8e9f2', paddingTop: 16, marginTop: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 4px' }}>
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #3d5af1, #8b5cf6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#fff',
+            }}
+          >
+            {initials}
           </div>
-          <p className="text-[10px] text-slate-500 leading-relaxed font-medium">
-            Utilize with our expert support for readiness.
-          </p>
-          <button className="w-full bg-[#5B7CFA] text-white text-xs font-bold py-3 rounded-2xl shadow-lg shadow-blue-500/30 hover:bg-[#4A6BEB] transition-all">
-            Upgrade Plan
-          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#1a1c3a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {displayName}
+            </div>
+            <div style={{ fontSize: 11, color: '#8b8fa8' }}>Nexus Pro</div>
+          </div>
         </div>
       </div>
     </div>
