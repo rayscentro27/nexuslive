@@ -21,6 +21,7 @@ import { Pricing } from './components/Pricing';
 import { Legal } from './components/Legal';
 import { Rewards } from './components/Rewards';
 import { AdminPortal } from './components/admin/AdminPortal';
+import { Landing } from './components/Landing';
 import { Lock, Zap } from 'lucide-react';
 
 function LockedPage({ title, requiredScore, onAction }: { title: string; requiredScore: number; onAction: () => void }) {
@@ -75,7 +76,7 @@ function LockedPage({ title, requiredScore, onAction }: { title: string; require
 function AppContent() {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
-  const [publicView, setPublicView] = useState<'pricing' | 'auth' | 'legal'>('pricing');
+  const [publicView, setPublicView] = useState<'landing' | 'pricing' | 'auth' | 'legal'>('landing');
   const [portal, setPortal] = useState<'client' | 'admin'>('client');
 
   if (loading) {
@@ -89,6 +90,13 @@ function AppContent() {
   if (!user) {
     return (
       <div className="min-h-screen" style={{ background: '#eaebf6' }}>
+        {publicView === 'landing' && (
+          <Landing
+            onGetStarted={() => setPublicView('auth')}
+            onViewPricing={() => setPublicView('pricing')}
+            onShowLegal={() => setPublicView('legal')}
+          />
+        )}
         {publicView === 'pricing' && (
           <Pricing
             onSelectPlan={() => setPublicView('auth')}

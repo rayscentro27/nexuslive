@@ -1,21 +1,36 @@
-import React from 'react';
-import { 
-  Settings, 
-  Shield, 
-  Bell, 
-  Users, 
-  Globe, 
-  Database, 
-  Lock, 
-  Mail, 
+import React, { useState } from 'react';
+import {
+  Settings,
+  Shield,
+  Bell,
+  Users,
+  Globe,
+  Database,
+  Lock,
+  Mail,
   Zap,
   ChevronRight,
   CreditCard,
-  Key
+  Key,
+  DollarSign
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { AdminSubscriptionSettings } from './AdminSubscriptionSettings';
+
+type Section = 'general' | 'security' | 'notifications' | 'users' | 'integrations' | 'subscriptions';
 
 export function AdminSettings() {
+  const [activeSection, setActiveSection] = useState<Section>('general');
+
+  const navItems: { label: string; icon: React.ElementType; id: Section }[] = [
+    { label: 'General', icon: Settings, id: 'general' },
+    { label: 'Subscriptions', icon: DollarSign, id: 'subscriptions' },
+    { label: 'Security', icon: Shield, id: 'security' },
+    { label: 'Notifications', icon: Bell, id: 'notifications' },
+    { label: 'Users', icon: Users, id: 'users' },
+    { label: 'Integrations', icon: Zap, id: 'integrations' },
+  ];
+
   const sections = [
     {
       title: 'General Settings',
@@ -37,7 +52,7 @@ export function AdminSettings() {
       title: 'System & Data',
       items: [
         { label: 'Database Backup', desc: 'Manage automated backups and data retention.', icon: Database },
-        { label: 'Billing & Plans', desc: 'Manage platform subscription and usage limits.', icon: CreditCard },
+        { label: 'Billing & Plans', desc: 'Manage platform subscription and usage limits.', icon: CreditCard, onClick: () => setActiveSection('subscriptions') },
         { label: 'Integrations', desc: 'Connect third-party services and webhooks.', icon: Zap },
       ]
     }
@@ -50,11 +65,6 @@ export function AdminSettings() {
           <h1 className="text-3xl font-black text-[#1A2244] tracking-tight">System Settings</h1>
           <p className="text-slate-500 font-medium mt-1 text-sm">Configure platform-wide parameters, security, and integrations.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button className="px-6 py-2 rounded-xl bg-[#5B7CFA] text-white text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all">
-            Save Changes
-          </button>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -63,19 +73,14 @@ export function AdminSettings() {
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm">
             <h3 className="text-sm font-black text-[#1A2244] uppercase tracking-widest mb-6">Settings Menu</h3>
             <div className="space-y-2">
-              {[
-                { label: 'General', icon: Settings, active: true },
-                { label: 'Security', icon: Shield, active: false },
-                { label: 'Notifications', icon: Bell, active: false },
-                { label: 'Users', icon: Users, active: false },
-                { label: 'Integrations', icon: Zap, active: false },
-              ].map((item, i) => (
-                <button 
-                  key={i} 
+              {navItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveSection(item.id)}
                   className={cn(
                     "w-full flex items-center justify-between p-3 rounded-xl transition-all group",
-                    item.active 
-                      ? "bg-blue-50 text-[#5B7CFA]" 
+                    activeSection === item.id
+                      ? "bg-blue-50 text-[#5B7CFA]"
                       : "hover:bg-slate-50 text-slate-400 hover:text-[#1A2244]"
                   )}
                 >
@@ -85,7 +90,7 @@ export function AdminSettings() {
                   </div>
                   <ChevronRight className={cn(
                     "w-4 h-4 transition-all",
-                    item.active ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    activeSection === item.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                   )} />
                 </button>
               ))}
@@ -108,32 +113,57 @@ export function AdminSettings() {
         </div>
 
         {/* Settings Content */}
-        <div className="lg:col-span-8 space-y-8">
-          {sections.map((section, i) => (
-            <div key={i} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-              <div className="p-6 border-b border-slate-100 bg-slate-50/30">
-                <h3 className="text-sm font-black text-[#1A2244] uppercase tracking-widest">{section.title}</h3>
-              </div>
-              <div className="divide-y divide-slate-50">
-                {section.items.map((item, j) => (
-                  <div key={j} className="p-6 flex items-center justify-between hover:bg-slate-50/50 transition-all group cursor-pointer">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-[#5B7CFA] group-hover:border-[#5B7CFA]/30 transition-all">
-                        <item.icon className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-sm font-black text-[#1A2244]">{item.label}</h4>
-                        <p className="text-xs text-slate-500 mt-1">{item.desc}</p>
-                      </div>
-                    </div>
-                    <button className="text-[10px] font-black text-[#5B7CFA] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
-                      Configure
-                    </button>
+        <div className="lg:col-span-8">
+          {activeSection === 'subscriptions' && <AdminSubscriptionSettings />}
+
+          {activeSection !== 'subscriptions' && (
+            <div className="space-y-8">
+              {sections.map((section, i) => (
+                <div key={i} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                  <div className="p-6 border-b border-slate-100 bg-slate-50/30">
+                    <h3 className="text-sm font-black text-[#1A2244] uppercase tracking-widest">{section.title}</h3>
                   </div>
-                ))}
-              </div>
+                  <div className="divide-y divide-slate-50">
+                    {section.items.map((item, j) => (
+                      <div
+                        key={j}
+                        onClick={(item as any).onClick}
+                        className={cn(
+                          "p-6 flex items-center justify-between transition-all group",
+                          (item as any).onClick ? "cursor-pointer hover:bg-blue-50/50" : "hover:bg-slate-50/50 cursor-default"
+                        )}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl border flex items-center justify-center transition-all",
+                            (item as any).onClick
+                              ? "bg-blue-50 border-[#5B7CFA]/20 text-[#5B7CFA]"
+                              : "bg-slate-50 border-slate-100 text-slate-400 group-hover:text-[#5B7CFA] group-hover:border-[#5B7CFA]/30"
+                          )}>
+                            <item.icon className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-black text-[#1A2244]">{item.label}</h4>
+                            <p className="text-xs text-slate-500 mt-1">{item.desc}</p>
+                          </div>
+                        </div>
+                        {(item as any).onClick && (
+                          <span className="text-[10px] font-black text-[#5B7CFA] uppercase tracking-widest">
+                            Configure
+                          </span>
+                        )}
+                        {!(item as any).onClick && (
+                          <button className="text-[10px] font-black text-[#5B7CFA] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all">
+                            Configure
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       </div>
     </div>
