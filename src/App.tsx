@@ -22,6 +22,7 @@ import { Legal } from './components/Legal';
 import { Rewards } from './components/Rewards';
 import { AdminPortal } from './components/admin/AdminPortal';
 import { Landing } from './components/Landing';
+import { PlanGate } from './components/PlanGate';
 import { Home, Zap, CreditCard, User, FileText, Lock } from 'lucide-react';
 
 function LockedPage({ title, requiredScore, onAction }: { title: string; requiredScore: number; onAction: () => void }) {
@@ -162,17 +163,50 @@ function AppContent() {
           {activeTab === 'business-setup' && <BusinessSetup />}
           {activeTab === 'messages'       && <Messages />}
           {activeTab === 'documents'      && <Documents />}
-          {activeTab === 'funding'        && <Funding />}
-          {activeTab === 'roadmap'        && <FundingRoadmap />}
-          {activeTab === 'grants'         && <GrantsFinder />}
-          {activeTab === 'trading'        && <TradingLab />}
-          {activeTab === 'referral'       && <Referral />}
           {activeTab === 'account'        && <Account />}
           {activeTab === 'settings'       && <Settings />}
-          {activeTab === 'credit'         && <CreditAnalysis />}
           {activeTab === 'auth'           && <Auth onBackToDashboard={() => setActiveTab('home')} />}
-          {activeTab === 'bots'           && <Bots onInteract={() => setActiveTab('messages')} />}
-          {activeTab === 'rewards'        && <Rewards />}
+
+          {activeTab === 'funding' && (
+            <PlanGate requiredPlan="pro" featureName="Funding Suite" onUpgrade={() => setActiveTab('home')}>
+              <Funding />
+            </PlanGate>
+          )}
+          {activeTab === 'grants' && (
+            <PlanGate requiredPlan="pro" featureName="AI Grant Finder" onUpgrade={() => setActiveTab('home')}>
+              <GrantsFinder />
+            </PlanGate>
+          )}
+          {activeTab === 'trading' && (
+            <PlanGate requiredPlan="pro" featureName="Trading Lab" onUpgrade={() => setActiveTab('home')}>
+              <TradingLab />
+            </PlanGate>
+          )}
+          {activeTab === 'credit' && (
+            <PlanGate requiredPlan="pro" featureName="Credit Analysis" onUpgrade={() => setActiveTab('home')}>
+              <CreditAnalysis />
+            </PlanGate>
+          )}
+          {activeTab === 'referral' && (
+            <PlanGate requiredPlan="pro" featureName="Refer & Earn" onUpgrade={() => setActiveTab('home')}>
+              <Referral />
+            </PlanGate>
+          )}
+          {activeTab === 'rewards' && (
+            <PlanGate requiredPlan="pro" featureName="Rewards" onUpgrade={() => setActiveTab('home')}>
+              <Rewards />
+            </PlanGate>
+          )}
+          {activeTab === 'roadmap' && (
+            <PlanGate requiredPlan="elite" featureName="Funding Roadmap" onUpgrade={() => setActiveTab('home')}>
+              <FundingRoadmap />
+            </PlanGate>
+          )}
+          {activeTab === 'bots' && (
+            <PlanGate requiredPlan="elite" featureName="AI Workforce" onUpgrade={() => setActiveTab('home')}>
+              <Bots onInteract={() => setActiveTab('messages')} />
+            </PlanGate>
+          )}
         </div>
 
         <footer

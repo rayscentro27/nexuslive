@@ -14,30 +14,48 @@ import {
   Trophy,
   TrendingUp,
   Lock,
+  Bot,
 } from 'lucide-react';
 import { useAuth } from './AuthProvider';
+import { usePlan, PlanTier } from '../hooks/usePlan';
 
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
 
-const menuItems = [
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  badge?: string;
+  isDivider?: boolean;
+  requiredPlan?: PlanTier;
+}
+
+const menuItems: MenuItem[] = [
   { id: 'home',           label: 'Home',           icon: Home },
-  { id: 'action-center',  label: 'Actions',         icon: Zap,          badge: '2' },
+  { id: 'action-center',  label: 'Actions',         icon: Zap,        badge: '2' },
   { id: 'documents',      label: 'Documents',       icon: FileText },
   { id: 'messages',       label: 'Messages',        icon: MessageSquare },
-  { id: 'funding',        label: 'Funding',         icon: CreditCard },
-  { id: 'grants',         label: 'Grants',          icon: PlusCircle },
-  { id: 'trading',        label: 'Trading',         icon: TrendingUp },
+  { id: 'funding',        label: 'Funding',         icon: CreditCard,  requiredPlan: 'pro' },
+  { id: 'grants',         label: 'Grants',          icon: PlusCircle,  requiredPlan: 'pro' },
+  { id: 'trading',        label: 'Trading',         icon: TrendingUp,  requiredPlan: 'pro' },
   { id: 'account',        label: 'Account',         icon: User },
   { id: 'settings',       label: 'Settings',        icon: Settings },
-  { id: 'divider1',       label: '',                icon: Home,         isDivider: true },
+  { id: 'divider1',       label: '',                icon: Home,        isDivider: true },
   { id: 'business-setup', label: 'Business Setup',  icon: Building2 },
-  { id: 'credit',         label: 'Credit Analysis', icon: Shield },
-  { id: 'roadmap',        label: 'Roadmap',         icon: Map },
-  { id: 'referral',       label: 'Refer & Earn',    icon: Trophy },
+  { id: 'credit',         label: 'Credit Analysis', icon: Shield,      requiredPlan: 'pro' },
+  { id: 'roadmap',        label: 'Roadmap',         icon: Map,         requiredPlan: 'elite' },
+  { id: 'referral',       label: 'Refer & Earn',    icon: Trophy,      requiredPlan: 'pro' },
+  { id: 'bots',           label: 'AI Workforce',    icon: Bot,         requiredPlan: 'elite' },
 ];
+
+const PLAN_COLORS: Record<PlanTier, string> = {
+  free:  '#3d5af1',
+  pro:   '#6366f1',
+  elite: '#10b981',
+};
 
 function getInitials(user: { email?: string; user_metadata?: { full_name?: string } } | null): string {
   if (!user) return 'N';
@@ -48,6 +66,7 @@ function getInitials(user: { email?: string; user_metadata?: { full_name?: strin
 
 export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const { user } = useAuth();
+  const { plan, isAtLeast } = usePlan();
   const initials = getInitials(user);
   const displayName = user?.user_metadata?.full_name ?? user?.email ?? 'Nexus User';
 
@@ -82,11 +101,12 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto no-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {menuItems.map((item) => {
-          if ('isDivider' in item && item.isDivider) {
+          if (item.isDivider) {
             return <div key={item.id} style={{ height: 1, background: '#e8e9f2', margin: '8px 4px' }} />;
           }
 
           const isActive = activeTab === item.id;
+          const locked = item.requiredPlan ? !isAtLeast(item.requiredPlan) : false;
           const Icon = item.icon;
 
           return (
@@ -102,7 +122,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
                 cursor: 'pointer',
                 border: 'none',
                 background: isActive ? '#eef0fd' : 'transparent',
-                color: isActive ? '#3d5af1' : '#8b8fa8',
+                color: isActive ? '#3d5af1' : locked ? '#b0b3c6' : '#8b8fa8',
                 fontWeight: isActive ? 600 : 400,
                 fontSize: 14,
                 transition: 'background 0.15s',
@@ -113,10 +133,16 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             >
               <Icon
                 size={16}
-                style={{ color: isActive ? '#3d5af1' : '#8b8fa8', flexShrink: 0 }}
+                style={{ color: isActive ? '#3d5af1' : locked ? '#b0b3c6' : '#8b8fa8', flexShrink: 0 }}
               />
               <span style={{ flex: 1 }}>{item.label}</span>
-              {'badge' in item && item.badge && (
+              {locked && item.requiredPlan && (
+                <Lock
+                  size={11}
+                  style={{ color: PLAN_COLORS[item.requiredPlan], opacity: 0.7, flexShrink: 0 }}
+                />
+              )}
+              {!locked && item.badge && (
                 <span
                   style={{
                     background: '#3d5af1',
@@ -159,7 +185,9 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
             <div style={{ fontSize: 12, fontWeight: 600, color: '#1a1c3a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {displayName}
             </div>
-            <div style={{ fontSize: 11, color: '#8b8fa8' }}>Nexus Pro</div>
+            <div style={{ fontSize: 11, color: '#8b8fa8', textTransform: 'capitalize' }}>
+              Nexus {plan}
+            </div>
           </div>
         </div>
       </div>

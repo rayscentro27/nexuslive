@@ -16,7 +16,7 @@ export interface UserProfile {
   business_potential: string | null;
   current_funding_level: number;
   next_milestone: string | null;
-  subscription_plan: 'free' | 'starter' | 'pro';
+  subscription_plan: 'free' | 'pro' | 'elite';
   onboarding_complete: boolean;
   created_at: string;
   updated_at: string;
