@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Check, ArrowRight, Shield, Zap, Star, AlertCircle } from 'lucide-react';
+import { Check, ArrowRight, Shield, Zap, Star, AlertCircle, X } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { BotAvatar } from './BotAvatar';
 import { supabase } from '../lib/supabase';
 import { redirectToCheckout } from '../services/stripeService';
+import { useAuth } from './AuthProvider';
 
 interface PricingProps {
   onSelectPlan: (plan: string) => void;
   onShowLegal: () => void;
+  onClose?: () => void;
 }
 
 interface PlanData {
@@ -43,7 +45,8 @@ const COLORS = { free: 'text-blue-500', pro: 'text-indigo-500', elite: 'text-eme
 const POPULAR = { free: false, pro: true, elite: false };
 const BUTTON_TEXT = { free: 'Get Started Free', pro: 'Start Pro', elite: 'Go Elite' };
 
-export function Pricing({ onSelectPlan, onShowLegal }: PricingProps) {
+export function Pricing({ onSelectPlan, onShowLegal, onClose }: PricingProps) {
+  const { user } = useAuth();
   const [plans, setPlans] = useState(STATIC_PLANS);
   const [loading, setLoading] = useState<string | null>(null);
   const [stripeError, setStripeError] = useState('');
@@ -74,13 +77,26 @@ export function Pricing({ onSelectPlan, onShowLegal }: PricingProps) {
     }
     setLoading(plan.id);
     setStripeError('');
-    const { error } = await redirectToCheckout(plan.stripe_price_id, '', '');
+    const { error } = await redirectToCheckout(
+      plan.stripe_price_id,
+      user?.id ?? '',
+      user?.email ?? '',
+    );
     if (error) setStripeError(error);
     setLoading(null);
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] py-20 px-4 font-sans">
+    <div className="min-h-screen bg-[#F8FAFF] py-20 px-4 font-sans relative">
+      {onClose && (
+        <button
+          onClick={onClose}
+          className="absolute top-6 right-6 z-10 w-10 h-10 rounded-full bg-white shadow flex items-center justify-center hover:bg-slate-50 transition-colors"
+          aria-label="Close"
+        >
+          <X className="w-5 h-5 text-slate-400" />
+        </button>
+      )}
       <div className="max-w-7xl mx-auto space-y-16">
 
         <div className="text-center space-y-4 max-w-3xl mx-auto">

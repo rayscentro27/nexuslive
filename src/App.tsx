@@ -81,6 +81,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState('home');
   const [publicView, setPublicView] = useState<'landing' | 'pricing' | 'auth' | 'legal'>('landing');
   const [portal, setPortal] = useState<'client' | 'admin'>('client');
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const isAdmin = !!ADMIN_EMAIL && user?.email === ADMIN_EMAIL;
 
   if (loading) {
@@ -168,42 +169,42 @@ function AppContent() {
           {activeTab === 'auth'           && <Auth onBackToDashboard={() => setActiveTab('home')} />}
 
           {activeTab === 'funding' && (
-            <PlanGate requiredPlan="pro" featureName="Funding Suite" onUpgrade={() => setActiveTab('home')}>
+            <PlanGate requiredPlan="pro" featureName="Funding Suite" onUpgrade={() => setShowUpgradeModal(true)}>
               <Funding />
             </PlanGate>
           )}
           {activeTab === 'grants' && (
-            <PlanGate requiredPlan="pro" featureName="AI Grant Finder" onUpgrade={() => setActiveTab('home')}>
+            <PlanGate requiredPlan="pro" featureName="AI Grant Finder" onUpgrade={() => setShowUpgradeModal(true)}>
               <GrantsFinder />
             </PlanGate>
           )}
           {activeTab === 'trading' && (
-            <PlanGate requiredPlan="pro" featureName="Trading Lab" onUpgrade={() => setActiveTab('home')}>
+            <PlanGate requiredPlan="pro" featureName="Trading Lab" onUpgrade={() => setShowUpgradeModal(true)}>
               <TradingLab />
             </PlanGate>
           )}
           {activeTab === 'credit' && (
-            <PlanGate requiredPlan="pro" featureName="Credit Analysis" onUpgrade={() => setActiveTab('home')}>
+            <PlanGate requiredPlan="pro" featureName="Credit Analysis" onUpgrade={() => setShowUpgradeModal(true)}>
               <CreditAnalysis />
             </PlanGate>
           )}
           {activeTab === 'referral' && (
-            <PlanGate requiredPlan="pro" featureName="Refer & Earn" onUpgrade={() => setActiveTab('home')}>
+            <PlanGate requiredPlan="pro" featureName="Refer & Earn" onUpgrade={() => setShowUpgradeModal(true)}>
               <Referral />
             </PlanGate>
           )}
           {activeTab === 'rewards' && (
-            <PlanGate requiredPlan="pro" featureName="Rewards" onUpgrade={() => setActiveTab('home')}>
+            <PlanGate requiredPlan="pro" featureName="Rewards" onUpgrade={() => setShowUpgradeModal(true)}>
               <Rewards />
             </PlanGate>
           )}
           {activeTab === 'roadmap' && (
-            <PlanGate requiredPlan="elite" featureName="Funding Roadmap" onUpgrade={() => setActiveTab('home')}>
+            <PlanGate requiredPlan="elite" featureName="Funding Roadmap" onUpgrade={() => setShowUpgradeModal(true)}>
               <FundingRoadmap />
             </PlanGate>
           )}
           {activeTab === 'bots' && (
-            <PlanGate requiredPlan="elite" featureName="AI Workforce" onUpgrade={() => setActiveTab('home')}>
+            <PlanGate requiredPlan="elite" featureName="AI Workforce" onUpgrade={() => setShowUpgradeModal(true)}>
               <Bots onInteract={() => setActiveTab('messages')} />
             </PlanGate>
           )}
@@ -248,6 +249,21 @@ function AppContent() {
           <Zap className="w-3 h-3" style={{ color: '#818cf8' }} />
           Admin
         </button>
+      )}
+
+      {/* Upgrade modal — shown when a locked feature is clicked */}
+      {showUpgradeModal && (
+        <div
+          className="fixed inset-0 z-[200] flex items-start justify-center overflow-y-auto"
+          style={{ background: 'rgba(26,28,58,0.7)', backdropFilter: 'blur(4px)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowUpgradeModal(false); }}
+        >
+          <Pricing
+            onSelectPlan={() => setShowUpgradeModal(false)}
+            onShowLegal={() => setShowUpgradeModal(false)}
+            onClose={() => setShowUpgradeModal(false)}
+          />
+        </div>
       )}
     </div>
   );
