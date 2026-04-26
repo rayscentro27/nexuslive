@@ -22,7 +22,7 @@ import { Legal } from './components/Legal';
 import { Rewards } from './components/Rewards';
 import { AdminPortal } from './components/admin/AdminPortal';
 import { Landing } from './components/Landing';
-import { Lock, Zap } from 'lucide-react';
+import { Home, Zap, CreditCard, User, FileText, Lock } from 'lucide-react';
 
 function LockedPage({ title, requiredScore, onAction }: { title: string; requiredScore: number; onAction: () => void }) {
   return (
@@ -73,11 +73,14 @@ function LockedPage({ title, requiredScore, onAction }: { title: string; require
   );
 }
 
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
+
 function AppContent() {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
   const [publicView, setPublicView] = useState<'landing' | 'pricing' | 'auth' | 'legal'>('landing');
   const [portal, setPortal] = useState<'client' | 'admin'>('client');
+  const isAdmin = !!ADMIN_EMAIL && user?.email === ADMIN_EMAIL;
 
   if (loading) {
     return (
@@ -137,15 +140,23 @@ function AppContent() {
     );
   }
 
+  const mobileNavItems = [
+    { id: 'home',          label: 'Home',     icon: Home },
+    { id: 'action-center', label: 'Actions',  icon: Zap },
+    { id: 'funding',       label: 'Funding',  icon: CreditCard },
+    { id: 'documents',     label: 'Docs',     icon: FileText },
+    { id: 'account',       label: 'Account',  icon: User },
+  ];
+
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#eaebf6' }}>
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      {/* Main content — ml-52 matches the new w-52 sidebar */}
-      <main className="flex-1 h-screen flex flex-col overflow-hidden" style={{ marginLeft: 208 }}>
+      {/* Main content — ml-0 on mobile, ml-52 on md+ to clear sidebar */}
+      <main className="flex-1 h-screen flex flex-col overflow-hidden md:ml-[208px]">
         <Header onNavigate={setActiveTab} />
 
-        <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ padding: 24 }}>
+        <div className="flex-1 overflow-y-auto scrollbar-hide pb-16 md:pb-0" style={{ padding: 24 }}>
           {activeTab === 'home'           && <Dashboard />}
           {activeTab === 'action-center'  && <ActionCenter />}
           {activeTab === 'business-setup' && <BusinessSetup />}
@@ -165,22 +176,45 @@ function AppContent() {
         </div>
 
         <footer
-          className="p-3 text-center text-[8px] font-bold uppercase tracking-widest shrink-0"
+          className="hidden md:block p-3 text-center text-[8px] font-bold uppercase tracking-widest shrink-0"
           style={{ color: '#8b8fa8', borderTop: '1px solid #e8e9f2', background: '#fff' }}
         >
-          © 2025 Nexus. All rights reserved.
+          © 2026 Nexus. All rights reserved.
         </footer>
       </main>
 
-      {/* Admin switcher */}
-      <button
-        onClick={() => setPortal('admin')}
-        className="fixed bottom-4 right-4 z-[100] px-4 py-2 rounded-full shadow-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all"
-        style={{ background: '#1a1c3a', color: '#fff', border: '1px solid #2d3748' }}
+      {/* Mobile bottom navigation — hidden on md+ */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden"
+        style={{ background: '#fff', borderTop: '1px solid #e8e9f2' }}
       >
-        <Zap className="w-3 h-3" style={{ color: '#818cf8' }} />
-        Switch to Admin Portal
-      </button>
+        {mobileNavItems.map(({ id, label, icon: Icon }) => {
+          const isActive = activeTab === id;
+          return (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5"
+              style={{ color: isActive ? '#3d5af1' : '#8b8fa8', background: 'none', border: 'none' }}
+            >
+              <Icon size={20} />
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Admin switcher — only visible to admin account, desktop only */}
+      {isAdmin && (
+        <button
+          onClick={() => setPortal('admin')}
+          className="fixed bottom-20 right-4 md:bottom-4 z-[100] px-4 py-2 rounded-full shadow-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all"
+          style={{ background: '#1a1c3a', color: '#fff', border: '1px solid #2d3748' }}
+        >
+          <Zap className="w-3 h-3" style={{ color: '#818cf8' }} />
+          Admin
+        </button>
+      )}
     </div>
   );
 }

@@ -53,7 +53,7 @@ export function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
 
   return (
     <div
-      className="w-52 h-screen flex flex-col fixed left-0 top-0 z-50"
+      className="w-52 h-screen flex-col fixed left-0 top-0 z-50 hidden md:flex"
       style={{
         background: '#ffffff',
         borderRight: '1px solid #e8e9f2',

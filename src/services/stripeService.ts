@@ -23,7 +23,8 @@ export async function redirectToCheckout(priceId: string, userId: string, email:
   const stripe = await stripePromise;
   if (!stripe || !priceId) return { error: 'Stripe not configured' };
 
-  const { error } = await stripe.redirectToCheckout({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (stripe as any).redirectToCheckout({
     lineItems: [{ price: priceId, quantity: 1 }],
     mode: 'subscription',
     successUrl: `${window.location.origin}/dashboard?subscription=success`,

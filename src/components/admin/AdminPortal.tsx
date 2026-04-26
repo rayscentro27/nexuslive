@@ -12,6 +12,7 @@ import { AdminDocuments } from './AdminDocuments';
 import { AdminMyBusiness } from './AdminMyBusiness';
 import { AdminReports } from './AdminReports';
 import { AdminSettings } from './AdminSettings';
+import { AdminMessaging } from './AdminMessaging';
 
 export function AdminPortal() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -35,6 +36,7 @@ export function AdminPortal() {
           {activeTab === 'trading' && <AdminTrading />}
           {activeTab === 'my-business' && <AdminMyBusiness />}
           {activeTab === 'reports' && <AdminReports />}
+          {activeTab === 'messages' && <AdminMessaging />}
           {activeTab === 'settings' && <AdminSettings />}
         </div>
 

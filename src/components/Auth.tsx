@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Mail,
   Lock,
@@ -13,9 +13,12 @@ import {
   EyeOff,
   AlertCircle
 } from 'lucide-react';
+import { Turnstile } from '@marsidev/react-turnstile';
 import { cn } from '../lib/utils';
 import { BotAvatar } from './BotAvatar';
 import { supabase } from '../lib/supabase';
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
 interface AuthProps {
   onShowLegal?: () => void;
@@ -39,22 +42,35 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
   const [signInEmail, setSignInEmail] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
 
+  // Turnstile captcha tokens
+  const [signUpToken, setSignUpToken] = useState('');
+  const [signInToken, setSignInToken] = useState('');
+  const signUpTurnstileRef = useRef<any>(null);
+  const signInTurnstileRef = useRef<any>(null);
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setSignUpError(null);
+    if (TURNSTILE_SITE_KEY && !signUpToken) {
+      setSignUpError('Please wait for the security check to complete.');
+      return;
+    }
     setSignUpLoading(true);
     try {
       const { error } = await supabase.auth.signUp({
         email: signUpEmail,
         password: signUpPassword,
         options: {
-          data: { full_name: signUpName }
+          data: { full_name: signUpName },
+          ...(TURNSTILE_SITE_KEY && signUpToken ? { captchaToken: signUpToken } : {}),
         }
       });
       if (error) throw error;
       setSignUpSuccess(true);
     } catch (err: any) {
       setSignUpError(err.message || 'Sign up failed. Please try again.');
+      signUpTurnstileRef.current?.reset();
+      setSignUpToken('');
     } finally {
       setSignUpLoading(false);
     }
@@ -63,16 +79,22 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setSignInError(null);
+    if (TURNSTILE_SITE_KEY && !signInToken) {
+      setSignInError('Please wait for the security check to complete.');
+      return;
+    }
     setSignInLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({
         email: signInEmail,
-        password: signInPassword
+        password: signInPassword,
+        options: TURNSTILE_SITE_KEY && signInToken ? { captchaToken: signInToken } : undefined,
       });
       if (error) throw error;
-      // AuthProvider's onAuthStateChange will handle the redirect
     } catch (err: any) {
       setSignInError(err.message || 'Sign in failed. Please check your credentials.');
+      signInTurnstileRef.current?.reset();
+      setSignInToken('');
     } finally {
       setSignInLoading(false);
     }
@@ -195,9 +217,19 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
               </div>
             )}
 
+            {TURNSTILE_SITE_KEY && (
+              <Turnstile
+                ref={signUpTurnstileRef}
+                siteKey={TURNSTILE_SITE_KEY}
+                onSuccess={setSignUpToken}
+                onExpire={() => setSignUpToken('')}
+                options={{ theme: 'light', size: 'flexible' }}
+              />
+            )}
+
             <button
               type="submit"
-              disabled={signUpLoading}
+              disabled={signUpLoading || (TURNSTILE_SITE_KEY ? !signUpToken : false)}
               className="w-full bg-[#5B7CFA] text-white py-3.5 rounded-xl font-black shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all transform hover:-translate-y-0.5 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {signUpLoading ? 'Creating Account...' : 'Sign Up'}
@@ -314,9 +346,19 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
                   </div>
                 )}
 
+                {TURNSTILE_SITE_KEY && (
+                  <Turnstile
+                    ref={signInTurnstileRef}
+                    siteKey={TURNSTILE_SITE_KEY}
+                    onSuccess={setSignInToken}
+                    onExpire={() => setSignInToken('')}
+                    options={{ theme: 'light', size: 'flexible' }}
+                  />
+                )}
+
                 <button
                   type="submit"
-                  disabled={signInLoading}
+                  disabled={signInLoading || (TURNSTILE_SITE_KEY ? !signInToken : false)}
                   className="w-full bg-[#5B7CFA] text-white py-3 rounded-xl font-black shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {signInLoading ? 'Signing In...' : 'Log In'}
