@@ -27,8 +27,8 @@ export async function redirectToCheckout(priceId: string, userId: string, email:
   const { error } = await (stripe as any).redirectToCheckout({
     lineItems: [{ price: priceId, quantity: 1 }],
     mode: 'subscription',
-    successUrl: `${window.location.origin}/dashboard?subscription=success`,
-    cancelUrl: `${window.location.origin}/pricing`,
+    successUrl: `${window.location.origin}/?subscription=success`,
+    cancelUrl: `${window.location.origin}/`,
     customerEmail: email,
     clientReferenceId: userId,
   });

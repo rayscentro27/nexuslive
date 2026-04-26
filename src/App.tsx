@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { supabase } from './lib/supabase';
 import { AuthProvider, useAuth } from './components/AuthProvider';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -23,7 +24,63 @@ import { Rewards } from './components/Rewards';
 import { AdminPortal } from './components/admin/AdminPortal';
 import { Landing } from './components/Landing';
 import { PlanGate } from './components/PlanGate';
-import { Home, Zap, CreditCard, User, FileText, Lock } from 'lucide-react';
+import { Home, Zap, CreditCard, User, FileText, Lock, AlertCircle } from 'lucide-react';
+
+function ResetPasswordForm({ onDone }: { onDone: () => void }) {
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password !== confirm) { setError('Passwords do not match'); return; }
+    if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
+    setSubmitting(true);
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    if (updateError) { setError(updateError.message); setSubmitting(false); return; }
+    onDone();
+  };
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-4 font-sans">
+      <div className="max-w-md w-full glass-card p-10 space-y-6">
+        <h2 className="text-2xl font-black text-[#1A2244]">Set New Password</h2>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="password"
+            required
+            placeholder="New password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all"
+          />
+          <input
+            type="password"
+            required
+            placeholder="Confirm new password"
+            value={confirm}
+            onChange={e => setConfirm(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/10 transition-all"
+          />
+          {error && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-100 text-red-700">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <p className="text-xs font-medium">{error}</p>
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full bg-[#5B7CFA] text-white py-3.5 rounded-xl font-black shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {submitting ? 'Updating...' : 'Update Password'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 function LockedPage({ title, requiredScore, onAction }: { title: string; requiredScore: number; onAction: () => void }) {
   return (
@@ -74,15 +131,17 @@ function LockedPage({ title, requiredScore, onAction }: { title: string; require
   );
 }
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
-
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading, resetMode, clearResetMode } = useAuth();
   const [activeTab, setActiveTab] = useState('home');
   const [publicView, setPublicView] = useState<'landing' | 'pricing' | 'auth' | 'legal'>('landing');
   const [portal, setPortal] = useState<'client' | 'admin'>('client');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const isAdmin = !!ADMIN_EMAIL && user?.email === ADMIN_EMAIL;
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+
+  if (resetMode) {
+    return <ResetPasswordForm onDone={clearResetMode} />;
+  }
 
   if (loading) {
     return (

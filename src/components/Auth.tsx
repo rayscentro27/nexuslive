@@ -268,21 +268,23 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
             </div>
           </div>
 
-          <div className="pt-4 border-t border-slate-50">
-            <button
-              onClick={onBackToDashboard}
-              className="w-full glass-card p-4 bg-blue-50/30 border-blue-100/50 flex items-center justify-between group cursor-pointer text-left"
-            >
-              <div className="flex items-center gap-3">
-                <BotAvatar type="dashboard" size="sm" />
-                <div>
-                  <p className="text-[10px] font-bold text-[#1A2244]">Preview Client Portal</p>
-                  <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">See what's inside</p>
+          {onBackToDashboard && (
+            <div className="pt-4 border-t border-slate-50">
+              <button
+                onClick={onBackToDashboard}
+                className="w-full glass-card p-4 bg-blue-50/30 border-blue-100/50 flex items-center justify-between group cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <BotAvatar type="dashboard" size="sm" />
+                  <div>
+                    <p className="text-[10px] font-bold text-[#1A2244]">Preview Client Portal</p>
+                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">See what's inside</p>
+                  </div>
                 </div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-[#5B7CFA] group-hover:translate-x-1 transition-all" />
-            </button>
-          </div>
+                <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-[#5B7CFA] group-hover:translate-x-1 transition-all" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right Side: Log In & Benefits */}

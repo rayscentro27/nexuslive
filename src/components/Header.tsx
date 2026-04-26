@@ -2,6 +2,7 @@ import React from 'react';
 import { Bell, MessageSquare, Coins, Rocket } from 'lucide-react';
 import { useAuth } from './AuthProvider';
 
+
 function getInitials(user: { email?: string; user_metadata?: { full_name?: string } } | null): string {
   if (!user) return 'N';
   const name = user.user_metadata?.full_name;
@@ -10,8 +11,9 @@ function getInitials(user: { email?: string; user_metadata?: { full_name?: strin
 }
 
 export function Header({ onNavigate }: { onNavigate?: (tab: string) => void }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const initials = getInitials(user);
+  const readinessScore = profile?.readiness_score ?? 0;
 
   return (
     <header
@@ -66,7 +68,7 @@ export function Header({ onNavigate }: { onNavigate?: (tab: string) => void }) {
             color: '#1a1c3a',
           }}
         >
-          <span>3%</span>
+          <span>{readinessScore}%</span>
         </div>
 
         {/* Messages */}

@@ -7,6 +7,8 @@ interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  resetMode: boolean;
+  clearResetMode: () => void;
   signOut: () => Promise<void>;
 }
 
@@ -16,6 +18,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [resetMode, setResetMode] = useState(false);
 
   async function loadProfile(u: User | null) {
     if (!u) { setProfile(null); return; }
@@ -30,6 +33,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (_event === 'PASSWORD_RECOVERY') {
+        setResetMode(true);
+        return;
+      }
+      if (_event === 'USER_UPDATED') {
+        setResetMode(false);
+      }
       setUser(session?.user ?? null);
       loadProfile(session?.user ?? null);
       setLoading(false);
@@ -43,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, resetMode, clearResetMode: () => setResetMode(false), signOut }}>
       {children}
     </AuthContext.Provider>
   );
