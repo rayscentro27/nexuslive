@@ -1,16 +1,32 @@
 """
 db/ai_client.py — Unified AI gateway client.
 
-Tries Hermes first (local, fast), falls back to Hermes.
-Both expose an OpenAI-compatible /v1/chat/completions endpoint.
+Provider chain (auto mode):
+  1. Hermes gateway (local, fast)
+  2. OpenRouter (paid, 128K+ context)
+  3. Netcup Ollama (SSH tunnel fallback, free)
+
+model_source kwarg:
+  "hermes"        → Hermes only
+  "netcup_ollama" → Netcup Ollama directly, skip Hermes
+  "auto"          → full chain with Netcup as last resort
 """
 import logging
 import os
+import sys
 import requests
+from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
 from config import settings
+
+# Resolve nexus-ai root so lib/ is importable regardless of cwd
+_ROOT = Path(__file__).resolve().parent.parent.parent  # nexus-strategy-lab/../..
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from lib.ollama_fallback import run_ollama_fallback, HERMES_FALLBACK_ENABLED  # noqa: E402
 
 logger = logging.getLogger(__name__)
 HERMES_MODEL = os.getenv('HERMES_MODEL', 'hermes')
@@ -82,26 +98,39 @@ def _chat(url: str, token: str, prompt: str, system: str = '', model: str = 'def
 
 
 def complete(prompt: str, system: str = '', max_tokens: int = 1024,
-             temperature: float = 0.3, provider: Optional[str] = None) -> str:
+             temperature: float = 0.3, provider: Optional[str] = None,
+             model_source: str = 'auto') -> str:
     """
-    Generate a completion. Uses AI_PROVIDER setting
-    ('hermes', 'openrouter', 'hermes', 'auto').
+    Generate a completion.
+
+    model_source:
+      "hermes"        → Hermes gateway only
+      "netcup_ollama" → Netcup Ollama directly (skip Hermes)
+      "auto"          → Hermes → OpenRouter → Netcup Ollama
+
+    provider kwarg (legacy): overrides AI_PROVIDER setting, not model_source.
     Raises RuntimeError if all providers fail.
     """
+    # ── Direct Netcup path ────────────────────────────────────────────────────
+    if model_source == 'netcup_ollama':
+        full_prompt = f"{system}\n\n{prompt}".strip() if system else prompt
+        result = run_ollama_fallback(full_prompt)
+        if result['success']:
+            logger.info("AI response via netcup_ollama (direct)")
+            return result['response']
+        raise RuntimeError(f"Netcup Ollama failed: {result['error']}")
+
+    # ── OpenAI-compatible provider chain ──────────────────────────────────────
     pref = provider or settings.AI_PROVIDER
 
-    providers = []
-    if pref == 'hermes':
+    if model_source == 'hermes' or pref == 'hermes':
         providers = [('hermes', settings.HERMES_GATEWAY_URL, settings.HERMES_GATEWAY_TOKEN, 'hermes')]
     elif pref == 'openrouter':
         providers = [('openrouter', settings.OPENROUTER_BASE_URL, settings.OPENROUTER_API_KEY, HERMES_MODEL)]
-    elif pref == 'hermes':
-        providers = [('hermes', settings.HERMES_GATEWAY_URL, settings.HERMES_GATEWAY_TOKEN, HERMES_MODEL)]
     else:  # auto
         providers = [
-            ('hermes',   settings.HERMES_GATEWAY_URL,  settings.HERMES_GATEWAY_TOKEN,   'hermes'),
-            ('openrouter', settings.OPENROUTER_BASE_URL, settings.OPENROUTER_API_KEY,   HERMES_MODEL),
-            ('hermes', settings.HERMES_GATEWAY_URL,         settings.HERMES_GATEWAY_TOKEN,    HERMES_MODEL),
+            ('hermes',     settings.HERMES_GATEWAY_URL,   settings.HERMES_GATEWAY_TOKEN, 'hermes'),
+            ('openrouter', settings.OPENROUTER_BASE_URL,  settings.OPENROUTER_API_KEY,   HERMES_MODEL),
         ]
 
     for name, url, token, model in providers:
@@ -111,13 +140,27 @@ def complete(prompt: str, system: str = '', max_tokens: int = 1024,
                        max_tokens=max_tokens, temperature=temperature)
         if result is not None:
             if _is_capacity_response(result):
-                logger.warning(f"AI provider {name} returned capacity/rate-limit response; trying next provider")
+                logger.warning(f"{name} returned capacity/rate-limit; trying next provider")
                 continue
-            logger.debug(f"AI response via {name}")
+            logger.info(f"AI response via {name}")
             return result
 
-    raise RuntimeError("All AI providers failed or are unconfigured. "
-                       "Check HERMES_GATEWAY_TOKEN / OPENROUTER_API_KEY / HERMES_GATEWAY_TOKEN in .env")
+    # ── Netcup Ollama last-resort fallback ────────────────────────────────────
+    if HERMES_FALLBACK_ENABLED and model_source != 'hermes':
+        logger.warning("All primary providers failed — triggering Netcup Ollama fallback")
+        full_prompt = f"{system}\n\n{prompt}".strip() if system else prompt
+        fb = run_ollama_fallback(full_prompt)
+        if fb['success']:
+            logger.info("AI response via netcup_ollama (fallback)")
+            return fb['response']
+        logger.error("Netcup Ollama fallback also failed: %s", fb['error'])
+
+    raise RuntimeError(
+        "All AI providers failed or are unconfigured. "
+        "Check HERMES_GATEWAY_TOKEN / OPENROUTER_API_KEY in .env. "
+        "Verify SSH tunnel for Netcup fallback: "
+        "ssh -N -L 11555:localhost:11434 root@v2202604354135454731.luckysrv.de"
+    )
 
 
 if __name__ == '__main__':

@@ -253,8 +253,18 @@ class NexusTelegramBot:
                 "<code>coordination summary</code>\n"
                 "<code>show tasks for codex</code>\n"
                 "<code>assign task to codex: review launchd runtime</code>\n"
-                "<code>assign task to claude: update docs</code>"
+                "<code>assign task to claude: update docs</code>\n\n"
+                "<b>CEO Auto-Routing</b>\n"
+                "<code>/route &lt;task&gt;</code> — Route a task to the right AI employee\n"
+                "Example: <code>/route create a TikTok script about business credit</code>"
             )
+
+        # ── CEO Auto-Routing ─────────────────────────────────────────────────
+        if normalized.startswith("/route "):
+            task = raw[len("/route "):].strip()
+            if not task:
+                return "Usage: <code>/route &lt;your task description&gt;</code>"
+            return self._submit_ceo_route(task)
 
         # ── Browser Worker commands ──────────────────────────────────────────
         if normalized in {"browser help", "/browser", "/browser help"}:
@@ -319,6 +329,29 @@ class NexusTelegramBot:
             return "\n".join(lines)
         except Exception as e:
             return f"⚠️ Status fetch failed: {e}"
+
+    def _submit_ceo_route(self, task: str) -> str:
+        """Submit a task to the CEO auto-routing pipeline."""
+        try:
+            import sys
+            sys.path.insert(0, str(Path(__file__).parent))
+            from lib.event_intake import submit_ceo_route_request
+            result = submit_ceo_route_request(
+                message=task,
+                source="telegram",
+                channel="bot",
+            )
+            if "error" in result:
+                return f"⚠️ CEO routing failed: {result['error']}"
+            return (
+                f"✅ <b>Task submitted for CEO routing</b>\n"
+                f"Event ID: <code>{result.get('event_id', '—')}</code>\n"
+                f"Status: <b>pending</b>\n\n"
+                f"The CEO will classify this and assign it to the right AI employee. "
+                f"Draft will appear in workflow_outputs for review."
+            )
+        except Exception as e:
+            return f"⚠️ CEO routing error: {e}"
 
     def handle_update(self, update: dict) -> None:
         update_id = update.get("update_id")
@@ -432,7 +465,7 @@ class NexusTelegramBot:
 <b>🤖 SYSTEM STATUS</b>
 
 <b>Status:</b> {status.get('status', 'Unknown')}
-<b>Hermes:</b> {'✅ Connected' if status.get('hermes_connected')') else '❌ Disconnected'}
+<b>Hermes:</b> {'✅ Connected' if status.get('hermes_connected') else '❌ Disconnected'}
 <b>Broker:</b> {'✅ Connected' if status.get('broker_connected') else '❌ Disconnected'}
 <b>Signals Processed:</b> {status.get('signals_processed', 0)}
 <b>Active Positions:</b> {status.get('active_positions', 0)}

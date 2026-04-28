@@ -1,4 +1,5 @@
 import "../env.js";
+import { runOllamaFallback } from "../lib/ollamaFallback.js";
 
 const HERMES_GATEWAY_URL = process.env.HERMES_GATEWAY_URL ?? "http://localhost:8642";
 const HERMES_TOKEN = process.env.HERMES_GATEWAY_TOKEN ?? "";
@@ -69,18 +70,43 @@ async function callHermes(messages, { max_tokens = 300, temperature = 0.2 } = {}
   return data?.choices?.[0]?.message?.content ?? "";
 }
 
-export async function diagnoseWithHermes(snapshot) {
+export async function diagnoseWithHermes(snapshot, { modelSource = "auto" } = {}) {
   if (!ENABLE_HERMES_OPS_DIAGNOSIS) return null;
 
-  try {
-    const raw = await callHermes([
-      { role: "system", content: "You are Hermes. Return valid JSON only." },
-      { role: "user", content: buildPrompt(snapshot) },
-    ]);
-    return extractJsonObject(raw);
-  } catch {
-    return null;
+  const prompt = buildPrompt(snapshot);
+  let raw = null;
+
+  // ── Try Hermes unless caller wants Netcup directly ────────────────────────
+  if (modelSource !== "netcup_ollama") {
+    try {
+      raw = await callHermes([
+        { role: "system", content: "You are Hermes. Return valid JSON only." },
+        { role: "user", content: prompt },
+      ]);
+      if (raw) {
+        console.log("[hermes_ops] Diagnosis: Hermes success");
+        return extractJsonObject(raw);
+      }
+      console.warn("[hermes_ops] Diagnosis: Hermes returned empty response");
+    } catch (err) {
+      console.error("[hermes_ops] Diagnosis: Hermes failed —", err?.message ?? err);
+    }
   }
+
+  // ── Netcup Ollama fallback ────────────────────────────────────────────────
+  if (modelSource === "netcup_ollama" || modelSource === "auto") {
+    console.warn("[hermes_ops] Diagnosis: triggering Netcup Ollama fallback");
+    const fb = await runOllamaFallback(
+      `System: You are Hermes. Return valid JSON only.\n\n${prompt}`
+    );
+    if (fb.success) {
+      console.log("[hermes_ops] Diagnosis: Netcup Ollama fallback succeeded");
+      return extractJsonObject(fb.response);
+    }
+    console.error("[hermes_ops] Diagnosis: Netcup fallback failed —", fb.error);
+  }
+
+  return null;
 }
 
 function buildActionPrompt({ operator_intent, worker, allowed_actions }) {
@@ -111,22 +137,43 @@ export async function proposeActionWithHermes({
   operator_intent,
   worker,
   allowed_actions,
+  modelSource = "auto",
 }) {
   if (!ENABLE_HERMES_OPS_ACTIONS) return null;
 
-  try {
-    const raw = await callHermes([
-      { role: "system", content: "You are Hermes. Return valid JSON only." },
-      {
-        role: "user",
-        content: buildActionPrompt({ operator_intent, worker, allowed_actions }),
-      },
-    ], {
-      max_tokens: 350,
-      temperature: 0.1,
-    });
-    return extractJsonObject(raw);
-  } catch {
-    return null;
+  const prompt = buildActionPrompt({ operator_intent, worker, allowed_actions });
+  let raw = null;
+
+  // ── Try Hermes unless caller wants Netcup directly ────────────────────────
+  if (modelSource !== "netcup_ollama") {
+    try {
+      raw = await callHermes([
+        { role: "system", content: "You are Hermes. Return valid JSON only." },
+        { role: "user", content: prompt },
+      ], { max_tokens: 350, temperature: 0.1 });
+
+      if (raw) {
+        console.log("[hermes_ops] Action: Hermes success");
+        return extractJsonObject(raw);
+      }
+      console.warn("[hermes_ops] Action: Hermes returned empty response");
+    } catch (err) {
+      console.error("[hermes_ops] Action: Hermes failed —", err?.message ?? err);
+    }
   }
+
+  // ── Netcup Ollama fallback ────────────────────────────────────────────────
+  if (modelSource === "netcup_ollama" || modelSource === "auto") {
+    console.warn("[hermes_ops] Action: triggering Netcup Ollama fallback");
+    const fb = await runOllamaFallback(
+      `System: You are Hermes. Return valid JSON only.\n\n${prompt}`
+    );
+    if (fb.success) {
+      console.log("[hermes_ops] Action: Netcup Ollama fallback succeeded");
+      return extractJsonObject(fb.response);
+    }
+    console.error("[hermes_ops] Action: Netcup fallback failed —", fb.error);
+  }
+
+  return null;
 }

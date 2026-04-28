@@ -1,13 +1,23 @@
 """
 LLM-driven browser executor.
 Hermes breaks a natural language task into browser steps; Playwright executes them.
+Falls back to Netcup Ollama if Hermes is unavailable or returns empty.
 """
 import json
 import logging
+import sys
 import urllib.request
 import os
+from pathlib import Path
 
 logger = logging.getLogger("BrowserWorker.LLM")
+
+# Resolve nexus-ai root so lib/ is importable
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from lib.ollama_fallback import run_ollama_fallback, HERMES_FALLBACK_ENABLED  # noqa: E402
 
 HERMES_URL = os.getenv("HERMES_GATEWAY_URL", "http://localhost:8642")
 HERMES_TOKEN = os.getenv("HERMES_GATEWAY_TOKEN", "")
@@ -29,8 +39,28 @@ Keep it under 15 steps. If login is required, stop and set {"action":"stop","rea
 """
 
 
-def plan_steps(task_description: str, page_url: str = "", page_text: str = "") -> list:
-    """Ask Hermes to plan browser steps for a natural language task."""
+def _parse_step_json(raw: str) -> list:
+    """Strip markdown fences and parse a JSON step array. Returns [] on failure."""
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+    try:
+        result = json.loads(raw)
+        return result if isinstance(result, list) else []
+    except Exception:
+        return []
+
+
+def plan_steps(task_description: str, page_url: str = "", page_text: str = "",
+               model_source: str = "auto") -> list:
+    """
+    Ask Hermes to plan browser steps for a natural language task.
+
+    model_source:
+      "hermes"        → Hermes only
+      "netcup_ollama" → Netcup Ollama directly
+      "auto"          → Hermes first, Netcup fallback if Hermes fails/empty
+    """
     context = f"Current URL: {page_url}\n" if page_url else ""
     if page_text:
         context += f"Page preview (first 500 chars):\n{page_text[:500]}\n"
@@ -42,32 +72,57 @@ def plan_steps(task_description: str, page_url: str = "", page_text: str = "") -
         "Respond with the JSON array only, no prose."
     )
 
-    data = json.dumps({
-        "model": "hermes",
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 1000,
-        "temperature": 0.2,
-    }).encode()
+    hermes_result = None
 
-    headers = {"Content-Type": "application/json"}
-    if HERMES_TOKEN:
-        headers["Authorization"] = f"Bearer {HERMES_TOKEN}"
+    # ── Skip Hermes if caller requested Netcup directly ───────────────────────
+    if model_source != "netcup_ollama":
+        data = json.dumps({
+            "model": "hermes",
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 1000,
+            "temperature": 0.2,
+        }).encode()
 
-    try:
-        req = urllib.request.Request(
-            f"{HERMES_URL}/v1/chat/completions",
-            data=data, headers=headers,
-        )
-        with urllib.request.urlopen(req, timeout=30) as r:
-            resp = json.loads(r.read())
-        raw = resp["choices"][0]["message"]["content"].strip()
-        # Strip markdown code fences if present
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
-        return json.loads(raw)
-    except Exception as e:
-        logger.error(f"Hermes planning failed: {e}")
-        return []
+        headers = {"Content-Type": "application/json"}
+        if HERMES_TOKEN:
+            headers["Authorization"] = f"Bearer {HERMES_TOKEN}"
+
+        try:
+            req = urllib.request.Request(
+                f"{HERMES_URL}/v1/chat/completions",
+                data=data, headers=headers,
+            )
+            with urllib.request.urlopen(req, timeout=30) as r:
+                resp = json.loads(r.read())
+            raw = resp["choices"][0]["message"]["content"].strip()
+            hermes_result = _parse_step_json(raw)
+            if hermes_result:
+                logger.info("Hermes planning succeeded (%d steps)", len(hermes_result))
+                return hermes_result
+            logger.warning("Hermes planning returned empty step list")
+        except Exception as e:
+            logger.error("Hermes planning failed: %s", e)
+
+    # ── Netcup Ollama fallback ────────────────────────────────────────────────
+    should_fallback = (
+        model_source == "netcup_ollama"
+        or (model_source == "auto" and HERMES_FALLBACK_ENABLED and not hermes_result)
+    )
+
+    if should_fallback:
+        logger.warning("Triggering Netcup Ollama fallback for browser planning")
+        fb = run_ollama_fallback(prompt)
+        if fb["success"]:
+            steps = _parse_step_json(fb["response"])
+            if steps:
+                logger.info("Netcup Ollama fallback provided %d steps", len(steps))
+                return steps
+            logger.warning("Netcup Ollama response was not valid JSON steps; response=%s",
+                           fb["response"][:120])
+        else:
+            logger.error("Netcup Ollama fallback failed: %s", fb["error"])
+
+    return []
 
 
 async def execute_steps(page, steps: list) -> dict:
@@ -148,11 +203,15 @@ async def execute_steps(page, steps: list) -> dict:
     }
 
 
-async def run_open_task(page, task_description: str) -> dict:
-    """Plan and execute a natural language browser task end-to-end."""
-    logger.info(f"Open task: {task_description}")
+async def run_open_task(page, task_description: str,
+                        model_source: str = "auto") -> dict:
+    """
+    Plan and execute a natural language browser task end-to-end.
 
-    # Get current page state for context
+    model_source: "hermes" | "netcup_ollama" | "auto"
+    """
+    logger.info("Open task: %s (model_source=%s)", task_description, model_source)
+
     try:
         current_url = page.url
         body_text = await page.evaluate("document.body?.innerText || ''")
@@ -160,12 +219,18 @@ async def run_open_task(page, task_description: str) -> dict:
         current_url = ""
         body_text = ""
 
-    steps = plan_steps(task_description, current_url, body_text)
+    steps = plan_steps(task_description, current_url, body_text, model_source=model_source)
     if not steps:
-        return {"status": "error", "summary": "Hermes could not plan steps for this task"}
+        return {
+            "status": "error",
+            "summary": "No provider could plan steps for this task",
+            "source": "none",
+            "fallback_used": model_source == "netcup_ollama",
+        }
 
-    logger.info(f"Planned {len(steps)} steps")
+    logger.info("Planned %d steps", len(steps))
     execution = await execute_steps(page, steps)
     execution["status"] = "ok"
     execution["task"] = task_description
+    execution["model_source"] = model_source
     return execution

@@ -739,6 +739,88 @@ setInterval(loadAll, 30000);
 </html>"""
 
 
+@app.route("/api/route-job", methods=["POST"])
+def api_route_job():
+    """
+    Submit a task for CEO auto-routing.
+
+    Body (JSON): {"message": "...", "channel": "admin_portal"}
+    Returns: {"event_id": "uuid", "status": "pending"} or {"error": "..."}
+    """
+    from flask import request as flask_request
+    from lib.event_intake import submit_ceo_route_request
+
+    try:
+        body    = flask_request.get_json(silent=True) or {}
+        message = (body.get("message") or "").strip()
+        if not message:
+            return jsonify({"error": "message is required"}), 400
+
+        result = submit_ceo_route_request(
+            message=message,
+            source="admin_portal",
+            channel=body.get("channel", "control_center"),
+            client_id=body.get("client_id"),
+            metadata=body.get("metadata"),
+        )
+        status_code = 400 if "error" in result else 200
+        return jsonify(result), status_code
+    except Exception as exc:
+        logger.exception("route-job error")
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/drafts")
+def api_drafts():
+    """
+    List workflow_outputs rows with status='pending_review' and
+    workflow_type='ceo_routed_draft' — drafts waiting for admin approval.
+
+    Query params:
+        limit  (int, default 20)
+        role   (str, optional — filter by subject_type)
+    """
+    from flask import request as flask_request
+    import urllib.request as _urllib_req
+
+    limit = flask_request.args.get("limit", 20, type=int)
+    role  = flask_request.args.get("role", "")
+
+    def _fetch_drafts():
+        supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+        supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY", "")
+        if not supabase_url or not supabase_key:
+            return {"error": "Supabase not configured"}
+
+        filters = (
+            "workflow_outputs"
+            "?workflow_type=eq.ceo_routed_draft"
+            "&status=eq.pending_review"
+            f"&order=created_at.desc"
+            f"&limit={limit}"
+            "&select=id,subject_type,summary,priority,created_at,raw_output"
+        )
+        if role:
+            filters += f"&subject_type=eq.{role}"
+
+        url = f"{supabase_url}/rest/v1/{filters}"
+        headers = {
+            "apikey":        supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+            "Content-Type":  "application/json",
+        }
+        req = _urllib_req.Request(url, headers=headers)
+        try:
+            import json as _json
+            with _urllib_req.urlopen(req, timeout=10) as r:
+                rows = _json.loads(r.read()) or []
+            return {"drafts": rows, "count": len(rows)}
+        except Exception as exc:
+            return {"error": str(exc), "drafts": []}
+
+    return jsonify(_safe(_fetch_drafts))
+
+
 @app.route("/")
 def index():
     return render_template_string(TERMINAL_HTML)

@@ -52,6 +52,11 @@ MODEL_RATES: dict = {
     'mistralai/mistral-7b-instruct':     (0.07,   0.07),
     'meta-llama/llama-3.1-8b-instruct':  (0.06,   0.06),
     'hermes':                            (0.00,   0.00),
+    # Local/tunneled Ollama — zero API cost
+    'netcup_ollama':                     (0.00,   0.00),
+    'llama3.2:3b':                       (0.00,   0.00),
+    'oracle_ollama':                     (0.00,   0.00),
+    'qwen2.5:14b':                       (0.00,   0.00),
 }
 DEFAULT_RATE = (1.00, 3.00)
 
