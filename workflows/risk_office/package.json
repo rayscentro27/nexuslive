@@ -1,0 +1,16 @@
+{
+  "name": "nexus-risk-office",
+  "version": "1.0.0",
+  "description": "Nexus AI Trading Analyst — signal review workflow. Analysis only, no execution.",
+  "type": "module",
+  "scripts": {
+    "once": "node risk_runner.js --once",
+    "poll": "node risk_runner.js --poll"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1"
+  }
+}

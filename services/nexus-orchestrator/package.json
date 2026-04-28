@@ -1,0 +1,17 @@
+{
+  "name": "nexus-orchestrator",
+  "version": "1.0.0",
+  "description": "Central backend decision layer for Nexus AI on Mac Mini",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": { "node": ">=20.0.0" },
+  "scripts": {
+    "start":      "node src/index.js",
+    "seed":       "node scripts/seedFakeEvents.js",
+    "dev":        "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.0.0"
+  }
+}

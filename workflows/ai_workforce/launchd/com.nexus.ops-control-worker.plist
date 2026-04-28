@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.nexus.ops-control-worker</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/raymonddavis/.nvm/versions/node/v24.14.0/bin/node</string>
+    <string>/Users/raymonddavis/nexus-ai/workflows/ai_workforce/ops_control_worker/ops_control_worker.js</string>
+    <string>--auto-recover</string>
+    <string>--apply-auto-recovery</string>
+    <string>--validate-actions</string>
+    <string>--apply-validation</string>
+    <string>--execute-actions</string>
+    <string>--apply-execution</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/raymonddavis/nexus-ai/workflows/ai_workforce</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StartInterval</key>
+  <integer>600</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/raymonddavis/nexus-ai/logs/ops-control-worker.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/raymonddavis/nexus-ai/logs/ops-control-worker.error.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/raymonddavis</string>
+    <key>PATH</key>
+    <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/Users/raymonddavis/.nvm/versions/node/v24.14.0/bin</string>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+</dict>
+</plist>

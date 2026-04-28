@@ -1,0 +1,24 @@
+{
+  "project_id": "ddc12533-d68f-5739-ae84-d7db071a2bfd",
+  "recommendation_id": "43d0f41a-dbfc-512b-b67c-25362e7a18f6",
+  "implementation_task_id": "155f17d6-bfe6-5923-92fb-edaee2c2af48",
+  "paper_trade_run_id": null,
+  "proposal_id": null,
+  "signal_id": null,
+  "symbol": null,
+  "side": null,
+  "timeframe": null,
+  "strategy_id": "I Built and Tested a Trading Bot Using Apollo 11 Logic (No More Noise)",
+  "asset_type": "trading",
+  "entry_price": null,
+  "stop_loss": null,
+  "take_profit": null,
+  "recommendation": "research_candidate research on multi has confidence 0.65 with risk state review and 0 replay datapoint(s).",
+  "risk_decision": {
+    "decision": "review",
+    "risk_flags": [],
+    "risk_score": 65
+  },
+  "recent_replays": [],
+  "queued_at": "2026-04-25T23:38:41.757667+00:00"
+}

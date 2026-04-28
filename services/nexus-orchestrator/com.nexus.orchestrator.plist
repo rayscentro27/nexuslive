@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.nexus.orchestrator</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/raymonddavis/.nvm/versions/node/v24.14.0/bin/node</string>
+    <string>/Users/raymonddavis/nexus-ai/services/nexus-orchestrator/src/index.js</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/raymonddavis/nexus-ai/services/nexus-orchestrator</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/raymonddavis/nexus-ai/logs/nexus-orchestrator.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/raymonddavis/nexus-ai/logs/nexus-orchestrator.error.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>WORKER_ID</key>
+    <string>nexus-orchestrator-1</string>
+    <key>POLL_INTERVAL_MS</key>
+    <string>5000</string>
+    <key>POLL_BATCH_SIZE</key>
+    <string>10</string>
+    <key>HEARTBEAT_INTERVAL_MS</key>
+    <string>30000</string>
+    <key>EVENT_LEASE_SECONDS</key>
+    <string>120</string>
+    <key>MAX_EVENT_ATTEMPTS</key>
+    <string>3</string>
+  </dict>
+</dict>
+</plist>

@@ -1,0 +1,16 @@
+{
+  "name": "nexus-autonomous-research-supernode",
+  "version": "1.0.0",
+  "description": "Phase 8 — Nexus Autonomous Research Supernode",
+  "type": "module",
+  "scripts": {
+    "once": "node research_orchestrator.js --once --sources sample_sources.json",
+    "credit": "node research_orchestrator.js --topic credit_repair --sources sample_sources.json",
+    "grants": "node research_orchestrator.js --topic grant_research --sources sample_sources.json",
+    "biz": "node research_orchestrator.js --topic business_opportunities --sources sample_sources.json",
+    "manual": "node research_orchestrator.js --manual"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  }
+}

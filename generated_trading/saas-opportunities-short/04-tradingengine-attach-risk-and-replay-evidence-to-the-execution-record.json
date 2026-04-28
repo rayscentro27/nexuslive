@@ -1,0 +1,28 @@
+{
+  "project_id": "01556dc4-0664-520b-8c42-58643d9c245d",
+  "recommendation_id": "087675a9-99c5-5fb8-a269-812430c6614b",
+  "implementation_task_id": "897ada2d-6091-5ade-a4d5-a7be42b70d58",
+  "paper_trade_run_id": "b618ec5c-a949-553b-8c7e-ff35e780e4fc",
+  "proposal_id": "d7c4b154-aba2-51e3-b346-53c9cfee14cd",
+  "signal_id": null,
+  "symbol": "saas_opportunities",
+  "side": "short",
+  "timeframe": "multi",
+  "strategy_id": "LEAPS Options Selling Strategy: How I Get 92% Win Rate Without Watching Charts",
+  "asset_type": "options",
+  "entry_price": null,
+  "stop_loss": null,
+  "take_profit": null,
+  "recommendation": "saas_opportunities short on multi has confidence 0.65 with risk state manual_review and 0 replay datapoint(s).",
+  "risk_decision": {
+    "decision": "manual_review",
+    "rr_ratio": null,
+    "created_at": "2026-04-25T23:59:21.300968+00:00",
+    "risk_flags": [],
+    "risk_score": 65,
+    "proposal_id": "d7c4b154-aba2-51e3-b346-53c9cfee14cd",
+    "rejection_reason": null
+  },
+  "recent_replays": [],
+  "queued_at": "2026-04-26T00:45:14.197155+00:00"
+}

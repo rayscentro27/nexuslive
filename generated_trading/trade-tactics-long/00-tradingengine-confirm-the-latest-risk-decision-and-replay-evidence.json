@@ -1,0 +1,28 @@
+{
+  "project_id": "956a9a00-c524-5774-a0cc-06b2f231c233",
+  "recommendation_id": "2bf75a55-ffbe-5965-938d-c2fce8a5996f",
+  "implementation_task_id": "3dd403c8-2d25-5dba-bcc3-3e57dddfa668",
+  "paper_trade_run_id": "84122851-c639-5f1b-8cbf-a1a96debab2b",
+  "proposal_id": "65a93b50-bfb0-5859-955c-454521159552",
+  "signal_id": null,
+  "symbol": "Trade_Tactics",
+  "side": "long",
+  "timeframe": "multi",
+  "strategy_id": "I Built and Tested a Trading Bot Using Apollo 11 Logic (No More Noise)",
+  "asset_type": "forex",
+  "entry_price": null,
+  "stop_loss": null,
+  "take_profit": null,
+  "recommendation": "Trade_Tactics long on multi has confidence 0.65 with risk state manual_review and 0 replay datapoint(s).",
+  "risk_decision": {
+    "decision": "manual_review",
+    "rr_ratio": null,
+    "created_at": "2026-04-25T23:59:20.68638+00:00",
+    "risk_flags": [],
+    "risk_score": 65,
+    "proposal_id": "65a93b50-bfb0-5859-955c-454521159552",
+    "rejection_reason": null
+  },
+  "recent_replays": [],
+  "queued_at": "2026-04-26T00:00:27.202667+00:00"
+}

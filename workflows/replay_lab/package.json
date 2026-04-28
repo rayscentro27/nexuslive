@@ -1,0 +1,10 @@
+{
+  "name": "nexus-replay-lab",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "once": "node replay_runner.js --once",
+    "calibrate": "node replay_runner.js --calibrate"
+  },
+  "dependencies": { "dotenv": "^16.4.5" }
+}

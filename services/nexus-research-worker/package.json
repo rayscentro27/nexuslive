@@ -1,0 +1,16 @@
+{
+  "name": "nexus-research-worker",
+  "version": "1.0.0",
+  "description": "Research job worker for Nexus AI — processes research_collect jobs from job_queue",
+  "type": "module",
+  "main": "src/index.js",
+  "engines": { "node": ">=20.0.0" },
+  "scripts": {
+    "start":    "node src/index.js",
+    "once":     "node scripts/runOnce.js",
+    "dev":      "node --watch src/index.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}

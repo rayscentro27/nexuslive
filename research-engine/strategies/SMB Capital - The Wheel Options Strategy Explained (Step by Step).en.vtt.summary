@@ -1,0 +1,52 @@
+Here’s a structured extraction from the provided transcript segment (noting it’s truncated, so some specifics may appear later but aren’t visible here).
+
+**Strategies**
+- **Primary strategy introduced: The Wheel options strategy**
+- Framed as a potentially higher-return alternative vs. passive equity returns (if used correctly).
+- Positioned as a method to generate additional profit from “solid stocks.”
+- **Core wheel mechanics implied (from options rights/obligations explanation):**
+- Sell options rather than only buying them.
+- Use obligation-based option selling (especially cash-secured puts and covered calls in the wheel framework) to collect premium.
+- **Educational framing:**
+- Emphasis on understanding **when** and **how** to apply the strategy, not just mechanics.
+
+**Indicators**
+- In this visible segment, **no specific technical indicators** (e.g., RSI, MACD, moving averages, IV rank) are explicitly named.
+- The transcript focuses on **options structure fundamentals**:
+- Call vs put
+- Buy vs sell
+- Rights vs obligations
+- 100 shares per options contract
+
+**Risk Management**
+- **Contract exposure awareness:** 1 options contract = **100 shares**, which directly impacts capital/risk.
+- **Obligation risk highlighted:**
+- Selling a call = obligation to sell 100 shares at strike.
+- Selling a put = obligation to buy 100 shares at strike.
+- **Implied risk principle for wheel users:**
+- Only use underlyings you’re willing to own (for short puts) and willing to sell at target prices (for covered calls).
+- No explicit stop-loss, max position size %, or formal R-multiple/risk-reward rules appear in this excerpt.
+
+**Trade Setups**
+From the visible text, explicit setup rules are not yet fully detailed, but the foundational setup logic is implied:
+- **Options decision framework setup:**
+- Bullish directional participation via calls.
+- Bearish/downside protection/speculation via puts.
+- Income-oriented setup via selling options (premium collection) with assignment obligations.
+- **Wheel setup likely being built toward (incomplete due to truncation):**
+1. Sell put at desired entry level.
+2. If assigned, hold shares.
+3. Sell call against shares.
+4. Repeat cycle.
+
+**Psychology**
+- **Confidence-building tone:** Strategy presented as “simple” and “easy to learn.”
+- **Discipline emphasis (implicit):**
+- Success tied to understanding proper context/timing (“how and when to use it”).
+- **Mindset angle:**
+- Encourages structured, rules-based options usage rather than random contract buying.
+- Focus on clarity of fundamentals before execution.
+
+---
+
+If you want, I can turn this into a **checklist playbook** for the wheel (entry criteria, strike selection, DTE, assignment handling, and management rules) so it’s immediately usable.

@@ -6,6 +6,7 @@ Monitors raysnexusproject12221971@gmail.com via IMAP for [NEXUS] tagged emails.
 Subject tags:
   [NEXUS] or [RESEARCH]  → extract YouTube URLs, run research pipeline, reply with summary
   [TASKS]                → parse task list, create coord_tasks entries, reply confirming
+  [STATUS]               → run autonomy stack checks and reply with current operator status
 
 Usage:
   python3 nexus_email_pipeline.py --once     # process inbox once and exit
@@ -37,14 +38,16 @@ if _env_file.exists():
         _line = _line.strip()
         if _line and not _line.startswith("#") and "=" in _line:
             _k, _, _v = _line.partition("=")
-            os.environ.setdefault(_k.strip(), _v.strip())
+            os.environ[_k.strip()] = _v.strip()
 
-NEXUS_EMAIL = os.getenv("NEXUS_EMAIL", "raysnexusproject12221971@gmail.com")
+NEXUS_EMAIL = os.getenv("NEXUS_EMAIL", "goclearonline@gmail.com")
 NEXUS_EMAIL_PASSWORD = os.getenv("NEXUS_EMAIL_PASSWORD", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 NEXUS_DIR = Path(__file__).parent
 RESEARCH_DIR = NEXUS_DIR / "workflows" / "research_ingestion"
+AUTONOMY_CHECK = NEXUS_DIR / "scripts" / "check_autonomy_stack.sh"
+AUTONOMY_STATUS = NEXUS_DIR / "scripts" / "autonomy_status.py"
 POLL_INTERVAL = int(os.getenv("EMAIL_POLL_INTERVAL", "120"))
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
@@ -70,9 +73,10 @@ def fetch_unread_nexus_emails():
         _, ids = imap.search(None, 'UNSEEN SUBJECT "nexus"')
         _, ids2 = imap.search(None, 'UNSEEN SUBJECT "research"')
         _, ids3 = imap.search(None, 'UNSEEN SUBJECT "tasks"')
+        _, ids4 = imap.search(None, 'UNSEEN SUBJECT "status"')
 
         all_ids = set()
-        for id_list in [ids, ids2, ids3]:
+        for id_list in [ids, ids2, ids3, ids4]:
             for i in id_list[0].split():
                 all_ids.add(i)
 
@@ -120,6 +124,136 @@ def send_reply(to, subject, body):
         smtp.login(NEXUS_EMAIL, NEXUS_EMAIL_PASSWORD)
         smtp.send_message(msg)
     print(f"[email] Reply sent to {to}")
+
+
+def summarize_autonomy_status(raw_output):
+    lines = raw_output.splitlines()
+    summary = []
+
+    or_ok = any("PASS" in line and "model=" in line for line in lines)
+    gmail_ok = any("PASS" in line and "@gmail.com" in line for line in lines)
+    email_line = next((line.strip() for line in lines if "Email pipeline" in line), "")
+    scheduler_line = next((line.strip() for line in lines if "Scheduler" in line), "")
+    hermes_line = next((line.strip() for line in lines if "Hermes gateway" in line), "")
+
+    if or_ok and gmail_ok:
+        summary.append("Overall: the main autonomy path is healthy.")
+    else:
+        summary.append("Overall: the autonomy path needs attention.")
+
+    summary.append(
+        "Model access: OpenRouter is connected and responding."
+        if or_ok else
+        "Model access: OpenRouter is not passing its health check."
+    )
+    summary.append(
+        "Email: Gmail authentication is working."
+        if gmail_ok else
+        "Email: Gmail authentication is failing."
+    )
+
+    if "last_exit=0" in email_line:
+        summary.append("Email worker: healthy. It runs as a one-shot job and exits cleanly between checks.")
+    elif email_line:
+        summary.append(f"Email worker: {email_line}")
+
+    if "state=running" in scheduler_line:
+        summary.append("Scheduler: running scheduled jobs normally.")
+    elif scheduler_line:
+        summary.append(f"Scheduler: {scheduler_line}")
+
+    if "state=running" in hermes_line:
+        summary.append("Hermes gateway: process is running.")
+    elif hermes_line:
+        summary.append(f"Hermes gateway: {hermes_line}")
+
+    # These are separate from Hermes Telegram polling and can still send outbound notices.
+    aux_paths = []
+    if (NEXUS_DIR / "operations_center" / "scheduler.py").exists():
+        aux_paths.append("scheduler alerts")
+    if (NEXUS_DIR / "coordination" / "coordination_worker.py").exists():
+        aux_paths.append("coordination alerts")
+    if (NEXUS_DIR / "ceo_agent" / "ceo_worker.py").exists():
+        aux_paths.append("CEO briefings")
+
+    if aux_paths:
+        summary.append(
+            "Other processes: Telegram-capable notification paths still exist for "
+            + ", ".join(aux_paths)
+            + ". These are separate from the Hermes Telegram gateway."
+        )
+
+    return "\n".join(summary)
+
+
+def format_autonomy_status_email(raw_output):
+    lines = raw_output.splitlines()
+
+    def normalize_launch_agent_line(line, label):
+        if not line:
+            return "unknown"
+        compact = " ".join(line.split())
+        if "state=not running" in compact and "last_exit=0" in compact:
+            return f"{label}: idle between checks (last exit 0)"
+        return compact
+
+    def first_match(pattern):
+        for line in lines:
+            if re.search(pattern, line):
+                return line.strip()
+        return ""
+
+    openrouter_line = first_match(r"PASS.*model=") or first_match(r"FAIL.*model=")
+    gmail_line = first_match(r"PASS.*@gmail\.com") or first_match(r"FAIL.*gmail")
+    email_line = normalize_launch_agent_line(first_match(r"Email pipeline"), "Email pipeline")
+    scheduler_line = normalize_launch_agent_line(first_match(r"Scheduler"), "Scheduler")
+    hermes_line = normalize_launch_agent_line(first_match(r"Hermes gateway"), "Hermes gateway")
+
+    recent = []
+    capture_recent = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped == "Recent Signals":
+            capture_recent = True
+            continue
+        if capture_recent and stripped.startswith("==="):
+            continue
+        if capture_recent and stripped == "Summary":
+            break
+        if capture_recent and stripped:
+            recent.append(stripped)
+
+    recent = recent[-3:]
+    plain_summary = summarize_autonomy_status(raw_output)
+
+    body_lines = [
+        "Nexus Status",
+        "",
+        "Operator summary:",
+        plain_summary,
+        "",
+        "Current checks:",
+        f"- OpenRouter: {openrouter_line or 'unknown'}",
+        f"- Gmail auth: {gmail_line or 'unknown'}",
+        f"- {email_line}",
+        f"- {scheduler_line}",
+        f"- {hermes_line}",
+    ]
+
+    if recent:
+        body_lines.extend([
+            "",
+            "Recent activity:",
+        ])
+        for line in recent:
+            body_lines.append(f"- {line}")
+
+    body_lines.extend([
+        "",
+        "Reply with [TASKS] to create work items or [STATUS] again for a fresh check.",
+    ])
+
+    return "\n".join(body_lines)
 
 
 # ── Supabase artifact fetch ───────────────────────────────────────────────────
@@ -326,20 +460,59 @@ def process_tasks(msg):
         f"Nexus Task Queue — {len(created)} Task(s) Created\n\n"
         f"{task_lines}\n\n"
         f"Agents pick these up on their next check.\n"
-        f"Message Hermes on Telegram for live status updates.\n\n"
+        f"For a live stack check, email back with [STATUS] in the subject.\n\n"
         f"---\n"
         f"Created: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+    )
+
+
+def process_status(msg):
+    if not AUTONOMY_CHECK.exists():
+        send_reply(
+            msg["reply_to"], msg["subject"],
+            "Nexus Status — check unavailable\n\n"
+            "The autonomy check script is missing.\n\n"
+            f"Expected at: {AUTONOMY_CHECK}"
+        )
+        return
+
+    result = subprocess.run(
+        [str(AUTONOMY_CHECK)],
+        cwd=str(NEXUS_DIR),
+        capture_output=True,
+        text=True,
+        timeout=90,
+    )
+
+    output = (result.stdout or "").strip()
+    if result.returncode != 0:
+        error = (result.stderr or "").strip()
+        body = (
+            "Nexus Status — check failed\n\n"
+            f"{output[:2500]}\n"
+        )
+        if error:
+            body += f"\nErrors:\n{error[:1200]}\n"
+    else:
+        body = format_autonomy_status_email(output)
+
+    send_reply(
+        msg["reply_to"],
+        msg["subject"],
+        f"{body}\n\n---\nChecked: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
     )
 
 
 # ── Mode detection ────────────────────────────────────────────────────────────
 
 def detect_mode(subject, body):
-    s = subject.lower()
-    if "tasks" in s:
+    s = subject.lower().strip()
+    if "[status]" in s or s == "status" or s.startswith("re: [status]"):
+        return "status"
+    if "[tasks]" in s or s == "tasks" or s.startswith("re: [tasks]"):
         return "tasks"
-    if "nexus" in s or "research" in s:
-        return "research" if YT_RE.search(body) else "tasks"
+    if "[nexus]" in s or "[research]" in s:
+        return "research" if YT_RE.search(body) else None
     return None
 
 
@@ -351,6 +524,10 @@ def poll_once():
         return 0
 
     for msg in messages:
+        sender_lower = (msg.get("sender") or "").lower()
+        if NEXUS_EMAIL.lower() in sender_lower:
+            print(f"[email] Skipping self-sent message — {msg['subject'][:60]}")
+            continue
         mode = detect_mode(msg["subject"], msg["body"])
         if not mode:
             continue
@@ -360,6 +537,8 @@ def poll_once():
                 process_research(msg)
             elif mode == "tasks":
                 process_tasks(msg)
+            elif mode == "status":
+                process_status(msg)
         except Exception as e:
             print(f"[email] Error: {e}")
 

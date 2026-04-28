@@ -1,0 +1,24 @@
+Here is a summary of the trading transcript with the requested sections:
+
+**Strategies**: 
+* The speaker is building a trading strategy around the Calman filter, a mathematical concept developed by Rudolfph Kelman in 1960.
+* The strategy involves applying a three-stage Calman filter to remove noise from price signals in a trading script.
+* The speaker mentions using the filter to get the true price signal, and that they need to consider position, velocity, and acceleration in their trading decisions.
+
+**Indicators**: 
+* The Calman filter is a key indicator used in the speaker's trading strategy.
+* The filter is used to remove noise from price signals, similar to how it was originally used to track position, velocity, and acceleration through noisy sensor data.
+* The speaker also mentions using volume confirmation as an indicator.
+
+**Risk Management**: 
+* The speaker does not explicitly discuss risk management techniques, but mentions that they have done a batch optimization of different strategies overnight.
+* The optimization results show a 24% drawdown for one of the strategies, indicating that the speaker is considering risk management in their strategy development.
+
+**Trade Setups**: 
+* The speaker mentions that they need to consider position, velocity, and acceleration to be non-negative, as well as volume confirmation, when setting up trades.
+* The Calman filter is used to remove noise from price signals, which helps the speaker to identify true price signals and make informed trading decisions.
+
+**Psychology**: 
+* The speaker's tone and language suggest a mindset focused on strategy development and optimization, rather than emotional or impulsive decision-making.
+* The speaker's emphasis on testing and optimizing different strategies overnight suggests a disciplined and methodical approach to trading.
+* The speaker also encourages viewers to subscribe to their channel and engage with their content, indicating a willingness to share knowledge and learn from others.

@@ -1,0 +1,60 @@
+{
+  "sources": [
+    {
+      "type": "youtube_channel",
+      "topic": "credit_repair",
+      "name": "CreditWarrior",
+      "url": "https://www.youtube.com/@CreditWarrior",
+      "max_videos": 3
+    },
+    {
+      "type": "youtube_channel",
+      "topic": "credit_repair",
+      "name": "CoachChisholm",
+      "url": "https://www.youtube.com/@CoachChisholm",
+      "max_videos": 3
+    },
+    {
+      "type": "youtube_channel",
+      "topic": "grant_research",
+      "name": "GrantsForWomen",
+      "url": "https://www.youtube.com/@grantsforwomen",
+      "max_videos": 3
+    },
+    {
+      "type": "youtube_channel",
+      "topic": "grant_research",
+      "name": "SmallBizGrantsTV",
+      "url": "https://www.youtube.com/@smallbizgrants",
+      "max_videos": 3
+    },
+    {
+      "type": "youtube_channel",
+      "topic": "business_opportunities",
+      "name": "AIChaosMarketing",
+      "url": "https://www.youtube.com/@AIAgencyPlaybook",
+      "max_videos": 3
+    },
+    {
+      "type": "youtube_channel",
+      "topic": "business_opportunities",
+      "name": "PatFlynn",
+      "url": "https://www.youtube.com/@PatFlynn",
+      "max_videos": 2
+    },
+    {
+      "type": "youtube_channel",
+      "topic": "crm_automation",
+      "name": "GoHighLevelGuide",
+      "url": "https://www.youtube.com/@GoHighLevelGuide",
+      "max_videos": 2
+    },
+    {
+      "type": "youtube_channel",
+      "topic": "trading",
+      "name": "TraderNick",
+      "url": "https://www.youtube.com/@TraderNick",
+      "max_videos": 2
+    }
+  ]
+}

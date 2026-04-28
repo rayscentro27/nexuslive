@@ -1,0 +1,19 @@
+{
+  "name": "nexus-autonomous-trading-lab",
+  "version": "1.0.0",
+  "description": "Nexus AI — Autonomous Trading Lab. Forex + Options analysis pipeline. No live trading. No auto execution.",
+  "type": "module",
+  "main": "lab_runner.js",
+  "scripts": {
+    "once":   "node lab_runner.js --once",
+    "limit":  "node lab_runner.js --limit 3",
+    "poll":   "node lab_runner.js --poll",
+    "status": "node lab_runner.js --status"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

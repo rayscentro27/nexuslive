@@ -1,0 +1,14 @@
+{
+  "name": "nexus-research-desk",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "once": "node research_desk_runner.js --once",
+    "briefs": "node research_desk_runner.js --briefs",
+    "gaps": "node research_desk_runner.js --gaps",
+    "hypotheses": "node research_desk_runner.js --hypotheses"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  }
+}

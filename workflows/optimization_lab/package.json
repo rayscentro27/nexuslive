@@ -1,0 +1,14 @@
+{
+  "name": "nexus-optimization-lab",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "analyze": "node optimization_runner.js --analyze",
+    "forex": "node optimization_runner.js --forex",
+    "options": "node optimization_runner.js --options",
+    "thresholds": "node optimization_runner.js --thresholds"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  }
+}

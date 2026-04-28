@@ -1,0 +1,28 @@
+{
+  "project_id": "d45cf943-afd9-5ec6-9ebf-01da70b48a8e",
+  "recommendation_id": "d03d5526-fed1-567e-8887-5d4880377cd0",
+  "implementation_task_id": "662994df-9b8a-5621-a0c1-1fbcfb62476c",
+  "paper_trade_run_id": "b3a19505-473f-511f-a11d-639024ccb584",
+  "proposal_id": "ff18c257-48c9-5e48-aa55-faddc3753098",
+  "signal_id": null,
+  "symbol": "Scarface_Trades",
+  "side": "short",
+  "timeframe": "multi",
+  "strategy_id": "This is How Real People Get Good At Trading (FAST)",
+  "asset_type": "options",
+  "entry_price": null,
+  "stop_loss": null,
+  "take_profit": null,
+  "recommendation": "Scarface_Trades short on multi has confidence 0.65 with risk state manual_review and 0 replay datapoint(s).",
+  "risk_decision": {
+    "decision": "manual_review",
+    "rr_ratio": null,
+    "created_at": "2026-04-25T23:59:21.002557+00:00",
+    "risk_flags": [],
+    "risk_score": 65,
+    "proposal_id": "ff18c257-48c9-5e48-aa55-faddc3753098",
+    "rejection_reason": null
+  },
+  "recent_replays": [],
+  "queued_at": "2026-04-26T00:55:25.898457+00:00"
+}

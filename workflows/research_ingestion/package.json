@@ -1,0 +1,16 @@
+{
+  "name": "nexus-research-ingestion",
+  "version": "1.0.0",
+  "description": "Phase 7 — Nexus Brain Research Ingestion Lab",
+  "type": "module",
+  "scripts": {
+    "once": "node research_ingestion_runner.js --once --sources sample_sources.json",
+    "credit": "node research_ingestion_runner.js --topic credit_repair --sources sample_sources.json",
+    "grants": "node research_ingestion_runner.js --topic grant_research --sources sample_sources.json",
+    "biz": "node research_ingestion_runner.js --topic business_opportunities --sources sample_sources.json",
+    "drop-ins": "node research_ingestion_runner.js --drop-ins"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  }
+}

@@ -1,0 +1,44 @@
+**Strategies**
+- **Short-on-retest of broken support:** Trader is short the Dow after price pulled back to a prior **support level now acting as resistance** (classic S/R flip).
+- **Rejection-based confirmation:** The short is supported by a **“negative rejection”** at that resistance zone (failed push higher).
+- **Momentum continuation bias:** Looking for a **flush through prior lows** to confirm downside continuation.
+- **Context overlay strategy:** Trade bias is aligned with macro/geopolitical backdrop (Middle East uncertainty, inflation pressure, oil spike risk), not purely technical.
+
+**Indicators**
+- **Price action / market structure (primary):**
+- Prior support → new resistance
+- Rejection at key level
+- Prior lows as trigger/confirmation zone
+- Yesterday’s intraday high as invalidation level
+- **Macro indicators used as directional filter:**
+- CPI (noted as mixed/neutral-ish)
+- PPI, PCE, and 2-year yield interpreted as signaling persistent inflation expectations
+- Oil spike as forward inflation risk factor
+- **No oscillators or moving averages** explicitly mentioned in the excerpt; approach is mostly **structure + macro narrative**.
+
+**Risk Management**
+- **Hard invalidation:** Stop loss placed **above yesterday’s intraday high**.
+- **Fast loss acceptance:** If price rallies through invalidation level, trader will **exit quickly** (“quick loss”) and move on.
+- **Dynamic stop management:** If downside confirms via break of prior lows, trader plans to **move stop into profit** (protect capital / reduce open risk).
+- **No fixed profit target:** Uses a **trailing-stop exit model** instead of predefined TP.
+- **Asymmetric process:** Small predefined loss vs potentially extended downside through trailing stop.
+
+**Trade Setups**
+1. **S/R Flip Short Setup**
+- Condition: Prior support is broken, then retested.
+- Entry logic: Short on rejection from that retest.
+- Invalidation: Break above recent intraday high.
+2. **Breakdown Confirmation Setup**
+- Condition: Price takes out prior lows.
+- Management action: Shift stop from initial risk zone to profitable/protective zone.
+3. **Macro-Alignment Filter**
+- Prefer shorts when uncertainty + inflation-sensitive macro data and yields suggest risk-off pressure.
+
+**Psychology**
+- **Pre-commitment to invalidation:** Clear “if X happens, I’m out” mentality reduces emotional decision-making.
+- **Losses treated as routine:** “Take a quick loss and move on” reflects strong process discipline.
+- **Flexibility over prediction:** No rigid target; lets market dictate extent via trailing stops.
+- **Headline-volatility awareness:** Acknowledges “whiplash” environment and trades with uncertainty in mind, not against it.
+- **Conviction + contingency:** Holds a directional thesis (downside) while preserving objectivity through explicit risk controls.
+
+If you want, I can also convert this into a **checklist template** (pre-trade / in-trade / post-trade) you can reuse on similar transcript analyses.
