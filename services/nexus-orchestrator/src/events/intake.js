@@ -22,6 +22,7 @@ export async function fetchPendingEvents() {
     .from('system_events')
     .select('id, event_type, payload, status, attempt_count, created_at, lease_expires_at')
     .eq('status', 'pending')
+    .not('event_type', 'like', 'ceo_%')
     .or(`lease_expires_at.is.null,lease_expires_at.lt.${now}`)
     .order('created_at', { ascending: true })
     .limit(BATCH_SIZE);

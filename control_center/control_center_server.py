@@ -487,6 +487,372 @@ def api_growth_summary():
     })
 
 
+@app.route("/api/growth/approval-queue")
+def api_growth_approval_queue():
+    from flask import request as flask_request
+    from scripts.prelaunch_utils import rest_select
+    import urllib.parse
+
+    limit = flask_request.args.get("limit", "24").strip()
+    platform = (flask_request.args.get("platform") or "").strip()
+    created_by = (flask_request.args.get("created_by") or "content_variant_generator").strip()
+    try:
+        limit_int = max(1, min(int(limit), 100))
+    except ValueError:
+        limit_int = 24
+
+    query = (
+        "content_variants?select="
+        "id,topic_id,campaign_id,platform,status,hook_draft,script_draft,caption_draft,"
+        "compliance_notes,created_at,cta,hashtags,created_by,content_topics(topic,slug,theme)"
+        "&status=eq.pending_review"
+        "&order=created_at.desc"
+        f"&limit={limit_int}"
+    )
+    if platform and platform.lower() != "all":
+        query += f"&platform=eq.{urllib.parse.quote(platform, safe='')}"
+    if created_by and created_by.lower() != "all":
+        query += f"&created_by=eq.{urllib.parse.quote(created_by, safe='')}"
+    try:
+        rows = rest_select(query) or []
+    except Exception:
+        rows = []
+    return jsonify({
+        "queue": rows,
+        "limit": limit_int,
+        "platform_filter": platform or "all",
+        "created_by_filter": created_by or "all",
+        "count": len(rows),
+    })
+
+
+@app.route("/api/funding/overview")
+def api_funding_overview():
+    from funding_engine.service import (
+        get_recent_recommendation_errors,
+        get_users_needing_recommendations,
+        get_users_with_stale_recommendations,
+    )
+    from scripts.prelaunch_utils import count_rows, rest_select
+
+    def safe_count(table: str, filter_query: str = "") -> int:
+        try:
+            return count_rows(table, filter_query)
+        except Exception:
+            return 0
+
+    def safe_recent(path: str):
+        try:
+            return rest_select(path) or []
+        except Exception:
+            return []
+
+    tier_rows = safe_recent(
+        "user_tier_progress?select=user_id,current_tier,tier_1_status,tier_2_status,tier_3_status,"
+        "business_readiness_score,relationship_score,updated_at&limit=250"
+    )
+    score_rows = safe_recent("user_business_score_inputs?select=user_id,tenant_id,created_at&limit=250")
+    relationship_rows = safe_recent("banking_relationships?select=user_id,tenant_id,created_at&limit=250")
+
+    tracked_users = {row.get("user_id") for row in tier_rows if row.get("user_id")}
+    score_users = {row.get("user_id") for row in score_rows if row.get("user_id")}
+    relationship_users = {row.get("user_id") for row in relationship_rows if row.get("user_id")}
+
+    ready_for_tier_1 = sum(
+        1 for row in tier_rows
+        if (row.get("tier_1_status") in {"ready", "completed"})
+        or float(row.get("business_readiness_score") or 0) >= 60
+    )
+    close_to_tier_2 = sum(
+        1 for row in tier_rows
+        if row.get("tier_2_status") != "unlocked"
+        and float(row.get("business_readiness_score") or 0) >= 60
+        and float(row.get("relationship_score") or 0) >= 8
+    )
+    recent_runs = safe_recent(
+        "funding_recommendation_runs?select=user_id,tenant_id,reason,status,created_at,completed_at,error,skipped_reason"
+        "&order=created_at.desc&limit=8"
+    )
+    last_generation_at = recent_runs[0].get("completed_at") if recent_runs else None
+
+    return jsonify({
+        "approval_data_ingestion_status": {
+            "raw_results": safe_count("credit_approval_results"),
+            "normalized_patterns": safe_count("card_approval_patterns"),
+        },
+        "lending_research_status": {
+            "institutions": safe_count("lending_institutions"),
+            "recent_institutions": safe_recent(
+                "lending_institutions?select=institution_name,institution_type,product_types,created_at&order=created_at.desc&limit=5"
+            ),
+        },
+        "users_ready_for_tier_1": ready_for_tier_1,
+        "users_close_to_tier_2_unlock": close_to_tier_2,
+        "recommendations_generated": safe_count("funding_recommendations"),
+        "application_results_submitted": safe_count("application_results"),
+        "pending_invoices": safe_count("success_fee_invoices", "status=eq.pending"),
+        "pending_referral_earnings": safe_count("referral_earnings", "status=eq.pending"),
+        "missing_business_score_inputs": max(len(tracked_users - score_users), 0),
+        "missing_banking_relationship_inputs": max(len(tracked_users - relationship_users), 0),
+        "users_needing_recommendation_generation": get_users_needing_recommendations(),
+        "users_with_stale_recommendations": get_users_with_stale_recommendations()[:20],
+        "last_recommendation_generation_time": last_generation_at,
+        "generation_errors": get_recent_recommendation_errors(limit=12),
+        "recent_recommendation_runs": recent_runs,
+        "recent_tier_progress": tier_rows[:8],
+    })
+
+
+@app.route("/api/funding/recommendations", methods=["GET", "POST"])
+def api_funding_recommendations():
+    from flask import request as flask_request
+    from funding_engine.service import generate_user_recommendations, persist_user_recommendations
+
+    source = flask_request.args if flask_request.method == "GET" else (flask_request.get_json(silent=True) or {})
+    user_id = (source.get("user_id") or "").strip()
+    tenant_id = (source.get("tenant_id") or "").strip() or None
+    tier = source.get("tier")
+    try:
+        tier = int(tier) if tier not in (None, "") else None
+    except Exception:
+        tier = None
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    if flask_request.method == "POST":
+        return jsonify(persist_user_recommendations(user_id=user_id, tenant_id=tenant_id, tier=tier))
+    return jsonify(generate_user_recommendations(user_id=user_id, tenant_id=tenant_id, tier=tier))
+
+
+@app.route("/api/funding/recommendations/refresh", methods=["POST"])
+def api_funding_recommendations_refresh():
+    from flask import request as flask_request
+    from funding_engine.service import create_or_refresh_user_recommendations
+
+    body = flask_request.get_json(silent=True) or {}
+    user_id = (body.get("user_id") or "").strip()
+    tenant_id = (body.get("tenant_id") or "").strip() or None
+    reason = (body.get("reason") or "manual_admin_refresh").strip() or "manual_admin_refresh"
+    force = bool(body.get("force"))
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    return jsonify(create_or_refresh_user_recommendations(user_id=user_id, tenant_id=tenant_id, reason=reason, force=force))
+
+
+@app.route("/api/funding/journey")
+def api_funding_journey():
+    from flask import request as flask_request
+    from funding_engine.service import generate_user_recommendations
+
+    user_id = (flask_request.args.get("user_id") or "").strip()
+    tenant_id = (flask_request.args.get("tenant_id") or "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    return jsonify(generate_user_recommendations(user_id=user_id, tenant_id=tenant_id))
+
+
+@app.route("/api/funding/tier-2-unlock")
+def api_funding_tier_2_unlock():
+    from flask import request as flask_request
+    from funding_engine.service import build_funding_snapshot
+
+    user_id = (flask_request.args.get("user_id") or "").strip()
+    tenant_id = (flask_request.args.get("tenant_id") or "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    snapshot = build_funding_snapshot(user_id=user_id, tenant_id=tenant_id)
+    return jsonify({
+        "tier_progress": snapshot.get("tier_progress"),
+        "missing_inputs": snapshot.get("missing_inputs"),
+        "readiness": snapshot.get("readiness"),
+        "relationship_score": snapshot.get("relationship_score"),
+    })
+
+
+@app.route("/api/funding/brief")
+def api_funding_brief():
+    from flask import request as flask_request
+    from funding_engine.service import build_hermes_funding_brief
+
+    user_id = (flask_request.args.get("user_id") or "").strip()
+    tenant_id = (flask_request.args.get("tenant_id") or "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    return jsonify(build_hermes_funding_brief(user_id=user_id, tenant_id=tenant_id))
+
+
+@app.route("/api/funding/business-score-inputs", methods=["POST"])
+def api_funding_business_score_inputs():
+    from flask import request as flask_request
+    from funding_engine.service import create_or_refresh_user_recommendations
+    from scripts.prelaunch_utils import supabase_request
+
+    body = flask_request.get_json(silent=True) or {}
+    user_id = (body.get("user_id") or "").strip()
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    payload = {
+        "tenant_id": (body.get("tenant_id") or "").strip() or None,
+        "user_id": user_id,
+        "duns_status": body.get("duns_status"),
+        "paydex_score": body.get("paydex_score"),
+        "experian_business_score": body.get("experian_business_score"),
+        "equifax_business_score": body.get("equifax_business_score"),
+        "nav_grade": body.get("nav_grade"),
+        "reporting_tradelines_count": body.get("reporting_tradelines_count"),
+        "business_bank_account_age_months": body.get("business_bank_account_age_months"),
+        "monthly_deposits": body.get("monthly_deposits"),
+        "average_balance": body.get("average_balance"),
+        "nsf_count": body.get("nsf_count"),
+        "revenue_consistency": body.get("revenue_consistency"),
+        "uploaded_report_url": body.get("uploaded_report_url"),
+    }
+    rows, _ = supabase_request("user_business_score_inputs", method="POST", body=payload, prefer="return=representation")
+    refresh = create_or_refresh_user_recommendations(
+        user_id=user_id,
+        tenant_id=payload["tenant_id"],
+        reason="business_score_inputs_updated",
+        force=False,
+    )
+    return jsonify({"ok": True, "input": (rows or [None])[0], "refresh": refresh.get("refresh")})
+
+
+@app.route("/api/funding/banking-relationships", methods=["POST"])
+def api_funding_banking_relationships():
+    from flask import request as flask_request
+    from funding_engine.service import create_or_refresh_user_recommendations
+    from scripts.prelaunch_utils import supabase_request
+
+    body = flask_request.get_json(silent=True) or {}
+    user_id = (body.get("user_id") or "").strip()
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    payload = {
+        "tenant_id": (body.get("tenant_id") or "").strip() or None,
+        "user_id": user_id,
+        "institution_name": body.get("institution_name"),
+        "account_type": body.get("account_type"),
+        "account_open_date": body.get("account_open_date"),
+        "account_age_days": body.get("account_age_days"),
+        "average_balance": body.get("average_balance"),
+        "monthly_deposits": body.get("monthly_deposits"),
+        "deposit_consistency": body.get("deposit_consistency"),
+        "prior_products": body.get("prior_products") or [],
+        "target_for_funding": bool(body.get("target_for_funding")),
+        "relationship_score": body.get("relationship_score"),
+        "verification_status": body.get("verification_status") or "self_reported",
+        "proof_url": body.get("proof_url"),
+    }
+    rows, _ = supabase_request("banking_relationships", method="POST", body=payload, prefer="return=representation")
+    refresh = create_or_refresh_user_recommendations(
+        user_id=user_id,
+        tenant_id=payload["tenant_id"],
+        reason="banking_relationship_updated",
+        force=False,
+    )
+    return jsonify({"ok": True, "relationship": (rows or [None])[0], "refresh": refresh.get("refresh")})
+
+
+@app.route("/api/funding/onboarding-complete", methods=["POST"])
+def api_funding_onboarding_complete():
+    from flask import request as flask_request
+    from funding_engine.service import create_or_refresh_user_recommendations
+    from scripts.prelaunch_utils import supabase_request, utc_now_iso
+
+    body = flask_request.get_json(silent=True) or {}
+    user_id = (body.get("user_id") or "").strip()
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    rows, _ = supabase_request(
+        f"user_profiles?id=eq.{user_id}",
+        method="PATCH",
+        body={"onboarding_complete": True, "updated_at": utc_now_iso()},
+        prefer="return=representation",
+    )
+    refresh = create_or_refresh_user_recommendations(
+        user_id=user_id,
+        tenant_id=(body.get("tenant_id") or "").strip() or None,
+        reason="onboarding_completed",
+        force=False,
+    )
+    return jsonify({"ok": True, "profile": (rows or [None])[0], "refresh": refresh.get("refresh")})
+
+
+@app.route("/api/funding/application-results", methods=["GET", "POST"])
+def api_funding_application_results():
+    from flask import request as flask_request
+    from funding_engine.billing_events import record_application_result
+    from scripts.prelaunch_utils import rest_select
+    import urllib.parse
+
+    if flask_request.method == "GET":
+        user_id = (flask_request.args.get("user_id") or "").strip()
+        tenant_id = (flask_request.args.get("tenant_id") or "").strip() or None
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        filters = [f"user_id=eq.{urllib.parse.quote(user_id, safe='')}"]
+        if tenant_id:
+            filters.append(f"tenant_id=eq.{urllib.parse.quote(tenant_id, safe='')}")
+        rows = rest_select(
+            "application_results?select=*&order=created_at.desc&" + "&".join(filters)
+        ) or []
+        return jsonify({"results": rows})
+
+    body = flask_request.get_json(silent=True) or {}
+    user_id = (body.get("user_id") or "").strip()
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    result = record_application_result(
+        tenant_id=(body.get("tenant_id") or "").strip() or None,
+        user_id=user_id,
+        recommendation_id=(body.get("recommendation_id") or "").strip() or None,
+        result_status=(body.get("result_status") or "").strip() or "reported",
+        approved_amount=body.get("approved_amount") or 0,
+        proof_url=(body.get("proof_url") or "").strip() or None,
+        verified=bool(body.get("verified")),
+    )
+    return jsonify(result), (200 if result.get("ok") else 400)
+
+
+@app.route("/api/funding/invoices")
+def api_funding_invoices():
+    from flask import request as flask_request
+    from scripts.prelaunch_utils import rest_select
+    import urllib.parse
+
+    user_id = (flask_request.args.get("user_id") or "").strip()
+    tenant_id = (flask_request.args.get("tenant_id") or "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    filters = [f"user_id=eq.{urllib.parse.quote(user_id, safe='')}"]
+    if tenant_id:
+        filters.append(f"tenant_id=eq.{urllib.parse.quote(tenant_id, safe='')}")
+    rows = rest_select("success_fee_invoices?select=*&order=created_at.desc&" + "&".join(filters)) or []
+    return jsonify({"invoices": rows})
+
+
+@app.route("/api/funding/referral-dashboard")
+def api_funding_referral_dashboard():
+    from flask import request as flask_request
+    from scripts.prelaunch_utils import rest_select
+    import urllib.parse
+
+    user_id = (flask_request.args.get("user_id") or "").strip()
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    q = urllib.parse.quote(user_id, safe="")
+    referrals = rest_select(
+        f"referrals?select=*&referrer_user_id=eq.{q}&order=created_at.desc"
+    ) or []
+    earnings = rest_select(
+        f"referral_earnings?select=*&referrer_user_id=eq.{q}&order=created_at.desc"
+    ) or []
+    return jsonify({
+        "referrals": referrals,
+        "earnings": earnings,
+        "pending_earnings": [row for row in earnings if row.get("status") == "pending"],
+    })
+
+
 @app.route("/api/growth/variants")
 def api_growth_variants():
     from flask import request as flask_request
@@ -494,14 +860,16 @@ def api_growth_variants():
     import urllib.parse
 
     limit = flask_request.args.get("limit", "24").strip()
-    status = flask_request.args.get("status", "draft_review").strip()
+    status = flask_request.args.get("status", "pending_review").strip()
     try:
         limit_int = max(1, min(int(limit), 100))
     except ValueError:
         limit_int = 24
 
     query = (
-        "content_variants?select=id,platform,status,hook_draft,script_draft,caption_draft,compliance_notes,created_at,topic_id"
+        "content_variants?select="
+        "id,topic_id,campaign_id,platform,status,hook_draft,script_draft,caption_draft,"
+        "compliance_notes,created_at,cta,hashtags,created_by,content_topics(topic,slug,theme)"
         "&order=created_at.desc"
         f"&limit={limit_int}"
     )
@@ -1644,9 +2012,11 @@ async function loadPrelaunchPage() {
 
 async function loadGrowthPage() {
   try {
-    const [d, variantFeed] = await Promise.all([
+    const [d, variantFeed, approvalQueue, fundingOverview] = await Promise.all([
       get('/api/growth/summary'),
       get('/api/growth/variants?status=all&limit=12'),
+      get('/api/growth/approval-queue?limit=18'),
+      get('/api/funding/overview'),
     ]);
     const flags = d.feature_flags || {};
     const queue = d.content_queue || {};
@@ -1656,15 +2026,18 @@ async function loadGrowthPage() {
     const leadScores = d.lead_scores || {};
     const onboarding = d.onboarding || {};
     const noteRows = d.learning_notes || [];
+    const pendingApprovals = (queue.approvals_by_decision || {}).pending || 0;
+    const approvalRows = approvalQueue.queue || [];
+    const funding = fundingOverview || {};
 
     document.getElementById('growth-summary-panel').innerHTML = `
       <div class="metric-grid">
         <div class="metric"><div class="val blue">${queue.topics_total || 0}</div><div class="lbl">TOPICS</div></div>
         <div class="metric"><div class="val amber">${Object.values(queue.variants_by_status || {}).reduce((a,b)=>a+b,0)}</div><div class="lbl">CONTENT DRAFTS</div></div>
-        <div class="metric"><div class="val green">${referrals.links_total || 0}</div><div class="lbl">REFERRAL LINKS</div></div>
-        <div class="metric"><div class="val blue">${Object.values(dms.messages_by_status || {}).reduce((a,b)=>a+b,0)}</div><div class="lbl">DM DRAFTS</div></div>
-        <div class="metric"><div class="val purple">${Object.values(influencers.messages_by_status || {}).reduce((a,b)=>a+b,0)}</div><div class="lbl">OUTREACH DRAFTS</div></div>
-        <div class="metric"><div class="val red">${noteRows.length}</div><div class="lbl">LEARNING NOTES</div></div>
+        <div class="metric"><div class="val red">${pendingApprovals}</div><div class="lbl">PENDING APPROVALS</div></div>
+        <div class="metric"><div class="val green">${funding.users_ready_for_tier_1 || 0}</div><div class="lbl">READY FOR TIER 1</div></div>
+        <div class="metric"><div class="val blue">${funding.users_close_to_tier_2_unlock || 0}</div><div class="lbl">CLOSE TO TIER 2</div></div>
+        <div class="metric"><div class="val purple">${funding.pending_invoices || 0}</div><div class="lbl">PENDING INVOICES</div></div>
       </div>
       <div style="margin-top:12px" class="audit-pre">Flags
 AUTO_POST_ENABLED=${esc(flags.AUTO_POST_ENABLED)}
@@ -1678,17 +2051,47 @@ INFLUENCER_REQUIRE_APPROVAL=${esc(flags.INFLUENCER_REQUIRE_APPROVAL)}</div>
 
     const recentTopics = (queue.recent_topics || []).map(row => `• ${row.topic} [${row.status}]`).join('\n') || '• none yet';
     const recentVariants = (variantFeed.variants || []).map(renderGrowthVariantCard).join('') || '<div style="color:var(--dim)">No content variants yet.</div>';
+    const approvalCards = approvalRows.map(renderGrowthApprovalCard).join('') || '<div style="color:var(--dim)">No pending content approvals.</div>';
     const recentScores = (leadScores.recent || []).map(row => `• ${row.lead_ref}: ${row.lead_score} (${row.segment}) → ${row.recommended_agent}`).join('\n') || '• none yet';
     const recentOnboarding = (onboarding.recent_recommendations || []).map(row => `• ${row.user_ref}: ${row.user_stage} → ${row.recommended_agent}`).join('\n') || '• none yet';
     const learningNotes = noteRows.map(row => `• ${row.note}`).join('\n') || '• none yet';
+    const recentTierProgress = (funding.recent_tier_progress || []).map(
+      row => `• ${row.user_id}: tier=${row.current_tier} | readiness=${row.business_readiness_score || 0} | relationship=${row.relationship_score || 0} | t2=${row.tier_2_status || 'n/a'}`
+    ).join('\n') || '• none yet';
+    const recommendationNeeds = (funding.users_needing_recommendation_generation || []).map(
+      row => `• ${row.user_id}: ${row.reason || 'needs generation'}`
+    ).join('\n') || '• none yet';
+    const staleRecommendations = (funding.users_with_stale_recommendations || []).map(
+      row => `• ${row.user_id}: ${row.product_name || 'recommendation'} | last=${row.last_generated_at || 'unknown'}`
+    ).join('\n') || '• none yet';
+    const generationErrors = (funding.generation_errors || []).map(
+      row => `• ${row.user_id}: ${row.error || row.skipped_reason || row.status}`
+    ).join('\n') || '• none yet';
 
     document.getElementById('growth-detail-panel').innerHTML = `
+      <div style="margin-bottom:12px">
+        <div class="message-title">Approval Queue</div>
+        <div class="message-meta">Draft-only queue for human review. Nothing here is posted or scheduled automatically.</div>
+        ${approvalCards}
+      </div>
       <div style="margin-bottom:12px">
         <div class="message-title">Recent Content Variants</div>
         ${recentVariants}
       </div>
       <div class="audit-pre">Content Queue
 ${esc(JSON.stringify(queue.variants_by_status || {}, null, 2))}
+
+Funding Engine
+approval_results_raw=${esc(String((funding.approval_data_ingestion_status || {}).raw_results || 0))}
+approval_patterns=${esc(String((funding.approval_data_ingestion_status || {}).normalized_patterns || 0))}
+lending_institutions=${esc(String((funding.lending_research_status || {}).institutions || 0))}
+recommendations_generated=${esc(String(funding.recommendations_generated || 0))}
+application_results=${esc(String(funding.application_results_submitted || 0))}
+pending_invoices=${esc(String(funding.pending_invoices || 0))}
+pending_referral_earnings=${esc(String(funding.pending_referral_earnings || 0))}
+missing_business_score_inputs=${esc(String(funding.missing_business_score_inputs || 0))}
+missing_banking_relationship_inputs=${esc(String(funding.missing_banking_relationship_inputs || 0))}
+last_recommendation_generation_time=${esc(String(funding.last_recommendation_generation_time || 'none'))}
 
 Recent Topics
 ${esc(recentTopics)}
@@ -1708,6 +2111,18 @@ ${esc(recentScores)}
 Onboarding Dropoffs
 ${esc(recentOnboarding)}
 
+Tier Progress
+${esc(recentTierProgress)}
+
+Users Needing Recommendation Generation
+${esc(recommendationNeeds)}
+
+Users With Stale Recommendations
+${esc(staleRecommendations)}
+
+Recommendation Generation Errors
+${esc(generationErrors)}
+
 Learning Notes
 ${esc(learningNotes)}</div>
     `;
@@ -1718,10 +2133,35 @@ ${esc(learningNotes)}</div>
   }
 }
 
+function renderGrowthApprovalCard(row) {
+  const topic = row.content_topics?.topic || row.topic_id || 'Unknown topic';
+  const theme = row.content_topics?.theme || 'general education';
+  const hashtags = Array.isArray(row.hashtags) ? row.hashtags.join(' ') : '';
+  const createdBy = row.created_by || 'unknown';
+  return `<div class="draft-card">
+    <div class="draft-top">
+      <div>
+        <div class="draft-role">${esc((row.platform || 'content').toUpperCase())}</div>
+        <div class="draft-meta">${ts(row.created_at)} | status=${esc(row.status || 'pending_review')} | by ${esc(createdBy)}</div>
+      </div>
+      <div>${statusBadge(row.status || 'pending_review')}</div>
+    </div>
+    <div class="message-title">${esc(topic)}</div>
+    <div class="message-meta">theme=${esc(theme)} | topic_id=${esc(row.topic_id || 'n/a')}</div>
+    <div class="message-body">Hook: ${esc(row.hook_draft || 'n/a')}</div>
+    <div class="message-body">${esc(row.script_draft || '')}</div>
+    <div class="message-body">${esc(row.caption_draft || '')}</div>
+    <div class="draft-detail">CTA: ${esc(row.cta || 'embedded in caption/compliance notes')}</div>
+    <div class="draft-detail">Hashtags: ${esc(hashtags || 'embedded in caption')}</div>
+    <div class="draft-detail">${esc(row.compliance_notes || '')}</div>
+  </div>`;
+}
+
 function renderGrowthVariantCard(row) {
+  const topic = row.content_topics?.topic || row.topic_id || 'Unknown topic';
   return `<div class="message-card">
     <div class="message-title">${esc((row.platform || 'variant').toUpperCase())} Variant #${esc(row.id)}</div>
-    <div class="message-meta">${ts(row.created_at)} | status=${esc(row.status || 'draft_review')}</div>
+    <div class="message-meta">${ts(row.created_at)} | status=${esc(row.status || 'pending_review')} | ${esc(topic)}</div>
     <div class="message-body">Hook: ${esc(row.hook_draft || 'n/a')}</div>
     <div class="message-body">${esc(row.caption_draft || '')}</div>
   </div>`;

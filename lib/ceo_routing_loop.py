@@ -175,13 +175,12 @@ def mark_routed(event_id: str, role: str, confidence: float) -> bool:
     return _sb_patch(
         f"system_events?id=eq.{event_id}",
         {
-            "status":       "routed",
-            "processed_by": "ceo_routing_loop",
-            "processed_at": now,
-            "metadata":     json.dumps({
-                "routed_to": role,
-                "confidence": confidence,
-            }),
+            "status": "routed",
+            "completed_at": now,
+            "claimed_by": None,
+            "claimed_at": None,
+            "lease_expires_at": None,
+            "last_error": None,
         },
     )
 
@@ -190,8 +189,11 @@ def mark_routing_failed(event_id: str, error: str) -> bool:
     return _sb_patch(
         f"system_events?id=eq.{event_id}",
         {
-            "status":    "routing_failed",
-            "error_msg": error[:500],
+            "status": "routing_failed",
+            "last_error": error[:500],
+            "claimed_by": None,
+            "claimed_at": None,
+            "lease_expires_at": None,
         },
     )
 

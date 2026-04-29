@@ -44,8 +44,14 @@ STATE_FILE = Path(__file__).parent / "scheduler_state.json"
 PID_FILE = Path(__file__).parent / "scheduler.pid"
 _running = True
 _lock = threading.Lock()
-TELEGRAM_ENABLED = os.getenv("SCHEDULER_TELEGRAM_ENABLED", "true").lower() == "true"
-EMAIL_ENABLED = os.getenv("SCHEDULER_EMAIL_ENABLED", "false").lower() == "true"
+
+
+def telegram_enabled() -> bool:
+    return os.getenv("SCHEDULER_TELEGRAM_ENABLED", "true").lower() == "true"
+
+
+def email_enabled() -> bool:
+    return os.getenv("SCHEDULER_EMAIL_ENABLED", "false").lower() == "true"
 
 
 def _acquire_pid_lock():
@@ -98,7 +104,38 @@ def _due(task_name: str, interval_hours: float) -> bool:
 def _mark_done(task_name: str):
     state = _load_state()
     state[task_name] = datetime.now().isoformat()
+    state.pop(f"_running_{task_name}", None)
     _save_state(state)
+
+
+def _claim_due(task_name: str, interval_hours: float) -> bool:
+    """
+    Atomically claim a due task so slow jobs do not start twice in parallel.
+    """
+    with _lock:
+        state = _load_state()
+        running_key = f"_running_{task_name}"
+        if state.get(running_key):
+            return False
+
+        last_run = state.get(task_name)
+        if last_run:
+            try:
+                last = datetime.fromisoformat(last_run)
+                if datetime.now() < last + timedelta(hours=interval_hours):
+                    return False
+            except Exception:
+                pass
+
+        state[running_key] = datetime.now().isoformat()
+        _save_state(state)
+        return True
+
+
+def _release_claim(task_name: str):
+    state = _load_state()
+    if state.pop(f"_running_{task_name}", None) is not None:
+        _save_state(state)
 
 
 # ─────────────────────────────────────────────
@@ -350,9 +387,87 @@ def task_ops_monitoring():
         logger.error(f"Ops monitoring error: {e}")
 
 
+def task_funding_brief():
+    """Produce a daily Hermes funding brief for a configured user."""
+    logger.info("▶ Running funding brief...")
+    user_id = (os.getenv("FUNDING_BRIEF_USER_ID") or "").strip()
+    tenant_id = (os.getenv("FUNDING_BRIEF_TENANT_ID") or "").strip() or None
+    if not user_id:
+        logger.info("Funding brief skipped — FUNDING_BRIEF_USER_ID not configured")
+        return
+    try:
+        from funding_engine.service import build_hermes_funding_brief
+
+        brief = build_hermes_funding_brief(user_id=user_id, tenant_id=tenant_id)
+        brief_text = brief.get("brief_text", "").strip()
+        if not brief_text:
+            logger.info("Funding brief skipped — no brief text generated")
+            return
+        _notify(
+            "💼 <b>Daily Funding Brief</b>\n"
+            + brief_text.replace("\n\n", "\n")
+        )
+        _notify_hermes(
+            f"Daily funding brief for user {user_id} at {datetime.now().strftime('%Y-%m-%d %H:%M')}:\n\n"
+            f"{brief_text}"
+        )
+        logger.info("✅ Funding brief generated")
+    except Exception as e:
+        logger.error(f"Funding brief failed: {e}")
+
+
+def task_funding_recommendation_refresh():
+    """Daily refresh for users who have usable funding profile data."""
+    logger.info("▶ Running funding recommendation refresh...")
+    try:
+        from funding_engine.service import (
+            create_or_refresh_user_recommendations,
+            get_users_needing_recommendations,
+            get_users_with_stale_recommendations,
+            process_pending_recommendation_jobs,
+        )
+
+        processed_jobs = process_pending_recommendation_jobs(limit=50)
+        candidate_map: dict[tuple[str | None, str], dict[str, Any]] = {}
+        for row in get_users_needing_recommendations():
+            key = (row.get("tenant_id"), row.get("user_id"))
+            candidate_map[key] = row
+        for row in get_users_with_stale_recommendations():
+            key = (row.get("tenant_id"), row.get("user_id"))
+            candidate_map[key] = {
+                "tenant_id": row.get("tenant_id"),
+                "user_id": row.get("user_id"),
+                "reason": "stale_recommendations_refresh",
+            }
+
+        refreshed = 0
+        skipped = 0
+        for row in list(candidate_map.values())[:100]:
+            result = create_or_refresh_user_recommendations(
+                user_id=row["user_id"],
+                tenant_id=row.get("tenant_id"),
+                reason=row.get("reason") or "scheduled_daily_refresh",
+                force=False,
+            )
+            if result.get("refresh", {}).get("skipped"):
+                skipped += 1
+            else:
+                refreshed += 1
+
+        logger.info(
+            "✅ Funding recommendation refresh done — refreshed=%s skipped=%s queued_processed=%s queued_failed=%s",
+            refreshed,
+            skipped,
+            processed_jobs.get("processed", 0),
+            processed_jobs.get("failed", 0),
+        )
+    except Exception as e:
+        logger.error(f"Funding recommendation refresh failed: {e}")
+
+
 def _notify(message: str):
     """Send a Telegram alert without crashing if bot is unavailable."""
-    if not TELEGRAM_ENABLED:
+    if not telegram_enabled():
         return
     try:
         import sys
@@ -369,7 +484,7 @@ _EMAIL_COOLDOWN_HOURS = 2.0  # minimum gap between emails with the same subject 
 
 def _email_notify(subject: str, body: str):
     """Send a fuller operator summary by email without crashing the scheduler."""
-    if not EMAIL_ENABLED:
+    if not email_enabled():
         return
     try:
         state = _load_state()
@@ -428,6 +543,8 @@ SCHEDULE = [
     (task_signal_analysis,    6.0,  "signal_analysis"),
     (task_lead_check,        24.0,  "lead_check"),
     (task_reputation_check,   1.0,  "reputation_check"),
+    (task_funding_brief,     24.0,  "funding_brief"),
+    (task_funding_recommendation_refresh, 24.0, "funding_recommendation_refresh"),
     (task_ops_monitoring,    24.0,  "ops_monitoring"),
     (task_token_check,       24.0,  "token_check"),
     (task_browser_health,    12.0,  "browser_health"),
@@ -441,6 +558,7 @@ def get_schedule_status() -> Dict:
     result = {}
     for fn, hours, name in SCHEDULE:
         last = state.get(name)
+        running = bool(state.get(f"_running_{name}"))
         if last:
             try:
                 next_run = (datetime.fromisoformat(last) + timedelta(hours=hours)).isoformat()
@@ -448,7 +566,12 @@ def get_schedule_status() -> Dict:
                 next_run = "unknown"
         else:
             next_run = "now (never run)"
-        result[name] = {"last_run": last, "interval_hours": hours, "next_run": next_run}
+        result[name] = {
+            "last_run": last,
+            "interval_hours": hours,
+            "next_run": next_run,
+            "running": running,
+        }
     return result
 
 
@@ -475,7 +598,7 @@ def run_scheduler():
         for fn, interval_hours, name in SCHEDULE:
             if not _running:
                 break
-            if _due(name, interval_hours):
+            if _claim_due(name, interval_hours):
                 t = threading.Thread(target=_run_task, args=(fn, name), daemon=True)
                 t.start()
 
@@ -493,6 +616,7 @@ def _run_task(fn: Callable, name: str):
         fn()
         _mark_done(name)
     except Exception as e:
+        _release_claim(name)
         logger.error(f"Task {name} raised: {e}")
 
 
@@ -501,7 +625,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--status", action="store_true")
     p.add_argument("--run-now", metavar="TASK",
-                   choices=["research", "signals", "leads", "reputation"],
+                   choices=["research", "signals", "leads", "reputation", "funding_brief", "funding_recommendation_refresh"],
                    help="Run a specific task immediately")
     args = p.parse_args()
 
@@ -513,6 +637,8 @@ if __name__ == "__main__":
             "signals": task_signal_analysis,
             "leads": task_lead_check,
             "reputation": task_reputation_check,
+            "funding_brief": task_funding_brief,
+            "funding_recommendation_refresh": task_funding_recommendation_refresh,
         }
         task_map[args.run_now]()
     else:

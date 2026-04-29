@@ -39,6 +39,10 @@ OPS_SNAPSHOT = os.path.join(os.path.dirname(__file__), "scripts", "hermes_ops_sn
 OPS_ATTENTION = os.path.join(os.path.dirname(__file__), "scripts", "hermes_ops_attention.sh")
 SCHEDULER_SCRIPT = os.path.join(os.path.dirname(__file__), "operations_center", "scheduler.py")
 
+
+def email_summaries_enabled() -> bool:
+    return os.getenv("TELEGRAM_EMAIL_SUMMARIES_ENABLED", "false").lower() == "true"
+
 class NexusTelegramBot:
     """Telegram bot for Nexus AI trading alerts and system monitoring"""
 
@@ -134,6 +138,8 @@ class NexusTelegramBot:
             return False
 
     def send_email_summary(self, subject: str, body: str) -> None:
+        if not email_summaries_enabled():
+            return
         try:
             from notifications.operator_notifications import send_operator_email
             sent, detail = send_operator_email(subject, body)

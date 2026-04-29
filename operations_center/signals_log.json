@@ -1,155 +1,5 @@
 [
   {
-    "id": "SIG-20260422175240",
-    "source": "TraderNick - How to Trade Oil Spikes\uff1a What You Need to Know!",
-    "sentiment": "bullish",
-    "confidence": 60,
-    "strategy_notes": [
-      "- **\u201cEasiest trade\u201d framing**: Not \u201ceasy money,\u201d but the setup with the clearest confluence and least ambiguity.",
-      "- **High-risk acknowledgment**: Explicit warning that markets are difficult and oil is highly volatile.",
-      "- **Implied risk control principle**: Avoid low-conviction trades; participate only when catalyst + chart direction are clear (quality filter as risk control).",
-      "- **No explicit hard rules provided** (in excerpt): No fixed stop size, R-multiple, or position-size formula stated yet.",
-      "- **Catalyst-driven breakout/continuation setup**:"
-    ],
-    "dry_run": true,
-    "generated_at": "2026-04-22T17:52:40.720487"
-  },
-  {
-    "id": "SIG-20260422175240",
-    "source": "TraderNick - THEY SOLD!",
-    "sentiment": "bullish",
-    "confidence": 67,
-    "strategy_notes": [
-      "- Starts with the **S&P 500** as a broad **risk barometer** to judge whether the environment is **risk-on or risk-off**.",
-      "- **S&P 500 as a risk indicator**",
-      "- If S&P is improving, that suggests broader **risk appetite** is returning.",
-      "- **Context-first risk filtering**",
-      "- Before entering trades, assess whether the broader market is **risk-on or risk-off**."
-    ],
-    "dry_run": true,
-    "generated_at": "2026-04-22T17:52:40.805611"
-  },
-  {
-    "id": "SIG-20260422175240",
-    "source": "SMB Capital - The $100 New Options Strategy",
-    "sentiment": "bullish",
-    "confidence": 60,
-    "strategy_notes": [
-      "- **Scale only after proof of progress**: Grow the account steadily, then expand strategy complexity as account size permits.",
-      "- No explicit stop-loss %, max daily loss, or risk/reward ratio is given in the visible excerpt.",
-      "- No concrete entry/exit setup is described in this excerpt.",
-      "- The only actionable \u201csetup\u201d discussed is:",
-      "- No pattern-specific triggers like breakouts, pullbacks, moving-average bounces, or support/resistance confirmations are mentioned here."
-    ],
-    "dry_run": true,
-    "generated_at": "2026-04-22T17:52:40.806457"
-  },
-  {
-    "id": "SIG-20260422175240",
-    "source": "TraderNick - Tomorrow could get Ugly",
-    "sentiment": "bullish",
-    "confidence": 60,
-    "strategy_notes": [
-      "- **Macro + technical confluence:** The speaker frames trades around geopolitical headline risk first, then checks whether price action confirms the narrative.",
-      "- **Risk-on / risk-off read through intermarket signals:** Rather than trading equities in isolation, the speaker uses oil, VIX, and the dollar to judge whether the market\u2019s relief move is credible.",
-      "- **Dollar Index near 100.5, backing off highs:** Used as a macro stress indicator. A softer dollar is interpreted as supportive for broader risk assets.",
-      "- **Don\u2019t trade unconfirmed narratives:** The clearest risk rule is informational\u2014avoid strong positioning until there is reliable confirmation, especially during geopolitical uncertainty.",
-      "- **Headline-risk awareness:** Weekend gaps and geopolitical events are treated as major risk factors; the market had \u201cbraced for impact,\u201d implying traders should be careful with overnight exposure."
-    ],
-    "dry_run": true,
-    "generated_at": "2026-04-22T17:52:40.807488"
-  },
-  {
-    "id": "SIG-20260422175240",
-    "source": "No Nonsense Forex - Finite Value Elements (Indicator Profile Series)",
-    "sentiment": "bullish",
-    "confidence": 60,
-    "strategy_notes": [
-      "## **Risk Management**",
-      "- Stop-loss placement",
-      "- Implied principle: risk/process discipline likely exists inside the broader \u201csystem,\u201d but not described in the visible segment.",
-      "- No explicit pattern-based setups are described in the available text (no entries like breakouts, pullbacks, trend continuation, reversals, etc.).",
-      "- **Patience in learning**: \u201cGet yourself started, get yourself caught up\u201d implies traders should build foundation first before trading live setups."
-    ],
-    "dry_run": true,
-    "generated_at": "2026-04-22T17:52:40.808146"
-  },
-  {
-    "id": "SIG-20260422235351",
-    "source": "TraderNick - How to Trade Oil Spikes\uff1a What You Need to Know!",
-    "sentiment": "bullish",
-    "confidence": 60,
-    "strategy_notes": [
-      "- **\u201cEasiest trade\u201d framing**: Not \u201ceasy money,\u201d but the setup with the clearest confluence and least ambiguity.",
-      "- **High-risk acknowledgment**: Explicit warning that markets are difficult and oil is highly volatile.",
-      "- **Implied risk control principle**: Avoid low-conviction trades; participate only when catalyst + chart direction are clear (quality filter as risk control).",
-      "- **No explicit hard rules provided** (in excerpt): No fixed stop size, R-multiple, or position-size formula stated yet.",
-      "- **Catalyst-driven breakout/continuation setup**:"
-    ],
-    "dry_run": true,
-    "generated_at": "2026-04-22T23:53:51.240527"
-  },
-  {
-    "id": "SIG-20260422235351",
-    "source": "TraderNick - THEY SOLD!",
-    "sentiment": "bullish",
-    "confidence": 67,
-    "strategy_notes": [
-      "- Starts with the **S&P 500** as a broad **risk barometer** to judge whether the environment is **risk-on or risk-off**.",
-      "- **S&P 500 as a risk indicator**",
-      "- If S&P is improving, that suggests broader **risk appetite** is returning.",
-      "- **Context-first risk filtering**",
-      "- Before entering trades, assess whether the broader market is **risk-on or risk-off**."
-    ],
-    "dry_run": true,
-    "generated_at": "2026-04-22T23:53:51.325199"
-  },
-  {
-    "id": "SIG-20260422235351",
-    "source": "SMB Capital - The $100 New Options Strategy",
-    "sentiment": "bullish",
-    "confidence": 60,
-    "strategy_notes": [
-      "- **Scale only after proof of progress**: Grow the account steadily, then expand strategy complexity as account size permits.",
-      "- No explicit stop-loss %, max daily loss, or risk/reward ratio is given in the visible excerpt.",
-      "- No concrete entry/exit setup is described in this excerpt.",
-      "- The only actionable \u201csetup\u201d discussed is:",
-      "- No pattern-specific triggers like breakouts, pullbacks, moving-average bounces, or support/resistance confirmations are mentioned here."
-    ],
-    "dry_run": true,
-    "generated_at": "2026-04-22T23:53:51.785837"
-  },
-  {
-    "id": "SIG-20260422235351",
-    "source": "TraderNick - Tomorrow could get Ugly",
-    "sentiment": "bullish",
-    "confidence": 60,
-    "strategy_notes": [
-      "- **Macro + technical confluence:** The speaker frames trades around geopolitical headline risk first, then checks whether price action confirms the narrative.",
-      "- **Risk-on / risk-off read through intermarket signals:** Rather than trading equities in isolation, the speaker uses oil, VIX, and the dollar to judge whether the market\u2019s relief move is credible.",
-      "- **Dollar Index near 100.5, backing off highs:** Used as a macro stress indicator. A softer dollar is interpreted as supportive for broader risk assets.",
-      "- **Don\u2019t trade unconfirmed narratives:** The clearest risk rule is informational\u2014avoid strong positioning until there is reliable confirmation, especially during geopolitical uncertainty.",
-      "- **Headline-risk awareness:** Weekend gaps and geopolitical events are treated as major risk factors; the market had \u201cbraced for impact,\u201d implying traders should be careful with overnight exposure."
-    ],
-    "dry_run": true,
-    "generated_at": "2026-04-22T23:53:51.955091"
-  },
-  {
-    "id": "SIG-20260422235352",
-    "source": "No Nonsense Forex - Finite Value Elements (Indicator Profile Series)",
-    "sentiment": "bullish",
-    "confidence": 60,
-    "strategy_notes": [
-      "## **Risk Management**",
-      "- Stop-loss placement",
-      "- Implied principle: risk/process discipline likely exists inside the broader \u201csystem,\u201d but not described in the visible segment.",
-      "- No explicit pattern-based setups are described in the available text (no entries like breakouts, pullbacks, trend continuation, reversals, etc.).",
-      "- **Patience in learning**: \u201cGet yourself started, get yourself caught up\u201d implies traders should build foundation first before trading live setups."
-    ],
-    "dry_run": true,
-    "generated_at": "2026-04-22T23:53:52.014905"
-  },
-  {
     "id": "SIG-20260423055453",
     "source": "TraderNick - How to Trade Oil Spikes\uff1a What You Need to Know!",
     "sentiment": "bullish",
@@ -2982,5 +2832,149 @@
     ],
     "dry_run": true,
     "generated_at": "2026-04-28T04:55:59.700718"
+  },
+  {
+    "id": "SIG-20260428105709",
+    "source": "No Nonsense Forex - HUGE Gold and Silver News (Podcast Episode 252)",
+    "sentiment": "bullish",
+    "confidence": 0,
+    "strategy_notes": [
+      "Unfortunately, there are no specific trading strategies, entry/exit rules, or setups mentioned in the provided transcript. The conversation appears to be introductory and focused on the podcast and its sponsor, Blueberry Markets.",
+      "There is no discussion of position sizing, stop loss rules, or risk/reward ratios in the provided transcript.",
+      "No specific trade setups or patterns are mentioned in the transcript. The host does mention that the episode will be more speculative, but the details are not provided."
+    ],
+    "dry_run": true,
+    "generated_at": "2026-04-28T10:57:09.252775"
+  },
+  {
+    "id": "SIG-20260428105709",
+    "source": "TraderNick - How to Trade Oil Spikes\uff1a What You Need to Know!",
+    "sentiment": "bullish",
+    "confidence": 60,
+    "strategy_notes": [
+      "- **\u201cEasiest trade\u201d framing**: Not \u201ceasy money,\u201d but the setup with the clearest confluence and least ambiguity.",
+      "- **High-risk acknowledgment**: Explicit warning that markets are difficult and oil is highly volatile.",
+      "- **Implied risk control principle**: Avoid low-conviction trades; participate only when catalyst + chart direction are clear (quality filter as risk control).",
+      "- **No explicit hard rules provided** (in excerpt): No fixed stop size, R-multiple, or position-size formula stated yet.",
+      "- **Catalyst-driven breakout/continuation setup**:"
+    ],
+    "dry_run": true,
+    "generated_at": "2026-04-28T10:57:09.313484"
+  },
+  {
+    "id": "SIG-20260428105709",
+    "source": "TraderNick - THEY SOLD!",
+    "sentiment": "bullish",
+    "confidence": 67,
+    "strategy_notes": [
+      "- Starts with the **S&P 500** as a broad **risk barometer** to judge whether the environment is **risk-on or risk-off**.",
+      "- **S&P 500 as a risk indicator**",
+      "- If S&P is improving, that suggests broader **risk appetite** is returning.",
+      "- **Context-first risk filtering**",
+      "- Before entering trades, assess whether the broader market is **risk-on or risk-off**."
+    ],
+    "dry_run": true,
+    "generated_at": "2026-04-28T10:57:09.524290"
+  },
+  {
+    "id": "SIG-20260428105710",
+    "source": "TraderNick - \uff02SELL EVERYTHING! The top is in!\uff02",
+    "sentiment": "bullish",
+    "confidence": 100,
+    "strategy_notes": [
+      "* Diversification: The speaker emphasizes the need to stay diverse to manage risk.",
+      "* Staying informed: The speaker suggests that staying informed about market trends and opportunities is crucial for managing risk.",
+      "* Trend following: The transcript implies that following trends, such as the current momentum in semiconductor stocks, can be a viable trade setup.",
+      "* Contrarian approach: The speaker mentions that some people were overly bearish on the market, which could be an opportunity for a contrarian trade setup.",
+      "* Long-term investing: The transcript suggests that investing in big tech stocks with strong earnings growth could be a viable long-term trade setup."
+    ],
+    "dry_run": true,
+    "generated_at": "2026-04-28T10:57:10.518869"
+  },
+  {
+    "id": "SIG-20260428105711",
+    "source": "Credit Plug - Ranking the Best Credit Unions for EASIEST Credit Card, Lines of Credit & Business Funding APPROVALS",
+    "sentiment": "bullish",
+    "confidence": 0,
+    "strategy_notes": [
+      "* Underwriting process: a critical indicator of a credit union's risk tolerance and lending standards",
+      "* Diversification: spreading risk by considering multiple credit unions and their respective benefits and drawbacks",
+      "* Membership requirements: being aware of the membership requirements for each credit union and managing the associated risks",
+      "Note: The transcript appears to be about credit unions rather than trading, so the insights are adapted to the context of credit unions and personal finance. If the transcript were about trading, the insights would likely be more focused on trading strategies, risk management, and market analysis."
+    ],
+    "dry_run": true,
+    "generated_at": "2026-04-28T10:57:11.796903"
+  },
+  {
+    "id": "SIG-20260428105813",
+    "source": "No Nonsense Forex - HUGE Gold and Silver News (Podcast Episode 252)",
+    "sentiment": "bullish",
+    "confidence": 0,
+    "strategy_notes": [
+      "Unfortunately, there are no specific trading strategies, entry/exit rules, or setups mentioned in the provided transcript. The conversation appears to be introductory and focused on the podcast and its sponsor, Blueberry Markets.",
+      "There is no discussion of position sizing, stop loss rules, or risk/reward ratios in the provided transcript.",
+      "No specific trade setups or patterns are mentioned in the transcript. The host does mention that the episode will be more speculative, but the details are not provided."
+    ],
+    "dry_run": true,
+    "generated_at": "2026-04-28T10:58:13.967923"
+  },
+  {
+    "id": "SIG-20260428105814",
+    "source": "TraderNick - How to Trade Oil Spikes\uff1a What You Need to Know!",
+    "sentiment": "bullish",
+    "confidence": 60,
+    "strategy_notes": [
+      "- **\u201cEasiest trade\u201d framing**: Not \u201ceasy money,\u201d but the setup with the clearest confluence and least ambiguity.",
+      "- **High-risk acknowledgment**: Explicit warning that markets are difficult and oil is highly volatile.",
+      "- **Implied risk control principle**: Avoid low-conviction trades; participate only when catalyst + chart direction are clear (quality filter as risk control).",
+      "- **No explicit hard rules provided** (in excerpt): No fixed stop size, R-multiple, or position-size formula stated yet.",
+      "- **Catalyst-driven breakout/continuation setup**:"
+    ],
+    "dry_run": true,
+    "generated_at": "2026-04-28T10:58:14.890218"
+  },
+  {
+    "id": "SIG-20260428105815",
+    "source": "TraderNick - THEY SOLD!",
+    "sentiment": "bullish",
+    "confidence": 67,
+    "strategy_notes": [
+      "- Starts with the **S&P 500** as a broad **risk barometer** to judge whether the environment is **risk-on or risk-off**.",
+      "- **S&P 500 as a risk indicator**",
+      "- If S&P is improving, that suggests broader **risk appetite** is returning.",
+      "- **Context-first risk filtering**",
+      "- Before entering trades, assess whether the broader market is **risk-on or risk-off**."
+    ],
+    "dry_run": true,
+    "generated_at": "2026-04-28T10:58:15.125162"
+  },
+  {
+    "id": "SIG-20260428105815",
+    "source": "TraderNick - \uff02SELL EVERYTHING! The top is in!\uff02",
+    "sentiment": "bullish",
+    "confidence": 100,
+    "strategy_notes": [
+      "* Diversification: The speaker emphasizes the need to stay diverse to manage risk.",
+      "* Staying informed: The speaker suggests that staying informed about market trends and opportunities is crucial for managing risk.",
+      "* Trend following: The transcript implies that following trends, such as the current momentum in semiconductor stocks, can be a viable trade setup.",
+      "* Contrarian approach: The speaker mentions that some people were overly bearish on the market, which could be an opportunity for a contrarian trade setup.",
+      "* Long-term investing: The transcript suggests that investing in big tech stocks with strong earnings growth could be a viable long-term trade setup."
+    ],
+    "dry_run": true,
+    "generated_at": "2026-04-28T10:58:15.204859"
+  },
+  {
+    "id": "SIG-20260428105815",
+    "source": "Credit Plug - Ranking the Best Credit Unions for EASIEST Credit Card, Lines of Credit & Business Funding APPROVALS",
+    "sentiment": "bullish",
+    "confidence": 0,
+    "strategy_notes": [
+      "* Underwriting process: a critical indicator of a credit union's risk tolerance and lending standards",
+      "* Diversification: spreading risk by considering multiple credit unions and their respective benefits and drawbacks",
+      "* Membership requirements: being aware of the membership requirements for each credit union and managing the associated risks",
+      "Note: The transcript appears to be about credit unions rather than trading, so the insights are adapted to the context of credit unions and personal finance. If the transcript were about trading, the insights would likely be more focused on trading strategies, risk management, and market analysis."
+    ],
+    "dry_run": true,
+    "generated_at": "2026-04-28T10:58:15.253840"
   }
 ]

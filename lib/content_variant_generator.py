@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import urllib.parse
+from functools import lru_cache
 from typing import Any
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,34 +18,74 @@ from scripts.prelaunch_utils import rest_select, supabase_request, table_exists
 PLATFORM_CONFIG = {
     "tiktok": {
         "label": "TikTok",
-        "cta": "Comment READY if you want the next step broken down simply.",
-        "hashtags": ["#BusinessCredit", "#FundableBusiness", "#NexusAI", "#EntrepreneurTips", "#MoneyEducation"],
+        "aliases": {"tiktok", "tik tok"},
+        "hook_style": "curiosity",
+        "hashtags": ["#TikTokBusiness", "#Fundability", "#BusinessCredit", "#NexusAI", "#SmallBusinessTips"],
     },
     "instagram_reels": {
         "label": "Instagram Reels",
-        "cta": "Save this and send it to the business owner who is applying too early.",
-        "hashtags": ["#BusinessFunding", "#BusinessSetup", "#Fundability", "#SmallBusinessTips", "#NexusGrowth"],
+        "aliases": {"instagram", "instagram reels", "ig", "reels"},
+        "hook_style": "mistake-based",
+        "hashtags": ["#InstagramReels", "#FundableBusiness", "#BusinessSetup", "#NexusAI", "#EntrepreneurTips"],
     },
     "youtube_shorts": {
         "label": "YouTube Shorts",
-        "cta": "Subscribe for more step-by-step business funding education without hype.",
-        "hashtags": ["#YouTubeShorts", "#BusinessCredit101", "#FundingTips", "#EntrepreneurEducation", "#NexusAI"],
+        "aliases": {"youtube", "youtube shorts", "shorts"},
+        "hook_style": "authority",
+        "hashtags": ["#YouTubeShorts", "#BusinessFunding", "#CreditEducation", "#NexusAI", "#BusinessGrowth"],
     },
 }
 
-HOOK_STYLE_BY_PLATFORM = {
-    "tiktok": "curiosity",
-    "instagram_reels": "mistake-based",
-    "youtube_shorts": "authority",
-}
+PREFERRED_CTAS = (
+    "Start your funding journey with Nexus.",
+    "Stop applying too early. Get fundable first.",
+    "Build your business foundation with Nexus.",
+    "Upload your credit report and get your roadmap.",
+)
+
+PROHIBITED_PHRASES = (
+    "guarantee",
+    "guaranteed",
+    "guarantees",
+    "guaranteeing",
+    "grant approval",
+    "guaranteed approval",
+    "instant approval",
+    "sba approval",
+    "credit repair",
+    "overnight funding",
+    "easy money",
+    "passive income",
+    "six figures fast",
+)
 
 
-def _clean_topic(topic: str) -> str:
-    return " ".join((topic or "").strip().split()) or "business funding timing"
+def _clean_text(value: str, fallback: str) -> str:
+    cleaned = " ".join((value or "").strip().split())
+    return cleaned or fallback
 
 
-def _pick_hook(topic: str, platform: str) -> str:
-    style = HOOK_STYLE_BY_PLATFORM.get(platform, "curiosity")
+def _topic_seed(topic_row: dict[str, Any]) -> int:
+    return sum(ord(ch) for ch in f"{topic_row.get('id', '')}{topic_row.get('slug', '')}{topic_row.get('topic', '')}")
+
+
+def normalize_platform(platform: str | None) -> str | None:
+    if not platform:
+        return None
+    raw = " ".join(str(platform).strip().lower().replace("-", " ").replace("_", " ").split())
+    for key, cfg in PLATFORM_CONFIG.items():
+        if raw == key.replace("_", " ") or raw == cfg["label"].lower() or raw in cfg["aliases"]:
+            return key
+    raise ValueError(f"Unsupported platform: {platform}")
+
+
+def selected_platforms(platform: str | None = None) -> list[str]:
+    normalized = normalize_platform(platform)
+    return [normalized] if normalized else list(PLATFORM_CONFIG.keys())
+
+
+def _pick_hook(topic: str, platform_key: str) -> str:
+    style = PLATFORM_CONFIG[platform_key]["hook_style"]
     hooks = generate_hooks(topic, count=6)
     for item in hooks:
         if item.get("style") == style:
@@ -52,105 +93,150 @@ def _pick_hook(topic: str, platform: str) -> str:
     return hooks[0]["hook"] if hooks else topic
 
 
-def _build_script(topic: str, theme: str, platform: str) -> str:
-    label = PLATFORM_CONFIG[platform]["label"]
+def _pick_cta(topic_row: dict[str, Any], platform_key: str) -> str:
+    index = (_topic_seed(topic_row) + list(PLATFORM_CONFIG.keys()).index(platform_key)) % len(PREFERRED_CTAS)
+    return PREFERRED_CTAS[index]
+
+
+def _build_script(topic: str, theme: str, platform_label: str, cta: str) -> str:
     return (
-        f"{_pick_hook(topic, platform)}\n\n"
-        f"If you are working on {topic.lower()}, slow down for a second. "
-        f"A lot of people think one quick fix solves it, but the real issue is usually the foundation.\n\n"
-        f"Start with the basics: make sure your business identity is complete, your profile is consistent, "
-        f"and your timing makes sense before you apply. That matters more than hype, shortcuts, or copying what someone posted online.\n\n"
-        f"For {label}, keep this simple: show one mistake, explain one fix, and give one practical next step. "
-        f"In this case, the next step is to review {theme.lower()} before moving into any application or funding move.\n\n"
-        f"The goal is not to promise results. The goal is to help people become more prepared, more fundable, and more informed."
+        f"{_pick_hook(topic, normalize_platform(platform_label) or 'tiktok')}\n\n"
+        f"Here is the simple version. If you are working on {topic.lower()}, do not treat funding like the first move. "
+        f"Start by checking whether your business basics match what lenders and vendors expect.\n\n"
+        f"Look at three things: your business identity, your documentation, and your timing. "
+        f"Is your business name consistent everywhere? Does your email, website, phone, and address look professional? "
+        f"Are you applying because you are ready, or just because an ad made it sound urgent?\n\n"
+        f"For {platform_label}, keep the takeaway practical: fix one weak point, document the change, then review your full foundation before the next application. "
+        f"That is how you build a stronger path without hype. {cta}"
     )
 
 
-def _build_caption(topic: str, platform: str) -> str:
-    label = PLATFORM_CONFIG[platform]["label"]
+def _build_caption(topic: str, theme: str, cta: str) -> str:
     return (
-        f"{label} draft: {topic}. "
-        "Keep it educational, practical, and easy to follow. "
-        "This is for review only and should stay in manual posting mode."
+        f"{topic} made simple. "
+        f"This one breaks down a practical angle on {theme.lower()} so founders can understand what to check before moving too fast. "
+        f"{cta}"
     )
 
 
-def _build_compliance_notes(topic: str, theme: str, platform: str) -> str:
-    hashtags = " ".join(PLATFORM_CONFIG[platform]["hashtags"])
-    cta = PLATFORM_CONFIG[platform]["cta"]
+def _build_compliance_notes(topic: str, theme: str) -> str:
     return (
-        "No guarantees about funding, credit repair, grants, SBA approvals, trading gains, or income.\n"
-        "Avoid urgency language that implies guaranteed outcomes.\n"
-        f"Theme: {theme or 'general education'}\n"
-        f"CTA: {cta}\n"
-        f"Hashtags: {hashtags}"
+        "Educational draft only. Manual human review required before any use. "
+        "No promises about funding, approvals, credit outcomes, grants, SBA results, trading performance, or income. "
+        f"Keep examples general and practical for topic '{topic}' in theme '{theme}'."
     )
 
 
-def build_variant(topic_row: dict[str, Any], platform: str) -> dict[str, Any]:
-    topic = _clean_topic(topic_row.get("topic", ""))
-    theme = (topic_row.get("theme") or "business readiness").strip()
-    return {
+def _validate_copy(variant: dict[str, Any]) -> None:
+    fields = [
+        variant["hook"],
+        variant["script"],
+        variant["caption"],
+        variant["cta"],
+    ]
+    lowered = " ".join(fields).lower()
+    found = [phrase for phrase in PROHIBITED_PHRASES if phrase in lowered]
+    if found:
+        raise ValueError(f"prohibited phrase(s) found: {', '.join(sorted(found))}")
+
+
+def build_variant(topic_row: dict[str, Any], platform_key: str) -> dict[str, Any]:
+    topic = _clean_text(topic_row.get("topic", ""), "business funding timing")
+    theme = _clean_text(topic_row.get("theme", ""), "business readiness")
+    platform_label = PLATFORM_CONFIG[platform_key]["label"]
+    cta = _pick_cta(topic_row, platform_key)
+    variant = {
         "topic_id": topic_row["id"],
-        "platform": platform,
+        "campaign_id": topic_row.get("campaign_id"),
+        "platform": platform_label,
+        "platform_key": platform_key,
+        "hook": _pick_hook(topic, platform_key),
+        "script": _build_script(topic, theme, platform_label, cta),
+        "caption": _build_caption(topic, theme, cta),
+        "hashtags": PLATFORM_CONFIG[platform_key]["hashtags"],
+        "cta": cta,
+        "compliance_notes": _build_compliance_notes(topic, theme),
+        "status": "pending_review",
+        "created_by": "content_variant_generator",
         "variant_type": "short_form",
-        "hook_draft": _pick_hook(topic, platform),
-        "script_draft": _build_script(topic, theme, platform),
-        "caption_draft": _build_caption(topic, platform),
-        "compliance_notes": _build_compliance_notes(topic, theme, platform),
-        "status": "draft_review",
-        "hashtags": PLATFORM_CONFIG[platform]["hashtags"],
-        "cta": PLATFORM_CONFIG[platform]["cta"],
         "topic": topic,
         "theme": theme,
+        "manual_review_required": True,
     }
+    _validate_copy(variant)
+    return variant
 
 
 def fetch_topics(limit: int | None = None) -> list[dict[str, Any]]:
-    query = "content_topics?select=id,slug,topic,theme,status&order=created_at.asc"
+    query = (
+        "content_topics?select=id,campaign_id,slug,topic,theme,status,target_stage"
+        "&order=created_at.asc"
+    )
     if limit:
         query += f"&limit={int(limit)}"
     rows = rest_select(query) or []
     return [row for row in rows if row.get("id")]
 
 
-def _find_existing_variant(topic_id: str, platform: str) -> dict[str, Any] | None:
+@lru_cache(maxsize=None)
+def _column_supported(table: str, column: str) -> bool:
+    try:
+        rest_select(f"{table}?select={urllib.parse.quote(column, safe='')}&limit=0")
+        return True
+    except Exception:
+        return False
+
+
+def _find_existing_variant(topic_id: str, platform_label: str) -> dict[str, Any] | None:
     topic_id_q = urllib.parse.quote(topic_id, safe="")
-    platform_q = urllib.parse.quote(platform, safe="")
+    platform_q = urllib.parse.quote(platform_label, safe="")
     rows = rest_select(
-        f"content_variants?select=id,status&topic_id=eq.{topic_id_q}&platform=eq.{platform_q}&limit=1"
+        f"content_variants?select=id,status,platform,topic_id&topic_id=eq.{topic_id_q}&platform=eq.{platform_q}&limit=1"
     ) or []
     return rows[0] if rows else None
 
 
-def _save_variant(variant: dict[str, Any]) -> dict[str, Any]:
-    existing = _find_existing_variant(variant["topic_id"], variant["platform"])
+def _variant_insert_body(variant: dict[str, Any]) -> dict[str, Any]:
+    caption_draft = variant["caption"]
+    compliance_notes = variant["compliance_notes"]
     body = {
         "topic_id": variant["topic_id"],
         "platform": variant["platform"],
         "variant_type": variant["variant_type"],
-        "hook_draft": variant["hook_draft"],
-        "script_draft": variant["script_draft"],
-        "caption_draft": (
-            f"{variant['caption_draft']}\n\n"
-            f"CTA: {variant['cta']}\n"
-            f"Hashtags: {' '.join(variant['hashtags'])}"
-        ),
-        "compliance_notes": variant["compliance_notes"],
+        "hook_draft": variant["hook"],
+        "script_draft": variant["script"],
+        "caption_draft": caption_draft,
+        "compliance_notes": compliance_notes,
         "status": variant["status"],
     }
-    if existing:
-        rows, _ = supabase_request(
-            f"content_variants?id=eq.{urllib.parse.quote(existing['id'], safe='')}",
-            method="PATCH",
-            body=body,
-            prefer="return=representation",
-        )
-        return (rows or [None])[0] or {}
+    optional_fields = {
+        "campaign_id": variant.get("campaign_id"),
+        "hashtags": variant.get("hashtags"),
+        "cta": variant.get("cta"),
+        "created_by": variant.get("created_by"),
+    }
+    for column, value in optional_fields.items():
+        if value is not None and _column_supported("content_variants", column):
+            body[column] = value
+    if "hashtags" not in body:
+        body["caption_draft"] = f"{caption_draft}\n\nHashtags: {' '.join(variant['hashtags'])}"
+    meta_lines = []
+    if "campaign_id" not in body and variant.get("campaign_id"):
+        meta_lines.append(f"Campaign ID: {variant['campaign_id']}")
+    if "cta" not in body:
+        meta_lines.append(f"CTA: {variant['cta']}")
+    if "created_by" not in body:
+        meta_lines.append(f"Created by: {variant['created_by']}")
+    if meta_lines:
+        body["compliance_notes"] = f"{compliance_notes}\n" + "\n".join(meta_lines)
+    return body
+
+
+def _save_variant(variant: dict[str, Any]) -> dict[str, Any]:
     rows, _ = supabase_request(
         "content_variants",
         method="POST",
-        body=body,
+        body=_variant_insert_body(variant),
         prefer="return=representation",
     )
     return (rows or [None])[0] or {}
@@ -176,61 +262,90 @@ def _ensure_approval(variant_id: str) -> None:
     )
 
 
-def generate_content_variants(*, limit: int | None = None, dry_run: bool = True) -> dict[str, Any]:
+def _preview_row(variant: dict[str, Any], *, existing: bool = False) -> dict[str, Any]:
+    return {
+        "topic_id": variant["topic_id"],
+        "campaign_id": variant.get("campaign_id"),
+        "platform": variant["platform"],
+        "hook": variant["hook"],
+        "script": variant["script"],
+        "caption": variant["caption"],
+        "hashtags": variant["hashtags"],
+        "cta": variant["cta"],
+        "compliance_notes": variant["compliance_notes"],
+        "status": variant["status"],
+        "created_by": variant["created_by"],
+        "duplicate": existing,
+    }
+
+
+def generate_content_variants(
+    *,
+    limit: int | None = None,
+    dry_run: bool = True,
+    platform: str | None = None,
+) -> dict[str, Any]:
+    platforms = selected_platforms(platform)
     topics = fetch_topics(limit=limit)
-    results: list[dict[str, Any]] = []
+    created: list[dict[str, Any]] = []
+    preview: list[dict[str, Any]] = []
     failures: list[dict[str, Any]] = []
+    duplicates_skipped = 0
 
     for topic_row in topics:
-        for platform in PLATFORM_CONFIG:
+        for platform_key in platforms:
             try:
-                variant = build_variant(topic_row, platform)
+                variant = build_variant(topic_row, platform_key)
+                existing = _find_existing_variant(variant["topic_id"], variant["platform"])
+                if existing:
+                    duplicates_skipped += 1
+                    if dry_run and len(preview) < 18:
+                        preview.append(_preview_row(variant, existing=True))
+                    continue
                 if dry_run:
-                    results.append({
-                        "topic_id": topic_row["id"],
-                        "topic": topic_row.get("topic"),
-                        "platform": platform,
-                        "status": "draft_review",
-                        "hook": variant["hook_draft"],
-                        "script": variant["script_draft"],
-                        "caption": variant["caption_draft"],
-                        "hashtags": variant["hashtags"],
-                        "cta": variant["cta"],
-                        "compliance_notes": variant["compliance_notes"],
-                    })
+                    if len(preview) < 18:
+                        preview.append(_preview_row(variant))
                     continue
                 saved = _save_variant(variant)
                 if not saved.get("id"):
                     raise RuntimeError("variant write returned empty response")
                 _ensure_approval(saved["id"])
-                results.append({
+                created.append({
                     "id": saved["id"],
-                    "topic_id": topic_row["id"],
-                    "topic": topic_row.get("topic"),
-                    "platform": platform,
-                    "status": saved.get("status", "draft_review"),
+                    "topic_id": variant["topic_id"],
+                    "campaign_id": variant.get("campaign_id"),
+                    "platform": variant["platform"],
+                    "status": saved.get("status", variant["status"]),
+                    "created_by": variant["created_by"],
                 })
             except Exception as exc:
                 failures.append({
                     "topic_id": topic_row.get("id"),
+                    "campaign_id": topic_row.get("campaign_id"),
                     "topic": topic_row.get("topic"),
-                    "platform": platform,
+                    "platform": PLATFORM_CONFIG[platform_key]["label"],
                     "error": str(exc),
                 })
 
     return {
         "dry_run": dry_run,
+        "platforms": [PLATFORM_CONFIG[key]["label"] for key in platforms],
         "topics_processed": len(topics),
-        "variants_created": len(results),
-        "failures": failures,
-        "results": results,
+        "variants_created": len(created),
+        "duplicates_skipped": duplicates_skipped,
+        "generation_failures": failures,
+        "preview_variants": preview,
+        "created_variants": created[:10],
         "review_locations": [
-            "Control Center → GROWTH tab",
-            "Supabase table: content_variants",
-            "Supabase table: content_approvals",
+            "Control Center -> GROWTH tab -> Recent Content Variants",
+            "Supabase: public.content_variants",
+            "Supabase: public.content_approvals",
         ],
-        "posted_live": False,
-        "scheduled_live": False,
+        "posted_count": 0,
+        "scheduled_count": 0,
+        "messages_sent_count": 0,
+        "requires_human_review": True,
+        "draft_only": True,
     }
 
 

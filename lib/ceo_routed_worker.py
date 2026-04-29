@@ -265,60 +265,72 @@ def _deterministic_uuid(seed: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_URL, seed))
 
 
+def _create_workflow_run(event_id: str, role: str, parent_job_id: Optional[str]) -> Optional[dict]:
+    workflow_id = _deterministic_uuid(f"ceo-routed-draft:{event_id}")
+    row = {
+        "id": workflow_id,
+        "workflow_type": "ceo_routed_draft",
+        "status": "completed",
+        "trigger_event": event_id,
+        "metadata": {
+            "source": "ceo_routed_worker",
+            "role": role,
+            "parent_job_id": parent_job_id,
+        },
+    }
+    return _sb_post("orchestrator_workflow_runs", row)
+
+
 def write_draft(event_id: str, payload: dict, draft: dict) -> Optional[dict]:
     """
     Write draft to workflow_outputs with status='pending_review'.
-    Uses the existing workflow_outputs schema (same as approval_handoff_worker).
+    Uses the live workflow_outputs schema:
+      workflow_id, workflow_type, summary, status, payload
     Returns the inserted row or None on failure.
     """
     if DRY_RUN:
         logger.info("DRY RUN — skipping workflow_outputs write for event=%s", event_id)
         return None
 
-    role      = draft.get("role", "unknown")
-    task_type = draft.get("task_type", "unclassified")
-    content   = draft.get("draft_content", "")
+    role       = draft.get("role", "unknown")
+    task_type  = draft.get("task_type", "unclassified")
+    content    = draft.get("draft_content", "")
     confidence = payload.get("routing_confidence", 0.0)
-    client_id  = payload.get("client_id") or payload.get("original_payload", {}).get("client_id")
+    parent_job = payload.get("parent_job_id")
 
     priority = "high" if confidence >= 0.70 else "medium" if confidence >= 0.45 else "low"
     summary  = content[:200].strip() if content else "Draft pending LLM availability."
 
-    workflow_id = _deterministic_uuid(f"ceo-routed-draft:{event_id}")
+    workflow_run = _create_workflow_run(event_id, role, parent_job)
+    if not workflow_run:
+        logger.warning("Failed to create workflow run for event=%s", event_id)
+        return None
 
     row = {
-        "workflow_id":              workflow_id,
-        "workflow_type":            "ceo_routed_draft",
-        "tenant_id":                None,
-        "client_id":                client_id,
-        "subject_type":             role,
-        "subject_id":               event_id,
-        "status":                   "pending_review",
-        "summary":                  summary,
-        "primary_action_key":       "review_draft",
-        "primary_action_title":     f"Review {role.replace('_', ' ').title()} Draft",
-        "primary_action_description": (
-            f"AI-generated {task_type} draft waiting for human review. "
-            "Approve before any external action is taken."
-        ),
-        "priority":                 priority,
-        "score":                    None,
-        "readiness_level":          "draft",
-        "blockers":                 [],
-        "strengths":                [],
-        "suggested_tasks":          ["Review draft content", "Approve or request revision"],
-        "source_job_id":            event_id,
-        "raw_output": {
-            "event_id":          event_id,
-            "role":              role,
-            "task_type":         task_type,
-            "draft_content":     content,
-            "model_used":        draft.get("model_used", "unknown"),
-            "fallback_used":     draft.get("fallback_used", False),
-            "llm_source":        draft.get("llm_source", "unknown"),
-            "routing_confidence": confidence,
-            "routing_reason":    payload.get("routing_reason", ""),
-            "requires_human_review": payload.get("requires_human_review", True),
+        "workflow_id": workflow_run["id"],
+        "workflow_type": "ceo_routed_draft",
+        "summary": summary,
+        "status": "pending_review",
+        "payload": {
+            "subject_type": role,
+            "subject_id": event_id,
+            "priority": priority,
+            "primary_action_key": "review_draft",
+            "primary_action_title": f"Review {role.replace('_', ' ').title()} Draft",
+            "readiness_level": "draft",
+            "source_job_id": event_id,
+            "raw_output": {
+                "event_id": event_id,
+                "role": role,
+                "task_type": task_type,
+                "draft_content": content,
+                "model_used": draft.get("model_used", "unknown"),
+                "fallback_used": draft.get("fallback_used", False),
+                "llm_source": draft.get("llm_source", "unknown"),
+                "routing_confidence": confidence,
+                "routing_reason": payload.get("routing_reason", ""),
+                "requires_human_review": payload.get("requires_human_review", True),
+            },
         },
     }
 
@@ -348,16 +360,15 @@ def claim_event(event_id: str) -> bool:
 
 def mark_drafted(event_id: str, role: str, output_id: Optional[str]) -> bool:
     now = datetime.now(timezone.utc).isoformat()
-    meta = {"drafted_role": role}
-    if output_id:
-        meta["workflow_output_id"] = output_id
     return _sb_patch(
         f"system_events?id=eq.{event_id}",
         {
-            "status":       "drafted",
-            "processed_by": "ceo_routed_worker",
-            "processed_at": now,
-            "metadata":     json.dumps(meta),
+            "status": "drafted",
+            "completed_at": now,
+            "claimed_by": None,
+            "claimed_at": None,
+            "lease_expires_at": None,
+            "last_error": None,
         },
     )
 
@@ -366,8 +377,11 @@ def mark_draft_failed(event_id: str, error: str) -> bool:
     return _sb_patch(
         f"system_events?id=eq.{event_id}",
         {
-            "status":    "draft_failed",
-            "error_msg": error[:500],
+            "status": "draft_failed",
+            "last_error": error[:500],
+            "claimed_by": None,
+            "claimed_at": None,
+            "lease_expires_at": None,
         },
     )
 
