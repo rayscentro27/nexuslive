@@ -13,8 +13,20 @@ CREATE TABLE IF NOT EXISTS public.worker_resource_status (
 );
 
 ALTER TABLE public.worker_resource_status ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "service_full_access" ON public.worker_resource_status
-  USING (true) WITH CHECK (true);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'worker_resource_status'
+      AND policyname = 'service_full_access'
+  ) THEN
+    CREATE POLICY "service_full_access" ON public.worker_resource_status
+      USING (true) WITH CHECK (true);
+  END IF;
+END
+$$;
 
 -- fast lookup: any worker checking a specific resource
 CREATE INDEX IF NOT EXISTS wrs_resource_idx
