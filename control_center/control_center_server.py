@@ -641,13 +641,39 @@ def api_funding_recommendations_refresh():
 @app.route("/api/funding/journey")
 def api_funding_journey():
     from flask import request as flask_request
-    from funding_engine.service import generate_user_recommendations
+    from funding_engine.service import build_funding_journey_orchestrator
 
     user_id = (flask_request.args.get("user_id") or "").strip()
     tenant_id = (flask_request.args.get("tenant_id") or "").strip() or None
+    auto_generate = str(flask_request.args.get("auto_generate") or "").strip().lower() in {"1", "true", "yes"}
+    force_refresh = str(flask_request.args.get("force_refresh") or "").strip().lower() in {"1", "true", "yes"}
     if not user_id:
         return jsonify({"error": "user_id is required"}), 400
-    return jsonify(generate_user_recommendations(user_id=user_id, tenant_id=tenant_id))
+    return jsonify(build_funding_journey_orchestrator(
+        user_id=user_id,
+        tenant_id=tenant_id,
+        auto_generate_if_missing=auto_generate,
+        force_refresh=force_refresh,
+    ))
+
+
+@app.route("/api/funding/journey/refresh", methods=["POST"])
+def api_funding_journey_refresh():
+    from flask import request as flask_request
+    from funding_engine.service import build_funding_journey_orchestrator
+
+    body = flask_request.get_json(silent=True) or {}
+    user_id = (body.get("user_id") or "").strip()
+    tenant_id = (body.get("tenant_id") or "").strip() or None
+    force = bool(body.get("force"))
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    return jsonify(build_funding_journey_orchestrator(
+        user_id=user_id,
+        tenant_id=tenant_id,
+        auto_generate_if_missing=True,
+        force_refresh=force,
+    ))
 
 
 @app.route("/api/funding/tier-2-unlock")
@@ -2052,6 +2078,19 @@ INFLUENCER_REQUIRE_APPROVAL=${esc(flags.INFLUENCER_REQUIRE_APPROVAL)}</div>
 
     document.getElementById('growth-detail-panel').innerHTML = `
       <div style="margin-bottom:12px">
+        <div class="message-title">Funding Journey AI Operator</div>
+        <div class="message-meta">Inspect one user at a time and trigger safe backend actions only. Nothing is sent to lenders or auto-submitted.</div>
+        <div class="draft-actions">
+          <input id="journey-user-id" class="mini-input" placeholder="user_id">
+          <input id="journey-tenant-id" class="mini-input" placeholder="tenant_id optional">
+          <button class="action-btn" onclick="loadFundingJourneyOrchestrator()">Load Journey</button>
+          <button class="action-btn revise" onclick="refreshFundingJourneyOrchestrator(false)">Refresh Recs</button>
+          <button class="action-btn approve" onclick="refreshFundingJourneyOrchestrator(true)">Force Refresh</button>
+        </div>
+        <div id="journey-orchestrator-flash" class="draft-flash"></div>
+        <div id="journey-orchestrator-panel" class="audit-pre">Enter a user id to load one user&apos;s Funding Journey.</div>
+      </div>
+      <div style="margin-bottom:12px">
         <div class="message-title">Approval Queue</div>
         <div class="message-meta">Draft-only queue for human review. Nothing here is posted or scheduled automatically.</div>
         ${approvalCards}
@@ -2108,10 +2147,156 @@ ${esc(generationErrors)}
 Learning Notes
 ${esc(learningNotes)}</div>
     `;
+
+    const storedUserId = localStorage.getItem('journey_user_id') || '';
+    const storedTenantId = localStorage.getItem('journey_tenant_id') || '';
+    const userInput = document.getElementById('journey-user-id');
+    const tenantInput = document.getElementById('journey-tenant-id');
+    if (userInput) userInput.value = storedUserId;
+    if (tenantInput) tenantInput.value = storedTenantId;
+    if (storedUserId) {
+      await loadFundingJourneyOrchestrator();
+    }
   } catch (e) {
     const msg = `<div class="red">Unable to load growth summary: ${esc(e.message)}</div>`;
     document.getElementById('growth-summary-panel').innerHTML = msg;
     document.getElementById('growth-detail-panel').innerHTML = msg;
+  }
+}
+
+function setJourneyFlash(message, cls='') {
+  const el = document.getElementById('journey-orchestrator-flash');
+  if (!el) return;
+  el.className = `draft-flash ${cls}`.trim();
+  el.textContent = message || '';
+}
+
+function getJourneyContext() {
+  const userId = (document.getElementById('journey-user-id')?.value || '').trim();
+  const tenantId = (document.getElementById('journey-tenant-id')?.value || '').trim();
+  return { userId, tenantId };
+}
+
+function renderJourneyActionButtons(actions) {
+  return (actions || []).map(action => `
+    <button class="action-btn" onclick="runFundingJourneyAction('${esc(action.type)}')">${esc(action.label || action.type)}</button>
+  `).join('');
+}
+
+function renderFundingJourneyPanel(journey) {
+  const readiness = journey.readiness || {};
+  const funding = journey.funding || {};
+  const nextAction = journey.next_best_action || {};
+  const topRecommendations = (funding.top_recommendations || []).map(row =>
+    `• Tier ${row.tier || '?'} | ${row.institution_name || 'Institution'} | ${row.product_name || 'Product'} | score=${row.approval_score || 0}`
+  ).join('\\n') || '• none yet';
+  const missingInputs = (journey.missing_inputs || []).map(item => `• ${item}`).join('\\n') || '• none';
+  const warnings = (journey.warnings || []).map(item => `• ${item}`).join('\\n') || '• none';
+  const incompleteSections = (readiness.incomplete_sections || []).map(section =>
+    `• ${section.section}: ${Math.round((section.pct || 0) * 100)}%`
+  ).join('\\n') || '• none';
+
+  return `
+    <div class="message-card">
+      <div class="message-title">Current Phase: ${esc(funding.current_phase || 'readiness')}</div>
+      <div class="message-meta">generated=${ts(journey.generated_at)} | recommendations=${esc(String(funding.active_recommendation_count || 0))} | stale=${esc(String(funding.stale_recommendation_count || 0))}</div>
+      <div class="message-body"><strong>Next Best Action:</strong> ${esc(nextAction.title || 'Review the Funding Journey.')}</div>
+      <div class="message-body">${esc(nextAction.detail || '')}</div>
+      <div class="draft-actions">${renderJourneyActionButtons(journey.available_actions || [])}</div>
+    </div>
+    <div class="audit-pre">Readiness
+score=${esc(String(readiness.overall_score || 0))}
+completion_pct=${esc(String(readiness.completion_pct || 0))}
+pending_tasks=${esc(String(readiness.pending_task_count || 0))}
+grant_ready=${esc(String(readiness.grant_ready || false))}
+trading_eligible=${esc(String(readiness.trading_eligible || false))}
+
+Incomplete Sections
+${esc(incompleteSections)}
+
+Funding
+strategy_phase=${esc(String(funding.current_phase || 'readiness'))}
+estimated_funding_low=${esc(String(funding.estimated_funding_low || 0))}
+estimated_funding_high=${esc(String(funding.estimated_funding_high || 0))}
+relationship_score=${esc(String(funding.relationship_score || 0))}
+last_recommendation_generated_at=${esc(String(funding.last_recommendation_generated_at || 'none'))}
+
+Top Recommendations
+${esc(topRecommendations)}
+
+Missing Inputs
+${esc(missingInputs)}
+
+Warnings
+${esc(warnings)}
+
+Disclaimer
+${esc(journey.disclaimer || '')}</div>
+  `;
+}
+
+async function loadFundingJourneyOrchestrator() {
+  const { userId, tenantId } = getJourneyContext();
+  if (!userId) {
+    setJourneyFlash('user_id required', 'err');
+    return;
+  }
+  localStorage.setItem('journey_user_id', userId);
+  localStorage.setItem('journey_tenant_id', tenantId);
+  setJourneyFlash('Loading journey...');
+  try {
+    const query = new URLSearchParams({ user_id: userId });
+    if (tenantId) query.set('tenant_id', tenantId);
+    const journey = await get(`/api/funding/journey?${query.toString()}`);
+    window.latestFundingJourney = journey;
+    document.getElementById('journey-orchestrator-panel').innerHTML = renderFundingJourneyPanel(journey);
+    setJourneyFlash(`Loaded journey for ${userId}`, 'ok');
+  } catch (e) {
+    setJourneyFlash(e.message, 'err');
+    document.getElementById('journey-orchestrator-panel').innerHTML = `<div class="red">Unable to load journey: ${esc(e.message)}</div>`;
+  }
+}
+
+async function refreshFundingJourneyOrchestrator(force=false) {
+  const { userId, tenantId } = getJourneyContext();
+  if (!userId) {
+    setJourneyFlash('user_id required', 'err');
+    return;
+  }
+  setJourneyFlash(force ? 'Force refreshing journey...' : 'Refreshing recommendations...');
+  try {
+    const journey = await postJson('/api/funding/journey/refresh', {
+      user_id: userId,
+      tenant_id: tenantId || null,
+      force,
+    });
+    window.latestFundingJourney = journey;
+    document.getElementById('journey-orchestrator-panel').innerHTML = renderFundingJourneyPanel(journey);
+    setJourneyFlash(force ? 'Journey force refresh complete' : 'Journey refresh complete', 'ok');
+  } catch (e) {
+    setJourneyFlash(e.message, 'err');
+  }
+}
+
+async function runFundingJourneyAction(actionType) {
+  const journey = window.latestFundingJourney || {};
+  const actions = journey.available_actions || [];
+  const action = actions.find(row => row.type === actionType);
+  if (!action || !action.endpoint) {
+    setJourneyFlash(`Unknown action: ${actionType}`, 'err');
+    return;
+  }
+  setJourneyFlash(`Running ${action.label || action.type}...`);
+  try {
+    if ((action.method || 'POST').toUpperCase() === 'POST') {
+      await postJson(action.endpoint, action.body || {});
+    } else {
+      await get(action.endpoint);
+    }
+    await loadFundingJourneyOrchestrator();
+    setJourneyFlash(`${action.label || action.type} complete`, 'ok');
+  } catch (e) {
+    setJourneyFlash(e.message, 'err');
   }
 }
 

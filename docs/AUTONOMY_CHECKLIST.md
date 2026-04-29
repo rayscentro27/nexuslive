@@ -7,6 +7,10 @@ Updated: 2026-04-23
 - OpenRouter paid completions are working.
 - Scheduler is running.
 - Hermes/email status commands exist.
+- Hermes Telegram inbound authority is now standardized on `telegram_bot.py`.
+- Hermes status-bot polling is disabled by default to avoid competing `getUpdates` consumers.
+- Safe local fallback exists:
+  - `python3 scripts/hermes_status.py`
 - Trading autonomy status script exists:
   - `scripts/trading_autonomy_status.py --format json|brief`
 - Email `[STATUS]` replies now use a cleaner summary-first format.
@@ -19,7 +23,7 @@ Updated: 2026-04-23
 
 ## Still Open
 
-- Hermes Telegram ingestion is not reliable.
+- Decide whether the NexusOne bot webhook should remain external long-term or be migrated onto a single local inbound surface.
 - Gmail auth state is inconsistent between manual checks and launch-agent processing.
 - Hermes runtime still shows fallback/noisy model behavior in logs.
 - Scheduler-side Telegram-capable notification code still exists separately from Hermes.

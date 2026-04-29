@@ -47,6 +47,7 @@ def duplicate_detection() -> dict:
     return {
         "telegram_process_count": len(telegram_processes),
         "telegram_processes": telegram_processes,
+        "canonical_consumer": "telegram_bot.py",
         "ignored_ceo_routed_events": ignored_ceo,
         "event_mix": event_mix,
         "status": "ok" if len(telegram_processes) <= 1 and ignored_ceo <= 1 else "attention",

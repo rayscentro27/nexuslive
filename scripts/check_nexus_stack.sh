@@ -62,6 +62,7 @@ check_proc() {
 }
 check_proc "Hermes gateway" "hermes"
 check_proc "Telegram monitor" "telegram_bot.py --monitor"
+check_proc "Legacy Hermes status poller" "hermes_status_bot.py"
 check_proc "Dashboard"        "dashboard.py"
 check_proc "Signal router"    "tradingview_router.py"
 check_proc "Signal review"    "signal_poller.py"
@@ -99,5 +100,8 @@ tail_log "Signal Review" "$LOG_DIR/signal-review.log"
 tail_log "LaunchD"   "$LOG_DIR/launchd.out.log"
 
 sep
+echo ""
+echo "Telegram inbound authority: telegram_bot.py --monitor"
+echo "Local fallback: python3 scripts/hermes_status.py"
 echo ""
 echo "Done."

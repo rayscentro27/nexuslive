@@ -10,10 +10,18 @@ import requests
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 from html import escape
 import subprocess
 import time
+import threading
+import concurrent.futures
+from collections import deque
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-posix fallback
+    fcntl = None
 
 # optionally load .env file for credentials
 try:
@@ -34,6 +42,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger('TelegramIntegration')
 UPDATE_OFFSET_FILE = os.path.join(os.path.dirname(__file__), ".telegram_update_offset")
+SINGLE_INSTANCE_LOCK = os.path.join(os.path.dirname(__file__), ".telegram_bot.lock")
 COORD_CLI = os.path.join(os.path.dirname(__file__), "nexus_coord.py")
 OPS_SNAPSHOT = os.path.join(os.path.dirname(__file__), "scripts", "hermes_ops_snapshot.sh")
 OPS_ATTENTION = os.path.join(os.path.dirname(__file__), "scripts", "hermes_ops_attention.sh")
@@ -49,11 +58,30 @@ class NexusTelegramBot:
     def __init__(self, config_file: str = "telegram_config.json"):
         self.config = self.load_config(config_file)
         # environment variables take precedence (after .env loading)
-        self.bot_token = os.getenv('NEXUS_ONE_BOT_TOKEN', self.config.get('bot_token', 'YOUR_TELEGRAM_BOT_TOKEN'))
+        self.bot_token = (
+            os.getenv('TELEGRAM_INBOUND_BOT_TOKEN')
+            or os.getenv('NEXUS_ONE_BOT_TOKEN')
+            or os.getenv('HERMES_BOT_TOKEN')
+            or self.config.get('bot_token', 'YOUR_TELEGRAM_BOT_TOKEN')
+        )
         self.chat_id = os.getenv('TELEGRAM_CHAT_ID', self.config.get('chat_id', 'YOUR_CHAT_ID'))
         self.api_url = f"https://api.telegram.org/bot{self.bot_token}"
         self.connected = False
         self.last_update_id = self.load_update_offset()
+        self.max_response_chars = int(os.getenv("TELEGRAM_MAX_RESPONSE_CHARS", "1800"))
+        self.max_inbound_chars = int(os.getenv("TELEGRAM_MAX_INBOUND_CHARS", "280"))
+        self.command_timeout_seconds = float(os.getenv("TELEGRAM_COMMAND_TIMEOUT_SECONDS", "12"))
+        self.cooldown_seconds = float(os.getenv("TELEGRAM_COMMAND_COOLDOWN_SECONDS", "3"))
+        self.circuit_breaker_window_seconds = float(os.getenv("TELEGRAM_CIRCUIT_BREAKER_WINDOW_SECONDS", "60"))
+        self.circuit_breaker_error_threshold = int(os.getenv("TELEGRAM_CIRCUIT_BREAKER_ERROR_THRESHOLD", "5"))
+        self.circuit_breaker_open_seconds = float(os.getenv("TELEGRAM_CIRCUIT_BREAKER_OPEN_SECONDS", "60"))
+        self.allow_mutating_commands = os.getenv("TELEGRAM_ALLOW_MUTATING_COMMANDS", "false").lower() == "true"
+        self.allow_webhook_takeover = os.getenv("TELEGRAM_DELETE_WEBHOOK_ON_START", "false").lower() == "true"
+        self.recent_update_ids: deque[int] = deque(maxlen=200)
+        self.chat_cooldowns: dict[str, float] = {}
+        self.error_timestamps: deque[float] = deque(maxlen=50)
+        self.circuit_open_until = 0.0
+        self._lock_handle = None
 
         if self.bot_token != 'YOUR_TELEGRAM_BOT_TOKEN':
             self.test_connection()
@@ -111,6 +139,108 @@ class NexusTelegramBot:
             logger.error(f"❌ Telegram connection error: {e}")
             return False
 
+    def acquire_single_instance_lock(self) -> bool:
+        if fcntl is None:
+            return True
+        try:
+            self._lock_handle = open(SINGLE_INSTANCE_LOCK, "w", encoding="utf-8")
+            fcntl.flock(self._lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self._lock_handle.write(str(os.getpid()))
+            self._lock_handle.flush()
+            return True
+        except OSError:
+            logger.error("Telegram monitor already running; refusing duplicate polling instance")
+            return False
+
+    def get_webhook_info(self) -> dict[str, Any]:
+        try:
+            response = requests.get(f"{self.api_url}/getWebhookInfo", timeout=5)
+            if response.status_code != 200:
+                return {"ok": False, "status_code": response.status_code}
+            payload = response.json()
+            return payload.get("result") or {}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def ensure_polling_ready(self) -> bool:
+        info = self.get_webhook_info()
+        webhook_url = str(info.get("url") or "").strip()
+        if not webhook_url:
+            return True
+        if self.allow_webhook_takeover:
+            try:
+                response = requests.post(
+                    f"{self.api_url}/deleteWebhook",
+                    json={"drop_pending_updates": False},
+                    timeout=10,
+                )
+                if response.status_code == 200:
+                    logger.warning("Deleted Telegram webhook so polling can own inbound commands")
+                    return True
+            except Exception as e:
+                logger.error(f"Failed to delete Telegram webhook: {e}")
+            return False
+        logger.warning(
+            "Webhook is active for this bot token; polling disabled to avoid 409 conflicts. "
+            "Set TELEGRAM_DELETE_WEBHOOK_ON_START=true to let telegram_bot.py take over inbound polling."
+        )
+        return False
+
+    def _truncate_response(self, text: str) -> str:
+        text = text or ""
+        if len(text) <= self.max_response_chars:
+            return text
+        return text[: self.max_response_chars - 16].rstrip() + "\n\n(truncated)"
+
+    def _structured_log(
+        self,
+        *,
+        update_id: int | None,
+        chat_id: str | None,
+        command: str,
+        duration_ms: int,
+        status: str,
+        error_message: str | None = None,
+    ) -> None:
+        payload = {
+            "update_id": update_id,
+            "chat_id": chat_id,
+            "command": command,
+            "duration_ms": duration_ms,
+            "status": status,
+        }
+        if error_message:
+            payload["error_message"] = error_message[:240]
+        logger.info("telegram_command %s", json.dumps(payload, sort_keys=True))
+
+    def _record_error(self) -> None:
+        now = time.time()
+        self.error_timestamps.append(now)
+        cutoff = now - self.circuit_breaker_window_seconds
+        while self.error_timestamps and self.error_timestamps[0] < cutoff:
+            self.error_timestamps.popleft()
+        if len(self.error_timestamps) >= self.circuit_breaker_error_threshold:
+            self.circuit_open_until = now + self.circuit_breaker_open_seconds
+            logger.error(
+                "Telegram circuit breaker opened for %.0fs after %s recent errors",
+                self.circuit_breaker_open_seconds,
+                len(self.error_timestamps),
+            )
+
+    def _circuit_open(self) -> bool:
+        return time.time() < self.circuit_open_until
+
+    def execute_with_timeout(self, func: Callable[[], str]) -> tuple[bool, str]:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(func)
+            try:
+                result = future.result(timeout=self.command_timeout_seconds)
+                return True, str(result or "")
+            except concurrent.futures.TimeoutError:
+                return False, "Command timed out. Try again in a moment."
+            except Exception as e:
+                return False, f"Command failed: {e}"
+
     def send_message(self, message: str, parse_mode: str = "HTML") -> bool:
         """Send message to Telegram"""
         if not self.connected:
@@ -120,7 +250,7 @@ class NexusTelegramBot:
         try:
             payload = {
                 "chat_id": self.chat_id,
-                "text": message,
+                "text": self._truncate_response(message),
                 "parse_mode": parse_mode
             }
 
@@ -162,11 +292,14 @@ class NexusTelegramBot:
         try:
             response = requests.get(f"{self.api_url}/getUpdates", params=params, timeout=timeout + 5)
             if response.status_code != 200:
+                if response.status_code == 409:
+                    self._record_error()
                 logger.warning(f"Telegram getUpdates failed: {response.status_code} {response.text[:200]}")
                 return []
             payload = response.json()
             return payload.get("result", [])
         except Exception as e:
+            self._record_error()
             logger.warning(f"Telegram polling error: {e}")
             return []
 
@@ -207,34 +340,185 @@ class NexusTelegramBot:
         except Exception as e:
             return f"command failed: {e}"
 
+    def latest_stored_brief(self) -> str:
+        try:
+            from scripts.prelaunch_utils import rest_select
+
+            rows = rest_select(
+                "executive_briefings?select=briefing_type,content,urgency,generated_by,created_at"
+                "&order=created_at.desc&limit=1",
+                timeout=8,
+            ) or []
+        except Exception as e:
+            return f"Latest stored brief unavailable: {e}"
+
+        if not rows:
+            return "No stored Hermes brief found yet."
+
+        row = rows[0]
+        content = str(row.get("content") or "").strip()
+        header = (
+            f"Latest stored brief\n"
+            f"type={row.get('briefing_type') or 'unknown'} | "
+            f"urgency={row.get('urgency') or 'unknown'} | "
+            f"by={row.get('generated_by') or 'unknown'} | "
+            f"at={row.get('created_at') or 'unknown'}\n\n"
+        )
+        return header + (content or "Brief content is empty.")
+
+    def safe_status_summary(self) -> str:
+        try:
+            from scripts.prelaunch_utils import list_launchd, pgrep_lines, probe_port
+        except Exception as e:
+            return f"Status unavailable: {e}"
+
+        telegram_processes = pgrep_lines("telegram_bot.py|hermes_status_bot.py|hermes_claude_bot.py")
+        scheduler_running = bool(pgrep_lines("operations_center/scheduler.py"))
+        lines = [
+            "Nexus status",
+            f"control_center={'up' if probe_port('127.0.0.1', 4000) else 'down'}",
+            f"hermes_gateway={'up' if probe_port('127.0.0.1', 8642) else 'down'}",
+            f"scheduler={'up' if scheduler_running else 'down'}",
+            f"telegram_processes={len(telegram_processes)}",
+            f"launchd_matches={len(list_launchd())}",
+        ]
+        return "\n".join(lines)
+
+    def safe_health_summary(self) -> str:
+        output = self.run_local_command("python3", os.path.join(os.path.dirname(__file__), "scripts", "backend_health_report.py"), timeout=15)
+        try:
+            payload = json.loads(output)
+            services = payload.get("services") or {}
+            supabase = payload.get("supabase") or {}
+            lines = [
+                "Nexus health",
+                f"control_center={services.get('control_center')}",
+                f"netcup_ollama_tunnel={services.get('netcup_ollama_tunnel')}",
+                f"scheduler_processes={len(services.get('scheduler_processes') or [])}",
+                f"telegram_processes={len(services.get('telegram_processes') or [])}",
+                f"job_queue_total={supabase.get('job_queue_total', 0)}",
+                f"worker_heartbeats_total={supabase.get('worker_heartbeats_total', 0)}",
+            ]
+            return "\n".join(lines)
+        except Exception:
+            return output
+
+    def safe_jobs_summary(self) -> str:
+        try:
+            from scripts.prelaunch_utils import count_by, count_rows
+            by_status = count_by("job_queue", "status")
+            lines = [
+                "Queue summary",
+                f"job_queue_total={count_rows('job_queue')}",
+                f"workflow_outputs_total={count_rows('workflow_outputs')}",
+            ]
+            for status, count in list(by_status.items())[:6]:
+                lines.append(f"{status}={count}")
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Queue summary unavailable: {e}"
+
+    def safe_workers_summary(self) -> str:
+        try:
+            from scripts.prelaunch_utils import count_rows, rest_select
+            rows = rest_select(
+                "worker_heartbeats?select=worker_id,worker_type,status,last_seen_at"
+                "&order=last_seen_at.desc&limit=8",
+                timeout=8,
+            ) or []
+        except Exception as e:
+            return f"Worker summary unavailable: {e}"
+
+        lines = [
+            "Worker summary",
+            f"worker_heartbeats_total={count_rows('worker_heartbeats')}",
+        ]
+        for row in rows[:5]:
+            lines.append(
+                f"{row.get('worker_id') or row.get('worker_type')}: "
+                f"{row.get('status') or 'unknown'} | {row.get('last_seen_at') or 'unknown'}"
+            )
+        return "\n".join(lines)
+
+    def safe_help_text(self) -> str:
+        return (
+            "Safe commands\n"
+            "status\n"
+            "health\n"
+            "jobs\n"
+            "workers\n"
+            "brief\n"
+            "help\n\n"
+            "Notes\n"
+            "- basic commands do not call an LLM\n"
+            "- unknown or long messages are rejected safely\n"
+            "- expensive workflows are disabled by default"
+        )
+
+    def parse_command(self, text: str) -> tuple[str, str]:
+        raw = text.strip()
+        normalized = raw.lower().strip()
+        mapping = {
+            "status": "status",
+            "/status": "status",
+            "health": "health",
+            "/health": "health",
+            "jobs": "jobs",
+            "/jobs": "jobs",
+            "workers": "workers",
+            "/workers": "workers",
+            "help": "help",
+            "/help": "help",
+            "brief": "brief",
+            "/brief": "brief",
+        }
+        return mapping.get(normalized, "unknown"), raw
+
+    def handle_basic_command(self, command: str) -> str:
+        handlers: dict[str, Callable[[], str]] = {
+            "status": self.safe_status_summary,
+            "health": self.safe_health_summary,
+            "jobs": self.safe_jobs_summary,
+            "workers": self.safe_workers_summary,
+            "help": self.safe_help_text,
+            "brief": self.latest_stored_brief,
+        }
+        handler = handlers.get(command)
+        if not handler:
+            return self.safe_help_text()
+        return handler()
+
     def handle_coordination_command(self, text: str) -> Optional[str]:
         raw = text.strip()
         normalized = raw.lower().strip()
 
-        if normalized in {"status", "ops snapshot", "give me an ops snapshot", "summarize system health"}:
-            return self.format_pre(self.run_local_command(OPS_SNAPSHOT, timeout=60))
+        basic_command, _ = self.parse_command(text)
+        if basic_command != "unknown":
+            return self.format_pre(self.handle_basic_command(basic_command))
+
+        if len(raw) > self.max_inbound_chars:
+            return "Message too long for Telegram command mode. Send `help` for safe commands."
 
         if normalized in {"what needs attention", "needs attention", "attention"}:
-            return self.format_pre(self.run_local_command(OPS_ATTENTION, timeout=60))
-
-        if normalized in {"show activity", "activity"}:
-            return self.format_pre(self.run_coord_cli("activity", "--limit", "8"))
-
-        if normalized in {"coordination summary", "show coordination summary", "summary"}:
-            return self.format_pre(self.run_coord_cli("summary"))
-
-        if normalized.startswith("show tasks for "):
-            agent = raw.split("for ", 1)[1].strip()
-            return self.format_pre(self.run_coord_cli("tasks", agent))
+            return self.format_pre(self.run_local_command(OPS_ATTENTION, timeout=15))
 
         if normalized in {"show pending tasks", "show tasks", "pending tasks"}:
             return self.format_pre(self.run_coord_cli("tasks", "hermes"))
 
+        if normalized in {"show activity", "activity"}:
+            return self.format_pre(self.run_coord_cli("activity", "--limit", "8"))
+
+        if normalized in {"/coord", "/coord-help", "coord help", "coordination help"}:
+            return self.format_pre(self.safe_help_text())
+
+        if not self.allow_mutating_commands:
+            return self.safe_help_text()
+
         if normalized in {"run lead check", "lead check"}:
-            return self.format_pre(self.run_local_command("python3", SCHEDULER_SCRIPT, "--run-now", "leads", timeout=60))
+            return self.format_pre(self.run_local_command("python3", SCHEDULER_SCRIPT, "--run-now", "leads", timeout=20))
 
         if normalized in {"run reputation check", "reputation check"}:
-            return self.format_pre(self.run_local_command("python3", SCHEDULER_SCRIPT, "--run-now", "reputation", timeout=60))
+            return self.format_pre(self.run_local_command("python3", SCHEDULER_SCRIPT, "--run-now", "reputation", timeout=20))
 
         if normalized.startswith("assign task to "):
             target_part = raw[len("assign task to "):]
@@ -246,24 +530,6 @@ class NexusTelegramBot:
             if not description:
                 return "Task description cannot be empty."
             return self.format_pre(self.run_coord_cli("add-task", agent, description, "--posted-by", "hermes"))
-
-        if normalized in {"/coord", "/coord-help", "coord help", "coordination help"}:
-            return (
-                "<b>Coordination Commands</b>\n\n"
-                "<code>status</code>\n"
-                "<code>what needs attention</code>\n"
-                "<code>show pending tasks</code>\n"
-                "<code>run lead check</code>\n"
-                "<code>run reputation check</code>\n"
-                "<code>show activity</code>\n"
-                "<code>coordination summary</code>\n"
-                "<code>show tasks for codex</code>\n"
-                "<code>assign task to codex: review launchd runtime</code>\n"
-                "<code>assign task to claude: update docs</code>\n\n"
-                "<b>CEO Auto-Routing</b>\n"
-                "<code>/route &lt;task&gt;</code> — Route a task to the right AI employee\n"
-                "Example: <code>/route create a TikTok script about business credit</code>"
-            )
 
         # ── CEO Auto-Routing ─────────────────────────────────────────────────
         if normalized.startswith("/route "):
@@ -306,7 +572,7 @@ class NexusTelegramBot:
                 return "Usage: <code>browser do: describe what to do</code>"
             return self._enqueue_browser_task("open", payload={"task": task_desc})
 
-        return None
+        return self.safe_help_text()
 
     def _enqueue_browser_task(self, task_type: str, payload: dict = None) -> str:
         """Insert a browser task into the queue and confirm."""
@@ -360,25 +626,90 @@ class NexusTelegramBot:
             return f"⚠️ CEO routing error: {e}"
 
     def handle_update(self, update: dict) -> None:
+        started = time.time()
         update_id = update.get("update_id")
-        if update_id is not None and update_id > self.last_update_id:
-            self.last_update_id = update_id
+        if update_id is not None:
+            if update_id in self.recent_update_ids:
+                self._structured_log(
+                    update_id=update_id,
+                    chat_id=None,
+                    command="duplicate",
+                    duration_ms=int((time.time() - started) * 1000),
+                    status="duplicate_ignored",
+                )
+                return
+            self.recent_update_ids.append(update_id)
+            if update_id > self.last_update_id:
+                self.last_update_id = update_id
 
         message = update.get("message") or {}
         chat = message.get("chat") or {}
         chat_id = str(chat.get("id", ""))
+        sender = message.get("from") or {}
+        if sender.get("is_bot"):
+            self._structured_log(
+                update_id=update_id,
+                chat_id=chat_id,
+                command="bot_message",
+                duration_ms=int((time.time() - started) * 1000),
+                status="self_ignored",
+            )
+            return
         if str(self.chat_id) != chat_id:
             return
 
         text = (message.get("text") or "").strip()
         if not text:
             return
+        command, _ = self.parse_command(text)
 
-        response = self.handle_coordination_command(text)
-        if response:
+        if self._circuit_open():
+            self._structured_log(
+                update_id=update_id,
+                chat_id=chat_id,
+                command=command,
+                duration_ms=int((time.time() - started) * 1000),
+                status="circuit_open",
+            )
+            return
+
+        cooldown_until = self.chat_cooldowns.get(chat_id, 0.0)
+        if time.time() < cooldown_until:
+            self._structured_log(
+                update_id=update_id,
+                chat_id=chat_id,
+                command=command,
+                duration_ms=int((time.time() - started) * 1000),
+                status="cooldown_ignored",
+            )
+            return
+        self.chat_cooldowns[chat_id] = time.time() + self.cooldown_seconds
+
+        ok, response = self.execute_with_timeout(lambda: self.handle_coordination_command(text) or self.safe_help_text())
+        if ok and response:
             self.send_message(response)
+            self._structured_log(
+                update_id=update_id,
+                chat_id=chat_id,
+                command=command,
+                duration_ms=int((time.time() - started) * 1000),
+                status="ok",
+            )
+            return
+        self._record_error()
+        self.send_message(response or "Command failed.")
+        self._structured_log(
+            update_id=update_id,
+            chat_id=chat_id,
+            command=command,
+            duration_ms=int((time.time() - started) * 1000),
+            status="error",
+            error_message=response,
+        )
 
     def poll_commands_once(self) -> None:
+        if self._circuit_open():
+            return
         updates = self.get_updates()
         if not updates:
             return
@@ -531,6 +862,13 @@ def monitor():
 
     _signal.signal(_signal.SIGTERM, _shutdown)
     _signal.signal(_signal.SIGINT, _shutdown)
+
+    if not bot.acquire_single_instance_lock():
+        return
+
+    if not bot.ensure_polling_ready():
+        logger.warning("Telegram command polling not started because polling is not the active delivery mode")
+        return
 
     if bot.connected:
         bot.send_message(

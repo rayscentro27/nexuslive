@@ -30,6 +30,9 @@ import urllib.request
 from datetime import datetime
 from email.mime.text import MIMEText
 from pathlib import Path
+from typing import Any
+
+from lib.research_email_commands import execute_email_command, help_text as research_email_help_text
 
 # Load .env manually so no dotenv package required
 _env_file = Path(__file__).parent / ".env"
@@ -57,6 +60,43 @@ IMAP_HOST = "imap.gmail.com"
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 
+# ── Idempotency state ─────────────────────────────────────────────────────────
+# Tracks message-ids that have already been fully processed. Persists across
+# restarts so a message that was marked-read before the worker ran is not
+# silently skipped or processed twice.
+
+_PROCESSED_IDS_FILE = NEXUS_DIR / ".email_pipeline_state.json"
+_MAX_STORED_IDS = 500  # prune oldest when limit reached
+
+
+def _load_processed_ids() -> set[str]:
+    try:
+        if _PROCESSED_IDS_FILE.exists():
+            data = json.loads(_PROCESSED_IDS_FILE.read_text())
+            return set(data.get("processed_message_ids") or [])
+    except Exception:
+        pass
+    return set()
+
+
+def _save_processed_id(message_id: str) -> None:
+    try:
+        ids = _load_processed_ids()
+        ids.add(message_id)
+        if len(ids) > _MAX_STORED_IDS:
+            ids = set(list(ids)[-_MAX_STORED_IDS:])
+        _PROCESSED_IDS_FILE.write_text(
+            json.dumps({"processed_message_ids": list(ids)}, indent=2)
+        )
+    except Exception as e:
+        print(f"[email] Warning: could not save processed id state: {e}")
+
+
+def _is_already_processed(message_id: str) -> bool:
+    if not message_id:
+        return False
+    return message_id in _load_processed_ids()
+
 YT_RE = re.compile(
     r'https?://(?:www\.)?(?:youtube\.com/(?:watch\?v=[\w-]+|shorts/[\w-]+)|youtu\.be/[\w-]+)(?:[^\s<>"]*)?'
 )
@@ -66,38 +106,58 @@ TASK_RE = re.compile(r'^\s*(?:\d+[.)]\s+|-\s+|\*\s+)(.+)', re.MULTILINE)
 # ── IMAP helpers ──────────────────────────────────────────────────────────────
 
 def fetch_unread_nexus_emails():
+    """
+    Fetch emails to process. Key behaviors:
+    - Does NOT mark emails as read here; that happens after successful processing.
+    - For [RESEARCH EMAIL] subjects, also fetches recently-seen emails (last 24h)
+      so messages marked read before the worker ran are not silently skipped.
+    - Returns message_id (from Message-ID header) for idempotency deduplication.
+    """
     with imaplib.IMAP4_SSL(IMAP_HOST) as imap:
         imap.login(NEXUS_EMAIL, NEXUS_EMAIL_PASSWORD)
         imap.select("INBOX")
 
-        _, ids = imap.search(None, 'UNSEEN SUBJECT "nexus"')
-        _, ids2 = imap.search(None, 'UNSEEN SUBJECT "research"')
-        _, ids3 = imap.search(None, 'UNSEEN SUBJECT "tasks"')
-        _, ids4 = imap.search(None, 'UNSEEN SUBJECT "status"')
+        searches = [
+            ('UNSEEN SUBJECT "nexus"',),
+            ('UNSEEN SUBJECT "research"',),
+            ('UNSEEN SUBJECT "tasks"',),
+            ('UNSEEN SUBJECT "status"',),
+            # Catch [RESEARCH EMAIL] that was marked read before the worker ran.
+            ('SINCE "1-Jan-2000" SUBJECT "research email"',),
+        ]
 
-        all_ids = set()
-        for id_list in [ids, ids2, ids3, ids4]:
-            for i in id_list[0].split():
-                all_ids.add(i)
+        all_uids: set[bytes] = set()
+        for (criteria,) in searches:
+            _, id_list = imap.search(None, criteria)
+            for uid in id_list[0].split():
+                all_uids.add(uid)
 
         messages = []
-        for uid in all_ids:
+        for uid in all_uids:
             _, data = imap.fetch(uid, "(RFC822)")
             raw = data[0][1]
             msg = email.message_from_bytes(raw)
             body = extract_body(msg)
             messages.append({
                 "uid": uid,
+                "message_id": (msg.get("Message-ID") or "").strip(),
                 "subject": msg.get("Subject", ""),
                 "sender": msg.get("From", ""),
                 "reply_to": msg.get("Reply-To") or msg.get("From", ""),
                 "body": body,
             })
 
-            # Mark as read
-            imap.store(uid, "+FLAGS", "\\Seen")
-
         return messages
+
+
+def mark_email_read(uid: bytes) -> None:
+    try:
+        with imaplib.IMAP4_SSL(IMAP_HOST) as imap:
+            imap.login(NEXUS_EMAIL, NEXUS_EMAIL_PASSWORD)
+            imap.select("INBOX")
+            imap.store(uid, "+FLAGS", "\\Seen")
+    except Exception as e:
+        print(f"[email] Warning: could not mark email read: {e}")
 
 
 def extract_body(msg):
@@ -124,6 +184,15 @@ def send_reply(to, subject, body):
         smtp.login(NEXUS_EMAIL, NEXUS_EMAIL_PASSWORD)
         smtp.send_message(msg)
     print(f"[email] Reply sent to {to}")
+
+
+def log_email_command(event: dict[str, Any]) -> None:
+    payload = {
+        "kind": "research_email_command",
+        **event,
+        "logged_at": datetime.now().isoformat(),
+    }
+    print(json.dumps(payload))
 
 
 def summarize_autonomy_status(raw_output):
@@ -503,10 +572,60 @@ def process_status(msg):
     )
 
 
+def process_research_email_command(msg):
+    reply_to = msg["reply_to"]
+    subject = msg["subject"]
+    command_text = (msg.get("body") or "").strip()
+
+    # Step 1 — send receipt immediately so the sender knows it was received.
+    send_reply(
+        reply_to,
+        subject,
+        "Nexus received your [RESEARCH EMAIL] request. Processing now.\n\n"
+        "You will receive a second email shortly with your result.\n\n"
+        "---\nNexus AI — no pipeline rerun is triggered by this command.",
+    )
+
+    if not command_text:
+        send_reply(reply_to, subject, research_email_help_text())
+        return
+
+    # Step 2 — execute command and send result email.
+    result = execute_email_command(command_text)
+    log_email_command({
+        "sender": msg.get("sender"),
+        "subject": subject,
+        "command": command_text[:160],
+        "mode": result.get("mode"),
+        "ok": result.get("ok"),
+        "sent": result.get("sent", False),
+        "send_blocked": result.get("send_blocked", False),
+        "detail": result.get("detail"),
+    })
+
+    if result.get("mode") == "send" and result.get("sent"):
+        result_body = (
+            f"Research email command completed.\n\n"
+            f"Subject: {result.get('subject')}\n"
+            f"Status: sent\n"
+            f"Detail: {result.get('detail')}\n\n"
+            f"No research pipeline rerun was triggered."
+        )
+    else:
+        result_body = (
+            f"Research email command result\n\n"
+            f"Subject: {result.get('subject')}\n\n"
+            f"{result.get('body')}\n"
+        )
+    send_reply(reply_to, subject, result_body)
+
+
 # ── Mode detection ────────────────────────────────────────────────────────────
 
 def detect_mode(subject, body):
     s = subject.lower().strip()
+    if "[research email]" in s or s == "research email" or s.startswith("re: [research email]"):
+        return "research_email"
     if "[status]" in s or s == "status" or s.startswith("re: [status]"):
         return "status"
     if "[tasks]" in s or s == "tasks" or s.startswith("re: [tasks]"):
@@ -523,14 +642,23 @@ def poll_once():
     if not messages:
         return 0
 
+    processed_count = 0
     for msg in messages:
         sender_lower = (msg.get("sender") or "").lower()
         if NEXUS_EMAIL.lower() in sender_lower:
             print(f"[email] Skipping self-sent message — {msg['subject'][:60]}")
             continue
+
         mode = detect_mode(msg["subject"], msg["body"])
         if not mode:
             continue
+
+        # Idempotency check — skip if this exact message was already processed.
+        message_id = msg.get("message_id") or ""
+        if message_id and _is_already_processed(message_id):
+            print(f"[email] Skipping already-processed message-id — {msg['subject'][:60]}")
+            continue
+
         print(f"[email] {mode.upper()} from {msg['sender'][:40]} — {msg['subject'][:50]}")
         try:
             if mode == "research":
@@ -539,10 +667,19 @@ def poll_once():
                 process_tasks(msg)
             elif mode == "status":
                 process_status(msg)
-        except Exception as e:
-            print(f"[email] Error: {e}")
+            elif mode == "research_email":
+                process_research_email_command(msg)
 
-    return len(messages)
+            # Mark as read only after successful processing.
+            mark_email_read(msg["uid"])
+            if message_id:
+                _save_processed_id(message_id)
+            processed_count += 1
+
+        except Exception as e:
+            print(f"[email] Error processing {msg['subject'][:50]}: {e}")
+
+    return processed_count
 
 
 def run_daemon():

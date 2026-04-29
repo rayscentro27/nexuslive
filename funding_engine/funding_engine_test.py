@@ -1085,6 +1085,96 @@ def test_current_phase_persisted_in_strategy():
         strategy_mod.get_active_strategy = original_get_active
 
 
+def test_funding_journey_orchestrator():
+    import funding_engine.strategy_engine as strategy_mod
+    import readiness_engine.service as readiness_service
+
+    original_build_readiness = readiness_service.build_readiness_snapshot
+    original_build_funding = service.build_funding_snapshot
+    original_get_active = service.get_active_recommendations
+    original_get_strategy = strategy_mod.get_active_strategy
+
+    readiness_service.build_readiness_snapshot = lambda user_id, tenant_id=None: {
+        "overall_score": 42,
+        "completion": {
+            "overall_pct": 0.58,
+            "sections": {
+                "business_foundation": {"pct": 0.6, "missing_fields": ["website_status"]},
+                "credit_profile": {"pct": 0.5, "missing_fields": ["credit_report_uploaded"]},
+                "banking_setup": {"pct": 0.8, "missing_fields": []},
+                "grant_eligibility": {"pct": 1.0, "missing_fields": []},
+                "trading_eligibility": {"pct": 0.0, "missing_fields": ["education_video_completed"]},
+            },
+        },
+        "tasks": [
+            {
+                "id": "task-1",
+                "status": "pending",
+                "priority": "high",
+                "task_title": "Upload credit report",
+                "task_description": "Upload your latest report so Nexus can guide you more precisely.",
+            }
+        ],
+        "next_best_action": {
+            "id": "task-1",
+            "priority": "high",
+            "task_title": "Upload credit report",
+            "task_description": "Upload your latest report so Nexus can guide you more precisely.",
+        },
+        "grant_ready": False,
+        "trading_eligible": False,
+        "note": "Readiness estimate only.",
+    }
+    service.build_funding_snapshot = lambda user_id, tenant_id=None, user_profile=None: {
+        "user_profile": {"id": user_id, "onboarding_complete": True, "personal_credit_score": 690},
+        "business_score_input": sample_business_inputs(),
+        "banking_relationships": [sample_relationship()],
+        "readiness": {"score": 63},
+        "tier_progress": {"current_tier": 1, "tier_2_status": "locked"},
+        "relationship_score": 14,
+        "missing_inputs": ["banking relationship inputs"],
+    }
+    service.get_active_recommendations = lambda user_id, tenant_id=None: [
+        {
+            "id": "rec-1",
+            "tier": 1,
+            "product_name": "Desert Valley CU Business Card",
+            "institution_name": "Desert Valley CU",
+            "product_type": "credit_union_business_credit_card",
+            "recommendation_type": "funding_product",
+            "approval_score": 82,
+            "confidence_level": "medium",
+            "expected_limit_low": 5000,
+            "expected_limit_high": 12000,
+            "reason": "Results vary. Approval is determined by the lender and is not guaranteed.",
+            "disclaimer": "Results vary. Approval is determined by the lender and is not guaranteed.",
+            "last_generated_at": "2026-04-20T12:00:00+00:00",
+        }
+    ]
+    strategy_mod.get_active_strategy = lambda user_id, tenant_id=None: {
+        "current_phase": "relationship_building",
+        "strategy_summary": "Build relationships before applying.",
+        "next_best_action": {"phase": "relationship_building", "action": "Open business checking at Desert Valley CU.", "priority": "medium"},
+        "estimated_funding_low": 5000,
+        "estimated_funding_high": 12000,
+    }
+
+    try:
+        journey = service.build_funding_journey_orchestrator("user-orch", "tenant-1")
+    finally:
+        readiness_service.build_readiness_snapshot = original_build_readiness
+        service.build_funding_snapshot = original_build_funding
+        service.get_active_recommendations = original_get_active
+        strategy_mod.get_active_strategy = original_get_strategy
+
+    check("journey orchestrator includes readiness block", isinstance(journey.get("readiness"), dict), str(type(journey.get("readiness"))))
+    check("journey orchestrator includes funding block", isinstance(journey.get("funding"), dict), str(type(journey.get("funding"))))
+    check("journey orchestrator prefers readiness next action when score is low", journey["next_best_action"].get("source") == "readiness", str(journey.get("next_best_action")))
+    check("journey orchestrator exposes safe actions", any(row.get("safe") for row in journey.get("available_actions") or []), str(journey.get("available_actions")))
+    check("journey orchestrator flags stale recommendations", journey["funding"].get("stale_recommendation_count") == 1, str(journey["funding"]))
+    check("journey orchestrator keeps disclaimer", "not guaranteed" in (journey.get("disclaimer") or "").lower(), str(journey.get("disclaimer")))
+
+
 def main() -> int:
     test_business_readiness_score()
     test_relationship_scoring()
@@ -1109,6 +1199,7 @@ def main() -> int:
     test_current_phase_determination()
     test_hermes_brief_includes_phase_text()
     test_current_phase_persisted_in_strategy()
+    test_funding_journey_orchestrator()
 
     failed = [name for name, ok, _ in _results if not ok]
     print()

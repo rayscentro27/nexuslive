@@ -6,6 +6,7 @@ from typing import Any
 
 from funding_engine.business_readiness_score import calculate_business_readiness_score
 from funding_engine.capital_ladder import evaluate_tier_progress
+from funding_engine.constants import DISCLAIMER
 from funding_engine.hermes_brief import build_daily_capital_brief
 from funding_engine.recommendations import generate_recommendations
 from funding_engine.relationship_scoring import score_relationship
@@ -100,6 +101,22 @@ def _recommendation_key(row: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
+def _parse_timestamp(value: Any) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _is_stale_timestamp(value: Any, days: int = 7) -> bool:
+    stamp = _parse_timestamp(value)
+    if not stamp:
+        return True
+    return stamp < (datetime.now(timezone.utc) - timedelta(days=days))
+
+
 def build_funding_snapshot(user_id: str, tenant_id: str | None = None, user_profile: dict[str, Any] | None = None) -> dict[str, Any]:
     db_profile = get_user_profile(user_id) or {}
     user_profile = {**db_profile, **(user_profile or {})}
@@ -152,6 +169,276 @@ def has_usable_profile_data(snapshot: dict[str, Any], user_profile: dict[str, An
     if user_profile.get("onboarding_complete") and user_profile.get("personal_credit_score"):
         return True
     return False
+
+
+def _summarize_recommendations(rows: list[dict[str, Any]], limit: int = 5) -> list[dict[str, Any]]:
+    ranked = sorted(
+        rows,
+        key=lambda row: (
+            -(float(row.get("approval_score") or 0)),
+            int(row.get("tier") or 99),
+            str(row.get("product_name") or ""),
+        ),
+    )
+    summary = []
+    for row in ranked[:limit]:
+        summary.append({
+            "id": row.get("id"),
+            "tier": row.get("tier"),
+            "product_name": row.get("product_name"),
+            "institution_name": row.get("institution_name"),
+            "product_type": row.get("product_type"),
+            "recommendation_type": row.get("recommendation_type"),
+            "approval_score": row.get("approval_score"),
+            "confidence_level": row.get("confidence_level"),
+            "expected_limit_low": row.get("expected_limit_low"),
+            "expected_limit_high": row.get("expected_limit_high"),
+            "reason": row.get("reason"),
+            "disclaimer": row.get("disclaimer") or DISCLAIMER,
+        })
+    return summary
+
+
+def _pick_journey_next_action(
+    *,
+    readiness_snapshot: dict[str, Any] | None,
+    strategy: dict[str, Any] | None,
+    top_recommendations: list[dict[str, Any]],
+    missing_inputs: list[str],
+) -> dict[str, Any]:
+    readiness_snapshot = readiness_snapshot or {}
+    readiness_action = readiness_snapshot.get("next_best_action") or {}
+    readiness_score = float(readiness_snapshot.get("overall_score") or 0)
+    pending_tasks = [row for row in (readiness_snapshot.get("tasks") or []) if row.get("status") == "pending"]
+    has_high_priority_tasks = any((row.get("priority") or "").lower() == "high" for row in pending_tasks)
+
+    if readiness_action and (readiness_score < 65 or has_high_priority_tasks):
+        return {
+            "source": "readiness",
+            "phase": "readiness",
+            "priority": readiness_action.get("priority") or "high",
+            "title": readiness_action.get("task_title") or "Complete the next readiness task.",
+            "detail": readiness_action.get("task_description") or "",
+            "task_id": readiness_action.get("id"),
+            "safe_action": {
+                "type": "complete_task",
+                "method": "POST",
+                "endpoint": f"/api/readiness/tasks/{readiness_action.get('id')}/complete" if readiness_action.get("id") else None,
+            },
+        }
+
+    strategy_action = (strategy or {}).get("next_best_action") or {}
+    if strategy_action:
+        return {
+            "source": "funding_strategy",
+            "phase": (strategy or {}).get("current_phase") or strategy_action.get("phase") or "funding",
+            "priority": strategy_action.get("priority") or "medium",
+            "title": strategy_action.get("action") or "Review your funding strategy.",
+            "detail": strategy_action.get("detail") or "",
+            "safe_action": {
+                "type": "refresh_recommendations",
+                "method": "POST",
+                "endpoint": "/api/funding/recommendations/refresh",
+            },
+        }
+
+    if top_recommendations:
+        row = top_recommendations[0]
+        return {
+            "source": "recommendations",
+            "phase": "funding",
+            "priority": "medium",
+            "title": row.get("product_name") or "Review your top funding recommendation.",
+            "detail": row.get("reason") or DISCLAIMER,
+            "safe_action": {
+                "type": "refresh_recommendations",
+                "method": "POST",
+                "endpoint": "/api/funding/recommendations/refresh",
+            },
+        }
+
+    if missing_inputs:
+        missing = missing_inputs[0]
+        return {
+            "source": "profile_gap",
+            "phase": "readiness",
+            "priority": "high",
+            "title": f"Add {missing}.",
+            "detail": "Nexus can generate stronger guidance after the missing profile data is filled in.",
+            "safe_action": {
+                "type": "recalculate_readiness",
+                "method": "POST",
+                "endpoint": "/api/readiness/recalculate",
+            },
+        }
+
+    return {
+        "source": "system",
+        "phase": "readiness",
+        "priority": "medium",
+        "title": "Review your Funding Journey.",
+        "detail": DISCLAIMER,
+        "safe_action": {
+            "type": "refresh_recommendations",
+            "method": "POST",
+            "endpoint": "/api/funding/recommendations/refresh",
+        },
+    }
+
+
+def build_funding_journey_orchestrator(
+    user_id: str,
+    tenant_id: str | None = None,
+    *,
+    auto_generate_if_missing: bool = False,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
+    from funding_engine.strategy_engine import build_and_persist_strategy, get_active_strategy
+    from readiness_engine.service import build_readiness_snapshot
+
+    readiness_snapshot = build_readiness_snapshot(user_id, tenant_id)
+    funding_snapshot = build_funding_snapshot(user_id, tenant_id)
+    active_recommendations = get_active_recommendations(user_id, tenant_id)
+    generated = False
+
+    if auto_generate_if_missing and (force_refresh or not active_recommendations) and has_usable_profile_data(funding_snapshot):
+        refresh_reason = "journey_orchestrator_force_refresh" if force_refresh else "journey_orchestrator_auto_generate"
+        refresh_result = create_or_refresh_user_recommendations(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            reason=refresh_reason,
+            force=force_refresh,
+        )
+        active_recommendations = get_active_recommendations(user_id, tenant_id)
+        generated = not bool(refresh_result.get("refresh", {}).get("skipped"))
+
+    strategy = get_active_strategy(user_id, tenant_id)
+    if not strategy and active_recommendations:
+        try:
+            strategy_result = build_and_persist_strategy(
+                user_id=user_id,
+                tenant_id=tenant_id,
+                user_profile=funding_snapshot.get("user_profile") or {},
+                readiness_profile=funding_snapshot.get("readiness") or {},
+                recommendations=active_recommendations,
+                relationships=funding_snapshot.get("banking_relationships") or [],
+                force=False,
+            )
+            strategy = strategy_result.get("strategy")
+        except Exception:
+            strategy = None
+
+    missing_inputs = list(dict.fromkeys(
+        list(funding_snapshot.get("missing_inputs") or [])
+        + [
+            section.replace("_", " ")
+            for section, meta in ((readiness_snapshot.get("completion") or {}).get("sections") or {}).items()
+            if float(meta.get("pct") or 0) < 1.0
+        ]
+    ))
+    top_recommendations = _summarize_recommendations(active_recommendations)
+    stale_recommendations = [row for row in active_recommendations if _is_stale_timestamp(row.get("last_generated_at"))]
+    next_action = _pick_journey_next_action(
+        readiness_snapshot=readiness_snapshot,
+        strategy=strategy,
+        top_recommendations=top_recommendations,
+        missing_inputs=missing_inputs,
+    )
+
+    warnings = []
+    if not has_usable_profile_data(funding_snapshot):
+        warnings.append("Profile data is still too thin for strong funding recommendations.")
+    if not active_recommendations:
+        warnings.append("No active funding recommendations are on file yet.")
+    if stale_recommendations:
+        warnings.append("Some active recommendations are older than 7 days and should be refreshed.")
+
+    completion = readiness_snapshot.get("completion") or {}
+    sections = completion.get("sections") or {}
+    available_actions = [
+        {
+            "type": "refresh_recommendations",
+            "label": "Refresh Recommendations",
+            "method": "POST",
+            "endpoint": "/api/funding/recommendations/refresh",
+            "body": {
+                "user_id": user_id,
+                "tenant_id": tenant_id,
+                "reason": "frontend_orchestrator_refresh",
+                "force": False,
+            },
+            "safe": True,
+        },
+        {
+            "type": "recalculate_readiness",
+            "label": "Recalculate Readiness",
+            "method": "POST",
+            "endpoint": "/api/readiness/recalculate",
+            "body": {
+                "user_id": user_id,
+                "tenant_id": tenant_id,
+            },
+            "safe": True,
+        },
+    ]
+    pending_tasks = [row for row in (readiness_snapshot.get("tasks") or []) if row.get("status") == "pending"]
+    if pending_tasks and pending_tasks[0].get("id"):
+        available_actions.append({
+            "type": "complete_top_readiness_task",
+            "label": "Mark Top Task Complete",
+            "method": "POST",
+            "endpoint": f"/api/readiness/tasks/{pending_tasks[0]['id']}/complete",
+            "body": {},
+            "safe": True,
+        })
+
+    return {
+        "orchestrator_version": "v1",
+        "user_id": user_id,
+        "tenant_id": tenant_id,
+        "generated_at": utc_now_iso(),
+        "auto_generated_recommendations": generated,
+        "can_generate_recommendations": has_usable_profile_data(funding_snapshot),
+        "missing_inputs": missing_inputs,
+        "warnings": warnings,
+        "next_best_action": next_action,
+        "available_actions": available_actions,
+        "readiness": {
+            "overall_score": readiness_snapshot.get("overall_score"),
+            "completion_pct": completion.get("overall_pct"),
+            "pending_task_count": len(pending_tasks),
+            "next_best_action": readiness_snapshot.get("next_best_action"),
+            "incomplete_sections": [
+                {
+                    "section": name,
+                    "pct": meta.get("pct"),
+                    "missing_fields": meta.get("missing_fields") or [],
+                }
+                for name, meta in sections.items()
+                if float(meta.get("pct") or 0) < 1.0
+            ],
+            "grant_ready": readiness_snapshot.get("grant_ready"),
+            "trading_eligible": readiness_snapshot.get("trading_eligible"),
+            "note": readiness_snapshot.get("note"),
+        },
+        "funding": {
+            "current_phase": (strategy or {}).get("current_phase") or "readiness",
+            "strategy_summary": (strategy or {}).get("strategy_summary"),
+            "strategy_next_best_action": (strategy or {}).get("next_best_action"),
+            "estimated_funding_low": (strategy or {}).get("estimated_funding_low"),
+            "estimated_funding_high": (strategy or {}).get("estimated_funding_high"),
+            "relationship_score": funding_snapshot.get("relationship_score"),
+            "tier_progress": funding_snapshot.get("tier_progress"),
+            "active_recommendation_count": len(active_recommendations),
+            "stale_recommendation_count": len(stale_recommendations),
+            "last_recommendation_generated_at": max(
+                [row.get("last_generated_at") for row in active_recommendations if row.get("last_generated_at")],
+                default=None,
+            ),
+            "top_recommendations": top_recommendations,
+        },
+        "disclaimer": DISCLAIMER,
+    }
 
 
 def generate_user_recommendations(

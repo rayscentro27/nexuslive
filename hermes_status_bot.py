@@ -42,14 +42,16 @@ except ImportError:
                     os.environ.setdefault(k.strip(), v.strip())
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-HERMES_TOKEN  = os.getenv('HERMES_BOT_TOKEN', '')
+TELEGRAM_BOT_TOKEN  = os.getenv('HERMES_BOT_TOKEN', '')
 CHAT_ID       = os.getenv('TELEGRAM_CHAT_ID', '')
 POLL_INTERVAL = int(os.getenv('HERMES_POLL_INTERVAL', '4'))
 SUPABASE_URL  = os.getenv('SUPABASE_URL', '')
 SUPABASE_KEY  = os.getenv('SUPABASE_KEY', '')
 HERMES_GATEWAY_URL  = os.getenv('HERMES_GATEWAY_URL', 'http://127.0.0.1:8642')
-HERMES_TOKEN = os.getenv('HERMES_GATEWAY_TOKEN', '')
+HERMES_GATEWAY_TOKEN = os.getenv('HERMES_GATEWAY_TOKEN', '')
 HERMES_MODEL = os.getenv('HERMES_MODEL', 'hermes')
+ALLOW_AI_FALLBACK = os.getenv('HERMES_STATUS_ALLOW_AI_FALLBACK', 'false').lower() == 'true'
+POLLING_ENABLED = os.getenv('HERMES_STATUS_POLLING_ENABLED', 'false').lower() == 'true'
 NEXUS_ROOT    = os.path.dirname(os.path.abspath(__file__))
 COORD_CLI     = os.path.join(NEXUS_ROOT, 'nexus_coord.py')
 OFFSET_FILE   = os.path.join(NEXUS_ROOT, '.hermes_status_offset')
@@ -65,7 +67,7 @@ logging.basicConfig(
 )
 log = logging.getLogger('hermes_status')
 
-TG_BASE = f'https://api.telegram.org/bot{HERMES_TOKEN}'
+TG_BASE = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}'
 
 
 # ── Telegram helpers ───────────────────────────────────────────────────────────
@@ -341,13 +343,13 @@ STYLE:
 
 
 def hermes_chat(question: str) -> str:
-    if not HERMES_TOKEN:
+    if not HERMES_GATEWAY_TOKEN:
         return '⚠️ `HERMES_GATEWAY_TOKEN` not set — cannot reach ChatGPT session.'
     try:
         r = requests.post(
             f'{HERMES_GATEWAY_URL}/v1/chat/completions',
             headers={
-                'Authorization': f'Bearer {HERMES_TOKEN}',
+                'Authorization': f'Bearer {HERMES_GATEWAY_TOKEN}',
                 'Content-Type': 'application/json',
             },
             json={
@@ -459,7 +461,7 @@ Natural language:
 `show tasks for codex`
 `assign task to codex: review logs`
 
-_Any other non-slash message gets routed to ChatGPT._
+_Any other non-slash message returns help by default._
 """
 
 DISPATCH = {
@@ -533,7 +535,11 @@ def handle(text: str):
         else:
             reply = f'Unknown command: `{cmd}`\nSend /help for available commands.'
     else:
-        reply = handle_coordination_text(text) or hermes_chat(text)
+        reply = handle_coordination_text(text)
+        if not reply and ALLOW_AI_FALLBACK:
+            reply = hermes_chat(text)
+        if not reply:
+            reply = HELP_TEXT
     send(reply)
 
 
@@ -556,7 +562,7 @@ def _save_offset(offset: int) -> None:
 # ── Main poll loop ─────────────────────────────────────────────────────────────
 
 def main():
-    if not HERMES_TOKEN:
+    if not TELEGRAM_BOT_TOKEN:
         print('ERROR: HERMES_BOT_TOKEN not set in .env', flush=True)
         sys.exit(1)
     if not CHAT_ID:
@@ -564,6 +570,10 @@ def main():
         sys.exit(1)
 
     once = '--once' in sys.argv
+
+    if not POLLING_ENABLED:
+        log.info('Hermes status bot polling disabled; exiting safely')
+        return
 
     if once:
         offset = _load_offset()

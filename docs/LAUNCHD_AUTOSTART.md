@@ -49,6 +49,23 @@ the LAN or internet unless explicitly tunnelled (e.g. Tailscale, ngrok).
 - Secrets live in `~/nexus-ai/.env` only — never in plist files or source code.
 - The `.env` file is in `.gitignore` and should never be committed.
 
+## Telegram Inbound Authority
+
+- Canonical inbound command consumer: `telegram_bot.py --monitor`
+- Launchd label: `com.raymonddavis.nexus.telegram`
+- Canonical inbound token source: `TELEGRAM_INBOUND_BOT_TOKEN`
+- Recommended token for local polling: the webhook-free Hermes bot token
+- `NEXUS_ONE_BOT_TOKEN` should remain available for the existing NexusOne webhook/outbound path unless you intentionally migrate that bot off webhook delivery.
+
+Safe defaults:
+- `TELEGRAM_DELETE_WEBHOOK_ON_START=false`
+- `TELEGRAM_ALLOW_MUTATING_COMMANDS=false`
+- `HERMES_STATUS_POLLING_ENABLED=false`
+
+Operator fallback:
+- `python3 scripts/hermes_status.py`
+- Control Center health and growth pages
+
 ---
 
 ## File Locations
@@ -67,7 +84,7 @@ the LAN or internet unless explicitly tunnelled (e.g. Tailscale, ngrok).
 ~/Library/LaunchAgents/
 ├── com.nexus.signal-review.plist          — Signal review poller daemon
 ├── com.raymonddavis.nexus.plist            — one-shot bootstrap
-├── com.raymonddavis.nexus.telegram.plist   — Telegram monitor daemon
+├── com.raymonddavis.nexus.telegram.plist   — Canonical Telegram inbound monitor
 └── com.raymonddavis.nexus.dashboard.plist  — Dashboard daemon
 
 ~/nexus-ai/openclaw/logs/
@@ -130,6 +147,9 @@ tail -f ~/nexus-ai/openclaw/logs/launchd.out.log
 
 # Full status report
 ~/nexus-ai/scripts/check_nexus_stack.sh
+
+# Safe local fallback for Hermes command status
+python3 ~/nexus-ai/scripts/hermes_status.py
 
 # Archive stale / oversized runtime logs
 ~/nexus-ai/scripts/prune_runtime_logs.sh
