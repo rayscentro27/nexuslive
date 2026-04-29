@@ -8,7 +8,11 @@ export const EVENT_ROUTES = {
   research_refresh_due:      'research',
 
   // Financial / CRM
-  funding_profile_updated:   'funding',
+  // funding_profile_updated is intentionally disabled. Funding recommendation refresh
+  // is handled by the Python funding_engine path: DB trigger → funding_recommendation_jobs
+  // → operations_center/scheduler.py → process_pending_recommendation_jobs().
+  // Re-enable and wire to the Python job queue before routing events here.
+  // funding_profile_updated:   'funding',
   credit_report_uploaded:    'credit',
 
   // Trading

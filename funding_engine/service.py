@@ -292,11 +292,24 @@ def create_or_refresh_user_recommendations(
 
     existing = get_active_recommendations(user_id, tenant_id)
     existing_by_key = {_recommendation_key(row): row for row in existing}
+
+    # Fetch historical (dismissed/completed/invoiced) keys so we never re-insert them.
+    hist_filters = [f"user_id=eq.{_quote(user_id)}"]
+    if tenant_id:
+        hist_filters.append(f"tenant_id=eq.{_quote(tenant_id)}")
+    historical = _safe_select(
+        "funding_recommendations?select=tier,recommendation_type,institution_name,product_name,product_type"
+        "&status=in.(dismissed,completed,invoiced)&limit=500&" + "&".join(hist_filters)
+    )
+    dismissed_keys = {_recommendation_key(row) for row in historical}
+
     saved: list[dict[str, Any]] = []
     created_count = 0
     updated_count = 0
 
     for row in data["recommendations"]:
+        if _recommendation_key(row) in dismissed_keys:
+            continue
         payload = _build_recommendation_payload(
             user_id=user_id,
             tenant_id=tenant_id,
@@ -331,6 +344,24 @@ def create_or_refresh_user_recommendations(
     )
     data["saved_recommendations"] = saved
     data["refresh"] = {"created": created_count, "updated": updated_count, "skipped": False}
+
+    # Build and persist funding strategy after recommendations are saved.
+    try:
+        from funding_engine.strategy_engine import build_and_persist_strategy
+        snap = data.get("snapshot") or {}
+        strategy_result = build_and_persist_strategy(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            user_profile=snap.get("user_profile") or {},
+            readiness_profile=snap.get("readiness") or {},
+            recommendations=data.get("recommendations") or [],
+            relationships=snap.get("banking_relationships") or [],
+            force=force,
+        )
+        data["strategy"] = strategy_result
+    except Exception:
+        data["strategy"] = {"persisted": False, "error": "strategy_build_skipped"}
+
     return data
 
 
@@ -439,6 +470,7 @@ def process_pending_recommendation_jobs(limit: int = 25) -> dict[str, Any]:
     processed = 0
     failed = 0
     skipped = 0
+    processed_pairs: set[tuple[Any, Any]] = set()
     for job in jobs:
         job_id = job.get("id")
         try:
@@ -453,6 +485,7 @@ def process_pending_recommendation_jobs(limit: int = 25) -> dict[str, Any]:
                 status = "skipped"
                 skipped += 1
             processed += 1
+            processed_pairs.add((job.get("tenant_id"), job["user_id"]))
             safe_patch(
                 f"funding_recommendation_jobs?id=eq.{_quote(job_id)}",
                 {"status": status, "processed_at": utc_now_iso(), "error": None},
@@ -463,10 +496,18 @@ def process_pending_recommendation_jobs(limit: int = 25) -> dict[str, Any]:
                 f"funding_recommendation_jobs?id=eq.{_quote(job_id)}",
                 {"status": "failed", "processed_at": utc_now_iso(), "error": str(exc)},
             )
-    return {"processed": processed, "failed": failed, "skipped": skipped, "job_count": len(jobs)}
+    return {
+        "processed": processed,
+        "failed": failed,
+        "skipped": skipped,
+        "job_count": len(jobs),
+        "processed_pairs": processed_pairs,
+    }
 
 
 def build_hermes_funding_brief(user_id: str, tenant_id: str | None = None, user_profile: dict[str, Any] | None = None) -> dict[str, Any]:
+    from funding_engine.strategy_engine import build_hermes_strategy_brief, get_active_strategy
+
     active = get_active_recommendations(user_id, tenant_id)
     if not active:
         create_or_refresh_user_recommendations(
@@ -475,13 +516,22 @@ def build_hermes_funding_brief(user_id: str, tenant_id: str | None = None, user_
             reason="hermes_brief_auto_generate",
             force=False,
         )
-    data = generate_user_recommendations(user_id=user_id, tenant_id=tenant_id, user_profile=user_profile, tier=None)
-    recs = data["recommendations"]
-    snapshot = data["snapshot"]
+        active = get_active_recommendations(user_id, tenant_id)
+
+    if active:
+        # Use saved recommendations — avoid a redundant full re-score pass.
+        snapshot = build_funding_snapshot(user_id, tenant_id, user_profile=user_profile)
+        recs = active
+    else:
+        # Fallback: no saved recs after auto-generate (e.g. missing profile data).
+        data = generate_user_recommendations(user_id=user_id, tenant_id=tenant_id, user_profile=user_profile, tier=None)
+        recs = data["recommendations"]
+        snapshot = data["snapshot"]
+
     top_tier_1 = next((row for row in recs if row.get("tier") == 1), None)
     relationship_move = next((row for row in recs if row.get("recommendation_type") == "relationship_action"), None)
     tier_progress = snapshot["tier_progress"]
-    return build_daily_capital_brief({
+    capital_brief = build_daily_capital_brief({
         "top_tier_1_move": top_tier_1["reason"] if top_tier_1 else None,
         "relationship_move": relationship_move["reason"] if relationship_move else None,
         "credit_union_opportunity": top_tier_1["product_name"] if top_tier_1 else None,
@@ -493,3 +543,14 @@ def build_hermes_funding_brief(user_id: str, tenant_id: str | None = None, user_
         ),
         "referral_earnings_reminder": "Referral earnings appear only after eligible Tier 1 or Tier 2 funding is reported.",
     })
+
+    # Augment with persisted strategy data if available.
+    persisted_strategy = get_active_strategy(user_id, tenant_id)
+    strategy_brief = build_hermes_strategy_brief(user_id, tenant_id, strategy=persisted_strategy)
+
+    capital_brief["strategy_brief"] = strategy_brief
+    capital_brief["next_best_action"] = strategy_brief.get("next_best_action")
+    capital_brief["estimated_funding_low"] = strategy_brief.get("estimated_funding_low")
+    capital_brief["estimated_funding_high"] = strategy_brief.get("estimated_funding_high")
+    capital_brief["current_phase"] = strategy_brief.get("current_phase")
+    return capital_brief

@@ -683,7 +683,6 @@ def api_funding_brief():
 @app.route("/api/funding/business-score-inputs", methods=["POST"])
 def api_funding_business_score_inputs():
     from flask import request as flask_request
-    from funding_engine.service import create_or_refresh_user_recommendations
     from scripts.prelaunch_utils import supabase_request
 
     body = flask_request.get_json(silent=True) or {}
@@ -707,19 +706,13 @@ def api_funding_business_score_inputs():
         "uploaded_report_url": body.get("uploaded_report_url"),
     }
     rows, _ = supabase_request("user_business_score_inputs", method="POST", body=payload, prefer="return=representation")
-    refresh = create_or_refresh_user_recommendations(
-        user_id=user_id,
-        tenant_id=payload["tenant_id"],
-        reason="business_score_inputs_updated",
-        force=False,
-    )
-    return jsonify({"ok": True, "input": (rows or [None])[0], "refresh": refresh.get("refresh")})
+    # Refresh is handled by the DB trigger → funding_recommendation_jobs → scheduler path.
+    return jsonify({"ok": True, "input": (rows or [None])[0], "refresh": {"queued": True}})
 
 
 @app.route("/api/funding/banking-relationships", methods=["POST"])
 def api_funding_banking_relationships():
     from flask import request as flask_request
-    from funding_engine.service import create_or_refresh_user_recommendations
     from scripts.prelaunch_utils import supabase_request
 
     body = flask_request.get_json(silent=True) or {}
@@ -743,19 +736,13 @@ def api_funding_banking_relationships():
         "proof_url": body.get("proof_url"),
     }
     rows, _ = supabase_request("banking_relationships", method="POST", body=payload, prefer="return=representation")
-    refresh = create_or_refresh_user_recommendations(
-        user_id=user_id,
-        tenant_id=payload["tenant_id"],
-        reason="banking_relationship_updated",
-        force=False,
-    )
-    return jsonify({"ok": True, "relationship": (rows or [None])[0], "refresh": refresh.get("refresh")})
+    # Refresh is handled by the DB trigger → funding_recommendation_jobs → scheduler path.
+    return jsonify({"ok": True, "relationship": (rows or [None])[0], "refresh": {"queued": True}})
 
 
 @app.route("/api/funding/onboarding-complete", methods=["POST"])
 def api_funding_onboarding_complete():
     from flask import request as flask_request
-    from funding_engine.service import create_or_refresh_user_recommendations
     from scripts.prelaunch_utils import supabase_request, utc_now_iso
 
     body = flask_request.get_json(silent=True) or {}
@@ -768,13 +755,8 @@ def api_funding_onboarding_complete():
         body={"onboarding_complete": True, "updated_at": utc_now_iso()},
         prefer="return=representation",
     )
-    refresh = create_or_refresh_user_recommendations(
-        user_id=user_id,
-        tenant_id=(body.get("tenant_id") or "").strip() or None,
-        reason="onboarding_completed",
-        force=False,
-    )
-    return jsonify({"ok": True, "profile": (rows or [None])[0], "refresh": refresh.get("refresh")})
+    # Refresh is handled by the DB trigger (onboarding_complete transition) → funding_recommendation_jobs → scheduler path.
+    return jsonify({"ok": True, "profile": (rows or [None])[0], "refresh": {"queued": True}})
 
 
 @app.route("/api/funding/application-results", methods=["GET", "POST"])
@@ -2455,6 +2437,183 @@ def api_update_draft(draft_id: str):
         payload, status_code = result
         return jsonify(payload), status_code
     return jsonify(result)
+
+
+# ── Readiness Engine Endpoints ────────────────────────────────────────────────
+
+@app.route("/api/readiness/profile")
+def api_readiness_profile():
+    from flask import request as flask_request
+    from readiness_engine.service import build_readiness_snapshot
+    user_id = flask_request.args.get("user_id", "").strip()
+    tenant_id = flask_request.args.get("tenant_id", "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+    return jsonify(_safe(lambda: build_readiness_snapshot(user_id, tenant_id)))
+
+
+@app.route("/api/readiness/business-foundation", methods=["POST"])
+def api_readiness_business_foundation():
+    from flask import request as flask_request
+    from readiness_engine.service import save_business_foundation
+    body = flask_request.get_json(silent=True) or {}
+    user_id = body.get("user_id", "").strip()
+    tenant_id = body.get("tenant_id", "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+    data = {k: v for k, v in body.items() if k not in {"user_id", "tenant_id"}}
+    return jsonify(save_business_foundation(user_id, tenant_id, data))
+
+
+@app.route("/api/readiness/credit-profile", methods=["POST"])
+def api_readiness_credit_profile():
+    from flask import request as flask_request
+    from readiness_engine.service import save_credit_profile
+    body = flask_request.get_json(silent=True) or {}
+    user_id = body.get("user_id", "").strip()
+    tenant_id = body.get("tenant_id", "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+    data = {k: v for k, v in body.items() if k not in {"user_id", "tenant_id"}}
+    return jsonify(save_credit_profile(user_id, tenant_id, data))
+
+
+@app.route("/api/readiness/banking", methods=["POST"])
+def api_readiness_banking():
+    from flask import request as flask_request
+    from readiness_engine.service import save_banking_profile
+    body = flask_request.get_json(silent=True) or {}
+    user_id = body.get("user_id", "").strip()
+    tenant_id = body.get("tenant_id", "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+    data = {k: v for k, v in body.items() if k not in {"user_id", "tenant_id"}}
+    return jsonify(save_banking_profile(user_id, tenant_id, data))
+
+
+@app.route("/api/readiness/grants", methods=["POST"])
+def api_readiness_grants():
+    from flask import request as flask_request
+    from readiness_engine.service import save_grant_profile
+    body = flask_request.get_json(silent=True) or {}
+    user_id = body.get("user_id", "").strip()
+    tenant_id = body.get("tenant_id", "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+    data = {k: v for k, v in body.items() if k not in {"user_id", "tenant_id"}}
+    return jsonify(save_grant_profile(user_id, tenant_id, data))
+
+
+@app.route("/api/readiness/trading", methods=["POST"])
+def api_readiness_trading():
+    from flask import request as flask_request
+    from readiness_engine.service import save_trading_profile
+    body = flask_request.get_json(silent=True) or {}
+    user_id = body.get("user_id", "").strip()
+    tenant_id = body.get("tenant_id", "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+    data = {k: v for k, v in body.items() if k not in {"user_id", "tenant_id"}}
+    return jsonify(save_trading_profile(user_id, tenant_id, data))
+
+
+@app.route("/api/readiness/tasks")
+def api_readiness_tasks():
+    from flask import request as flask_request
+    from readiness_engine.service import get_readiness_tasks
+    user_id = flask_request.args.get("user_id", "").strip()
+    tenant_id = flask_request.args.get("tenant_id", "").strip() or None
+    status = flask_request.args.get("status", "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+    return jsonify(get_readiness_tasks(user_id, tenant_id, status))
+
+
+@app.route("/api/readiness/tasks/<task_id>/complete", methods=["POST"])
+def api_readiness_task_complete(task_id: str):
+    from readiness_engine.service import complete_task
+    return jsonify(complete_task(task_id))
+
+
+@app.route("/api/readiness/recalculate", methods=["POST"])
+def api_readiness_recalculate():
+    from flask import request as flask_request
+    from readiness_engine.service import recalculate_readiness
+    body = flask_request.get_json(silent=True) or {}
+    user_id = body.get("user_id", "").strip()
+    tenant_id = body.get("tenant_id", "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id required"}), 400
+    return jsonify(recalculate_readiness(user_id, tenant_id))
+
+
+# ── Funding Strategy Endpoints ────────────────────────────────────────────────
+
+@app.route("/api/funding/strategy")
+def api_funding_strategy():
+    from flask import request as flask_request
+    from funding_engine.strategy_engine import get_active_strategy
+    user_id = (flask_request.args.get("user_id") or "").strip()
+    tenant_id = (flask_request.args.get("tenant_id") or "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    strategy = get_active_strategy(user_id, tenant_id)
+    if not strategy:
+        return jsonify({"strategy": None, "message": "No active strategy found. Run a recommendation refresh to generate one."}), 200
+    return jsonify({
+        "strategy_status": strategy.get("strategy_status"),
+        "strategy_summary": strategy.get("strategy_summary"),
+        "next_best_action": strategy.get("next_best_action"),
+        "current_phase": strategy.get("current_phase"),
+        "estimated_funding_low": strategy.get("estimated_funding_low"),
+        "estimated_funding_high": strategy.get("estimated_funding_high"),
+        "application_step_count": len(strategy.get("application_sequence") or []),
+        "generated_at": strategy.get("generated_at"),
+        "updated_at": strategy.get("updated_at"),
+    })
+
+
+@app.route("/api/funding/strategy/full")
+def api_funding_strategy_full():
+    from flask import request as flask_request
+    from funding_engine.strategy_engine import get_active_strategy
+    user_id = (flask_request.args.get("user_id") or "").strip()
+    tenant_id = (flask_request.args.get("tenant_id") or "").strip() or None
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    return jsonify(get_active_strategy(user_id, tenant_id) or {})
+
+
+@app.route("/api/funding/strategy/refresh", methods=["POST"])
+def api_funding_strategy_refresh():
+    from flask import request as flask_request
+    from funding_engine.service import build_funding_snapshot, generate_user_recommendations
+    from funding_engine.strategy_engine import build_and_persist_strategy
+    body = flask_request.get_json(silent=True) or {}
+    user_id = (body.get("user_id") or "").strip()
+    tenant_id = (body.get("tenant_id") or "").strip() or None
+    force = bool(body.get("force", False))
+    if not user_id:
+        return jsonify({"error": "user_id is required"}), 400
+    data = generate_user_recommendations(user_id=user_id, tenant_id=tenant_id)
+    snap = data.get("snapshot") or {}
+    result = build_and_persist_strategy(
+        user_id=user_id,
+        tenant_id=tenant_id,
+        user_profile=snap.get("user_profile") or {},
+        readiness_profile=snap.get("readiness") or {},
+        recommendations=data.get("recommendations") or [],
+        relationships=snap.get("banking_relationships") or [],
+        force=force,
+    )
+    return jsonify({
+        "persisted": result.get("persisted"),
+        "action": result.get("action"),
+        "next_best_action": (result.get("strategy") or {}).get("next_best_action"),
+        "current_phase": (result.get("strategy") or {}).get("current_phase"),
+        "estimated_funding_low": (result.get("strategy") or {}).get("estimated_funding_low"),
+        "estimated_funding_high": (result.get("strategy") or {}).get("estimated_funding_high"),
+    })
 
 
 @app.route("/")

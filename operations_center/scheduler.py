@@ -428,6 +428,9 @@ def task_funding_recommendation_refresh():
         )
 
         processed_jobs = process_pending_recommendation_jobs(limit=50)
+        # Skip users already handled by the job queue in this same run.
+        already_processed: set = processed_jobs.get("processed_pairs") or set()
+
         candidate_map: dict[tuple[str | None, str], dict[str, Any]] = {}
         for row in get_users_needing_recommendations():
             key = (row.get("tenant_id"), row.get("user_id"))
@@ -443,6 +446,10 @@ def task_funding_recommendation_refresh():
         refreshed = 0
         skipped = 0
         for row in list(candidate_map.values())[:100]:
+            pair = (row.get("tenant_id"), row.get("user_id"))
+            if pair in already_processed:
+                skipped += 1
+                continue
             result = create_or_refresh_user_recommendations(
                 user_id=row["user_id"],
                 tenant_id=row.get("tenant_id"),
