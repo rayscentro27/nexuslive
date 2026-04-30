@@ -132,17 +132,19 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-4 font-sans overflow-hidden relative">
+    <div className="min-h-screen bg-[#F8FAFF] flex flex-col items-center justify-start md:justify-center p-4 font-sans overflow-hidden">
       {onBackToDashboard && (
-        <button
-          onClick={onBackToDashboard}
-          className="absolute top-8 left-8 z-50 flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#5B7CFA] transition-all group"
-        >
-          <ArrowRight className="w-4 h-4 rotate-180 group-hover:-translate-x-1 transition-transform" />
-          Back to Dashboard
-        </button>
+        <div className="w-full max-w-5xl mb-2 md:mb-0">
+          <button
+            onClick={onBackToDashboard}
+            className="md:absolute md:top-8 md:left-8 z-50 flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-[#5B7CFA] transition-all group py-2"
+          >
+            <ArrowRight className="w-4 h-4 rotate-180 group-hover:-translate-x-1 transition-transform" />
+            Back to Dashboard
+          </button>
+        </div>
       )}
-      <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+      <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 items-center">
 
         {/* Left Side: Sign Up Form */}
         <div className="glass-card p-8 space-y-6 relative overflow-hidden">
@@ -243,23 +245,23 @@ export function Auth({ onShowLegal, onBackToDashboard }: AuthProps) {
               <div className="flex-1 h-px bg-slate-100" />
             </div>
 
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <button
                 onClick={() => handleOAuth('google')}
-                className="flex items-center justify-center p-2.5 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-all shadow-sm group"
+                className="flex items-center justify-center p-3.5 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-all shadow-sm group"
               >
                 <Chrome className="w-5 h-5 text-slate-400 group-hover:text-[#1A2244]" />
               </button>
               <button
                 onClick={() => handleOAuth('github')}
-                className="flex items-center justify-center p-2.5 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-all shadow-sm group"
+                className="flex items-center justify-center p-3.5 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-all shadow-sm group"
               >
                 <Github className="w-5 h-5 text-slate-400 group-hover:text-[#1A2244]" />
               </button>
               {[Facebook, Apple].map((Icon, i) => (
                 <button
                   key={i}
-                  className="flex items-center justify-center p-2.5 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-all shadow-sm group opacity-40 cursor-not-allowed"
+                  className="flex items-center justify-center p-3.5 bg-white border border-slate-100 rounded-xl transition-all shadow-sm group opacity-40 cursor-not-allowed"
                   disabled
                 >
                   <Icon className="w-5 h-5 text-slate-400" />

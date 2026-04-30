@@ -26,6 +26,18 @@
     min-height: 100vh;
     background-color: #eaebf6;  /* lavender background */
     @apply text-slate-900 antialiased relative overflow-x-hidden;
+    -webkit-text-size-adjust: 100%;   /* prevent iOS auto font inflation */
+    text-size-adjust: 100%;
+  }
+
+  /* Prevent double-tap zoom on buttons/links — makes the app feel native */
+  button, a, input, select, textarea {
+    touch-action: manipulation;
+  }
+
+  /* iOS Safari safe-area support */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 

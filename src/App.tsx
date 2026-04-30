@@ -176,7 +176,7 @@ function AppContent() {
           <div className="relative">
             <button
               onClick={() => setPublicView('pricing')}
-              className="absolute top-8 left-8 z-50 text-[10px] font-black uppercase tracking-widest transition-colors"
+              className="md:absolute md:top-8 md:left-8 z-50 text-[10px] font-black uppercase tracking-widest transition-colors block px-4 pt-4 md:p-0"
               style={{ color: '#8b8fa8' }}
             >
               ← Back to Pricing
@@ -222,7 +222,7 @@ function AppContent() {
       <main className="flex-1 h-screen flex flex-col overflow-hidden md:ml-[208px]">
         <Header onNavigate={setActiveTab} />
 
-        <div className="flex-1 overflow-y-auto scrollbar-hide pb-16 md:pb-0" style={{ padding: 24 }}>
+        <div className="flex-1 overflow-y-auto scrollbar-hide pb-20 md:pb-0" style={{ padding: '16px 16px' }}>
           {activeTab === 'home'           && <Dashboard />}
           {activeTab === 'action-center'  && <ActionCenter />}
           {activeTab === 'business-setup' && <BusinessSetup />}
@@ -285,7 +285,7 @@ function AppContent() {
       {/* Mobile bottom navigation — hidden on md+ */}
       <nav
         className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden"
-        style={{ background: '#fff', borderTop: '1px solid #e8e9f2' }}
+        style={{ background: '#fff', borderTop: '1px solid #e8e9f2', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         {mobileNavItems.map(({ id, label, icon: Icon }) => {
           const isActive = activeTab === id;
@@ -293,11 +293,11 @@ function AppContent() {
             <button
               key={id}
               onClick={() => setActiveTab(id)}
-              className="flex-1 flex flex-col items-center justify-center py-2 gap-0.5"
+              className="flex-1 flex flex-col items-center justify-center py-3 gap-1 min-h-[56px]"
               style={{ color: isActive ? '#3d5af1' : '#8b8fa8', background: 'none', border: 'none' }}
             >
-              <Icon size={20} />
-              <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+              <Icon size={22} />
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
             </button>
           );
         })}

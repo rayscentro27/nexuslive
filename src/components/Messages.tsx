@@ -39,6 +39,7 @@ export function Messages() {
   const [conversationIds, setConversationIds] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingMessages, setIsFetchingMessages] = useState(false);
+  const [mobileView, setMobileView] = useState<'contacts' | 'chat'>('contacts');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Initialize all conversations on mount
@@ -143,10 +144,22 @@ export function Messages() {
 
   const currentMessages = chatHistory[selectedContact.id] || [];
 
+  function selectContact(contact: typeof initialContacts[0]) {
+    setSelectedContact(contact);
+    setMobileView('chat');
+  }
+
   return (
-    <div className="p-4 h-full flex gap-4 overflow-hidden">
-      {/* Contacts List */}
-      <div className="w-52 flex flex-col gap-3 shrink-0">
+    <div className="h-full flex overflow-hidden">
+
+      {/* Contacts List — full screen on mobile when mobileView==='contacts', sidebar on desktop */}
+      <div className={cn(
+        "flex flex-col gap-3 shrink-0 bg-white border-r border-slate-100",
+        "w-full md:w-52",
+        mobileView === 'chat' ? "hidden md:flex" : "flex"
+      )}
+        style={{ padding: '16px 12px' }}
+      >
         <h2 className="text-lg font-black text-[#1A2244] px-1">Messages</h2>
 
         <div className="relative">
@@ -154,33 +167,33 @@ export function Messages() {
           <input
             type="text"
             placeholder="Search"
-            className="w-full bg-slate-50 border border-slate-100 rounded-xl py-1.5 pl-9 pr-3 text-[10px] font-bold focus:outline-none focus:ring-4 focus:ring-blue-500/5 transition-all"
+            className="w-full bg-slate-50 border border-slate-100 rounded-xl py-2 pl-9 pr-3 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-blue-500/5 transition-all"
           />
         </div>
 
         <div className="flex-1 glass-card overflow-hidden flex flex-col border-slate-100">
           <div className="p-2.5 border-b border-slate-50 bg-slate-50/50">
-            <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">AI Specialists</span>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">AI Specialists</span>
           </div>
           <div className="flex-1 overflow-y-auto no-scrollbar">
             {initialContacts.map((contact) => (
               <button
                 key={contact.id}
-                onClick={() => setSelectedContact(contact)}
+                onClick={() => selectContact(contact)}
                 className={cn(
-                  "w-full p-2.5 flex gap-2 items-start hover:bg-slate-50 transition-colors border-b border-slate-50",
+                  "w-full p-3 flex gap-3 items-center hover:bg-slate-50 transition-colors border-b border-slate-50",
                   selectedContact.id === contact.id && "bg-blue-50/50"
                 )}
               >
-                <div className="w-7 h-7 rounded-lg bg-[#C5C9F7] overflow-hidden shrink-0 relative shadow-sm">
+                <div className="w-9 h-9 rounded-xl bg-[#C5C9F7] overflow-hidden shrink-0 relative shadow-sm">
                   <img src={contact.avatar} alt={contact.name} className="w-full h-full object-cover" />
                   {contact.active && (
-                    <div className="absolute bottom-0 right-0 w-1.5 h-1.5 bg-green-500 border border-white rounded-full" />
+                    <div className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 border border-white rounded-full" />
                   )}
                 </div>
                 <div className="flex-1 text-left min-w-0">
-                  <p className="text-[10px] font-black text-[#1A2244] truncate">{contact.name}</p>
-                  <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-0.5 truncate">{contact.role}</p>
+                  <p className="text-sm font-black text-[#1A2244] truncate">{contact.name}</p>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5 truncate">{contact.role}</p>
                 </div>
               </button>
             ))}
@@ -188,22 +201,35 @@ export function Messages() {
         </div>
       </div>
 
-      {/* Chat Area */}
-      <div className="flex-1 glass-card flex flex-col overflow-hidden border-slate-100">
-        <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-white">
+      {/* Chat Area — full screen on mobile when mobileView==='chat' */}
+      <div className={cn(
+        "flex-1 flex flex-col overflow-hidden",
+        mobileView === 'contacts' ? "hidden md:flex" : "flex"
+      )}>
+        {/* Chat header */}
+        <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-white shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#C5C9F7] overflow-hidden shadow-sm">
+            {/* Back button — mobile only */}
+            <button
+              onClick={() => setMobileView('contacts')}
+              className="md:hidden p-1.5 -ml-1 text-slate-400 hover:text-[#5B7CFA]"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div className="w-8 h-8 rounded-lg bg-[#C5C9F7] overflow-hidden shadow-sm shrink-0">
               <img src={selectedContact.avatar} alt={selectedContact.name} className="w-full h-full object-cover" />
             </div>
             <div>
-              <p className="text-xs font-black text-[#1A2244] leading-tight">{selectedContact.name}</p>
-              <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{selectedContact.role}</p>
+              <p className="text-sm font-black text-[#1A2244] leading-tight">{selectedContact.name}</p>
+              <p className="text-[10px] text-slate-400 font-medium">{selectedContact.role}</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <button className="p-2 text-slate-400 hover:text-[#5B7CFA] hover:bg-slate-50 rounded-lg transition-all"><Phone className="w-3.5 h-3.5" /></button>
-            <button className="p-2 text-slate-400 hover:text-[#5B7CFA] hover:bg-slate-50 rounded-lg transition-all"><Video className="w-3.5 h-3.5" /></button>
-            <button className="p-2 text-slate-400 hover:text-[#5B7CFA] hover:bg-slate-50 rounded-lg transition-all"><MoreVertical className="w-3.5 h-3.5" /></button>
+            <button className="p-2 text-slate-400 hover:text-[#5B7CFA] hover:bg-slate-50 rounded-lg transition-all"><Phone className="w-4 h-4" /></button>
+            <button className="p-2 text-slate-400 hover:text-[#5B7CFA] hover:bg-slate-50 rounded-lg transition-all hidden sm:block"><Video className="w-4 h-4" /></button>
+            <button className="p-2 text-slate-400 hover:text-[#5B7CFA] hover:bg-slate-50 rounded-lg transition-all"><MoreVertical className="w-4 h-4" /></button>
           </div>
         </div>
 
@@ -264,7 +290,7 @@ export function Messages() {
               value={msgInput}
               onChange={(e) => setMsgInput(e.target.value)}
               disabled={isLoading}
-              className="flex-1 bg-transparent border-none focus:outline-none text-[11px] font-medium py-1.5 disabled:opacity-50"
+              className="flex-1 bg-transparent border-none focus:outline-none text-sm font-medium py-2 disabled:opacity-50"
             />
             <button type="button" className="text-slate-400 hover:text-[#5B7CFA] transition-colors"><Smile className="w-3.5 h-3.5" /></button>
             <button
@@ -279,8 +305,8 @@ export function Messages() {
         </form>
       </div>
 
-      {/* Context Panel */}
-      <div className="w-60 flex flex-col gap-4 shrink-0">
+      {/* Context Panel — hidden on mobile and tablet, visible on large screens */}
+      <div className="w-60 hidden lg:flex flex-col gap-4 shrink-0">
         <div className="glass-card p-4 space-y-4 border-slate-100 bg-gradient-to-br from-white to-blue-50/20">
           <div className="space-y-1">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">User Readiness</h3>
