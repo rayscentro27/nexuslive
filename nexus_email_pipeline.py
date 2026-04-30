@@ -49,6 +49,28 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 NEXUS_DIR = Path(__file__).parent
 RESEARCH_DIR = NEXUS_DIR / "workflows" / "research_ingestion"
+
+# Resolve node binary — launchd strips PATH so we need the full path.
+def _find_node() -> str:
+    candidates = [
+        "/usr/local/bin/node",
+        "/opt/homebrew/bin/node",
+        str(Path.home() / ".nvm/versions/node/v24.14.0/bin/node"),
+    ]
+    # Also check any nvm version
+    nvm_base = Path.home() / ".nvm/versions/node"
+    if nvm_base.exists():
+        for version_dir in sorted(nvm_base.iterdir(), reverse=True):
+            candidate = version_dir / "bin" / "node"
+            if candidate.exists():
+                candidates.insert(0, str(candidate))
+                break
+    for c in candidates:
+        if Path(c).exists():
+            return c
+    return "node"  # fallback, will fail clearly
+
+NODE_BIN = _find_node()
 AUTONOMY_CHECK = NEXUS_DIR / "scripts" / "check_autonomy_stack.sh"
 AUTONOMY_STATUS = NEXUS_DIR / "scripts" / "autonomy_status.py"
 POLL_INTERVAL = int(os.getenv("EMAIL_POLL_INTERVAL", "120"))
@@ -434,10 +456,18 @@ def groq_enhance(raw_recommendation):
     req = urllib.request.Request(
         f"{GROQ_BASE_URL}/chat/completions",
         data=payload,
-        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json",
+            "User-Agent": "groq-python/0.9.0",
+        },
     )
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        import ssl as _ssl
+        _ctx = _ssl.create_default_context()
+        _ctx.check_hostname = False
+        _ctx.verify_mode = _ssl.CERT_NONE
+        with urllib.request.urlopen(req, timeout=30, context=_ctx) as resp:
             data = json.loads(resp.read())
             return data["choices"][0]["message"]["content"]
     except Exception as e:
@@ -469,7 +499,7 @@ def process_research(msg):
     since = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
 
     result = subprocess.run(
-        ["node", "research_ingestion_runner.js", "--mode", "batch",
+        [NODE_BIN, "research_ingestion_runner.js", "--once",
          "--sources", str(drop_file)],
         cwd=str(RESEARCH_DIR),
         capture_output=True, text=True, timeout=300,
@@ -583,11 +613,17 @@ def process_research_email_command(msg):
         subject,
         "Nexus received your [RESEARCH EMAIL] request. Processing now.\n\n"
         "You will receive a second email shortly with your result.\n\n"
-        "---\nNexus AI — no pipeline rerun is triggered by this command.",
+        "---\nNexus AI",
     )
 
     if not command_text:
         send_reply(reply_to, subject, research_email_help_text())
+        return
+
+    # If the body contains YouTube URLs, treat this as a research pipeline
+    # request — same as [NEXUS] or [RESEARCH] subject lines.
+    if YT_RE.search(command_text):
+        process_research(msg)
         return
 
     # Step 2 — execute command and send result email.
