@@ -27,7 +27,7 @@ import email
 import subprocess
 import re
 import urllib.request
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Any
@@ -89,6 +89,7 @@ SMTP_PORT = 587
 
 _PROCESSED_IDS_FILE = NEXUS_DIR / ".email_pipeline_state.json"
 _MAX_STORED_IDS = 500  # prune oldest when limit reached
+_RESEARCH_EMAIL_LOOKBACK_DAYS = max(1, int(os.getenv("RESEARCH_EMAIL_LOOKBACK_DAYS", "7")))
 
 
 def _load_processed_ids() -> set[str]:
@@ -119,6 +120,10 @@ def _is_already_processed(message_id: str) -> bool:
         return False
     return message_id in _load_processed_ids()
 
+
+def _imap_since_date(days: int) -> str:
+    return (datetime.now(UTC) - timedelta(days=max(1, days))).strftime("%d-%b-%Y")
+
 YT_RE = re.compile(
     r'https?://(?:www\.)?(?:youtube\.com/(?:watch\?v=[\w-]+|shorts/[\w-]+)|youtu\.be/[\w-]+)(?:[^\s<>"]*)?'
 )
@@ -145,7 +150,7 @@ def fetch_unread_nexus_emails():
             ('UNSEEN SUBJECT "tasks"',),
             ('UNSEEN SUBJECT "status"',),
             # Catch [RESEARCH EMAIL] that was marked read before the worker ran.
-            ('SINCE "1-Jan-2000" SUBJECT "research email"',),
+            (f'SINCE "{_imap_since_date(_RESEARCH_EMAIL_LOOKBACK_DAYS)}" SUBJECT "research email"',),
         ]
 
         all_uids: set[bytes] = set()
@@ -496,7 +501,7 @@ def process_research(msg):
     drop_file.write_text(json.dumps({"sources": sources}, indent=2))
 
     print(f"[email] Research pipeline — {len(urls)} URL(s)...")
-    since = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S")
+    since = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S")
 
     result = subprocess.run(
         [NODE_BIN, "research_ingestion_runner.js", "--once",

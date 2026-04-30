@@ -581,8 +581,252 @@ class NexusDashboard:
                 logger.error(f"Portal signal detail error for {signal_id}: {e}")
                 return jsonify({'error': 'Failed to fetch signal'}), 500
 
+    def _trading_api_data(self):
+        """Shared helper: fetch engine status + recent paper trades from local sources."""
+        # Engine status from local file
+        status_file = Path(__file__).parent / 'logs' / 'trading_engine_status.json'
+        engine = {}
+        try:
+            engine = json.loads(status_file.read_text())
+        except Exception:
+            pass
+
+        # Recent paper trades from Supabase
+        sb_url = os.getenv('SUPABASE_URL', '')
+        sb_key = os.getenv('SUPABASE_KEY', '')
+        trades = []
+        if sb_url and sb_key:
+            try:
+                import requests as _req
+                r = _req.get(
+                    f"{sb_url}/rest/v1/paper_trading_journal_entries"
+                    "?select=id,symbol,asset_class,entry_status,thesis,stop_loss,"
+                    "target_price,tags,opened_at,closed_at"
+                    "&order=opened_at.desc&limit=50",
+                    headers={'apikey': sb_key, 'Authorization': f'Bearer {sb_key}'},
+                    timeout=8,
+                )
+                trades = r.json() if r.ok else []
+            except Exception:
+                pass
+
+        # Signal review log tail
+        log_file = Path(__file__).parent / 'logs' / 'signal_review.log'
+        log_tail = []
+        try:
+            lines = log_file.read_text().splitlines()
+            log_tail = lines[-20:]
+        except Exception:
+            pass
+
+        return engine, trades, log_tail
+
+    # ── /api/trading/paper-trades ──────────────────────────────────────────────
+
+    def _register_trading_routes(self):
+
+        @self.app.route('/api/trading/paper-trades')
+        def api_paper_trades():
+            engine, trades, log_tail = self._trading_api_data()
+            return jsonify({
+                'engine':    engine,
+                'trades':    trades,
+                'log_tail':  log_tail,
+            })
+
+        # ── /trading  (dashboard page) ─────────────────────────────────────────
+
+        @self.app.route('/trading')
+        def trading_dashboard():
+            html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nexus — Trading Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f172a,#1e3a5f);color:#e2e8f0;min-height:100vh;padding:20px}
+.container{max-width:1400px;margin:0 auto}
+h1{font-size:1.8em;margin-bottom:4px}
+.sub{opacity:.6;font-size:.85em;margin-bottom:24px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
+.card{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:16px}
+.card h3{font-size:.72em;opacity:.55;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.card .val{font-size:1.7em;font-weight:700}
+.badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.75em;font-weight:600}
+.badge.green{background:rgba(74,222,128,.15);color:#4ade80;border:1px solid rgba(74,222,128,.3)}
+.badge.red{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3)}
+.badge.yellow{background:rgba(250,204,21,.15);color:#facc15;border:1px solid rgba(250,204,21,.3)}
+.badge.blue{background:rgba(96,165,250,.15);color:#60a5fa;border:1px solid rgba(96,165,250,.3)}
+.section{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:18px;margin-bottom:20px}
+.section h2{font-size:.85em;opacity:.6;text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px}
+table{width:100%;border-collapse:collapse;font-size:.85em}
+th{text-align:left;padding:8px 10px;opacity:.5;font-weight:500;border-bottom:1px solid rgba(255,255,255,.1)}
+td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.06)}
+tr:hover td{background:rgba(255,255,255,.04)}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:.75em}
+.pill.open{background:rgba(74,222,128,.15);color:#4ade80}
+.pill.closed{background:rgba(148,163,184,.1);color:#94a3b8}
+.webhook-box{background:rgba(0,0,0,.3);border-radius:8px;padding:14px;font-family:monospace;font-size:.82em;word-break:break-all;color:#7dd3fc;margin-bottom:10px}
+.copy-btn{background:rgba(96,165,250,.2);border:1px solid rgba(96,165,250,.4);color:#60a5fa;padding:6px 14px;border-radius:6px;cursor:pointer;font-size:.8em;margin-top:8px}
+.copy-btn:hover{background:rgba(96,165,250,.35)}
+.log-box{background:rgba(0,0,0,.35);border-radius:8px;padding:12px;font-family:monospace;font-size:.75em;max-height:200px;overflow-y:auto;line-height:1.6;color:#94a3b8}
+.log-box .info{color:#7dd3fc}
+.log-box .warn{color:#fbbf24}
+.log-box .err{color:#f87171}
+.refresh-btn{background:rgba(96,165,250,.2);border:1px solid rgba(96,165,250,.4);color:#60a5fa;padding:8px 18px;border-radius:7px;cursor:pointer;font-size:.85em;margin-bottom:20px}
+.refresh-btn:hover{background:rgba(96,165,250,.35)}
+.nav{margin-bottom:20px;font-size:.85em}
+.nav a{color:#7dd3fc;text-decoration:none;margin-right:16px;opacity:.7}
+.nav a:hover{opacity:1}
+.ts{font-size:.72em;opacity:.45}
+#last-refresh{font-size:.75em;opacity:.4;margin-left:10px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="nav"><a href="/">← Main Dashboard</a></div>
+  <h1>Trading Dashboard</h1>
+  <p class="sub">Paper trading — DRY_RUN mode &nbsp;|&nbsp; Webhook: signals.goclearonline.cc</p>
+  <button class="refresh-btn" onclick="loadData()">Refresh <span id="last-refresh"></span></button>
+
+  <div class="grid" id="stat-grid">
+    <div class="card"><h3>Mode</h3><div class="val" id="s-mode">—</div></div>
+    <div class="card"><h3>Signals Today</h3><div class="val" id="s-count">—</div></div>
+    <div class="card"><h3>Open Trades</h3><div class="val" id="s-open">—</div></div>
+    <div class="card"><h3>Total Trades</h3><div class="val" id="s-total">—</div></div>
+    <div class="card"><h3>Last Signal</h3><div class="val" id="s-last" style="font-size:1em">—</div></div>
+  </div>
+
+  <div class="section">
+    <h2>TradingView Webhook Setup</h2>
+    <div style="font-size:.85em;margin-bottom:10px;opacity:.7">Paste this URL in your TradingView alert → Webhook URL field:</div>
+    <div class="webhook-box" id="webhook-url">https://signals.goclearonline.cc/webhook/tradingview</div>
+    <button class="copy-btn" onclick="copyWebhook()">Copy URL</button>
+    <div style="margin-top:16px;font-size:.82em;opacity:.6">Alert message body (JSON):</div>
+    <div class="webhook-box" style="margin-top:6px">{
+  "symbol": "{{ticker}}",
+  "action": "{{strategy.order.action}}",
+  "entry":  {{close}},
+  "stop":   {{strategy.order.contracts}},
+  "target": {{strategy.order.price}},
+  "timeframe": "{{interval}}",
+  "confidence": 75,
+  "strategy": "my_strategy_name"
+}</div>
+  </div>
+
+  <div class="section">
+    <h2>Recent Paper Trades</h2>
+    <table>
+      <thead><tr><th>Symbol</th><th>Thesis</th><th>SL</th><th>TP</th><th>Status</th><th>Tags</th><th>Opened</th></tr></thead>
+      <tbody id="trades-body"><tr><td colspan="7" style="opacity:.4;text-align:center;padding:20px">Loading...</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Signal Review Log</h2>
+    <div class="log-box" id="log-box">Loading...</div>
+  </div>
+</div>
+
+<script>
+const WEBHOOK = 'https://signals.goclearonline.cc/webhook/tradingview';
+
+function copyWebhook() {
+  navigator.clipboard.writeText(WEBHOOK).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy URL', 2000);
+  });
+}
+
+function fmt(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+function pill(status) {
+  const cls = status === 'open' ? 'open' : 'closed';
+  return `<span class="pill ${cls}">${status}</span>`;
+}
+
+function tagBadge(tags) {
+  if (!tags || !tags.length) return '';
+  return tags.slice(0,3).map(t => `<span class="badge blue" style="margin:1px;font-size:.7em">${t}</span>`).join('');
+}
+
+function colorLine(line) {
+  if (line.includes('ERROR')) return `<div class="err">${line}</div>`;
+  if (line.includes('WARNING') || line.includes('WARN') || line.includes('heuristic')) return `<div class="warn">${line}</div>`;
+  return `<div class="info">${line}</div>`;
+}
+
+async function loadData() {
+  try {
+    const res = await fetch('/api/trading/paper-trades');
+    const d = await res.json();
+
+    const eng = d.engine || {};
+    document.getElementById('s-mode').innerHTML =
+      eng.dry_run ? '<span class="badge green">DRY RUN</span>' : '<span class="badge red">LIVE</span>';
+    document.getElementById('s-count').textContent = eng.signals_processed ?? '—';
+
+    const trades = d.trades || [];
+    const open = trades.filter(t => t.entry_status === 'open').length;
+    document.getElementById('s-open').textContent = open;
+    document.getElementById('s-total').textContent = trades.length;
+
+    const last = eng.last_signal;
+    document.getElementById('s-last').textContent = last
+      ? `${last.symbol} ${last.action} @ ${last.entry_price ?? last.entry ?? '—'}`
+      : '—';
+
+    // Trades table
+    const tbody = document.getElementById('trades-body');
+    if (!trades.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="opacity:.4;text-align:center;padding:20px">No paper trades yet</td></tr>';
+    } else {
+      tbody.innerHTML = trades.map(t => `
+        <tr>
+          <td><strong>${t.symbol}</strong><br><span class="ts">${t.asset_class || ''}</span></td>
+          <td style="max-width:260px;opacity:.8">${(t.thesis||'').slice(0,80)}${t.thesis && t.thesis.length>80?'…':''}</td>
+          <td class="ts">${t.stop_loss ? Number(t.stop_loss).toFixed(4) : '—'}</td>
+          <td class="ts">${t.target_price ? Number(t.target_price).toFixed(4) : '—'}</td>
+          <td>${pill(t.entry_status)}</td>
+          <td>${tagBadge(t.tags)}</td>
+          <td class="ts">${fmt(t.opened_at)}</td>
+        </tr>`).join('');
+    }
+
+    // Log
+    const logBox = document.getElementById('log-box');
+    if (d.log_tail && d.log_tail.length) {
+      logBox.innerHTML = d.log_tail.map(colorLine).join('');
+      logBox.scrollTop = logBox.scrollHeight;
+    } else {
+      logBox.textContent = 'No log data available.';
+    }
+
+    document.getElementById('last-refresh').textContent =
+      '· ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  } catch(e) {
+    console.error('loadData error:', e);
+  }
+}
+
+loadData();
+setInterval(loadData, 30000);
+</script>
+</body>
+</html>"""
+            return html
+
     def run(self, host: str = '127.0.0.1', port: int = 3000, debug: bool = False):
         """Start dashboard server"""
+        self._register_trading_routes()
         logger.info(f"🚀 Dashboard running at http://{host}:{port}")
         self.app.run(host=host, port=port, debug=debug)
 

@@ -505,6 +505,62 @@ class NexusTradingEngine:
         self.last_result = {'status': 'position_closed', 'symbol': position['symbol'], 'reason': reason, 'pnl': pnl}
         self.write_status("position_closed")
 
+    def _supabase_log_paper_trade(self, trade_data: dict):
+        """Write a paper trade record to Supabase (non-fatal)."""
+        import urllib.request as _req
+        sb_url = os.getenv('SUPABASE_URL', '')
+        sb_key = os.getenv('SUPABASE_KEY', '')
+        if not sb_url or not sb_key:
+            return
+        signal = trade_data.get('signal', {}) or {}
+        result = trade_data.get('result', {}) or {}
+        strategy_signal = trade_data.get('strategy_analysis', {}) or {}
+        if not signal.get('symbol'):
+            return
+        symbol = signal.get('symbol', 'UNKNOWN')
+        crypto_tickers = ('BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'ADA')
+        asset_class = 'crypto' if any(t in symbol.upper() for t in crypto_tickers) else 'forex'
+        entry_status = 'open' if result.get('status') in ('approved_demo', 'executed') else 'rejected'
+        payload = {
+            'symbol': symbol,
+            'asset_class': asset_class,
+            'timeframe': signal.get('timeframe'),
+            'thesis': (
+                f"{'DRY_RUN' if DRY_RUN else 'PRACTICE'} | "
+                f"{(signal.get('action') or '?').upper()} @ {signal.get('entry_price', '?')} | "
+                f"Strategy: {signal.get('strategy', 'nexus_engine')} | "
+                f"Confidence: {signal.get('confidence', '?')}%"
+            ),
+            'entry_idea': json.dumps({
+                'action': signal.get('action'),
+                'entry_price': signal.get('entry_price'),
+                'result_status': result.get('status'),
+                'generated_by': strategy_signal.get('generated_by', 'nexus_engine'),
+            }),
+            'stop_loss': signal.get('stop_loss'),
+            'target_price': signal.get('take_profit'),
+            'risk_percent': 1.0,
+            'tags': ['paper', 'nexus_auto', 'dry_run' if DRY_RUN else 'practice'],
+            'entry_status': entry_status,
+            'opened_at': datetime.now().isoformat(),
+        }
+        try:
+            url = f"{sb_url}/rest/v1/paper_trading_journal_entries"
+            body = json.dumps(payload).encode()
+            request = _req.Request(
+                url, data=body, method='POST',
+                headers={
+                    'apikey': sb_key,
+                    'Authorization': f'Bearer {sb_key}',
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=minimal',
+                },
+            )
+            with _req.urlopen(request, timeout=10) as r:
+                r.read()
+        except Exception as e:
+            print(f"⚠️ Paper trade Supabase log failed (non-fatal): {e}")
+
     def log_trade(self, trade_data):
         """Log trading activity"""
         self.trading_log.append(trade_data)
@@ -516,6 +572,10 @@ class NexusTradingEngine:
         with open(log_file, 'a') as f:
             json.dump(trade_data, f)
             f.write('\n')
+
+        # Persist to Supabase so paper trades appear in the dashboard
+        if 'signal' in trade_data:
+            self._supabase_log_paper_trade(trade_data)
 
     def start_automated_trading(self):
         """Start automated trading loop"""

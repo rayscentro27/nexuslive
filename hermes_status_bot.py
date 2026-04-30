@@ -25,6 +25,8 @@ from html import escape
 
 import requests
 
+from lib.telegram_role_config import get_ops_config
+
 VERSION = "1.0"
 
 # ── Load .env ──────────────────────────────────────────────────────────────────
@@ -42,8 +44,9 @@ except ImportError:
                     os.environ.setdefault(k.strip(), v.strip())
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-TELEGRAM_BOT_TOKEN  = os.getenv('HERMES_BOT_TOKEN', '')
-CHAT_ID       = os.getenv('TELEGRAM_CHAT_ID', '')
+OPS_CONFIG = get_ops_config()
+TELEGRAM_BOT_TOKEN  = OPS_CONFIG.token
+CHAT_ID       = OPS_CONFIG.chat_id
 POLL_INTERVAL = int(os.getenv('HERMES_POLL_INTERVAL', '4'))
 SUPABASE_URL  = os.getenv('SUPABASE_URL', '')
 SUPABASE_KEY  = os.getenv('SUPABASE_KEY', '')
@@ -563,10 +566,10 @@ def _save_offset(offset: int) -> None:
 
 def main():
     if not TELEGRAM_BOT_TOKEN:
-        print('ERROR: HERMES_BOT_TOKEN not set in .env', flush=True)
+        print('ERROR: TELEGRAM_OPS_BOT_TOKEN not set in .env', flush=True)
         sys.exit(1)
     if not CHAT_ID:
-        print('ERROR: TELEGRAM_CHAT_ID not set in .env', flush=True)
+        print('ERROR: TELEGRAM_OPS_CHAT_ID not set in .env', flush=True)
         sys.exit(1)
 
     once = '--once' in sys.argv

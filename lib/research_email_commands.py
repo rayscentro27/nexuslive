@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import json
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable
 
 from notifications.operator_notifications import send_operator_email
@@ -9,6 +11,7 @@ from scripts.prelaunch_utils import rest_select
 
 SEND_ENABLED = os.getenv("EMAIL_COMMAND_SEND_ENABLED", "false").lower() == "true"
 MAX_ARTIFACTS = int(os.getenv("EMAIL_COMMAND_MAX_RESEARCH_ARTIFACTS", "3"))
+LATEST_FUNDING_BRIEF_FILE = Path(__file__).resolve().parent.parent / "state" / "latest_funding_brief.json"
 
 
 def _safe_select(path: str) -> list[dict[str, Any]]:
@@ -32,7 +35,27 @@ def latest_executive_brief(briefing_type: str | None = None) -> dict[str, Any] |
         query += f"&briefing_type=eq.{briefing_type}"
     query += "&order=created_at.desc&limit=1"
     rows = _safe_select(query)
-    return rows[0] if rows else None
+    if rows:
+        return rows[0]
+    if briefing_type == "funding":
+        return latest_local_funding_brief()
+    return None
+
+
+def latest_local_funding_brief() -> dict[str, Any] | None:
+    try:
+        if not LATEST_FUNDING_BRIEF_FILE.exists():
+            return None
+        row = json.loads(LATEST_FUNDING_BRIEF_FILE.read_text())
+        return {
+            "briefing_type": row.get("briefing_type") or "funding",
+            "content": row.get("content") or "",
+            "urgency": row.get("urgency") or "medium",
+            "generated_by": row.get("generated_by") or "funding_engine_local_cache",
+            "created_at": row.get("created_at"),
+        }
+    except Exception:
+        return None
 
 
 def help_text() -> str:

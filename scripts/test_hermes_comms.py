@@ -13,6 +13,7 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from scripts.prelaunch_utils import count_by, default_test_mode, pgrep_lines, probe_port, rest_select
+from lib.telegram_role_config import get_ops_config, get_reports_config, hermes_chat_enabled, shared_token_detected
 
 
 def str_bool(value: str | None, default: bool) -> bool:
@@ -48,6 +49,10 @@ def duplicate_detection() -> dict:
         "telegram_process_count": len(telegram_processes),
         "telegram_processes": telegram_processes,
         "canonical_consumer": "telegram_bot.py",
+        "ops_token_source": get_ops_config().token_source,
+        "reports_token_source": get_reports_config().token_source,
+        "hermes_chat_enabled": hermes_chat_enabled(),
+        "shared_token_detected": shared_token_detected(),
         "ignored_ceo_routed_events": ignored_ceo,
         "event_mix": event_mix,
         "status": "ok" if len(telegram_processes) <= 1 and ignored_ceo <= 1 else "attention",

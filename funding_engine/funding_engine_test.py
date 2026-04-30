@@ -338,6 +338,32 @@ def test_application_result_submission_triggers_refresh():
     check("application result response keeps disclaimer", "not guaranteed" in result["disclaimer"].lower(), result["disclaimer"])
 
 
+def test_funding_brief_persistence():
+    original_build = service.build_hermes_funding_brief
+    original_safe_insert = service.safe_insert
+    inserted: list[tuple[str, dict, str]] = []
+
+    service.build_hermes_funding_brief = lambda user_id, tenant_id=None, user_profile=None: {
+        "brief_text": "Today's Funding Move:\nReview Tier 1 readiness.\n\nResults vary. Approval is determined by the lender and is not guaranteed.",
+        "current_phase": "readiness",
+    }
+
+    def fake_safe_insert(table, body, prefer="return=representation", **_):
+        inserted.append((table, body, prefer))
+        return {"ok": True, "rows": []}
+
+    service.safe_insert = fake_safe_insert
+    try:
+        brief = service.persist_hermes_funding_brief("user-brief", "tenant-1")
+    finally:
+        service.build_hermes_funding_brief = original_build
+        service.safe_insert = original_safe_insert
+
+    check("funding brief persistence stores executive briefing", inserted and inserted[0][0] == "executive_briefings", str(inserted))
+    check("funding brief persistence uses funding briefing type", inserted and inserted[0][1].get("briefing_type") == "funding", str(inserted[0][1] if inserted else {}))
+    check("funding brief persistence marks stored", brief.get("stored") is True, str(brief))
+
+
 def test_no_duplicate_invoices_or_referral_earnings():
     original_safe_insert = billing_events.safe_insert
     original_referral = billing_events.create_referral_earning_if_eligible
@@ -1183,6 +1209,7 @@ def main() -> int:
     test_billing_and_referrals()
     test_recommendation_refresh_create_update_force_skip_and_hermes()
     test_application_result_submission_triggers_refresh()
+    test_funding_brief_persistence()
     test_no_duplicate_invoices_or_referral_earnings()
     test_dismissed_recommendations_not_recreated()
     test_process_pending_jobs_returns_processed_pairs()

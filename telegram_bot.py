@@ -48,6 +48,14 @@ OPS_SNAPSHOT = os.path.join(os.path.dirname(__file__), "scripts", "hermes_ops_sn
 OPS_ATTENTION = os.path.join(os.path.dirname(__file__), "scripts", "hermes_ops_attention.sh")
 SCHEDULER_SCRIPT = os.path.join(os.path.dirname(__file__), "operations_center", "scheduler.py")
 
+from lib.telegram_role_config import (
+    allow_shared_token,
+    get_chat_config,
+    get_ops_config,
+    get_reports_config,
+    validate_ops_polling,
+)
+
 
 def email_summaries_enabled() -> bool:
     return os.getenv("TELEGRAM_EMAIL_SUMMARIES_ENABLED", "false").lower() == "true"
@@ -57,14 +65,9 @@ class NexusTelegramBot:
 
     def __init__(self, config_file: str = "telegram_config.json"):
         self.config = self.load_config(config_file)
-        # environment variables take precedence (after .env loading)
-        self.bot_token = (
-            os.getenv('TELEGRAM_INBOUND_BOT_TOKEN')
-            or os.getenv('NEXUS_ONE_BOT_TOKEN')
-            or os.getenv('HERMES_BOT_TOKEN')
-            or self.config.get('bot_token', 'YOUR_TELEGRAM_BOT_TOKEN')
-        )
-        self.chat_id = os.getenv('TELEGRAM_CHAT_ID', self.config.get('chat_id', 'YOUR_CHAT_ID'))
+        self.role_config = get_ops_config()
+        self.bot_token = self.role_config.token or self.config.get('bot_token', 'YOUR_TELEGRAM_BOT_TOKEN')
+        self.chat_id = self.role_config.chat_id or self.config.get('chat_id', 'YOUR_CHAT_ID')
         self.api_url = f"https://api.telegram.org/bot{self.bot_token}"
         self.connected = False
         self.last_update_id = self.load_update_offset()
@@ -82,6 +85,9 @@ class NexusTelegramBot:
         self.error_timestamps: deque[float] = deque(maxlen=50)
         self.circuit_open_until = 0.0
         self._lock_handle = None
+
+        for warning in self.role_config.warnings:
+            logger.warning("Telegram ops config: %s", warning)
 
         if self.bot_token != 'YOUR_TELEGRAM_BOT_TOKEN':
             self.test_connection()
@@ -163,6 +169,12 @@ class NexusTelegramBot:
             return {"ok": False, "error": str(e)}
 
     def ensure_polling_ready(self) -> bool:
+        ok, errors = validate_ops_polling()
+        if not ok:
+            for error in errors:
+                logger.error(error)
+            return False
+
         info = self.get_webhook_info()
         webhook_url = str(info.get("url") or "").strip()
         if not webhook_url:
@@ -471,6 +483,7 @@ class NexusTelegramBot:
             "/help": "help",
             "brief": "brief",
             "/brief": "brief",
+            "/research": "research",
         }
         return mapping.get(normalized, "unknown"), raw
 
@@ -572,7 +585,67 @@ class NexusTelegramBot:
                 return "Usage: <code>browser do: describe what to do</code>"
             return self._enqueue_browser_task("open", payload={"task": task_desc})
 
+        # ── Research Ingestion ───────────────────────────────────────────────
+        if normalized.startswith("/research") or normalized.startswith("research "):
+            url = raw.split(None, 1)[1].strip() if " " in raw else ""
+            if not url:
+                return (
+                    "<b>Research Ingestion</b>\n\n"
+                    "Usage: <code>/research [YouTube URL or web link]</code>\n\n"
+                    "Examples:\n"
+                    "<code>/research https://youtube.com/watch?v=XXXXX</code>\n"
+                    "<code>/research https://youtube.com/@ChannelName</code>\n\n"
+                    "The researcher will extract trade setups and queue them for AI scoring and demo trading."
+                )
+            return self._enqueue_research(url)
+
         return self.safe_help_text()
+
+    def _enqueue_research(self, url: str) -> str:
+        """Queue a URL for research ingestion and signal extraction."""
+        import json
+        import tempfile
+        import subprocess as sp
+
+        NODE = "/Users/raymonddavis/.nvm/versions/node/v22.22.1/bin/node"
+        RUNNER = "/Users/raymonddavis/nexus-ai/workflows/research_ingestion/research_ingestion_runner.js"
+        CWD = "/Users/raymonddavis/nexus-ai/workflows/research_ingestion"
+
+        sources_payload = {
+            "sources": [{
+                "url":        url,
+                "name":       "user_submitted",
+                "topic":      "trading",
+                "max_videos": 3,
+            }]
+        }
+
+        try:
+            tmp = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".json", delete=False, dir="/tmp", prefix="nexus_research_"
+            )
+            json.dump(sources_payload, tmp)
+            tmp.close()
+
+            sp.Popen(
+                [NODE, RUNNER, "--once", "--sources", tmp.name, "--topic", "trading"],
+                cwd=CWD,
+                stdout=open(f"/Users/raymonddavis/nexus-ai/logs/research_ingestion.log", "a"),
+                stderr=sp.STDOUT,
+                start_new_session=True,
+            )
+            logger.info(f"[research] Queued URL for ingestion: {url}")
+            return (
+                f"🔬 <b>Research queued</b>\n\n"
+                f"URL: <code>{url}</code>\n"
+                f"Topic: trading\n\n"
+                f"The researcher is extracting trade setups. "
+                f"Signals will appear in Supabase and be scored automatically in ~3 minutes.\n\n"
+                f"Watch for Telegram alerts when proposals are ready."
+            )
+        except Exception as e:
+            logger.error(f"[research] Failed to queue {url}: {e}")
+            return f"⚠️ Research queue error: {e}"
 
     def _enqueue_browser_task(self, task_type: str, payload: dict = None) -> str:
         """Insert a browser task into the queue and confirm."""
@@ -843,6 +916,46 @@ Access your real-time trading dashboard:
 <i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>
 """
         return self.send_message(message)
+
+
+class TelegramReportSender:
+    """Send-only Telegram client for outbound reports."""
+
+    def __init__(self):
+        self.role_config = get_reports_config()
+        self.bot_token = self.role_config.token
+        self.chat_id = self.role_config.chat_id
+        self.api_url = f"https://api.telegram.org/bot{self.bot_token}" if self.bot_token else ""
+        self.connected = bool(self.bot_token and self.chat_id)
+        for warning in self.role_config.warnings:
+            logger.warning("Telegram reports config: %s", warning)
+        ops = get_ops_config()
+        if (
+            self.bot_token
+            and ops.token
+            and self.bot_token == ops.token
+            and not allow_shared_token()
+        ):
+            logger.warning("Reports token matches ops token; outbound sending allowed, but shared-token polling remains blocked")
+
+    def send_message(self, message: str, parse_mode: str = "HTML") -> bool:
+        if not self.connected:
+            logger.warning("Telegram reports bot not configured")
+            return False
+        try:
+            payload = {
+                "chat_id": self.chat_id,
+                "text": message,
+                "parse_mode": parse_mode,
+            }
+            response = requests.post(f"{self.api_url}/sendMessage", json=payload, timeout=10)
+            if response.status_code == 200:
+                return True
+            logger.error("Reports send failed: %s", response.text[:200])
+            return False
+        except Exception as e:
+            logger.error("Reports send error: %s", e)
+            return False
 
 def monitor():
     """

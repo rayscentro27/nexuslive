@@ -14,6 +14,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from lib.telegram_role_config import get_chat_config, get_ops_config, get_reports_config, hermes_chat_enabled
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s %(levelname)s %(message)s',
@@ -24,8 +26,9 @@ logging.basicConfig(
 )
 log = logging.getLogger('HermesClaude')
 
-BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-ALLOWED_CHAT_ID = str(os.getenv('TELEGRAM_CHAT_ID', ''))
+CHAT_CONFIG = get_chat_config()
+BOT_TOKEN = CHAT_CONFIG.token
+ALLOWED_CHAT_ID = str(CHAT_CONFIG.chat_id or '')
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 GROQ_BASE_URL = os.getenv('GROQ_BASE_URL', 'https://api.groq.com/openai/v1')
 GROQ_MODEL = 'llama-3.3-70b-versatile'
@@ -216,6 +219,22 @@ def handle_message(msg):
 
 
 def run():
+    if not hermes_chat_enabled():
+        log.warning('Hermes chat bot disabled by default; set ENABLE_HERMES_CHAT_BOT=true to enable.')
+        return
+
+    ops = get_ops_config()
+    reports = get_reports_config()
+    if not BOT_TOKEN:
+        log.error('TELEGRAM_HERMES_CHAT_BOT_TOKEN is required when Hermes chat bot is enabled')
+        return
+    if BOT_TOKEN == ops.token:
+        log.error('Hermes chat bot token must not match TELEGRAM_OPS_BOT_TOKEN')
+        return
+    if BOT_TOKEN == reports.token:
+        log.error('Hermes chat bot token must not match TELEGRAM_REPORTS_BOT_TOKEN')
+        return
+
     log.info(f'Starting Hermes Claude Bot (model: {GROQ_MODEL})')
 
     # Verify bot

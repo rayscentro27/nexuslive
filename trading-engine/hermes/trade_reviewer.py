@@ -12,6 +12,7 @@ engine never gets silently blocked by an AI outage.
 import os
 import json
 import re
+import uuid
 import logging
 import requests
 from datetime import datetime, timezone
@@ -47,38 +48,22 @@ CHAT_COMPLETIONS_URL = (
     else f'{_root}/v1/chat/completions'
 )
 SUPABASE_URL   = os.getenv('SUPABASE_URL', '')
-SUPABASE_KEY   = os.getenv('SUPABASE_KEY', '')
+SUPABASE_KEY   = (
+    os.getenv('SUPABASE_SERVICE_ROLE_KEY')
+    or os.getenv('SUPABASE_KEY', '')
+)
 
 # Block signals with Hermes confidence below this threshold
 MIN_CONFIDENCE = int(os.getenv('HERMES_MIN_CONFIDENCE', '50'))
 REVIEW_TIMEOUT = int(os.getenv('HERMES_REVIEW_TIMEOUT', '8'))
 
-SYSTEM_PROMPT = """\
-You are Hermes, AI trading risk officer for the Nexus system. Review every
-inbound trade signal and determine whether it should be executed on Oanda.
-
-APPROVED INSTRUMENTS: EURUSD, GBPUSD, USDJPY only. Reject anything else.
-APPROVED TIMEFRAMES: H1, H4 only. Reject anything else.
-BROKER: Oanda practice account. Max 5 trades/day. Max 0.01 lot per trade.
-
-HARD BLOCKS (auto-reject, no exceptions):
-- Reward:Risk ratio < 1.5
-- Stop loss not set
-- Take profit not set
-- Signal confidence < 40%
-- Instrument not in approved list
-
-APPROVAL THRESHOLD:
-- R:R >= 2.0, confidence >= 60% → approve
-- R:R 1.5-1.9 or confidence 40-59% → use judgment, lean toward skip
-
-RISK FLAGS TO NOTE (do not auto-reject, but include in risk_notes):
-- Entry near major round number (1.1000, 1.1500, etc.)
-- Stop loss < 20 pips (too tight, noise risk)
-- Take profit > 200 pips on H1/H4 (overextended target)
-
-Respond with valid JSON only — no prose, no markdown fences.\
-"""
+SYSTEM_PROMPT = (
+    "You are Hermes, Nexus AI trading risk officer. "
+    "Approve forex signals on EURUSD/GBPUSD/USDJPY (H1/H4 only). "
+    "Hard blocks: R:R<1.5, no stop, no TP, confidence<40%, wrong instrument. "
+    "Approve if R:R>=2.0 and confidence>=60%. "
+    "Reply with JSON only: {\"approved\":bool,\"confidence\":0-100,\"reason\":\"str\",\"risk_notes\":\"str\",\"recommendation\":\"execute|skip|wait\"}"
+)
 
 
 # ── AI gateway call ────────────────────────────────────────────────────────────
@@ -136,9 +121,9 @@ def _log_review(signal: dict, result: dict):
             json={
                 'domain':               'trading',
                 'entity_type':          'trade_signal',
-                'entity_id':            signal.get('symbol', 'unknown'),
+                'entity_id':            str(uuid.uuid4()),
                 'review_score':         result.get('confidence', 0),
-                'recommendations_json': result,
+                'recommendations_json': {**result, 'symbol': signal.get('symbol'), 'action': signal.get('action')},
                 'created_at':           datetime.now(timezone.utc).isoformat(),
             },
             timeout=10,

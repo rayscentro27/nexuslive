@@ -66,12 +66,14 @@ class BrokerAPI:
             return {'error': 'Not connected'}
 
         if self.broker_type == 'demo':
+            balance = self.config.get('balance', 100000.0)
+            leverage = self.config.get('leverage', 100)
             return {
-                'balance': self.config['balance'],
-                'equity': self.config['balance'],
+                'balance': balance,
+                'equity': balance,
                 'margin_used': 0,
-                'margin_available': self.config['balance'] * self.config['leverage'],
-                'leverage': self.config['leverage']
+                'margin_available': balance * leverage,
+                'leverage': leverage,
             }
 
         elif self.broker_type == 'oanda':

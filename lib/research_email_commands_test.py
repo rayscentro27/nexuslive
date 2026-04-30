@@ -84,6 +84,37 @@ def test_send_latest_funding_brief():
     check("funding brief keeps disclaimer", "not guaranteed" in sent_calls[0][1].lower(), sent_calls[0][1] if sent_calls else "")
 
 
+def test_local_funding_brief_fallback():
+    original_path = commands.LATEST_FUNDING_BRIEF_FILE
+    import tempfile
+    from pathlib import Path
+
+    tmp_dir = Path(tempfile.mkdtemp())
+    tmp_file = tmp_dir / "latest_funding_brief.json"
+    tmp_file.write_text(
+        '{\n'
+        '  "briefing_type": "funding",\n'
+        '  "content": "Stored fallback funding brief. Results vary. Approval is determined by the lender and is not guaranteed.",\n'
+        '  "urgency": "medium",\n'
+        '  "generated_by": "funding_engine",\n'
+        '  "created_at": "2026-04-30T04:00:00+00:00"\n'
+        '}'
+    )
+    commands.LATEST_FUNDING_BRIEF_FILE = tmp_file
+    original_safe = commands._safe_select
+    commands._safe_select = lambda path: []
+    try:
+        row = commands.latest_executive_brief("funding")
+    finally:
+        commands._safe_select = original_safe
+        commands.LATEST_FUNDING_BRIEF_FILE = original_path
+        tmp_file.unlink(missing_ok=True)
+        tmp_dir.rmdir()
+
+    check("funding brief falls back to local cache", row is not None, str(row))
+    check("funding brief local cache keeps disclaimer", "not guaranteed" in (row or {}).get("content", "").lower(), str(row))
+
+
 def test_unknown_command_returns_help():
     result = commands.execute_email_command("launch a giant workflow")
     check("unknown command returns help", result.get("mode") == "unknown", str(result))
@@ -205,6 +236,7 @@ def main() -> int:
     test_preview_research_summary()
     test_send_disabled_by_default()
     test_send_latest_funding_brief()
+    test_local_funding_brief_fallback()
     test_unknown_command_returns_help()
     test_receipt_sent_before_result()
     test_duplicate_message_id_skipped()

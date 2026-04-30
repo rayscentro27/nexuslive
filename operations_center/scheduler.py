@@ -230,6 +230,19 @@ def task_signal_analysis():
         logger.error(f"Signal analysis failed: {e}")
 
 
+def task_strategy_worker():
+    """Process unreviewed research rows through the strategy approval pipeline."""
+    logger.info("▶ Running strategy worker...")
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from strategy_review.strategy_worker import main as _strategy_main
+        _strategy_main()
+        logger.info("✅ Strategy worker completed")
+    except Exception as e:
+        logger.error(f"Strategy worker failed: {e}")
+
+
 def task_lead_check():
     """Daily lead summary — syncs live signups then sends one digest email."""
     logger.info("▶ Running daily lead summary...")
@@ -396,9 +409,9 @@ def task_funding_brief():
         logger.info("Funding brief skipped — FUNDING_BRIEF_USER_ID not configured")
         return
     try:
-        from funding_engine.service import build_hermes_funding_brief
+        from funding_engine.service import persist_hermes_funding_brief
 
-        brief = build_hermes_funding_brief(user_id=user_id, tenant_id=tenant_id)
+        brief = persist_hermes_funding_brief(user_id=user_id, tenant_id=tenant_id)
         brief_text = brief.get("brief_text", "").strip()
         if not brief_text:
             logger.info("Funding brief skipped — no brief text generated")
@@ -411,7 +424,10 @@ def task_funding_brief():
             f"Daily funding brief for user {user_id} at {datetime.now().strftime('%Y-%m-%d %H:%M')}:\n\n"
             f"{brief_text}"
         )
-        logger.info("✅ Funding brief generated")
+        if brief.get("stored"):
+            logger.info("✅ Funding brief generated and stored")
+        else:
+            logger.info(f"✅ Funding brief generated (storage unavailable: {brief.get('storage_error')})")
     except Exception as e:
         logger.error(f"Funding brief failed: {e}")
 
@@ -479,8 +495,8 @@ def _notify(message: str):
     try:
         import sys
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        from telegram_bot import NexusTelegramBot
-        bot = NexusTelegramBot()
+        from telegram_bot import TelegramReportSender
+        bot = TelegramReportSender()
         if bot.connected:
             bot.send_message(message)
     except Exception as e:
@@ -546,9 +562,10 @@ def _notify_hermes(content: str):
 # ─────────────────────────────────────────────
 
 SCHEDULE = [
-    (task_research_pipeline, 12.0,  "research_pipeline"),
-    (task_signal_analysis,    6.0,  "signal_analysis"),
-    (task_lead_check,        24.0,  "lead_check"),
+    (task_research_pipeline,         12.0, "research_pipeline"),
+    (task_signal_analysis,            6.0, "signal_analysis"),
+    (task_strategy_worker,            6.0, "strategy_worker"),
+    (task_lead_check,                24.0, "lead_check"),
     (task_reputation_check,   1.0,  "reputation_check"),
     (task_funding_brief,     24.0,  "funding_brief"),
     (task_funding_recommendation_refresh, 24.0, "funding_recommendation_refresh"),

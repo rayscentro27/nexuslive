@@ -7,7 +7,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from telegram_bot import NexusTelegramBot
+from telegram_bot import NexusTelegramBot, TelegramReportSender
+from lib.telegram_role_config import hermes_chat_enabled, validate_ops_polling
 
 PASS = "\033[92m PASS\033[0m"
 FAIL = "\033[91m FAIL\033[0m"
@@ -21,12 +22,44 @@ def check(name: str, condition: bool, detail: str = "") -> None:
 
 
 def make_bot() -> NexusTelegramBot:
-    os.environ.setdefault("NEXUS_ONE_BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
-    os.environ.setdefault("TELEGRAM_CHAT_ID", "chat-1")
+    os.environ.setdefault("TELEGRAM_OPS_BOT_TOKEN", "ops-token")
+    os.environ.setdefault("TELEGRAM_OPS_CHAT_ID", "chat-1")
+    os.environ.setdefault("TELEGRAM_REPORTS_BOT_TOKEN", "reports-token")
+    os.environ.setdefault("TELEGRAM_REPORTS_CHAT_ID", "chat-1")
     bot = NexusTelegramBot()
     bot.chat_id = "chat-1"
     bot.connected = True
     return bot
+
+
+def test_ops_bot_uses_ops_token():
+    os.environ["TELEGRAM_OPS_BOT_TOKEN"] = "ops-token-1"
+    os.environ["TELEGRAM_OPS_CHAT_ID"] = "chat-1"
+    bot = NexusTelegramBot()
+    check("ops bot uses ops token", bot.bot_token == "ops-token-1", bot.bot_token)
+
+
+def test_reports_sender_uses_reports_token():
+    os.environ["TELEGRAM_REPORTS_BOT_TOKEN"] = "reports-token-1"
+    os.environ["TELEGRAM_REPORTS_CHAT_ID"] = "chat-2"
+    sender = TelegramReportSender()
+    check("reports sender uses reports token", sender.bot_token == "reports-token-1", sender.bot_token)
+    check("reports sender uses reports chat id", sender.chat_id == "chat-2", sender.chat_id)
+
+
+def test_shared_token_rejected_by_default():
+    os.environ["TELEGRAM_OPS_BOT_TOKEN"] = "shared-token"
+    os.environ["TELEGRAM_REPORTS_BOT_TOKEN"] = "shared-token"
+    os.environ["TELEGRAM_OPS_CHAT_ID"] = "chat-1"
+    os.environ["TELEGRAM_REPORTS_CHAT_ID"] = "chat-1"
+    os.environ["TELEGRAM_ALLOW_SHARED_TOKEN"] = "false"
+    ok, errors = validate_ops_polling()
+    check("shared token rejected by default", ok is False and any("reports token" in error for error in errors), str(errors))
+
+
+def test_hermes_chat_disabled_by_default():
+    os.environ["ENABLE_HERMES_CHAT_BOT"] = "false"
+    check("Hermes chat bot disabled by default", hermes_chat_enabled() is False, str(hermes_chat_enabled()))
 
 
 def test_status_command_does_not_call_llm():
@@ -166,6 +199,10 @@ def test_no_recursive_loop():
 
 
 def main() -> int:
+    test_ops_bot_uses_ops_token()
+    test_reports_sender_uses_reports_token()
+    test_shared_token_rejected_by_default()
+    test_hermes_chat_disabled_by_default()
     test_status_command_does_not_call_llm()
     test_duplicate_update_ignored()
     test_ignore_self_messages()

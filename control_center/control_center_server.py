@@ -29,6 +29,15 @@ logger = logging.getLogger("ControlCenter")
 
 app = Flask(__name__)
 
+# CORS — allow requests from Netlify functions (nexus-api.goclearonline.cc)
+@app.after_request
+def _add_cors(response):
+    origin = 'https://nexus-api.goclearonline.cc'
+    response.headers['Access-Control-Allow-Origin'] = origin
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+    response.headers['Access-Control-Allow-Methods'] = 'GET,OPTIONS'
+    return response
+
 # ─────────────────────────────────────────────
 # Data API routes
 # ─────────────────────────────────────────────
@@ -2798,6 +2807,49 @@ def api_funding_strategy_refresh():
         "current_phase": (result.get("strategy") or {}).get("current_phase"),
         "estimated_funding_low": (result.get("strategy") or {}).get("estimated_funding_low"),
         "estimated_funding_high": (result.get("strategy") or {}).get("estimated_funding_high"),
+    })
+
+
+@app.route("/api/trading/status")
+def api_trading_status():
+    from scripts.prelaunch_utils import rest_select
+
+    status_file = Path(__file__).parent.parent / "logs" / "trading_engine_status.json"
+    engine_status = {}
+    if status_file.exists():
+        try:
+            engine_status = json.loads(status_file.read_text())
+        except Exception:
+            pass
+
+    recent_trades = _safe(lambda: rest_select(
+        "paper_trading_journal_entries"
+        "?select=id,symbol,asset_class,thesis,entry_status,stop_loss,target_price,opened_at,tags"
+        "&order=opened_at.desc&limit=20"
+    ) or [])
+
+    signal_review_log = _safe(lambda: (
+        Path(__file__).parent.parent / "logs" / "signal_review.log"
+    ).read_text().splitlines()[-10:] if (
+        Path(__file__).parent.parent / "logs" / "signal_review.log"
+    ).exists() else [])
+
+    return jsonify({
+        "engine": {
+            "stage": engine_status.get("stage"),
+            "dry_run": engine_status.get("dry_run"),
+            "live_trading": engine_status.get("live_trading"),
+            "auto_trading": engine_status.get("auto_trading"),
+            "broker_type": engine_status.get("broker_type"),
+            "broker_connected": engine_status.get("broker_connected"),
+            "active_positions": engine_status.get("active_positions", 0),
+            "signals_processed": engine_status.get("signals_processed", 0),
+            "updated_at": engine_status.get("updated_at"),
+            "last_signal": engine_status.get("last_signal"),
+            "last_result": engine_status.get("last_result"),
+        },
+        "recent_paper_trades": recent_trades,
+        "signal_review_tail": signal_review_log,
     })
 
 

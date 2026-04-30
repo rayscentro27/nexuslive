@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import urllib.parse
+import json
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from funding_engine.business_readiness_score import calculate_business_readiness_score
@@ -16,6 +18,8 @@ from scripts.prelaunch_utils import rest_select, supabase_request, table_exists,
 RECOMMENDATION_VERSION = "v1"
 ACTIVE_RECOMMENDATION_STATUSES = {"recommended", "pending_review", "active"}
 HISTORICAL_RECOMMENDATION_STATUSES = {"completed", "dismissed", "invoiced"}
+STATE_DIR = Path(__file__).resolve().parent.parent / "state"
+LATEST_FUNDING_BRIEF_FILE = STATE_DIR / "latest_funding_brief.json"
 
 
 def _safe_select(path: str) -> list[dict[str, Any]]:
@@ -841,3 +845,40 @@ def build_hermes_funding_brief(user_id: str, tenant_id: str | None = None, user_
     capital_brief["estimated_funding_high"] = strategy_brief.get("estimated_funding_high")
     capital_brief["current_phase"] = strategy_brief.get("current_phase")
     return capital_brief
+
+
+def persist_hermes_funding_brief(
+    user_id: str,
+    tenant_id: str | None = None,
+    user_profile: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    brief = build_hermes_funding_brief(user_id=user_id, tenant_id=tenant_id, user_profile=user_profile)
+    brief_text = (brief.get("brief_text") or "").strip()
+    if not brief_text:
+        brief["stored"] = False
+        brief["storage_error"] = "missing_brief_text"
+        return brief
+
+    payload = {
+        "briefing_type": "funding",
+        "content": brief_text,
+        "urgency": "medium" if (brief.get("current_phase") or "").lower() in {"readiness", "relationship_building"} else "low",
+        "generated_by": "funding_engine",
+    }
+    try:
+        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        LATEST_FUNDING_BRIEF_FILE.write_text(json.dumps({
+            **payload,
+            "user_id": user_id,
+            "tenant_id": tenant_id,
+            "created_at": utc_now_iso(),
+        }, indent=2))
+        brief["local_cache_path"] = str(LATEST_FUNDING_BRIEF_FILE)
+    except Exception as exc:
+        brief["local_cache_error"] = str(exc)
+
+    stored = safe_insert("executive_briefings", payload, prefer="return=minimal")
+    brief["stored"] = bool(stored.get("ok"))
+    if not stored.get("ok"):
+        brief["storage_error"] = stored.get("error")
+    return brief
