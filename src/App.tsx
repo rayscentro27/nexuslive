@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { AuthProvider, useAuth } from './components/AuthProvider';
 import { Sidebar } from './components/Sidebar';
@@ -8,6 +9,7 @@ import { Messages } from './components/Messages';
 import { Documents } from './components/Documents';
 import { Funding } from './components/Funding';
 import { TradingLab } from './components/TradingLab';
+import { TradingDashboard } from './components/TradingDashboard';
 import { GrantsFinder } from './components/GrantsFinder';
 import { Referral } from './components/Referral';
 import { Settings } from './components/Settings';
@@ -22,8 +24,11 @@ import { Pricing } from './components/Pricing';
 import { Legal } from './components/Legal';
 import { Rewards } from './components/Rewards';
 import { AdminPortal } from './components/admin/AdminPortal';
+import { AdminDashboardPage } from './components/AdminDashboardPage';
 import { Landing } from './components/Landing';
 import { PlanGate } from './components/PlanGate';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { AppShell } from './components/AppShell';
 import { Home, Zap, CreditCard, User, FileText, Lock, AlertCircle } from 'lucide-react';
 
 function ResetPasswordForm({ onDone }: { onDone: () => void }) {
@@ -331,7 +336,63 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <Routes>
+        {/* ── /app/* — URL-based protected portal ───────────────────────── */}
+        <Route
+          path="/app"
+          element={
+            <ProtectedRoute>
+              <AppShell />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/app/dashboard" replace />} />
+          <Route path="dashboard"  element={<Dashboard />} />
+          <Route path="actions"    element={<ActionCenter />} />
+          <Route path="messages"   element={<Messages />} />
+          <Route path="documents"  element={<Documents />} />
+          <Route path="readiness"  element={<BusinessSetup />} />
+          <Route path="account"    element={<Account />} />
+          <Route path="settings"   element={<Settings />} />
+
+          <Route path="funding" element={
+            <PlanGate requiredPlan="pro" featureName="Funding Suite" onUpgrade={() => {}}>
+              <Funding />
+            </PlanGate>
+          } />
+          <Route path="trading" element={<TradingDashboard />} />
+          <Route path="credit" element={
+            <PlanGate requiredPlan="pro" featureName="Credit Analysis" onUpgrade={() => {}}>
+              <CreditAnalysis />
+            </PlanGate>
+          } />
+          <Route path="roadmap" element={
+            <PlanGate requiredPlan="elite" featureName="Funding Roadmap" onUpgrade={() => {}}>
+              <FundingRoadmap />
+            </PlanGate>
+          } />
+          <Route path="bots" element={
+            <PlanGate requiredPlan="elite" featureName="AI Workforce" onUpgrade={() => {}}>
+              <Bots onInteract={() => {}} />
+            </PlanGate>
+          } />
+          <Route path="admin" element={
+            <ProtectedRoute requireAdmin>
+              <AdminDashboardPage />
+            </ProtectedRoute>
+          } />
+        </Route>
+
+        {/* ── legacy /admin shortcut ─────────────────────────────────────── */}
+        <Route path="/admin" element={
+          <ProtectedRoute requireAdmin>
+            <AdminPortal />
+          </ProtectedRoute>
+        } />
+
+        {/* ── public + legacy SPA (tab-based) ───────────────────────────── */}
+        <Route path="/*" element={<AppContent />} />
+      </Routes>
     </AuthProvider>
   );
 }

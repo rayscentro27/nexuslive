@@ -10,6 +10,17 @@
   node_bundler = "esbuild"
 
 # SPA fallback — all routes serve index.html
+# Note: Netlify function routes (/.netlify/functions/*) are auto-handled and must NOT be listed here.
+[[redirects]]
+  from   = "/app/*"
+  to     = "/index.html"
+  status = 200
+
+[[redirects]]
+  from   = "/admin"
+  to     = "/index.html"
+  status = 200
+
 [[redirects]]
   from   = "/*"
   to     = "/index.html"
