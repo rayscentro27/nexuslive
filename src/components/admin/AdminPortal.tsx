@@ -18,10 +18,10 @@ export function AdminPortal() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <div className="flex h-screen overflow-hidden" style={{ background: '#eaebf6' }}>
       <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
       
-      <main className="flex-1 ml-64 h-screen flex flex-col overflow-hidden">
+      <main className="flex-1 md:ml-52 h-screen flex flex-col overflow-hidden">
         <AdminHeader />
         
         <div className="flex-1 overflow-y-auto no-scrollbar">

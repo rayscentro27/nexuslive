@@ -1,99 +1,265 @@
 import React from 'react';
-import { 
-  LayoutDashboard, 
-  Users, 
-  BarChart3, 
-  Cpu, 
-  FileCheck, 
-  ShieldAlert, 
-  TrendingUp, 
+import {
+  LayoutDashboard,
+  Users,
+  BarChart3,
+  Cpu,
+  FileText,
+  ShieldAlert,
+  TrendingUp,
   Settings,
   LogOut,
-  ChevronRight,
   Zap,
-  Briefcase,
   MessageSquare,
-  FileText,
   PieChart,
   Building2,
-  Lightbulb
+  Lightbulb,
 } from 'lucide-react';
-import { cn } from '../../lib/utils';
 
 interface AdminSidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
 
-export function AdminSidebar({ activeTab, setActiveTab }: AdminSidebarProps) {
-  const menuItems = [
-    { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
-    { id: 'clients', label: 'Clients', icon: Users },
-    { id: 'pipeline', label: 'Pipeline', icon: BarChart3 },
-    { id: 'credit', label: 'Credit Ops', icon: ShieldAlert },
-    { id: 'funding', label: 'Funding Engine', icon: Zap },
-    { id: 'opportunities', label: 'Business Opportunities', icon: Lightbulb },
-    { id: 'documents', label: 'Documents', icon: FileText },
-    { id: 'messages', label: 'Messages', icon: MessageSquare },
-    { id: 'ai-workforce', label: 'AI Workforce', icon: Cpu },
-    { id: 'trading', label: 'Trading Lab', icon: TrendingUp },
-    { id: 'my-business', label: 'My Business', icon: Building2 },
-    { id: 'reports', label: 'Reports', icon: PieChart },
-  ];
+const menuItems = [
+  { id: 'dashboard',     label: 'Overview',              icon: LayoutDashboard },
+  { id: 'clients',       label: 'Clients',               icon: Users },
+  { id: 'pipeline',      label: 'Pipeline',              icon: BarChart3 },
+  { id: 'credit',        label: 'Credit Ops',            icon: ShieldAlert },
+  { id: 'funding',       label: 'Funding Engine',        icon: Zap },
+  { id: 'opportunities', label: 'Business Opportunities', icon: Lightbulb },
+  { id: 'documents',     label: 'Documents',             icon: FileText },
+  { id: 'messages',      label: 'Messages',              icon: MessageSquare },
+  { id: 'ai-workforce',  label: 'AI Workforce',          icon: Cpu },
+  { id: 'trading',       label: 'Trading Lab',           icon: TrendingUp },
+  { id: 'my-business',   label: 'My Business',           icon: Building2 },
+  { id: 'reports',       label: 'Reports',               icon: PieChart },
+];
 
+export function AdminSidebar({ activeTab, setActiveTab }: AdminSidebarProps) {
   return (
-    <aside className="w-64 bg-white text-slate-500 flex flex-col h-screen fixed left-0 top-0 z-50 border-r border-slate-200">
-      <div className="p-6 flex items-center gap-3 border-b border-slate-100 bg-slate-50/50">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#5B7CFA] to-[#4A6BEB] flex items-center justify-center shadow-lg shadow-blue-500/20">
-          <Zap className="w-6 h-6 text-white fill-current" />
+    <div
+      className="w-52 h-screen flex-col fixed left-0 top-0 z-50 hidden md:flex"
+      style={{
+        background: '#ffffff',
+        borderRight: '1px solid #e8e9f2',
+        padding: '20px 12px',
+      }}
+    >
+      {/* Logo + ADMIN badge */}
+      <div className="flex items-center gap-2.5 px-2 mb-4">
+        <div
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            background: 'linear-gradient(135deg, #1a1c3a, #2d3068)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <span style={{ color: '#fff', fontWeight: 800, fontSize: 18, fontFamily: 'serif', letterSpacing: -1 }}>N</span>
         </div>
-        <div>
-          <h1 className="text-lg font-black text-[#1A2244] tracking-tight leading-none">NEXUS</h1>
-          <p className="text-[8px] font-black text-[#5B7CFA] uppercase tracking-[0.2em] mt-1">Admin OS v2.1</p>
-        </div>
+        <span style={{ fontWeight: 700, fontSize: 17, color: '#1a1c3a', letterSpacing: -0.5 }}>Nexus</span>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto no-scrollbar">
-        <p className="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">Operations</p>
-        {menuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            className={cn(
-              "w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all group",
-              activeTab === item.id 
-                ? "bg-[#5B7CFA]/10 text-[#5B7CFA] shadow-sm" 
-                : "hover:bg-slate-50 hover:text-[#1A2244]"
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <item.icon className={cn(
-                "w-4 h-4 transition-colors",
-                activeTab === item.id ? "text-[#5B7CFA]" : "text-slate-400 group-hover:text-[#5B7CFA]"
-              )} />
-              <span className="text-xs font-bold tracking-tight">{item.label}</span>
-            </div>
-            {activeTab === item.id && <div className="w-1 h-4 bg-[#5B7CFA] rounded-full" />}
-          </button>
-        ))}
+      {/* ADMIN badge */}
+      <div className="px-2 mb-5">
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            background: '#1a1c3a',
+            color: '#ffffff',
+            fontSize: 9,
+            fontWeight: 800,
+            letterSpacing: '0.18em',
+            borderRadius: 6,
+            padding: '3px 8px',
+            textTransform: 'uppercase',
+          }}
+        >
+          <span
+            style={{
+              width: 5,
+              height: 5,
+              borderRadius: '50%',
+              background: '#22c55e',
+              flexShrink: 0,
+              display: 'inline-block',
+            }}
+          />
+          Admin Portal
+        </span>
+      </div>
+
+      {/* Navigation */}
+      <nav
+        className="flex-1 overflow-y-auto no-scrollbar"
+        style={{ display: 'flex', flexDirection: 'column', gap: 2 }}
+      >
+        <div
+          style={{
+            fontSize: 9,
+            fontWeight: 800,
+            color: '#8b8fa8',
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            padding: '0 14px',
+            marginBottom: 6,
+          }}
+        >
+          Operations
+        </div>
+
+        {menuItems.map((item) => {
+          const isActive = activeTab === item.id;
+          const Icon = item.icon;
+
+          return (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '9px 14px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                border: 'none',
+                background: isActive ? '#eef0fd' : 'transparent',
+                color: isActive ? '#3d5af1' : '#8b8fa8',
+                fontWeight: isActive ? 600 : 400,
+                fontSize: 14,
+                transition: 'background 0.15s, color 0.15s',
+                width: '100%',
+                textAlign: 'left',
+                fontFamily: 'inherit',
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLButtonElement).style.background = '#f5f6fb';
+                  (e.currentTarget as HTMLButtonElement).style.color = '#1a1c3a';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+                  (e.currentTarget as HTMLButtonElement).style.color = '#8b8fa8';
+                }
+              }}
+            >
+              <Icon
+                size={16}
+                style={{ color: isActive ? '#3d5af1' : '#8b8fa8', flexShrink: 0 }}
+              />
+              <span style={{ flex: 1 }}>{item.label}</span>
+              {isActive && (
+                <span
+                  style={{
+                    width: 4,
+                    height: 16,
+                    borderRadius: 2,
+                    background: '#3d5af1',
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+            </button>
+          );
+        })}
       </nav>
 
-      <div className="p-4 border-t border-slate-100 space-y-1 bg-slate-50/30">
-        <button 
+      {/* Footer actions */}
+      <div style={{ borderTop: '1px solid #e8e9f2', paddingTop: 12, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <button
           onClick={() => setActiveTab('settings')}
-          className={cn(
-            "w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all",
-            activeTab === 'settings' ? "bg-[#5B7CFA]/10 text-[#5B7CFA]" : "text-slate-400 hover:bg-slate-50 hover:text-[#1A2244]"
-          )}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '9px 14px',
+            borderRadius: 10,
+            cursor: 'pointer',
+            border: 'none',
+            background: activeTab === 'settings' ? '#eef0fd' : 'transparent',
+            color: activeTab === 'settings' ? '#3d5af1' : '#8b8fa8',
+            fontWeight: activeTab === 'settings' ? 600 : 400,
+            fontSize: 14,
+            transition: 'background 0.15s, color 0.15s',
+            width: '100%',
+            textAlign: 'left',
+            fontFamily: 'inherit',
+          }}
         >
-          <Settings className="w-4 h-4" />
-          <span className="text-xs font-bold">Settings</span>
+          <Settings size={16} style={{ color: activeTab === 'settings' ? '#3d5af1' : '#8b8fa8', flexShrink: 0 }} />
+          <span>Settings</span>
         </button>
-        <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-red-50 hover:text-red-500 transition-all text-slate-400">
-          <LogOut className="w-4 h-4" />
-          <span className="text-xs font-bold">Exit Admin</span>
+
+        <button
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '9px 14px',
+            borderRadius: 10,
+            cursor: 'pointer',
+            border: 'none',
+            background: 'transparent',
+            color: '#8b8fa8',
+            fontWeight: 400,
+            fontSize: 14,
+            transition: 'background 0.15s, color 0.15s',
+            width: '100%',
+            textAlign: 'left',
+            fontFamily: 'inherit',
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = '#fef2f2';
+            (e.currentTarget as HTMLButtonElement).style.color = '#ef4444';
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
+            (e.currentTarget as HTMLButtonElement).style.color = '#8b8fa8';
+          }}
+        >
+          <LogOut size={16} style={{ flexShrink: 0 }} />
+          <span>Exit Admin</span>
         </button>
+
+        {/* Admin identity footer */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 4px 0 4px', marginTop: 4 }}>
+          <div
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #1a1c3a, #3d5af1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              fontSize: 13,
+              fontWeight: 700,
+              color: '#fff',
+            }}
+          >
+            AR
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#1a1c3a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              Admin Root
+            </div>
+            <div style={{ fontSize: 11, color: '#3d5af1', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+              Superuser
+            </div>
+          </div>
+        </div>
       </div>
-    </aside>
+    </div>
   );
 }

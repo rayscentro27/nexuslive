@@ -15,11 +15,35 @@ const STARTER_TASKS: Omit<Task, 'id' | 'user_id' | 'created_at'>[] = [
   { title: 'EIN Obtained',                      category: 'business_setup',  status: 'complete',  priority: 1, readiness_impact: 5,  is_primary: false, duration_minutes: 10,  description: null,                                                      due_date: null, completed_at: new Date().toISOString() },
 ];
 
+// Static business setup steps used as fallback display data
+const setupSteps = [
+  { label: 'LLC Formation', done: true },
+  { label: 'EIN Registration', done: true },
+  { label: 'Business Bank Account', done: false },
+  { label: 'DUNS Number', done: false },
+  { label: 'Business Address', done: false },
+  { label: 'Phone & Website', done: false },
+];
+
+// Priority badge colors
+function priorityColor(priority: number): string {
+  if (priority === 1) return '#ef4444';
+  if (priority === 2) return '#f59e0b';
+  return '#8b8fa8';
+}
+
+function priorityLabel(priority: number): string {
+  if (priority === 1) return 'High';
+  if (priority === 2) return 'Medium';
+  return 'Low';
+}
+
 export function ActionCenter() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCompletedExpanded, setIsCompletedExpanded] = useState(false);
+  const [isSetupExpanded, setIsSetupExpanded] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -49,157 +73,376 @@ export function ActionCenter() {
   const completedImpact = completedTasks.reduce((sum, t) => sum + t.readiness_impact, 0);
   const progress = totalImpact > 0 ? Math.round((completedImpact / totalImpact) * 100) : 0;
 
-  return (
-    <div className="p-3 max-w-6xl mx-auto space-y-3 h-full flex flex-col overflow-y-auto no-scrollbar">
-      <div className="flex flex-col space-y-0.5 shrink-0">
-        <h1 className="text-xl font-black text-[#1A2244]">Action Center</h1>
-        <p className="text-[10px] text-slate-500 font-medium">The engine of your funding journey. Complete tasks to advance.</p>
-      </div>
+  // All pending tasks for the main list (primary + remaining)
+  const allPending = [...(primaryTask ? [primaryTask] : []), ...remainingTasks];
 
-      {/* Progress Bar */}
-      <div className="glass-card p-2.5 space-y-1.5 shrink-0 bg-gradient-to-br from-white to-blue-50/30">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-[#5B7CFA]">
-              <Zap className="w-3.5 h-3.5" />
-            </div>
-            <div>
-              <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">Funding Momentum</span>
-              <h2 className="text-[11px] font-black text-[#1A2244]">
-                {remainingTasks.length + (primaryTask ? 1 : 0)} tasks left before funding unlock
-              </h2>
-            </div>
-          </div>
-          <div className="text-right">
-            <span className="text-base font-black text-[#5B7CFA]">{progress}%</span>
-            <p className="text-[6px] font-bold text-slate-400 uppercase tracking-widest">Completion</p>
-          </div>
+  return (
+    <div style={{ padding: 24, background: '#eaebf6', minHeight: '100%' }}>
+
+      {/* Page header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#1a1c3a', marginBottom: 4 }}>Action Center</h1>
+          <p style={{ fontSize: 13, color: '#8b8fa8' }}>
+            The engine of your funding journey. Complete tasks to advance.
+          </p>
         </div>
-        <div className="h-1.5 bg-nexus-100 rounded-full overflow-hidden p-0.5">
-          <div
-            className="h-full bg-gradient-to-r from-[#5B7CFA] to-[#3A5EE5] rounded-full shadow-[0_0_4px_rgba(91,124,250,0.3)] transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            style={{
+              background: '#22c55e18',
+              color: '#22c55e',
+              borderRadius: 20,
+              padding: '4px 14px',
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            Completed: {completedTasks.length}/{tasks.length}
+          </span>
+          <button
+            style={{
+              padding: '7px 16px',
+              borderRadius: 8,
+              border: '1px solid #e8e9f2',
+              background: '#fff',
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#1a1c3a',
+              cursor: 'pointer',
+            }}
+          >
+            Refresh
+          </button>
         </div>
       </div>
 
       {loading ? (
-        <div className="flex-1 flex items-center justify-center">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 60 }}>
           <Loader2 className="w-6 h-6 animate-spin text-[#5B7CFA]" />
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 flex-1 min-h-0">
-          {/* Primary Task */}
-          <div className="lg:col-span-5 space-y-2">
-            <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-1">Next Best Action</h2>
-            {primaryTask ? (
-              <div className="glass-card p-3.5 border-2 border-[#5B7CFA]/20 bg-blue-50/10 relative overflow-hidden h-full flex flex-col justify-between">
-                <div className="absolute top-0 left-0 w-1 h-full bg-[#5B7CFA]" />
-                <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#5B7CFA] flex items-center justify-center">
-                      <Play className="w-4 h-4 fill-current" />
-                    </div>
-                    <span className="px-1.5 py-0.5 bg-[#5B7CFA] text-white text-[7px] font-black uppercase rounded-md">Primary</span>
-                  </div>
-                  <div className="space-y-0.5">
-                    <h3 className="text-base font-black text-[#1A2244] leading-tight">{primaryTask.title}</h3>
-                    {primaryTask.description && (
-                      <p className="text-[10px] text-slate-500 font-medium">{primaryTask.description}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[9px] font-black text-green-600 bg-green-50 px-1.5 py-0.5 rounded-md uppercase tracking-widest">
-                      +{primaryTask.readiness_impact}% Readiness
-                    </span>
-                    {primaryTask.duration_minutes && (
-                      <span className="flex items-center gap-1 text-[9px] text-slate-400 font-bold">
-                        <Clock className="w-2.5 h-2.5" />{primaryTask.duration_minutes} min
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleComplete(primaryTask.id)}
-                  className="w-full mt-3 bg-[#5B7CFA] text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all flex items-center justify-center gap-2"
-                >
-                  Mark Complete
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <div className="glass-card p-6 text-center text-slate-400">
-                <CheckCircle2 className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                <p className="text-xs font-bold">All primary tasks done!</p>
-              </div>
-            )}
-          </div>
+        /* Two-column layout */
+        <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
 
-          {/* Remaining Tasks */}
-          <div className="lg:col-span-7 flex flex-col space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <h2 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Remaining Tasks</h2>
-              <span className="text-[9px] font-bold text-slate-400">{remainingTasks.length} Pending</span>
+          {/* ── LEFT MAIN COLUMN ── */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* 1. Overall Readiness card */}
+            <div className="glass-card" style={{ padding: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1a1c3a' }}>Overall Readiness</h3>
+                <span style={{ fontSize: 20, fontWeight: 800, color: '#3d5af1' }}>{progress}%</span>
+              </div>
+              <div style={{ height: 6, background: '#e8e9f2', borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ width: `${progress}%`, height: '100%', background: '#3d5af1', borderRadius: 10 }} />
+              </div>
+              <p style={{ fontSize: 12, color: '#8b8fa8', marginTop: 8 }}>
+                {allPending.length} task{allPending.length !== 1 ? 's' : ''} remaining before funding unlock
+              </p>
             </div>
 
-            <div className="space-y-1.5 overflow-y-auto no-scrollbar pr-1">
-              {remainingTasks.map((task) => (
-                <div
-                  key={task.id}
-                  className="glass-card p-2 flex items-center justify-between group hover:border-[#5B7CFA]/20 transition-all bg-white/50"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-6 h-6 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center shrink-0 group-hover:bg-blue-50 group-hover:text-[#5B7CFA] transition-colors">
-                      <Circle className="w-3.5 h-3.5" />
+            {/* 2. Business Setup collapsible card */}
+            <div className="glass-card" style={{ padding: 20 }}>
+              <button
+                onClick={() => setIsSetupExpanded(!isSetupExpanded)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  marginBottom: isSetupExpanded ? 16 : 0,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1a1c3a' }}>Business Setup</h3>
+                  <span
+                    style={{
+                      background: '#f59e0b18',
+                      color: '#f59e0b',
+                      borderRadius: 20,
+                      padding: '2px 10px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                    }}
+                  >
+                    65% Ready
+                  </span>
+                </div>
+                {isSetupExpanded
+                  ? <ChevronUp size={16} color="#8b8fa8" />
+                  : <ChevronDown size={16} color="#8b8fa8" />
+                }
+              </button>
+
+              {isSetupExpanded && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+                  {setupSteps.map((step, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '10px 12px',
+                        borderRadius: 8,
+                        background: step.done ? '#f0fdf4' : '#f7f8ff',
+                        border: `1px solid ${step.done ? '#bbf7d0' : '#e8e9f2'}`,
+                      }}
+                    >
+                      {step.done
+                        ? <CheckCircle2 size={14} color="#22c55e" style={{ flexShrink: 0 }} />
+                        : <Circle size={14} color="#8b8fa8" style={{ flexShrink: 0 }} />
+                      }
+                      <span style={{ fontSize: 12, fontWeight: 600, color: step.done ? '#166534' : '#8b8fa8' }}>
+                        {step.label}
+                      </span>
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="text-[11px] font-black text-[#1A2244] truncate">{task.title}</h3>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[8px] font-black text-green-600 uppercase tracking-widest">+{task.readiness_impact}%</span>
-                        {task.duration_minutes && (
-                          <span className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{task.duration_minutes} min</span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 3. Pending Tasks card */}
+            <div className="glass-card" style={{ padding: 20 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1a1c3a', marginBottom: 14 }}>Pending Tasks</h3>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {allPending.map((task) => {
+                  const isChecked = task.status === 'complete';
+                  const pColor = priorityColor(task.priority);
+                  const pLabel = priorityLabel(task.priority);
+                  return (
+                    <div
+                      key={task.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '12px 14px',
+                        borderRadius: 10,
+                        border: '1px solid #e8e9f2',
+                        background: '#fff',
+                      }}
+                    >
+                      {/* Checkbox */}
+                      <div
+                        onClick={() => handleComplete(task.id)}
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 6,
+                          border: `2px solid ${isChecked ? '#22c55e' : '#e8e9f2'}`,
+                          background: isChecked ? '#22c55e' : '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {isChecked && (
+                          <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
+                            <path d="M1 4L4 7L10 1" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
                         )}
                       </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleComplete(task.id)}
-                    className="p-1.5 bg-slate-50 text-slate-400 rounded-lg hover:bg-[#5B7CFA] hover:text-white transition-all shadow-sm"
-                  >
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
 
-              {/* Completed Tasks */}
-              <div className="pt-1">
-                <button
-                  onClick={() => setIsCompletedExpanded(!isCompletedExpanded)}
-                  className="w-full flex items-center justify-between p-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-3 h-3 text-green-500" />
-                    Completed Tasks ({completedTasks.length})
-                  </div>
-                  {isCompletedExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                </button>
-
-                {isCompletedExpanded && (
-                  <div className="mt-1.5 space-y-1.5">
-                    {completedTasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className="glass-card p-2 flex items-center justify-between bg-slate-50/30 opacity-70"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
-                          <h3 className="text-[11px] font-bold text-slate-500 line-through">{task.title}</h3>
-                        </div>
-                        <span className="text-[8px] font-black text-green-600 uppercase tracking-widest">+{task.readiness_impact}%</span>
+                      {/* Task info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: '#1a1c3a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {task.title}
+                          {task.is_primary && (
+                            <span
+                              style={{
+                                marginLeft: 8,
+                                background: '#3d5af118',
+                                color: '#3d5af1',
+                                borderRadius: 20,
+                                padding: '1px 8px',
+                                fontSize: 10,
+                                fontWeight: 600,
+                              }}
+                            >
+                              Primary
+                            </span>
+                          )}
+                        </p>
+                        {task.due_date && (
+                          <p style={{ fontSize: 11, color: '#8b8fa8', margin: '2px 0 0' }}>
+                            Due {new Date(task.due_date).toLocaleDateString()}
+                          </p>
+                        )}
                       </div>
-                    ))}
+
+                      {/* Priority badge */}
+                      <span
+                        style={{
+                          background: pColor + '18',
+                          color: pColor,
+                          borderRadius: 20,
+                          padding: '2px 10px',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {pLabel}
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {allPending.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                    <CheckCircle2 size={32} color="#22c55e" style={{ margin: '0 auto 8px' }} />
+                    <p style={{ fontSize: 14, fontWeight: 600, color: '#22c55e' }}>All tasks complete!</p>
                   </div>
                 )}
+              </div>
+
+              {/* Completed tasks collapsible */}
+              {completedTasks.length > 0 && (
+                <div style={{ marginTop: 16, borderTop: '1px solid #e8e9f2', paddingTop: 12 }}>
+                  <button
+                    onClick={() => setIsCompletedExpanded(!isCompletedExpanded)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '4px 0',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 600, color: '#8b8fa8' }}>
+                      <CheckCircle2 size={14} color="#22c55e" />
+                      Completed Tasks ({completedTasks.length})
+                    </div>
+                    {isCompletedExpanded ? <ChevronUp size={14} color="#8b8fa8" /> : <ChevronDown size={14} color="#8b8fa8" />}
+                  </button>
+
+                  {isCompletedExpanded && (
+                    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {completedTasks.map((task) => (
+                        <div
+                          key={task.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '10px 14px',
+                            borderRadius: 10,
+                            border: '1px solid #e8e9f2',
+                            background: '#f9fafb',
+                            opacity: 0.7,
+                          }}
+                        >
+                          <CheckCircle2 size={16} color="#22c55e" style={{ flexShrink: 0 }} />
+                          <p style={{ fontSize: 13, fontWeight: 500, color: '#8b8fa8', margin: 0, textDecoration: 'line-through', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {task.title}
+                          </p>
+                          <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: '#22c55e', flexShrink: 0 }}>
+                            +{task.readiness_impact}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── RIGHT SIDEBAR (260px) ── */}
+          <div style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* 1. Recent Alerts card */}
+            <div className="glass-card" style={{ padding: 20 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a1c3a', marginBottom: 14 }}>Recent Alerts</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[
+                  { label: 'Credit Score Updated', sub: 'Your score changed by +12 pts', color: '#22c55e', icon: '📈' },
+                  { label: 'Grant Deadline', sub: 'SBIR application closes in 3 days', color: '#f59e0b', icon: '⏰' },
+                  { label: 'Document Required', sub: 'Upload your bank statements', color: '#ef4444', icon: '📄' },
+                ].map((alert, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        background: alert.color + '18',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        fontSize: 15,
+                      }}
+                    >
+                      {alert.icon}
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: '#1a1c3a', margin: 0 }}>{alert.label}</p>
+                      <p style={{ fontSize: 11, color: '#8b8fa8', margin: '2px 0 0' }}>{alert.sub}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. AI Advisor card */}
+            <div
+              style={{
+                padding: 20,
+                borderRadius: 12,
+                background: 'linear-gradient(135deg, #eef2ff 0%, #ede9fe 100%)',
+                border: '1px solid #e8e9f2',
+              }}
+            >
+              <div style={{ fontSize: 28, marginBottom: 10 }}>🤖</div>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a1c3a', marginBottom: 8 }}>AI Advisor</h3>
+              <p style={{ fontSize: 12, color: '#8b8fa8', marginBottom: 16, lineHeight: 1.5 }}>
+                "Your funding readiness is strong. Focus on lowering credit utilization to unlock higher loan amounts."
+              </p>
+              <button
+                className="nexus-button-primary"
+                style={{
+                  width: '100%',
+                  padding: '10px 0',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Chat with Advisor
+              </button>
+            </div>
+
+            {/* 3. Quick Stats card */}
+            <div className="glass-card" style={{ padding: 20 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a1c3a', marginBottom: 14 }}>Quick Stats</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {[
+                  { label: 'Credit Score', value: '—', color: '#3d5af1' },
+                  { label: 'Funding Readiness', value: `${progress}%`, color: '#3d5af1' },
+                  { label: 'Tasks Completed', value: `${completedTasks.length}`, color: '#22c55e' },
+                  { label: 'Grants Eligible', value: '3', color: '#f59e0b' },
+                ].map((stat, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 12, color: '#8b8fa8' }}>{stat.label}</span>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: stat.color }}>{stat.value}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

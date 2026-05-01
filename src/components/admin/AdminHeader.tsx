@@ -1,65 +1,197 @@
 import React from 'react';
-import { 
-  Bell, 
-  Search, 
-  Command, 
-  Activity, 
-  ShieldCheck, 
-  Globe,
-  ChevronDown
-} from 'lucide-react';
+import { Bell, Search, Command, Activity, Globe, ChevronDown, ShieldCheck } from 'lucide-react';
 
 export function AdminHeader() {
   return (
-    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 sticky top-0 z-40">
-      <div className="flex items-center gap-8">
-        <div className="relative group">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-[#5B7CFA] transition-colors" />
-          <input 
-            type="text" 
-            placeholder="Search system, clients, or AI logs..." 
-            className="bg-slate-50 border border-slate-200 rounded-xl py-2 pl-10 pr-12 text-xs font-medium text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#5B7CFA]/20 focus:border-[#5B7CFA]/50 w-80 transition-all"
-          />
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-slate-200">
-            <Command className="w-2.5 h-2.5 text-slate-400" />
-            <span className="text-[9px] font-black text-slate-400">K</span>
-          </div>
-        </div>
+    <header
+      className="flex items-center shrink-0 sticky top-0 z-40 bg-white border-b border-[#e8e9f2]"
+      style={{ height: 56, padding: '0 20px', gap: 12 }}
+    >
+      {/* ADMIN PORTAL label */}
+      <div className="hidden md:flex items-center gap-2 mr-2">
+        <ShieldCheck size={15} style={{ color: '#1a1c3a' }} />
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 800,
+            color: '#1a1c3a',
+            letterSpacing: '0.14em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Admin Portal
+        </span>
+        <span
+          style={{
+            width: 1,
+            height: 16,
+            background: '#e8e9f2',
+            display: 'inline-block',
+            marginLeft: 6,
+          }}
+        />
+      </div>
 
-        <div className="flex items-center gap-6 border-l border-slate-200 pl-8">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">System Live</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-[#5B7CFA]" />
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">98.2% Efficiency</span>
-          </div>
+      {/* Search */}
+      <div className="relative group hidden sm:block" style={{ flex: '0 1 300px' }}>
+        <Search
+          size={14}
+          style={{
+            position: 'absolute',
+            left: 10,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            color: '#8b8fa8',
+          }}
+        />
+        <input
+          type="text"
+          placeholder="Search clients, logs, docs..."
+          style={{
+            background: '#eaebf6',
+            border: '1px solid #e8e9f2',
+            borderRadius: 10,
+            padding: '7px 36px 7px 32px',
+            fontSize: 13,
+            color: '#1a1c3a',
+            width: '100%',
+            outline: 'none',
+            fontFamily: 'inherit',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            right: 8,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            background: '#ffffff',
+            border: '1px solid #e8e9f2',
+            borderRadius: 5,
+            padding: '1px 5px',
+          }}
+        >
+          <Command size={9} style={{ color: '#8b8fa8' }} />
+          <span style={{ fontSize: 9, fontWeight: 700, color: '#8b8fa8' }}>K</span>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200">
-          <Globe className="w-3.5 h-3.5 text-slate-400" />
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Production</span>
+      {/* Status indicators */}
+      <div className="hidden lg:flex items-center gap-5" style={{ marginLeft: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: '#22c55e',
+              display: 'inline-block',
+              animation: 'pulse 2s infinite',
+            }}
+          />
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#8b8fa8', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            System Live
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Activity size={13} style={{ color: '#3d5af1' }} />
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#8b8fa8', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            98.2% Efficiency
+          </span>
+        </div>
+      </div>
+
+      {/* Spacer */}
+      <div style={{ flex: 1 }} />
+
+      {/* Right controls */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
+        {/* Environment pill */}
+        <div
+          className="hidden sm:flex items-center gap-1.5"
+          style={{
+            background: '#eaebf6',
+            border: '1px solid #e8e9f2',
+            borderRadius: 8,
+            padding: '5px 10px',
+          }}
+        >
+          <Globe size={12} style={{ color: '#8b8fa8' }} />
+          <span style={{ fontSize: 10, fontWeight: 700, color: '#8b8fa8', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            Production
+          </span>
         </div>
 
-        <button className="p-2.5 text-slate-400 hover:text-[#1A2244] hover:bg-slate-50 rounded-xl transition-all relative">
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#5B7CFA] rounded-full border-2 border-white" />
+        {/* Bell */}
+        <button
+          style={{
+            background: '#eaebf6',
+            border: 'none',
+            borderRadius: 8,
+            padding: '8px 10px',
+            cursor: 'pointer',
+            position: 'relative',
+          }}
+        >
+          <Bell size={15} style={{ color: '#8b8fa8' }} />
+          <span
+            style={{
+              position: 'absolute',
+              top: 7,
+              right: 7,
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: '#3d5af1',
+              border: '1.5px solid #fff',
+            }}
+          />
         </button>
 
-        <div className="h-8 w-[1px] bg-slate-200 mx-2" />
+        {/* Divider */}
+        <span style={{ width: 1, height: 20, background: '#e8e9f2', display: 'inline-block', margin: '0 4px' }} />
 
-        <button className="flex items-center gap-3 pl-2 group">
-          <div className="text-right">
-            <p className="text-xs font-black text-[#1A2244] leading-none">Admin Root</p>
-            <p className="text-[9px] font-bold text-[#5B7CFA] uppercase tracking-widest mt-1">Superuser</p>
+        {/* Admin user button */}
+        <button
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px 0',
+            fontFamily: 'inherit',
+          }}
+        >
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1c3a', lineHeight: 1 }}>Admin Root</div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#3d5af1', letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: 2 }}>
+              Superuser
+            </div>
           </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden group-hover:border-[#5B7CFA] transition-all">
-            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Admin" alt="Admin" />
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #1a1c3a, #3d5af1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#fff',
+              flexShrink: 0,
+            }}
+          >
+            AR
           </div>
-          <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-[#1A2244] transition-colors" />
+          <ChevronDown size={14} style={{ color: '#8b8fa8' }} />
         </button>
       </div>
     </header>

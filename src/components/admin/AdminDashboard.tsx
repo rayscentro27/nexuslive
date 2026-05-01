@@ -1,11 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import {
   Users, DollarSign, Cpu, ShieldAlert,
-  ArrowUpRight, Clock, CheckCircle2, AlertCircle,
-  Zap, Lightbulb, ChevronRight, FileText
+  ArrowUpRight, Clock,
 } from 'lucide-react';
-import { cn } from '../../lib/utils';
-import { getAllClients, getAllDocuments, getAllFundingApplications, getBotProfiles, UserProfile, Document, FundingApplication, BotProfile } from '../../lib/db';
+import {
+  getAllClients,
+  getAllDocuments,
+  getAllFundingApplications,
+  getBotProfiles,
+  UserProfile,
+  Document,
+  FundingApplication,
+  BotProfile,
+} from '../../lib/db';
 
 function fmtMoney(n: number) {
   if (n >= 1_000_000) return '$' + (n / 1_000_000).toFixed(1) + 'M';
@@ -41,172 +48,311 @@ export function AdminDashboard() {
   const botHealth = bots.length > 0 ? Math.round((activeBots / bots.length) * 100) : 0;
   const pendingDocs = documents.filter(d => d.status === 'pending').length;
 
-  const stats = [
-    { label: 'Active Clients', value: loading ? '—' : clients.length.toString(), change: 'Total enrolled', trend: 'up', icon: Users, color: 'blue' },
-    { label: 'Pipeline Value', value: loading ? '—' : fmtMoney(pipelineValue), change: 'Funding requested', trend: 'up', icon: DollarSign, color: 'green' },
-    { label: 'AI Health', value: loading ? '—' : `${botHealth}%`, change: `${activeBots} of ${bots.length} active`, trend: 'up', icon: Cpu, color: 'purple' },
-    { label: 'Docs Pending', value: loading ? '—' : pendingDocs.toString(), change: 'Awaiting review', trend: pendingDocs > 5 ? 'up' : 'down', icon: ShieldAlert, color: 'amber' },
+  const metrics = [
+    {
+      label: 'Active Clients',
+      value: loading ? '—' : clients.length.toString(),
+      sub: 'Total enrolled',
+      icon: Users,
+      iconBg: '#eef0fd',
+      iconColor: '#3d5af1',
+    },
+    {
+      label: 'Pipeline Value',
+      value: loading ? '—' : fmtMoney(pipelineValue),
+      sub: 'Funding requested',
+      icon: DollarSign,
+      iconBg: '#f0fdf4',
+      iconColor: '#22c55e',
+    },
+    {
+      label: 'AI Health',
+      value: loading ? '—' : `${botHealth}%`,
+      sub: `${activeBots} of ${bots.length} active`,
+      icon: Cpu,
+      iconBg: '#f5f3ff',
+      iconColor: '#7c3aed',
+    },
+    {
+      label: 'Docs Pending',
+      value: loading ? '—' : pendingDocs.toString(),
+      sub: 'Awaiting review',
+      icon: ShieldAlert,
+      iconBg: pendingDocs > 5 ? '#fff7ed' : '#f0fdf4',
+      iconColor: pendingDocs > 5 ? '#f59e0b' : '#22c55e',
+    },
   ];
-
-  const colorMap: Record<string, string> = {
-    blue: 'bg-blue-50 text-[#5B7CFA]',
-    green: 'bg-green-50 text-green-600',
-    purple: 'bg-purple-50 text-purple-600',
-    amber: 'bg-amber-50 text-amber-600',
-  };
 
   const recentClients = clients.slice(0, 4);
   const recentApps = applications.slice(0, 3);
 
   return (
-    <div className="p-8 space-y-8 bg-slate-50/50 min-h-full text-slate-600">
-      <div className="flex items-center justify-between">
+    <div
+      style={{ background: '#eaebf6', minHeight: '100%' }}
+      className="p-6 md:p-8 space-y-6"
+    >
+      {/* Page header */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-black text-[#1A2244] tracking-tight">Overview</h1>
-          <p className="text-slate-500 font-medium mt-1 text-sm">Operational workspace and system-wide performance monitoring.</p>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1a1c3a', letterSpacing: -0.5, margin: 0 }}>
+            Overview
+          </h1>
+          <p style={{ fontSize: 13, color: '#8b8fa8', marginTop: 4 }}>
+            Operational workspace and system-wide performance monitoring.
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="px-4 py-2 rounded-xl bg-white border border-slate-200 flex items-center gap-2 shadow-sm">
-            <Clock className="w-4 h-4 text-slate-400" />
-            <span className="text-xs font-bold text-slate-500">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div
+            className="glass-card"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10 }}
+          >
+            <Clock size={14} style={{ color: '#8b8fa8' }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#8b8fa8' }}>
               Last Sync: {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
-          <button className="px-6 py-2 rounded-xl bg-[#5B7CFA] text-white text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all">
+          <button className="nexus-button-primary" style={{ padding: '8px 18px', fontSize: 12, borderRadius: 10 }}>
             System Report
           </button>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, i) => (
-          <div key={i} className="bg-white border border-slate-200 p-6 rounded-3xl relative overflow-hidden group hover:border-[#5B7CFA]/30 transition-all shadow-sm">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#5B7CFA]/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-[#5B7CFA]/10 transition-all" />
-            <div className="relative z-10 flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", colorMap[stat.color])}>
-                  <stat.icon className="w-6 h-6" />
+      {/* Metrics grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {metrics.map((m, i) => {
+          const Icon = m.icon;
+          return (
+            <div key={i} className="glass-card" style={{ padding: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: m.iconBg,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Icon size={20} style={{ color: m.iconColor }} />
                 </div>
-                <ArrowUpRight className="w-4 h-4 text-slate-200" />
+                <ArrowUpRight size={14} style={{ color: '#e8e9f2' }} />
               </div>
-              <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                <h3 className="text-2xl font-black text-[#1A2244] mt-1">{stat.value}</h3>
-                <p className="text-[10px] font-bold text-slate-400 mt-1">{stat.change}</p>
+              <div style={{ fontSize: 9, fontWeight: 700, color: '#8b8fa8', letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+                {m.label}
               </div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: '#1a1c3a', margin: '4px 0 2px', letterSpacing: -1 }}>
+                {m.value}
+              </div>
+              <div style={{ fontSize: 11, color: '#8b8fa8' }}>{m.sub}</div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
+      {/* Main content row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Clients */}
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-[#5B7CFA]">
-                <Users className="w-4 h-4" />
+
+        {/* Recent Clients table */}
+        <div className="glass-card lg:col-span-2" style={{ overflow: 'hidden' }}>
+          <div
+            style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid #e8e9f2',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: '#f8f9fe',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: '#eef0fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Users size={15} style={{ color: '#3d5af1' }} />
               </div>
-              <h3 className="text-sm font-black text-[#1A2244] uppercase tracking-widest">Recent Clients</h3>
+              <span style={{ fontSize: 11, fontWeight: 800, color: '#1a1c3a', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                Recent Clients
+              </span>
             </div>
-            <span className="text-[10px] font-bold text-slate-400">{clients.length} total</span>
+            <span style={{ fontSize: 11, color: '#8b8fa8', fontWeight: 600 }}>{clients.length} total</span>
           </div>
-          <div className="divide-y divide-slate-50">
+
+          <div>
             {recentClients.length > 0 ? recentClients.map((c) => (
-              <div key={c.id} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50/50 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className="w-9 h-9 rounded-xl bg-[#C5C9F7] flex items-center justify-center font-black text-[#5B7CFA] text-sm shrink-0">
+              <div
+                key={c.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '14px 20px',
+                  borderBottom: '1px solid #f5f6fb',
+                  transition: 'background 0.12s',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      background: '#eef0fd',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 14,
+                      fontWeight: 800,
+                      color: '#3d5af1',
+                      flexShrink: 0,
+                    }}
+                  >
                     {(c.full_name ?? 'U').charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <p className="text-sm font-black text-[#1A2244]">{c.full_name ?? 'Unknown'}</p>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1c3a' }}>
+                      {c.full_name ?? 'Unknown'}
+                    </div>
+                    <div style={{ fontSize: 10, color: '#8b8fa8', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 2 }}>
                       {c.subscription_plan} plan · joined {new Date(c.created_at).toLocaleDateString()}
-                    </p>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-[#1A2244]">{c.readiness_score}%</p>
-                    <div className="w-20 h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#1a1c3a' }}>{c.readiness_score}%</div>
+                    <div style={{ width: 72, height: 4, background: '#eaebf6', borderRadius: 4, marginTop: 4, overflow: 'hidden' }}>
                       <div
-                        className={cn("h-full rounded-full", c.readiness_score >= 80 ? "bg-green-500" : c.readiness_score >= 50 ? "bg-[#5B7CFA]" : "bg-amber-500")}
-                        style={{ width: `${c.readiness_score}%` }}
+                        style={{
+                          height: '100%',
+                          borderRadius: 4,
+                          background: c.readiness_score >= 80 ? '#22c55e' : c.readiness_score >= 50 ? '#3d5af1' : '#f59e0b',
+                          width: `${c.readiness_score}%`,
+                        }}
                       />
                     </div>
                   </div>
-                  <button className="px-3 py-1.5 bg-blue-50 text-[#5B7CFA] text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-[#5B7CFA] hover:text-white transition-all">
+                  <button
+                    style={{
+                      background: '#eef0fd',
+                      color: '#3d5af1',
+                      border: 'none',
+                      borderRadius: 8,
+                      padding: '5px 12px',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      transition: 'background 0.12s',
+                    }}
+                  >
                     View
                   </button>
                 </div>
               </div>
             )) : (
-              <div className="px-6 py-8 text-center">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No clients yet</p>
+              <div style={{ padding: '32px 20px', textAlign: 'center' }}>
+                <span style={{ fontSize: 11, color: '#8b8fa8', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                  No clients yet
+                </span>
               </div>
             )}
           </div>
         </div>
 
         {/* Right column */}
-        <div className="space-y-6">
-          {/* Bot Health */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
-                <Cpu className="w-4 h-4" />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* AI Workforce card */}
+          <div className="glass-card" style={{ padding: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Cpu size={15} style={{ color: '#7c3aed' }} />
               </div>
-              <h3 className="text-sm font-black text-[#1A2244] uppercase tracking-widest">AI Workforce</h3>
+              <span style={{ fontSize: 11, fontWeight: 800, color: '#1a1c3a', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                AI Workforce
+              </span>
             </div>
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {bots.slice(0, 4).map(bot => (
-                <div key={bot.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className={cn("w-2 h-2 rounded-full", bot.status === 'active' ? "bg-green-500" : bot.status === 'idle' ? "bg-amber-400" : "bg-slate-300")} />
-                    <span className="text-[11px] font-bold text-slate-700">{bot.name}</span>
+                <div key={bot.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: '50%',
+                        background: bot.status === 'active' ? '#22c55e' : bot.status === 'idle' ? '#f59e0b' : '#e8e9f2',
+                        display: 'inline-block',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#1a1c3a' }}>{bot.name}</span>
                   </div>
-                  <span className={cn(
-                    "text-[9px] font-black uppercase px-2 py-0.5 rounded-full",
-                    bot.status === 'active' ? "bg-green-50 text-green-600" :
-                    bot.status === 'idle' ? "bg-amber-50 text-amber-600" :
-                    "bg-slate-100 text-slate-400"
-                  )}>{bot.status}</span>
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      padding: '2px 8px',
+                      borderRadius: 20,
+                      background: bot.status === 'active' ? '#f0fdf4' : bot.status === 'idle' ? '#fff7ed' : '#f5f6fb',
+                      color: bot.status === 'active' ? '#22c55e' : bot.status === 'idle' ? '#f59e0b' : '#8b8fa8',
+                    }}
+                  >
+                    {bot.status}
+                  </span>
                 </div>
               ))}
               {bots.length === 0 && (
-                <p className="text-[10px] font-bold text-slate-400">No bots configured</p>
+                <span style={{ fontSize: 11, color: '#8b8fa8' }}>No bots configured</span>
               )}
             </div>
           </div>
 
-          {/* Recent Applications */}
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-600">
-                <DollarSign className="w-4 h-4" />
+          {/* Recent Applications card */}
+          <div className="glass-card" style={{ padding: 20 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <DollarSign size={15} style={{ color: '#22c55e' }} />
               </div>
-              <h3 className="text-sm font-black text-[#1A2244] uppercase tracking-widest">Applications</h3>
+              <span style={{ fontSize: 11, fontWeight: 800, color: '#1a1c3a', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                Applications
+              </span>
             </div>
             {recentApps.length > 0 ? (
-              <div className="space-y-3">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {recentApps.map(app => (
-                  <div key={app.id} className="flex items-center justify-between">
+                  <div key={app.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
-                      <p className="text-[11px] font-black text-[#1A2244]">{app.lender_name ?? 'Unknown'}</p>
-                      <p className="text-[9px] text-slate-400 font-bold">${(app.requested_amount ?? 0).toLocaleString()}</p>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#1a1c3a' }}>
+                        {app.lender_name ?? 'Unknown'}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#8b8fa8', fontWeight: 600, marginTop: 2 }}>
+                        ${(app.requested_amount ?? 0).toLocaleString()}
+                      </div>
                     </div>
-                    <span className={cn(
-                      "text-[9px] font-black uppercase px-2 py-0.5 rounded-full",
-                      app.status === 'approved' ? "bg-green-50 text-green-600" :
-                      app.status === 'pending' ? "bg-blue-50 text-blue-600" :
-                      "bg-amber-50 text-amber-600"
-                    )}>{app.status}</span>
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.1em',
+                        padding: '2px 8px',
+                        borderRadius: 20,
+                        background: app.status === 'approved' ? '#f0fdf4' : app.status === 'pending' ? '#eef0fd' : '#fff7ed',
+                        color: app.status === 'approved' ? '#22c55e' : app.status === 'pending' ? '#3d5af1' : '#f59e0b',
+                      }}
+                    >
+                      {app.status}
+                    </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-[10px] font-bold text-slate-400">No applications yet</p>
+              <span style={{ fontSize: 11, color: '#8b8fa8' }}>No applications yet</span>
             )}
           </div>
         </div>

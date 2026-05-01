@@ -82,6 +82,19 @@ export const handler = async (event) => {
           if (error) console.warn('user_subscriptions upsert skipped:', error.message);
         });
 
+        // Emit system_event so communication_agent sends the welcome email
+        await supabase.from('system_events').insert({
+          event_type:  'client_registered',
+          status:      'pending',
+          priority:    'high',
+          client_id:   userId,
+          payload:     { email, plan, stripe_customer_id: session.customer },
+          source:      'stripe_webhook',
+          created_at:  new Date().toISOString(),
+        }).then(({ error }) => {
+          if (error) console.warn('system_events insert skipped:', error.message);
+        });
+
         console.log(`Subscription activated — user ${userId} → ${plan}`);
         break;
       }
