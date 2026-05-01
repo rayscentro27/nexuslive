@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { AuthProvider, useAuth } from './components/AuthProvider';
-import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { Messages } from './components/Messages';
@@ -29,7 +28,75 @@ import { Landing } from './components/Landing';
 import { PlanGate } from './components/PlanGate';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppShell } from './components/AppShell';
-import { Home, Zap, CreditCard, User, FileText, Lock, AlertCircle } from 'lucide-react';
+import { Zap, Lock, AlertCircle } from 'lucide-react';
+
+const DOCK_ITEMS = [
+  { id: 'home',          emoji: '🏠', label: 'Home' },
+  { id: 'action-center', emoji: '⚡', label: 'Actions', badge: '2' },
+  { id: 'funding',       emoji: '💰', label: 'Funding' },
+  { id: 'messages',      emoji: '💬', label: 'Messages' },
+  { id: 'documents',     emoji: '📄', label: 'Docs' },
+  { id: 'grants',        emoji: '🏆', label: 'Grants' },
+  { id: 'trading',       emoji: '📈', label: 'Trading' },
+  { id: 'referral',      emoji: '🎁', label: 'Refer' },
+  { id: 'account',       emoji: '👤', label: 'Account' },
+  { id: 'settings',      emoji: '⚙️', label: 'Settings' },
+];
+
+function BottomDock({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (t: string) => void }) {
+  return (
+    <div style={{
+      position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 200,
+      background: 'rgba(210,225,245,0.82)',
+      backdropFilter: 'blur(32px)',
+      WebkitBackdropFilter: 'blur(32px)' as any,
+      border: '1px solid rgba(255,255,255,0.7)',
+      borderRadius: 28, padding: '10px 18px',
+      display: 'flex', alignItems: 'center', gap: 4,
+      boxShadow: '0 8px 40px rgba(60,80,180,0.22), 0 2px 8px rgba(0,0,0,0.08)',
+    }}>
+      {DOCK_ITEMS.map(item => {
+        const isActive = activeTab === item.id;
+        return (
+          <button
+            key={item.id}
+            onClick={() => setActiveTab(item.id)}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+              cursor: 'pointer', minWidth: 52, background: 'none', border: 'none', padding: '2px 0',
+            }}
+          >
+            <div style={{
+              width: 44, height: 44, borderRadius: 13, fontSize: 20,
+              background: isActive ? '#3d5af1' : 'rgba(255,255,255,0.45)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: isActive ? '2px solid rgba(255,255,255,0.85)' : '1.5px solid rgba(255,255,255,0.5)',
+              boxShadow: isActive ? '0 0 0 3px rgba(61,90,241,0.22), 0 4px 14px rgba(60,80,180,0.2)' : '0 2px 6px rgba(60,80,180,0.08)',
+              position: 'relative',
+              transition: 'all 0.15s',
+            }}>
+              {item.emoji}
+              {(item as any).badge && !isActive && (
+                <div style={{
+                  position: 'absolute', top: -4, right: -4,
+                  background: '#ef4444', color: '#fff',
+                  borderRadius: 10, fontSize: 9, fontWeight: 700,
+                  padding: '1px 5px', border: '1.5px solid #fff',
+                }}>{(item as any).badge}</div>
+              )}
+            </div>
+            <span style={{
+              fontSize: 10, fontWeight: isActive ? 700 : 500,
+              color: isActive ? '#3d5af1' : '#1a1c3a',
+              textAlign: 'center', lineHeight: 1.1,
+            }}>{item.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function ResetPasswordForm({ onDone }: { onDone: () => void }) {
   const [password, setPassword] = useState('');
@@ -206,23 +273,12 @@ function AppContent() {
     );
   }
 
-  const mobileNavItems = [
-    { id: 'home',          label: 'Home',     icon: Home },
-    { id: 'action-center', label: 'Actions',  icon: Zap },
-    { id: 'funding',       label: 'Funding',  icon: CreditCard },
-    { id: 'documents',     label: 'Docs',     icon: FileText },
-    { id: 'account',       label: 'Account',  icon: User },
-  ];
-
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#eaebf6' }}>
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-
-      {/* Main content — ml-0 on mobile, ml-52 on md+ to clear sidebar */}
-      <main className="flex-1 h-screen flex flex-col overflow-hidden md:ml-[208px]">
+      <main className="flex-1 h-screen flex flex-col overflow-hidden">
         <Header onNavigate={setActiveTab} />
 
-        <div className="flex-1 overflow-y-auto scrollbar-hide pb-20 md:pb-0" style={{ padding: '16px 16px' }}>
+        <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ padding: '16px 16px', paddingBottom: 100 }}>
           {activeTab === 'home'           && <Dashboard />}
           {activeTab === 'action-center'  && <ActionCenter />}
           {activeTab === 'business-setup' && <BusinessSetup />}
@@ -273,47 +329,22 @@ function AppContent() {
             </PlanGate>
           )}
         </div>
-
-        <footer
-          className="hidden md:block p-3 text-center text-[8px] font-bold uppercase tracking-widest shrink-0"
-          style={{ color: '#8b8fa8', borderTop: '1px solid #e8e9f2', background: '#fff' }}
-        >
-          © 2026 Nexus. All rights reserved.
-        </footer>
       </main>
 
-      {/* Mobile bottom navigation — hidden on md+ */}
-      <nav
-        className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden"
-        style={{ background: '#fff', borderTop: '1px solid #e8e9f2', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-      >
-        {mobileNavItems.map(({ id, label, icon: Icon }) => {
-          const isActive = activeTab === id;
-          return (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className="flex-1 flex flex-col items-center justify-center py-3 gap-1 min-h-[56px]"
-              style={{ color: isActive ? '#3d5af1' : '#8b8fa8', background: 'none', border: 'none' }}
-            >
-              <Icon size={22} />
-              <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</span>
-            </button>
-          );
-        })}
-      </nav>
-
-      {/* Admin switcher — only visible to admin account, desktop only */}
+      {/* Admin switcher — only visible to admin accounts */}
       {isAdmin && (
         <button
           onClick={() => setPortal('admin')}
-          className="fixed bottom-20 right-4 md:bottom-4 z-[100] px-4 py-2 rounded-full shadow-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all"
-          style={{ background: '#1a1c3a', color: '#fff', border: '1px solid #2d3748' }}
+          className="fixed z-[201] px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 transition-all"
+          style={{ bottom: 96, right: 16, background: '#1a1c3a', color: '#fff', border: '1px solid #2d3748', fontSize: 11, fontWeight: 700 }}
         >
           <Zap className="w-3 h-3" style={{ color: '#818cf8' }} />
           Admin
         </button>
       )}
+
+      {/* Bottom dock — always visible */}
+      <BottomDock activeTab={activeTab} setActiveTab={setActiveTab} />
 
       {/* Upgrade modal — shown when a locked feature is clicked */}
       {showUpgradeModal && (

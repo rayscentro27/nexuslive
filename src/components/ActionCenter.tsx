@@ -77,13 +77,13 @@ export function ActionCenter() {
   const allPending = [...(primaryTask ? [primaryTask] : []), ...remainingTasks];
 
   return (
-    <div style={{ padding: 24, background: '#eaebf6', minHeight: '100%' }}>
+    <div style={{ padding: '16px 20px', background: '#eaebf6' }}>
 
       {/* Page header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: '#1a1c3a', marginBottom: 4 }}>Action Center</h1>
-          <p style={{ fontSize: 13, color: '#8b8fa8' }}>
+          <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1a1c3a', marginBottom: 3 }}>Action Center</h1>
+          <p style={{ fontSize: 15, color: '#8b8fa8' }}>
             The engine of your funding journey. Complete tasks to advance.
           </p>
         </div>
@@ -93,8 +93,8 @@ export function ActionCenter() {
               background: '#22c55e18',
               color: '#22c55e',
               borderRadius: 20,
-              padding: '4px 14px',
-              fontSize: 12,
+              padding: '4px 16px',
+              fontSize: 14,
               fontWeight: 600,
             }}
           >
@@ -129,15 +129,15 @@ export function ActionCenter() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
             {/* 1. Overall Readiness card */}
-            <div className="glass-card" style={{ padding: 20 }}>
+            <div className="glass-card" style={{ padding: 18 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1a1c3a' }}>Overall Readiness</h3>
-                <span style={{ fontSize: 20, fontWeight: 800, color: '#3d5af1' }}>{progress}%</span>
+                <h3 style={{ fontSize: 17, fontWeight: 700, color: '#1a1c3a' }}>Overall Readiness</h3>
+                <span style={{ fontSize: 22, fontWeight: 800, color: '#3d5af1' }}>{progress}%</span>
               </div>
-              <div style={{ height: 6, background: '#e8e9f2', borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ height: 7, background: '#e8e9f2', borderRadius: 10, overflow: 'hidden' }}>
                 <div style={{ width: `${progress}%`, height: '100%', background: '#3d5af1', borderRadius: 10 }} />
               </div>
-              <p style={{ fontSize: 12, color: '#8b8fa8', marginTop: 8 }}>
+              <p style={{ fontSize: 14, color: '#8b8fa8', marginTop: 8 }}>
                 {allPending.length} task{allPending.length !== 1 ? 's' : ''} remaining before funding unlock
               </p>
             </div>
