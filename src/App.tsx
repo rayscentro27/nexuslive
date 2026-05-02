@@ -39,61 +39,69 @@ const DOCK_ITEMS = [
   { id: 'grants',        emoji: '🏆', label: 'Grants' },
   { id: 'trading',       emoji: '📈', label: 'Trading' },
   { id: 'referral',      emoji: '🎁', label: 'Refer' },
+  { id: 'credit',        emoji: '🛡️', label: 'Credit' },
   { id: 'account',       emoji: '👤', label: 'Account' },
   { id: 'settings',      emoji: '⚙️', label: 'Settings' },
 ];
+
+function DockButton({ item, isActive, onClick }: { item: { emoji: string; label: string; badge?: string }; isActive: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+        cursor: 'pointer', minWidth: 56, background: 'none', border: 'none', padding: '2px 0',
+      }}
+    >
+      <div style={{
+        width: 52, height: 52, borderRadius: 15, fontSize: 26,
+        background: isActive ? '#3d5af1' : 'rgba(255,255,255,0.52)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        border: isActive ? '2px solid rgba(255,255,255,0.9)' : '1.5px solid rgba(255,255,255,0.55)',
+        boxShadow: isActive ? '0 0 0 4px rgba(61,90,241,0.2), 0 6px 18px rgba(60,80,180,0.25)' : '0 2px 8px rgba(60,80,180,0.1)',
+        position: 'relative',
+        transition: 'all 0.15s',
+      }}>
+        {item.emoji}
+        {item.badge && !isActive && (
+          <div style={{
+            position: 'absolute', top: -4, right: -4,
+            background: '#ef4444', color: '#fff',
+            borderRadius: 10, fontSize: 10, fontWeight: 800,
+            padding: '1px 5px', border: '2px solid #fff',
+          }}>{item.badge}</div>
+        )}
+      </div>
+      <span style={{
+        fontSize: 11, fontWeight: isActive ? 700 : 500,
+        color: isActive ? '#3d5af1' : '#1a1c3a',
+        textAlign: 'center', lineHeight: 1.1,
+      }}>{item.label}</span>
+    </button>
+  );
+}
 
 function BottomDock({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (t: string) => void }) {
   return (
     <div style={{
       position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)',
       zIndex: 200,
-      background: 'rgba(210,225,245,0.82)',
+      background: 'rgba(210,225,245,0.88)',
       backdropFilter: 'blur(32px)',
       WebkitBackdropFilter: 'blur(32px)' as any,
-      border: '1px solid rgba(255,255,255,0.7)',
-      borderRadius: 28, padding: '10px 18px',
-      display: 'flex', alignItems: 'center', gap: 4,
-      boxShadow: '0 8px 40px rgba(60,80,180,0.22), 0 2px 8px rgba(0,0,0,0.08)',
+      border: '1px solid rgba(255,255,255,0.75)',
+      borderRadius: 30, padding: '10px 18px',
+      display: 'flex', alignItems: 'center', gap: 6,
+      boxShadow: '0 10px 48px rgba(60,80,180,0.24), 0 2px 8px rgba(0,0,0,0.08)',
     }}>
-      {DOCK_ITEMS.map(item => {
-        const isActive = activeTab === item.id;
-        return (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-              cursor: 'pointer', minWidth: 52, background: 'none', border: 'none', padding: '2px 0',
-            }}
-          >
-            <div style={{
-              width: 44, height: 44, borderRadius: 13, fontSize: 20,
-              background: isActive ? '#3d5af1' : 'rgba(255,255,255,0.45)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: isActive ? '2px solid rgba(255,255,255,0.85)' : '1.5px solid rgba(255,255,255,0.5)',
-              boxShadow: isActive ? '0 0 0 3px rgba(61,90,241,0.22), 0 4px 14px rgba(60,80,180,0.2)' : '0 2px 6px rgba(60,80,180,0.08)',
-              position: 'relative',
-              transition: 'all 0.15s',
-            }}>
-              {item.emoji}
-              {(item as any).badge && !isActive && (
-                <div style={{
-                  position: 'absolute', top: -4, right: -4,
-                  background: '#ef4444', color: '#fff',
-                  borderRadius: 10, fontSize: 9, fontWeight: 700,
-                  padding: '1px 5px', border: '1.5px solid #fff',
-                }}>{(item as any).badge}</div>
-              )}
-            </div>
-            <span style={{
-              fontSize: 10, fontWeight: isActive ? 700 : 500,
-              color: isActive ? '#3d5af1' : '#1a1c3a',
-              textAlign: 'center', lineHeight: 1.1,
-            }}>{item.label}</span>
-          </button>
-        );
-      })}
+      {DOCK_ITEMS.map(item => (
+        <DockButton
+          key={item.id}
+          item={item}
+          isActive={activeTab === item.id}
+          onClick={() => setActiveTab(item.id)}
+        />
+      ))}
     </div>
   );
 }

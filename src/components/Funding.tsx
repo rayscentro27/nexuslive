@@ -108,14 +108,14 @@ export function Funding() {
   const readinessRiskColor = readiness >= 80 ? '#22c55e' : readiness >= 50 ? '#f59e0b' : '#ef4444';
 
   return (
-    <div className="p-6 max-w-6xl mx-auto h-full flex flex-col overflow-y-auto no-scrollbar" style={{ gap: 24 }}>
+    <div className="p-6 max-w-6xl mx-auto h-full flex flex-col overflow-y-auto no-scrollbar" style={{ gap: 20 }}>
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a1c3a', margin: 0 }}>Funding</h1>
-          <p style={{ fontSize: 13, color: '#8b8fa8', marginTop: 4 }}>Track your funding applications and opportunities.</p>
+          <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1a1c3a', margin: 0 }}>Funding Suite</h1>
+          <p style={{ fontSize: 15, color: '#8b8fa8', marginTop: 4 }}>Track your funding applications and opportunities.</p>
         </div>
-        <button className="nexus-button-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', fontSize: 13 }}>
+        <button className="nexus-button-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', fontSize: 14 }}>
           <Plus size={15} /> New Application
         </button>
       </div>
@@ -158,13 +158,13 @@ export function Funding() {
                 label: 'Approval Rate',
               },
             ].map(({ icon: Icon, iconBg, iconColor, value, label }) => (
-              <div key={label} className="glass-card" style={{ padding: '20px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Icon size={20} color={iconColor} />
+              <div key={label} className="glass-card" style={{ padding: '18px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Icon size={22} color={iconColor} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: '#1a1c3a', lineHeight: 1 }}>{value}</div>
-                  <div style={{ fontSize: 12, color: '#8b8fa8', marginTop: 3 }}>{label}</div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: '#1a1c3a', lineHeight: 1 }}>{value}</div>
+                  <div style={{ fontSize: 13, color: '#8b8fa8', marginTop: 3 }}>{label}</div>
                 </div>
               </div>
             ))}

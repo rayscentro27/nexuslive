@@ -143,12 +143,12 @@ export function Documents() {
   const storageUsedPct = Math.min((usedGB / totalGB) * 100, 100);
 
   return (
-    <div className="p-6 max-w-6xl mx-auto h-full flex flex-col overflow-y-auto no-scrollbar" style={{ gap: 24 }}>
+    <div className="p-6 max-w-6xl mx-auto h-full flex flex-col overflow-y-auto no-scrollbar" style={{ gap: 20 }}>
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a1c3a', margin: 0 }}>Documents</h1>
-          <p style={{ fontSize: 13, color: '#8b8fa8', marginTop: 4 }}>
+          <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1a1c3a', margin: 0 }}>Documents</h1>
+          <p style={{ fontSize: 15, color: '#8b8fa8', marginTop: 4 }}>
             {docs.length} uploaded{attentionCount > 0 ? ` · ${attentionCount} need attention` : ''}
           </p>
         </div>
@@ -156,7 +156,7 @@ export function Documents() {
           className="nexus-button-primary"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', fontSize: 13, opacity: uploading ? 0.6 : 1 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', fontSize: 14, opacity: uploading ? 0.6 : 1 }}
         >
           {uploading ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
           Upload Document
@@ -182,12 +182,12 @@ export function Documents() {
           { label: 'Need Attention', value: attentionCount, iconBg: '#fef2f2', iconColor: '#ef4444', Icon: AlertCircle },
         ].map(({ label, value, iconBg, iconColor, Icon }) => (
           <div key={label} className="glass-card" style={{ padding: '18px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 12, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Icon size={18} color={iconColor} />
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Icon size={22} color={iconColor} />
             </div>
             <div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: '#1a1c3a', lineHeight: 1 }}>{value}</div>
-              <div style={{ fontSize: 12, color: '#8b8fa8', marginTop: 3 }}>{label}</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#1a1c3a', lineHeight: 1 }}>{value}</div>
+              <div style={{ fontSize: 13, color: '#8b8fa8', marginTop: 3 }}>{label}</div>
             </div>
           </div>
         ))}
