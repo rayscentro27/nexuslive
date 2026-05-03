@@ -72,28 +72,44 @@ ALTER TABLE user_access_overrides   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscription_notifications ENABLE ROW LEVEL SECURITY;
 
 -- Admin only policies for invite tables
-CREATE POLICY IF NOT EXISTS "admin_manage_invited_users"
-  ON invited_users FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
-  );
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "admin_manage_invited_users" ON invited_users;
+  CREATE POLICY "admin_manage_invited_users"
+    ON invited_users FOR ALL
+    USING (
+      EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
+    );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE POLICY IF NOT EXISTS "admin_manage_access_overrides"
-  ON user_access_overrides FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
-    OR user_id = auth.uid()
-  );
 
-CREATE POLICY IF NOT EXISTS "user_own_subscription_notifications"
-  ON subscription_notifications FOR SELECT
-  USING (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "admin_manage_access_overrides" ON user_access_overrides;
+  CREATE POLICY "admin_manage_access_overrides"
+    ON user_access_overrides FOR ALL
+    USING (
+      EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
+      OR user_id = auth.uid()
+    );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE POLICY IF NOT EXISTS "admin_manage_subscription_notifications"
-  ON subscription_notifications FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
-  );
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_subscription_notifications" ON subscription_notifications;
+  CREATE POLICY "user_own_subscription_notifications"
+    ON subscription_notifications FOR SELECT
+    USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "admin_manage_subscription_notifications" ON subscription_notifications;
+  CREATE POLICY "admin_manage_subscription_notifications"
+    ON subscription_notifications FOR ALL
+    USING (
+      EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
+    );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 
 -- ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
 
@@ -113,15 +129,23 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "user_own_notifications"
-  ON notifications FOR ALL
-  USING (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_notifications" ON notifications;
+  CREATE POLICY "user_own_notifications"
+    ON notifications FOR ALL
+    USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE POLICY IF NOT EXISTS "admin_all_notifications"
-  ON notifications FOR INSERT
-  USING (
-    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
-  );
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "admin_all_notifications" ON notifications;
+  CREATE POLICY "admin_all_notifications"
+    ON notifications FOR INSERT
+    WITH CHECK (
+      EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
+    );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 
 -- ─── CREDIT BOOST ENGINE ─────────────────────────────────────────────────────
 
@@ -210,23 +234,47 @@ ALTER TABLE user_rent_reporting         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE credit_fundability_scores   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE credit_education_library    ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "public_read_boost_opps"
-  ON credit_boost_opportunities FOR SELECT USING (true);
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "public_read_boost_opps" ON credit_boost_opportunities;
+  CREATE POLICY "public_read_boost_opps"
+    ON credit_boost_opportunities FOR SELECT USING (true);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE POLICY IF NOT EXISTS "user_own_boost_actions"
-  ON credit_boost_actions FOR ALL USING (user_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "public_read_rent_providers"
-  ON rent_reporting_providers FOR SELECT USING (true);
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_boost_actions" ON credit_boost_actions;
+  CREATE POLICY "user_own_boost_actions"
+    ON credit_boost_actions FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE POLICY IF NOT EXISTS "user_own_rent_reporting"
-  ON user_rent_reporting FOR ALL USING (user_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "user_own_fundability"
-  ON credit_fundability_scores FOR ALL USING (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "public_read_rent_providers" ON rent_reporting_providers;
+  CREATE POLICY "public_read_rent_providers"
+    ON rent_reporting_providers FOR SELECT USING (true);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE POLICY IF NOT EXISTS "public_read_education"
-  ON credit_education_library FOR SELECT USING (true);
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_rent_reporting" ON user_rent_reporting;
+  CREATE POLICY "user_own_rent_reporting"
+    ON user_rent_reporting FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_fundability" ON credit_fundability_scores;
+  CREATE POLICY "user_own_fundability"
+    ON credit_fundability_scores FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "public_read_education" ON credit_education_library;
+  CREATE POLICY "public_read_education"
+    ON credit_education_library FOR SELECT USING (true);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 
 -- ─── BUSINESS CREDIT + VENDOR TRADELINES ────────────────────────────────────
 
@@ -275,14 +323,26 @@ ALTER TABLE business_credit_profiles  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vendor_tradelines_catalog ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_vendor_accounts      ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "user_own_biz_credit"
-  ON business_credit_profiles FOR ALL USING (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_biz_credit" ON business_credit_profiles;
+  CREATE POLICY "user_own_biz_credit"
+    ON business_credit_profiles FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE POLICY IF NOT EXISTS "public_read_vendors"
-  ON vendor_tradelines_catalog FOR SELECT USING (true);
 
-CREATE POLICY IF NOT EXISTS "user_own_vendor_accounts"
-  ON user_vendor_accounts FOR ALL USING (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "public_read_vendors" ON vendor_tradelines_catalog;
+  CREATE POLICY "public_read_vendors"
+    ON vendor_tradelines_catalog FOR SELECT USING (true);
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_vendor_accounts" ON user_vendor_accounts;
+  CREATE POLICY "user_own_vendor_accounts"
+    ON user_vendor_accounts FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 
 -- ─── FUNDING READINESS ────────────────────────────────────────────────────────
 
@@ -345,17 +405,33 @@ ALTER TABLE funding_roadmap_stages      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE funding_timeline_events     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE next_best_actions           ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "user_own_funding_readiness"
-  ON funding_readiness_snapshots FOR ALL USING (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_funding_readiness" ON funding_readiness_snapshots;
+  CREATE POLICY "user_own_funding_readiness"
+    ON funding_readiness_snapshots FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE POLICY IF NOT EXISTS "user_own_roadmap_stages"
-  ON funding_roadmap_stages FOR ALL USING (user_id = auth.uid());
 
-CREATE POLICY IF NOT EXISTS "user_own_timeline_events"
-  ON funding_timeline_events FOR ALL USING (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_roadmap_stages" ON funding_roadmap_stages;
+  CREATE POLICY "user_own_roadmap_stages"
+    ON funding_roadmap_stages FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE POLICY IF NOT EXISTS "user_own_nba"
-  ON next_best_actions FOR ALL USING (user_id = auth.uid());
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_timeline_events" ON funding_timeline_events;
+  CREATE POLICY "user_own_timeline_events"
+    ON funding_timeline_events FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_nba" ON next_best_actions;
+  CREATE POLICY "user_own_nba"
+    ON next_best_actions FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 
 -- ─── FUNDING APPLICATIONS / 0% STRATEGY ─────────────────────────────────────
 
@@ -427,27 +503,46 @@ ALTER TABLE funding_strategy_steps  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE funding_accounts        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE client_funding_summary  ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "user_own_funding_recs"    ON funding_recommendations FOR ALL USING (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS "user_own_strategies"      ON funding_strategies FOR ALL USING (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS "user_own_strategy_steps"  ON funding_strategy_steps FOR ALL USING (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS "user_own_funding_accounts" ON funding_accounts FOR ALL USING (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS "user_own_funding_summary" ON client_funding_summary FOR ALL USING (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_funding_recs" ON funding_recommendations;
+  CREATE POLICY "user_own_funding_recs"    ON funding_recommendations FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
--- ─── APPROVAL SIMULATOR ──────────────────────────────────────────────────────
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_strategies" ON funding_strategies;
+  CREATE POLICY "user_own_strategies" ON funding_strategies FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_strategy_steps" ON funding_strategy_steps;
+  CREATE POLICY "user_own_strategy_steps"  ON funding_strategy_steps FOR ALL USING (user_id = auth.uid());
+  DROP POLICY IF EXISTS "user_own_funding_accounts" ON funding_accounts;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE TABLE IF NOT EXISTS lender_rules (
-  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  lender_name     text        NOT NULL,
-  product_type    text        NOT NULL,
-  min_score       integer,
-  max_utilization integer,
-  min_income      numeric(12,2),
-  requirements    jsonb,
-  estimated_limit_min numeric(10,2),
-  estimated_limit_max numeric(10,2),
-  is_active       boolean     NOT NULL DEFAULT true,
-  created_at      timestamptz NOT NULL DEFAULT now()
-);
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_funding_accounts" ON funding_accounts;
+  CREATE POLICY "user_own_funding_accounts" ON funding_accounts FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_funding_summary" ON client_funding_summary;
+  CREATE POLICY "user_own_funding_summary" ON client_funding_summary FOR ALL USING (user_id = auth.uid());
+  
+  -- ─── APPROVAL SIMULATOR ──────────────────────────────────────────────────────
+  
+  CREATE TABLE IF NOT EXISTS lender_rules (
+    id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    lender_name     text        NOT NULL,
+    product_type    text        NOT NULL,
+    min_score       integer,
+    max_utilization integer,
+    min_income      numeric(12,2),
+    requirements    jsonb,
+    estimated_limit_min numeric(10,2),
+    estimated_limit_max numeric(10,2),
+    is_active       boolean     NOT NULL DEFAULT true,
+    created_at      timestamptz NOT NULL DEFAULT now()
+  );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 
 CREATE TABLE IF NOT EXISTS approval_simulations (
   id                  uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -466,8 +561,16 @@ CREATE TABLE IF NOT EXISTS approval_simulations (
 ALTER TABLE lender_rules        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE approval_simulations ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "public_read_lender_rules" ON lender_rules FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "user_own_simulations" ON approval_simulations FOR ALL USING (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "public_read_lender_rules" ON lender_rules;
+  CREATE POLICY "public_read_lender_rules" ON lender_rules FOR SELECT USING (true);
+  DROP POLICY IF EXISTS "user_own_simulations" ON approval_simulations;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_simulations" ON approval_simulations;
+  CREATE POLICY "user_own_simulations" ON approval_simulations FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- ─── CONCIERGE ───────────────────────────────────────────────────────────────
 
@@ -497,8 +600,16 @@ CREATE TABLE IF NOT EXISTS concierge_clients (
 ALTER TABLE concierge_plans   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE concierge_clients ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "public_read_concierge_plans" ON concierge_plans FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "user_own_concierge" ON concierge_clients FOR ALL USING (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "public_read_concierge_plans" ON concierge_plans;
+  CREATE POLICY "public_read_concierge_plans" ON concierge_plans FOR SELECT USING (true);
+  DROP POLICY IF EXISTS "user_own_concierge" ON concierge_clients;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_concierge" ON concierge_clients;
+  CREATE POLICY "user_own_concierge" ON concierge_clients FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- ─── COMMISSION / REFERRAL ENGINE ────────────────────────────────────────────
 
@@ -539,32 +650,43 @@ ALTER TABLE referrals           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE referral_earnings   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE funding_commissions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "user_own_referrals" ON referrals FOR ALL USING (referrer_id = auth.uid());
-CREATE POLICY IF NOT EXISTS "user_own_referral_earnings" ON referral_earnings FOR ALL USING (referrer_id = auth.uid());
-CREATE POLICY IF NOT EXISTS "user_own_commissions" ON funding_commissions FOR ALL USING (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_referrals" ON referrals;
+  CREATE POLICY "user_own_referrals" ON referrals FOR ALL USING (referrer_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
--- ─── GRANTS ENGINE ───────────────────────────────────────────────────────────
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_referral_earnings" ON referral_earnings;
+  CREATE POLICY "user_own_referral_earnings" ON referral_earnings FOR ALL USING (referrer_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_commissions" ON funding_commissions;
+  CREATE POLICY "user_own_commissions" ON funding_commissions FOR ALL USING (user_id = auth.uid());
+  
+  -- ─── GRANTS ENGINE ───────────────────────────────────────────────────────────
+  
+  CREATE TABLE IF NOT EXISTS grants_catalog (
+    id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    title           text        NOT NULL,
+    description     text,
+    grantor         text,
+    category        text        NOT NULL, -- 'federal' | 'state' | 'local' | 'nonprofit' | 'business'
+    amount_min      numeric(12,2),
+    amount_max      numeric(12,2),
+    deadline        timestamptz,
+    official_url    text,
+    eligibility     text,
+    required_docs   jsonb,
+    naics_codes     text[],
+    states          text[],
+    is_active       boolean     NOT NULL DEFAULT true,
+    is_verified     boolean     NOT NULL DEFAULT false,
+    source          text,       -- URL of where grant was found
+    scraped_at      timestamptz,
+    created_at      timestamptz NOT NULL DEFAULT now()
+  );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
-CREATE TABLE IF NOT EXISTS grants_catalog (
-  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  title           text        NOT NULL,
-  description     text,
-  grantor         text,
-  category        text        NOT NULL, -- 'federal' | 'state' | 'local' | 'nonprofit' | 'business'
-  amount_min      numeric(12,2),
-  amount_max      numeric(12,2),
-  deadline        timestamptz,
-  official_url    text,
-  eligibility     text,
-  required_docs   jsonb,
-  naics_codes     text[],
-  states          text[],
-  is_active       boolean     NOT NULL DEFAULT true,
-  is_verified     boolean     NOT NULL DEFAULT false,
-  source          text,       -- URL of where grant was found
-  scraped_at      timestamptz,
-  created_at      timestamptz NOT NULL DEFAULT now()
-);
 
 CREATE TABLE IF NOT EXISTS grant_matches (
   id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -633,14 +755,38 @@ ALTER TABLE grant_review_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE grant_deadlines       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE grant_scrape_logs     ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "public_read_grants" ON grants_catalog FOR SELECT USING (is_active = true);
-CREATE POLICY IF NOT EXISTS "user_own_grant_matches" ON grant_matches FOR ALL USING (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS "user_own_grant_apps" ON grant_applications FOR ALL USING (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS "user_own_grant_requests" ON grant_review_requests FOR ALL USING (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS "user_own_grant_deadlines" ON grant_deadlines FOR ALL USING (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS "admin_read_scrape_logs" ON grant_scrape_logs FOR SELECT USING (
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "public_read_grants" ON grants_catalog;
+  CREATE POLICY "public_read_grants" ON grants_catalog FOR SELECT USING (is_active = true);
+  DROP POLICY IF EXISTS "user_own_grant_matches" ON grant_matches;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_grant_matches" ON grant_matches;
+  CREATE POLICY "user_own_grant_matches" ON grant_matches FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_grant_apps" ON grant_applications;
+  CREATE POLICY "user_own_grant_apps" ON grant_applications FOR ALL USING (user_id = auth.uid());
+  DROP POLICY IF EXISTS "user_own_grant_requests" ON grant_review_requests;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_grant_requests" ON grant_review_requests;
+  CREATE POLICY "user_own_grant_requests" ON grant_review_requests FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_grant_deadlines" ON grant_deadlines;
+  CREATE POLICY "user_own_grant_deadlines" ON grant_deadlines FOR ALL USING (user_id = auth.uid());
+  DROP POLICY IF EXISTS "admin_read_scrape_logs" ON grant_scrape_logs;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "admin_read_scrape_logs" ON grant_scrape_logs;
+  CREATE POLICY "admin_read_scrape_logs" ON grant_scrape_logs FOR SELECT USING (
   EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
 );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- ─── TRADING LAB ──────────────────────────────────────────────────────────────
 
@@ -716,14 +862,38 @@ ALTER TABLE paper_trades            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE paper_trading_metrics   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE broker_connections      ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "public_read_approved_strategies" ON trading_strategies FOR SELECT USING (is_approved = true);
-CREATE POLICY IF NOT EXISTS "admin_manage_strategies" ON trading_strategies FOR ALL USING (
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "public_read_approved_strategies" ON trading_strategies;
+  CREATE POLICY "public_read_approved_strategies" ON trading_strategies FOR SELECT USING (is_approved = true);
+  DROP POLICY IF EXISTS "admin_manage_strategies" ON trading_strategies;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "admin_manage_strategies" ON trading_strategies;
+  CREATE POLICY "admin_manage_strategies" ON trading_strategies FOR ALL USING (
   EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
 );
-CREATE POLICY IF NOT EXISTS "user_own_paper_account" ON paper_trading_accounts FOR ALL USING (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS "user_own_paper_trades" ON paper_trades FOR ALL USING (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS "user_own_trading_metrics" ON paper_trading_metrics FOR ALL USING (user_id = auth.uid());
-CREATE POLICY IF NOT EXISTS "user_own_broker_connections" ON broker_connections FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_paper_account" ON paper_trading_accounts;
+  CREATE POLICY "user_own_paper_account" ON paper_trading_accounts FOR ALL USING (user_id = auth.uid());
+  DROP POLICY IF EXISTS "user_own_paper_trades" ON paper_trades;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_paper_trades" ON paper_trades;
+  CREATE POLICY "user_own_paper_trades" ON paper_trades FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_trading_metrics" ON paper_trading_metrics;
+  CREATE POLICY "user_own_trading_metrics" ON paper_trading_metrics FOR ALL USING (user_id = auth.uid());
+  DROP POLICY IF EXISTS "user_own_broker_connections" ON broker_connections;
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_broker_connections" ON broker_connections;
+  CREATE POLICY "user_own_broker_connections" ON broker_connections FOR ALL USING (user_id = auth.uid());
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
 -- ─── AI EMPLOYEE / RESEARCHER SYSTEM ─────────────────────────────────────────
 
@@ -787,18 +957,34 @@ ALTER TABLE ai_employee_runs              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE research_sources              ENABLE ROW LEVEL SECURITY;
 ALTER TABLE website_change_recommendations ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "admin_manage_ai_events" ON ai_agent_events FOR ALL USING (
-  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
-);
-CREATE POLICY IF NOT EXISTS "admin_manage_ai_runs" ON ai_employee_runs FOR ALL USING (
-  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
-);
-CREATE POLICY IF NOT EXISTS "admin_manage_research" ON research_sources FOR ALL USING (
-  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
-);
-CREATE POLICY IF NOT EXISTS "admin_manage_change_recs" ON website_change_recommendations FOR ALL USING (
-  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
-);
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "admin_manage_ai_events" ON ai_agent_events;
+  CREATE POLICY "admin_manage_ai_events" ON ai_agent_events FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
+  );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "admin_manage_ai_runs" ON ai_employee_runs;
+  CREATE POLICY "admin_manage_ai_runs" ON ai_employee_runs FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
+  );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "admin_manage_research" ON research_sources;
+  CREATE POLICY "admin_manage_research" ON research_sources FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
+  );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "admin_manage_change_recs" ON website_change_recommendations;
+  CREATE POLICY "admin_manage_change_recs" ON website_change_recommendations FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
+  );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 
 -- ─── BANK BEHAVIOR TRACKING ───────────────────────────────────────────────────
 
@@ -819,20 +1005,24 @@ CREATE TABLE IF NOT EXISTS bank_behavior_snapshots (
 );
 
 ALTER TABLE bank_behavior_snapshots ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "user_own_bank_behavior" ON bank_behavior_snapshots FOR ALL USING (user_id = auth.uid());
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "user_own_bank_behavior" ON bank_behavior_snapshots;
+  CREATE POLICY "user_own_bank_behavior" ON bank_behavior_snapshots FOR ALL USING (user_id = auth.uid());
+  
+  -- ─── PARTNER / WHITE LABEL SYSTEM ────────────────────────────────────────────
+  
+  CREATE TABLE IF NOT EXISTS partners (
+    id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+    name            text        NOT NULL,
+    type            text        NOT NULL DEFAULT 'credit_repair', -- 'credit_repair' | 'funding_broker' | 'business_coach' | 'accountant' | 'nonprofit' | 'grant_writer'
+    contact_email   text,
+    contact_phone   text,
+    status          text        NOT NULL DEFAULT 'active',
+    commission_rate numeric(5,2) NOT NULL DEFAULT 0,
+    created_at      timestamptz NOT NULL DEFAULT now()
+  );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
 
--- ─── PARTNER / WHITE LABEL SYSTEM ────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS partners (
-  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  name            text        NOT NULL,
-  type            text        NOT NULL DEFAULT 'credit_repair', -- 'credit_repair' | 'funding_broker' | 'business_coach' | 'accountant' | 'nonprofit' | 'grant_writer'
-  contact_email   text,
-  contact_phone   text,
-  status          text        NOT NULL DEFAULT 'active',
-  commission_rate numeric(5,2) NOT NULL DEFAULT 0,
-  created_at      timestamptz NOT NULL DEFAULT now()
-);
 
 CREATE TABLE IF NOT EXISTS partner_branding (
   id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -858,15 +1048,27 @@ ALTER TABLE partners          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE partner_branding  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE partner_clients   ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "admin_manage_partners" ON partners FOR ALL USING (
-  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
-);
-CREATE POLICY IF NOT EXISTS "admin_manage_partner_branding" ON partner_branding FOR ALL USING (
-  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
-);
-CREATE POLICY IF NOT EXISTS "admin_manage_partner_clients" ON partner_clients FOR ALL USING (
-  EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
-);
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "admin_manage_partners" ON partners;
+  CREATE POLICY "admin_manage_partners" ON partners FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
+  );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "admin_manage_partner_branding" ON partner_branding;
+  CREATE POLICY "admin_manage_partner_branding" ON partner_branding FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
+  );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "admin_manage_partner_clients" ON partner_clients;
+  CREATE POLICY "admin_manage_partner_clients" ON partner_clients FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
+  );
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
 
 -- ─── SEED: Vendor Tradelines Catalog ─────────────────────────────────────────
 
