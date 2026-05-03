@@ -1,7 +1,7 @@
 import React from 'react';
-import { Bell, MessageSquare, Coins, Rocket } from 'lucide-react';
+import { MessageSquare, Coins, Rocket } from 'lucide-react';
 import { useAuth } from './AuthProvider';
-
+import { NotificationBell } from './NotificationBell';
 
 function getInitials(user: { email?: string; user_metadata?: { full_name?: string } } | null): string {
   if (!user) return 'N';
@@ -32,7 +32,7 @@ export function Header({ onNavigate }: { onNavigate?: (tab: string) => void }) {
       {/* Right Controls */}
       <div className="flex items-center gap-2">
 
-        {/* Score pill — hidden on small phones, shown sm+ */}
+        {/* Score pill — hidden on small phones */}
         <div className="hidden sm:flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-semibold text-[#1a1c3a]"
           style={{ background: '#eaebf6' }}>
           <span>{readinessScore}%</span>
@@ -47,12 +47,8 @@ export function Header({ onNavigate }: { onNavigate?: (tab: string) => void }) {
           <MessageSquare size={16} style={{ color: '#8b8fa8' }} />
         </button>
 
-        {/* Bell */}
-        <button className="rounded-lg flex items-center justify-center relative"
-          style={{ background: '#eaebf6', padding: '8px 10px', border: 'none', cursor: 'pointer' }}>
-          <Bell size={16} style={{ color: '#8b8fa8' }} />
-          <span style={{ position: 'absolute', top: 6, right: 7, width: 7, height: 7, borderRadius: '50%', background: '#3d5af1', border: '1.5px solid #fff' }} />
-        </button>
+        {/* Notification Bell — real, live */}
+        <NotificationBell onOpenPage={() => onNavigate?.('notifications')} />
 
         {/* Coins — hidden on mobile */}
         <div className="hidden sm:flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold cursor-pointer"

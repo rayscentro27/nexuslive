@@ -1,80 +1,124 @@
-import React from 'react';
-import { 
-  Users, 
-  Copy, 
-  QrCode, 
-  TrendingUp, 
-  DollarSign, 
-  Mail, 
-  MessageCircle, 
-  Facebook, 
-  MessageSquare, 
-  ChevronRight,
-  CheckCircle2,
-  Clock,
-  Zap,
-  Award,
-  ArrowUpRight
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Users, Copy, QrCode, TrendingUp, DollarSign, Award,
+  MessageSquare, ChevronRight, CheckCircle2, Clock, ArrowUpRight,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { BotAvatar } from './BotAvatar';
+import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthProvider';
 
-const leaderboard = [
-  { rank: 1, name: 'Mike Thompson', referrals: 8, earnings: '$1,540', avatar: 'Mike' },
-  { rank: 2, name: 'Sarah Patel', referrals: 8, earnings: '$1,065', avatar: 'Sarah' },
-  { rank: 3, name: 'Amanda Nguyen', referrals: 5, earnings: '$925', avatar: 'Amanda' },
-];
+interface Referral {
+  id: string;
+  referred_email: string;
+  status: string;
+  referral_code: string;
+  converted_at: string | null;
+  created_at: string;
+}
 
-const activity = [
-  { name: 'John Carter', referrals: 3, date: 'Apr 4', status: 'Successful', amount: '$450', avatar: 'John' },
-  { name: 'Jenny Lee', referrals: 8, date: 'Apr 1', status: 'Pending', amount: '$50', avatar: 'Jenny' },
-  { name: 'Amanda Nguyen', referrals: 3, date: 'Apr 18', status: 'Registered', avatar: 'Amanda' },
-];
+interface Earning {
+  id: string;
+  amount: number;
+  status: string;
+  created_at: string;
+}
+
+interface Commission {
+  id: string;
+  funding_amount: number;
+  commission_amount: number;
+  status: string;
+  created_at: string;
+}
+
+function statusMeta(status: string) {
+  if (status === 'converted') return { label: 'Converted', color: '#22c55e' };
+  if (status === 'signed_up')  return { label: 'Signed Up',  color: '#3d5af1' };
+  return                              { label: 'Pending',    color: '#f59e0b' };
+}
 
 export function Referral() {
+  const { user } = useAuth();
+  const [referrals,    setReferrals]    = useState<Referral[]>([]);
+  const [earnings,     setEarnings]     = useState<Earning[]>([]);
+  const [commissions,  setCommissions]  = useState<Commission[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [copied,       setCopied]       = useState(false);
+
+  // Generate a deterministic referral code from the user id
+  const referralCode = user ? user.id.slice(0, 8).toUpperCase() : 'XXXXXX';
+  const referralLink = `${window.location.origin}/signup?ref=${referralCode}`;
+
+  const load = useCallback(async () => {
+    if (!user) return;
+    const [refRes, earRes, comRes] = await Promise.all([
+      supabase.from('referrals').select('*').eq('referrer_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('referral_earnings').select('*').eq('referrer_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('funding_commissions').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+    ]);
+    setReferrals((refRes.data ?? []) as Referral[]);
+    setEarnings((earRes.data ?? []) as Earning[]);
+    setCommissions((comRes.data ?? []) as Commission[]);
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(referralLink).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  // Computed totals — fall back to display zeros if no DB data yet
+  const totalReferralEarnings = earnings.filter(e => e.status !== 'pending').reduce((s, e) => s + e.amount, 0);
+  const totalCommissions      = commissions.filter(c => c.status !== 'pending').reduce((s, c) => s + c.commission_amount, 0);
+  const pendingEarnings       = earnings.filter(e => e.status === 'pending').reduce((s, e) => s + e.amount, 0);
+  const totalEarned           = totalReferralEarnings + totalCommissions;
+  const convertedCount        = referrals.filter(r => r.status === 'converted').length;
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto h-full flex flex-col">
+      {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div className="space-y-0.5">
           <h2 className="text-2xl font-bold text-[#1A2244]">Refer & Earn</h2>
           <p className="text-xs text-slate-500 font-medium">Earn up to $550 for each referral</p>
         </div>
         <div className="flex items-center gap-3">
-          <p className="text-slate-500 font-medium text-xs">Progress: <span className="text-[#1A2244] font-bold">42%</span></p>
-          <div className="w-24 h-2 bg-nexus-100 rounded-full overflow-hidden shadow-inner">
-            <div className="w-[42%] h-full bg-[#5B7CFA]" />
-          </div>
+          <p className="text-slate-500 font-medium text-xs">
+            Converted: <span className="text-[#1A2244] font-bold">{convertedCount}</span>
+          </p>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6 pr-1">
         {/* Hero Banner */}
-        <div className="glass-card overflow-hidden relative min-h-[200px] group shadow-xl shrink-0">
-          <img 
-            src="https://picsum.photos/seed/referral-hero/1200/400" 
-            alt="Referral Hero" 
-            className="w-full h-full object-cover absolute inset-0 group-hover:scale-105 transition-transform duration-700"
-            referrerPolicy="no-referrer"
-          />
+        <div className="glass-card overflow-hidden relative min-h-[180px] group shadow-xl shrink-0"
+          style={{ background: 'linear-gradient(135deg, #1e2a6e 0%, #3d5af1 100%)' }}>
           <div className="absolute inset-0 bg-gradient-to-r from-[#1A2244]/40 to-transparent pointer-events-none" />
           <div className="absolute bottom-6 left-6 space-y-3 max-w-lg">
             <h3 className="text-2xl font-black text-white tracking-tight leading-tight">
-              Invite your friends and <br />
-              <span className="text-blue-400">earn $550</span> per referral
+              Invite your network and<br />
+              <span className="text-blue-300">earn $75+ per referral</span>
             </h3>
-            <button className="bg-white text-[#1A2244] px-6 py-2.5 rounded-xl text-xs font-bold shadow-xl flex items-center gap-2 hover:bg-slate-50 transition-all">
-              Invite Friends Now
+            <button
+              onClick={handleCopy}
+              className="bg-white text-[#1A2244] px-6 py-2.5 rounded-xl text-xs font-bold shadow-xl flex items-center gap-2 hover:bg-slate-50 transition-all"
+            >
+              {copied ? 'Copied!' : 'Copy My Link'}
               <ArrowUpRight className="w-4 h-4" />
             </button>
           </div>
-          {/* Referral Bot */}
-          <div className="absolute bottom-2 right-2 w-32 h-32 opacity-90 group-hover:scale-110 transition-transform duration-500">
+          <div className="absolute bottom-2 right-2 w-28 h-28 opacity-80 group-hover:scale-110 transition-transform duration-500">
             <BotAvatar type="referral" size="xl" className="bg-transparent shadow-none" />
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column: Link & Summary */}
+          {/* Left: Link + Earnings */}
           <div className="lg:col-span-2 space-y-6">
             {/* Share Link */}
             <div className="glass-card p-6 space-y-4">
@@ -82,18 +126,25 @@ export function Referral() {
                 <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-[#5B7CFA]">
                   <Users className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-bold text-[#1A2244]">Share Your Referral Link</h3>
+                <h3 className="text-sm font-bold text-[#1A2244]">Your Referral Link</h3>
               </div>
               <div className="flex flex-col md:flex-row gap-3">
                 <div className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-slate-600 font-medium text-xs flex items-center justify-between">
-                  <span className="truncate">https://app.nexus.com/signup?ref=XYZ123</span>
-                  <div className="flex gap-1.5">
-                    <button className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"><Copy className="w-3.5 h-3.5" /></button>
-                    <button className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors"><QrCode className="w-3.5 h-3.5" /></button>
+                  <span className="truncate">{referralLink}</span>
+                  <div className="flex gap-1.5 ml-2 shrink-0">
+                    <button onClick={handleCopy} className="p-1.5 hover:bg-slate-200 rounded-lg transition-colors">
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-                <button className="bg-[#5B7CFA] text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all">Copy Link</button>
+                <button
+                  onClick={handleCopy}
+                  className="bg-[#5B7CFA] text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all"
+                >
+                  {copied ? '✓ Copied' : 'Copy Link'}
+                </button>
               </div>
+              <p className="text-[10px] text-slate-400">Your code: <strong className="text-[#1A2244]">{referralCode}</strong></p>
             </div>
 
             {/* Earnings Summary */}
@@ -107,44 +158,42 @@ export function Referral() {
                 </div>
                 <ChevronRight className="w-4 h-4 text-slate-400" />
               </div>
-              
+
               <div className="space-y-2">
                 <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Total Earned</p>
-                <p className="text-4xl font-black text-[#1A2244] tracking-tight">$1,540</p>
-                <div className="w-full h-2 bg-nexus-100 rounded-full overflow-hidden mt-4">
-                  <div className="w-3/4 h-full bg-gradient-to-r from-[#5B7CFA] to-[#3A5EE5]" />
-                </div>
-                <div className="flex justify-between text-[8px] font-bold text-slate-400 uppercase tracking-widest pt-1">
-                  <span>0%</span>
-                  <span>30%</span>
-                  <span>50%</span>
-                  <span>100%</span>
-                </div>
+                <p className="text-4xl font-black text-[#1A2244] tracking-tight">
+                  ${totalEarned.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </p>
               </div>
 
-              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-slate-100">
+              <div className="grid grid-cols-3 gap-4 pt-4 border-t border-slate-100">
                 <div className="space-y-1">
-                  <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Referral</p>
-                  <p className="text-lg font-black text-green-600">$975</p>
-                  <p className="text-[8px] text-slate-400 font-bold">10 refs</p>
+                  <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Referrals</p>
+                  <p className="text-lg font-black text-green-600">
+                    ${totalReferralEarnings.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-[8px] text-slate-400 font-bold">{referrals.length} total</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Funding</p>
-                  <p className="text-lg font-black text-green-600">$655</p>
-                  <p className="text-[8px] text-slate-400 font-bold">$28k Funded</p>
+                  <p className="text-lg font-black text-green-600">
+                    ${totalCommissions.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-[8px] text-slate-400 font-bold">{commissions.length} deals</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Unpaid</p>
-                  <p className="text-lg font-black text-[#1A2244]">$250</p>
-                  <button className="text-[8px] font-bold text-[#5B7CFA] uppercase tracking-widest hover:underline">Details</button>
+                  <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Pending</p>
+                  <p className="text-lg font-black text-[#1A2244]">
+                    ${pendingEarnings.toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                  </p>
+                  <p className="text-[8px] text-slate-400 font-bold">Awaiting verification</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right Column: Program & Leaderboard */}
+          {/* Right: Program Info */}
           <div className="space-y-6">
-            {/* Program Info */}
             <div className="glass-card p-6 space-y-6">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
@@ -158,57 +207,51 @@ export function Referral() {
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
                     <p className="text-xs font-bold text-[#1A2244]">Referral Commission</p>
                   </div>
-                  <p className="text-[10px] text-slate-500 pl-6 leading-relaxed">$75 per referral</p>
+                  <p className="text-[10px] text-slate-500 pl-6 leading-relaxed">$75 per person who signs up via your link</p>
                 </div>
-
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-green-500" />
                     <p className="text-xs font-bold text-[#1A2244]">Funding Commission</p>
                   </div>
-                  <p className="text-[10px] text-slate-500 pl-6 leading-relaxed">Earn 2% of funded amount</p>
+                  <p className="text-[10px] text-slate-500 pl-6 leading-relaxed">Earn 2% of funded amount when your referral gets funded</p>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <p className="text-xs font-bold text-[#1A2244]">Conversion Bonus</p>
+                  </div>
+                  <p className="text-[10px] text-slate-500 pl-6 leading-relaxed">Extra $25 when referral upgrades to Pro</p>
                 </div>
               </div>
-              <button className="w-full py-2 bg-slate-50 text-[#1A2244] font-bold text-[10px] rounded-xl border border-slate-100 hover:bg-slate-100 transition-all">Milestones</button>
             </div>
 
-            {/* Leaderboard */}
-            <div className="glass-card p-6 space-y-6">
-              <div className="flex items-center gap-3">
+            {/* Stats */}
+            <div className="glass-card p-6">
+              <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
                   <TrendingUp className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-bold text-[#1A2244]">Leaderboard</h3>
+                <h3 className="text-sm font-bold text-[#1A2244]">Your Stats</h3>
               </div>
-              <div className="space-y-4">
-                {leaderboard.map((user) => (
-                  <div key={user.rank} className="flex items-center gap-3 group cursor-pointer">
-                    <div className={cn(
-                      "w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-black shadow-sm",
-                      user.rank === 1 ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-600"
-                    )}>
-                      {user.rank}
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-[#C5C9F7] overflow-hidden shrink-0 shadow-md group-hover:scale-105 transition-transform">
-                      <img 
-                        src={`https://api.dicebear.com/7.x/notionists/svg?seed=${user.avatar}&backgroundColor=c5c9f7`} 
-                        alt={user.name} 
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-[#1A2244] truncate">{user.name}</p>
-                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{user.referrals} refs • {user.earnings}</p>
-                    </div>
+              <div className="space-y-3">
+                {[
+                  { label: 'Total referred',   value: referrals.length },
+                  { label: 'Converted',        value: convertedCount },
+                  { label: 'Signed up',        value: referrals.filter(r => r.status === 'signed_up').length },
+                  { label: 'Pending',          value: referrals.filter(r => r.status === 'pending').length },
+                ].map(s => (
+                  <div key={s.label} className="flex justify-between items-center">
+                    <span className="text-xs text-slate-500">{s.label}</span>
+                    <span className="text-xs font-bold text-[#1A2244]">{s.value}</span>
                   </div>
                 ))}
               </div>
-              <button className="w-full py-2 bg-slate-50 text-[#1A2244] font-bold text-[10px] rounded-xl border border-slate-100 hover:bg-slate-100 transition-all">View All</button>
             </div>
           </div>
         </div>
 
-        {/* Referral Activity */}
+        {/* Activity Table */}
         <div className="glass-card overflow-hidden shrink-0">
           <div className="p-6 border-b border-slate-100 flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
@@ -216,86 +259,67 @@ export function Referral() {
             </div>
             <h3 className="text-sm font-bold text-[#1A2244]">Referral Activity</h3>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-slate-50/50 text-left">
-                  <th className="px-6 py-3 text-[8px] font-bold text-slate-500 uppercase tracking-widest">Referred</th>
-                  <th className="px-6 py-3 text-[8px] font-bold text-slate-500 uppercase tracking-widest text-center">Date</th>
-                  <th className="px-6 py-3 text-[8px] font-bold text-slate-500 uppercase tracking-widest text-right">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {activity.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/30 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-[#C5C9F7] overflow-hidden shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-                          <img 
-                            src={`https://api.dicebear.com/7.x/notionists/svg?seed=${item.avatar}&backgroundColor=c5c9f7`} 
-                            alt={item.name} 
-                            referrerPolicy="no-referrer"
-                          />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-[#1A2244]">{item.name}</p>
-                          <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{item.referrals} referrals</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs text-slate-600 text-center font-bold">{item.date}</td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {item.status === 'Successful' && <CheckCircle2 className="w-3 h-3 text-green-500" />}
-                          {item.status === 'Pending' && <Clock className="w-3 h-3 text-amber-500" />}
-                          <span className={cn(
-                            "text-[8px] font-black uppercase tracking-widest",
-                            item.status === 'Successful' ? "text-green-600" : 
-                            item.status === 'Pending' ? "text-amber-600" : 
-                            "text-slate-400"
-                          )}>
-                            {item.status}
-                          </span>
-                        </div>
-                        {item.amount && <p className="text-sm font-black text-[#1A2244]">{item.amount}</p>}
-                      </div>
-                    </td>
+
+          {loading ? (
+            <div className="p-8 text-center text-slate-400 text-sm">Loading…</div>
+          ) : referrals.length === 0 ? (
+            <div className="p-8 text-center">
+              <Users className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+              <p className="text-sm text-slate-400">No referrals yet — share your link to get started!</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-slate-50/50 text-left">
+                    <th className="px-6 py-3 text-[8px] font-bold text-slate-500 uppercase tracking-widest">Email</th>
+                    <th className="px-6 py-3 text-[8px] font-bold text-slate-500 uppercase tracking-widest text-center">Date</th>
+                    <th className="px-6 py-3 text-[8px] font-bold text-slate-500 uppercase tracking-widest text-right">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {referrals.map(ref => {
+                    const { label, color } = statusMeta(ref.status);
+                    return (
+                      <tr key={ref.id} className="hover:bg-slate-50/30 transition-colors">
+                        <td className="px-6 py-4">
+                          <p className="text-sm font-bold text-[#1A2244]">{ref.referred_email}</p>
+                        </td>
+                        <td className="px-6 py-4 text-xs text-slate-600 text-center font-bold">
+                          {new Date(ref.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <span style={{ background: color + '18', color, borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700 }}>
+                            {label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        {/* Invite Friends Footer */}
-        <div className="glass-card p-6 space-y-6 shrink-0">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-[#5B7CFA]">
-                <MessageSquare className="w-5 h-5" />
-              </div>
-              <h3 className="text-xl font-black text-[#1A2244]">Invite More Friends</h3>
+        {/* Invite Footer */}
+        <div className="glass-card p-6 space-y-4 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-[#5B7CFA]">
+              <MessageSquare className="w-5 h-5" />
             </div>
-            <div className="flex items-center gap-4">
-              <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Earn $550 per referral</span>
-              <div className="flex gap-1.5">
-                {[...Array(10)].map((_, i) => (
-                  <div key={i} className={cn("w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black shadow-sm", i < 3 ? "bg-green-500 text-white" : "bg-slate-100 text-slate-400")}>
-                    {i < 3 ? <CheckCircle2 className="w-3 h-3" /> : i + 1}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <h3 className="text-xl font-black text-[#1A2244]">Invite More Friends</h3>
           </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <button className="bg-slate-50 text-[#1A2244] py-2.5 text-[10px] rounded-xl font-bold border border-slate-100 hover:bg-slate-100 transition-all">Email</button>
-            <button className="bg-slate-50 text-[#1A2244] py-2.5 text-[10px] rounded-xl font-bold border border-slate-100 hover:bg-slate-100 transition-all">SMS</button>
-            <button className="bg-slate-50 text-[#1A2244] py-2.5 text-[10px] rounded-xl font-bold border border-slate-100 hover:bg-slate-100 transition-all">Facebook</button>
-            <button className="bg-slate-50 text-[#1A2244] py-2.5 text-[10px] rounded-xl font-bold border border-slate-100 hover:bg-slate-100 transition-all">Whatsapp</button>
-            <button className="bg-slate-50 text-[#1A2244] py-2.5 text-[10px] rounded-xl font-bold border border-slate-100 hover:bg-slate-100 transition-all">Messenger</button>
-            <button className="bg-[#5B7CFA] text-white py-2.5 text-[10px] rounded-xl font-black shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all">Invite All</button>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {['Email', 'SMS', 'WhatsApp', 'Messenger'].map(channel => (
+              <button
+                key={channel}
+                onClick={handleCopy}
+                className="bg-slate-50 text-[#1A2244] py-2.5 text-[10px] rounded-xl font-bold border border-slate-100 hover:bg-slate-100 transition-all"
+              >
+                {channel}
+              </button>
+            ))}
           </div>
         </div>
       </div>

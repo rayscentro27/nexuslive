@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, XCircle, TrendingUp, DollarSign, Award, Percent, Loader2, Plus } from 'lucide-react';
+import { CheckCircle2, XCircle, TrendingUp, DollarSign, Award, Percent, Loader2, Plus, CreditCard, Zap, Info, ExternalLink } from 'lucide-react';
 import { useAuth } from './AuthProvider';
 import { getProfile, getFundingApplications, getTasks, UserProfile, FundingApplication, Task } from '../lib/db';
 
@@ -18,8 +18,185 @@ function formatAmount(n: number | null) {
   return '$' + n.toLocaleString();
 }
 
-const TABS = ['Overview', 'Applications', 'Pipeline', 'History'] as const;
+const TABS = ['Overview', 'Applications', 'Pipeline', 'Strategy', 'History'] as const;
 type Tab = typeof TABS[number];
+
+// ─── 0% Strategy Data ──────────────────────────────────────────────────────────
+
+const ZERO_PCT_CARDS = [
+  {
+    name: 'Chase Ink Business Unlimited',
+    introApr: '0% for 12 months',
+    regularApr: '18.49%–24.49%',
+    limit: '$5,000–$25,000',
+    minScore: 680,
+    perks: 'Unlimited 1.5% cashback, no annual fee',
+    applyUrl: 'https://creditcards.chase.com/business-credit-cards/ink/unlimited',
+  },
+  {
+    name: 'American Express Blue Business Cash',
+    introApr: '0% for 12 months',
+    regularApr: '18.49%–26.49%',
+    limit: '$5,000–$50,000',
+    minScore: 670,
+    perks: '2% cashback on first $50k/yr, no annual fee',
+    applyUrl: 'https://www.americanexpress.com/us/credit-cards/card/blue-business-cash/',
+  },
+  {
+    name: 'US Bank Business Triple Cash',
+    introApr: '0% for 15 months',
+    regularApr: '19.24%–28.24%',
+    limit: '$3,000–$25,000',
+    minScore: 660,
+    perks: '3% cashback on gas/office, $500 bonus offer',
+    applyUrl: 'https://www.usbank.com/business-banking/business-credit-cards/triple-cash-rewards-credit-card.html',
+  },
+  {
+    name: 'Bank of America Business Advantage',
+    introApr: '0% for 9 months',
+    regularApr: '17.99%–27.99%',
+    limit: '$5,000–$50,000',
+    minScore: 660,
+    perks: 'Preferred Rewards multiplier up to 2.625% back',
+    applyUrl: 'https://www.bankofamerica.com/smallbusiness/credit-cards/',
+  },
+];
+
+const STRATEGY_STEPS = [
+  { step: 1, title: 'Pull credit & check score', detail: 'You need 660+ personal FICO. Check all 3 bureaus before applying.', done: false },
+  { step: 2, title: 'Apply in one day (same-day batch)', detail: 'Apply for 2–4 cards in a single day to minimize hard inquiry stacking.', done: false },
+  { step: 3, title: 'Use cards for business expenses only', detail: 'Keep personal and business spending separate from day one.', done: false },
+  { step: 4, title: 'Pay minimum during 0% window', detail: 'Preserve cash flow. Pay minimums until the promo expires.', done: false },
+  { step: 5, title: 'Deploy capital into revenue-generating assets', detail: 'Use the 0% window to invest, not consume.', done: false },
+  { step: 6, title: 'Payoff before promo ends', detail: 'Set a calendar alert 60 days before each card\'s intro period ends.', done: false },
+];
+
+function ZeroPctStrategy() {
+  const [steps, setSteps] = useState(STRATEGY_STEPS.map(s => ({ ...s })));
+
+  const toggle = (i: number) =>
+    setSteps(prev => prev.map((s, idx) => idx === i ? { ...s, done: !s.done } : s));
+
+  const doneCount = steps.filter(s => s.done).length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Hero */}
+      <div style={{
+        background: 'linear-gradient(135deg, #0f1232 0%, #1e2a6e 100%)',
+        borderRadius: 20, padding: '24px 24px 20px', color: '#fff',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <Zap size={20} color="#fff" />
+          </div>
+          <div>
+            <p style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>0% Business Credit Strategy</p>
+            <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', margin: 0 }}>Access $25k–$150k in unsecured capital at 0% APR</p>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 8 }}>
+          {[
+            { label: 'Potential Capital', value: '$25k–$150k' },
+            { label: 'Avg Intro Period', value: '12–15 months' },
+            { label: 'Interest During Window', value: '0%' },
+          ].map(m => (
+            <div key={m.label} style={{ background: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: '10px 14px' }}>
+              <p style={{ fontSize: 18, fontWeight: 800, margin: 0 }}>{m.value}</p>
+              <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', margin: 0 }}>{m.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Disclaimer */}
+      <div style={{ padding: '10px 14px', borderRadius: 12, background: '#fffbeb', border: '1px solid #fde68a', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <Info size={14} color="#f59e0b" style={{ flexShrink: 0, marginTop: 1 }} />
+        <p style={{ fontSize: 12, color: '#92400e', margin: 0 }}>
+          This strategy is educational. Nexus does not submit applications on your behalf. All applications go directly through the card issuer. Credit approval is never guaranteed.
+        </p>
+      </div>
+
+      {/* Checklist */}
+      <div className="glass-card" style={{ padding: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a1c3a', margin: 0 }}>Strategy Checklist</h3>
+          <span style={{ fontSize: 12, color: '#3d5af1', fontWeight: 700 }}>{doneCount}/{steps.length} done</span>
+        </div>
+        <div style={{ height: 4, background: '#e8e9f2', borderRadius: 99, marginBottom: 16, overflow: 'hidden' }}>
+          <div style={{ width: `${(doneCount / steps.length) * 100}%`, height: '100%', background: '#3d5af1', borderRadius: 99, transition: 'width 0.4s' }} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {steps.map((s, i) => (
+            <button
+              key={s.step}
+              onClick={() => toggle(i)}
+              style={{
+                display: 'flex', gap: 12, alignItems: 'flex-start',
+                background: s.done ? '#f0fdf4' : '#f7f8ff',
+                border: `1.5px solid ${s.done ? '#bbf7d0' : '#e8e9f2'}`,
+                borderRadius: 12, padding: '12px 14px', cursor: 'pointer', textAlign: 'left',
+              }}
+            >
+              <div style={{
+                width: 22, height: 22, borderRadius: '50%', flexShrink: 0, marginTop: 1,
+                background: s.done ? '#22c55e' : '#e8e9f2',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {s.done
+                  ? <CheckCircle2 size={14} color="#fff" />
+                  : <span style={{ fontSize: 10, fontWeight: 800, color: '#8b8fa8' }}>{s.step}</span>
+                }
+              </div>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: s.done ? '#16a34a' : '#1a1c3a', margin: 0 }}>{s.title}</p>
+                <p style={{ fontSize: 12, color: '#8b8fa8', margin: '2px 0 0' }}>{s.detail}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Card catalog */}
+      <div className="glass-card" style={{ padding: 20 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a1c3a', marginBottom: 14 }}>Recommended Cards</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {ZERO_PCT_CARDS.map(card => (
+            <div key={card.name} style={{ border: '1px solid #e8e9f2', borderRadius: 14, padding: '14px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: '#eef0fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <CreditCard size={18} color="#3d5af1" />
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 800, color: '#1a1c3a', margin: 0 }}>{card.name}</p>
+                    <p style={{ fontSize: 11, color: '#8b8fa8', margin: 0 }}>Min FICO {card.minScore} · {card.limit}</p>
+                  </div>
+                </div>
+                <span style={{ background: '#f0fdf4', color: '#16a34a', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20 }}>
+                  {card.introApr}
+                </span>
+              </div>
+              <p style={{ fontSize: 12, color: '#8b8fa8', margin: '0 0 10px' }}>{card.perks}</p>
+              <a
+                href={card.applyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '7px 14px', borderRadius: 8, background: '#3d5af1', color: '#fff',
+                  fontSize: 12, fontWeight: 700, textDecoration: 'none',
+                }}
+              >
+                Apply at Issuer <ExternalLink size={11} />
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function Funding() {
   const { user } = useAuth();
@@ -256,7 +433,11 @@ export function Funding() {
                 </>
               )}
 
-              {/* Active Applications Table */}
+              {/* Strategy tab — full width, no sidebar */}
+              {activeTab === 'Strategy' && <ZeroPctStrategy />}
+
+              {/* Active Applications Table — hidden on Strategy tab */}
+              {activeTab !== 'Strategy' && (
               <div className="glass-card" style={{ padding: 20 }}>
                 <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a1c3a', marginBottom: 16 }}>
                   {activeTab === 'History' ? 'Funding History' : 'Active Applications'}
@@ -294,6 +475,7 @@ export function Funding() {
                   })}
                 </div>
               </div>
+              )}
             </div>
 
             {/* ── Right Sidebar ── */}

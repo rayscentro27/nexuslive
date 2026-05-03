@@ -1,28 +1,333 @@
-import React from 'react';
-import { 
-  TrendingUp, 
-  Clock, 
-  Zap, 
-  ChevronRight, 
-  Play, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  TrendingUp, TrendingDown,
+  Clock,
+  Zap,
+  ChevronRight,
+  Play,
   MessageSquare,
   BarChart3,
   Bot,
-  CheckCircle2
+  CheckCircle2,
+  Plus, Loader2, X, AlertCircle,
 } from 'lucide-react';
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   BarChart,
   Bar
 } from 'recharts';
 import { cn } from '../lib/utils';
 import { BotAvatar } from './BotAvatar';
+import { supabase } from '../lib/supabase';
+import { useAuth } from './AuthProvider';
+
+// ─── Paper Trading ─────────────────────────────────────────────────────────────
+
+interface PaperAccount {
+  id: string;
+  balance: number;
+  initial_balance: number;
+}
+
+interface PaperTrade {
+  id: string;
+  symbol: string;
+  direction: string;
+  entry_price: number;
+  exit_price: number | null;
+  quantity: number;
+  status: string;
+  pnl: number | null;
+  opened_at: string;
+  closed_at: string | null;
+  notes: string | null;
+}
+
+interface TradeForm {
+  symbol: string;
+  direction: 'long' | 'short';
+  entry_price: string;
+  quantity: string;
+  notes: string;
+}
+
+const EMPTY_TRADE: TradeForm = { symbol: '', direction: 'long', entry_price: '', quantity: '1', notes: '' };
+
+function PaperTradingTab() {
+  const { user } = useAuth();
+  const [account,    setAccount]    = useState<PaperAccount | null>(null);
+  const [trades,     setTrades]     = useState<PaperTrade[]>([]);
+  const [loading,    setLoading]    = useState(true);
+  const [showForm,   setShowForm]   = useState(false);
+  const [form,       setForm]       = useState<TradeForm>(EMPTY_TRADE);
+  const [saving,     setSaving]     = useState(false);
+  const [closingId,  setClosingId]  = useState<string | null>(null);
+  const [closePrice, setClosePrice] = useState('');
+
+  const load = useCallback(async () => {
+    if (!user) return;
+    // Get or create account
+    let { data: acct } = await supabase
+      .from('paper_trading_accounts')
+      .select('*')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!acct) {
+      const { data: created } = await supabase
+        .from('paper_trading_accounts')
+        .insert({ user_id: user.id })
+        .select()
+        .single();
+      acct = created;
+    }
+
+    const { data: tradeData } = await supabase
+      .from('paper_trades')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('opened_at', { ascending: false });
+
+    setAccount(acct as PaperAccount);
+    setTrades((tradeData ?? []) as PaperTrade[]);
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openTrade = async () => {
+    if (!user || !account || !form.symbol || !form.entry_price) return;
+    setSaving(true);
+    await supabase.from('paper_trades').insert({
+      user_id:     user.id,
+      account_id:  account.id,
+      symbol:      form.symbol.toUpperCase(),
+      direction:   form.direction,
+      entry_price: parseFloat(form.entry_price),
+      quantity:    parseFloat(form.quantity) || 1,
+      notes:       form.notes || null,
+      status:      'open',
+    });
+    setSaving(false);
+    setShowForm(false);
+    setForm(EMPTY_TRADE);
+    load();
+  };
+
+  const closeTrade = async (trade: PaperTrade) => {
+    if (!closePrice) return;
+    const exit = parseFloat(closePrice);
+    const direction = trade.direction === 'long' ? 1 : -1;
+    const pnl = (exit - trade.entry_price) * trade.quantity * direction;
+    const newBalance = (account?.balance ?? 0) + pnl;
+
+    await Promise.all([
+      supabase.from('paper_trades').update({
+        exit_price:  exit,
+        status:      'closed',
+        pnl:         pnl,
+        closed_at:   new Date().toISOString(),
+      }).eq('id', trade.id),
+      supabase.from('paper_trading_accounts').update({ balance: newBalance }).eq('id', account!.id),
+    ]);
+
+    setClosingId(null);
+    setClosePrice('');
+    load();
+  };
+
+  const openTrades  = trades.filter(t => t.status === 'open');
+  const closedTrades = trades.filter(t => t.status === 'closed');
+  const totalPnl    = closedTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
+  const winRate     = closedTrades.length > 0
+    ? Math.round((closedTrades.filter(t => (t.pnl ?? 0) > 0).length / closedTrades.length) * 100)
+    : 0;
+
+  if (loading) return (
+    <div style={{ padding: 48, textAlign: 'center' }}>
+      <Loader2 size={28} color="#3d5af1" style={{ animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Disclaimer */}
+      <div style={{ padding: '10px 14px', borderRadius: 12, background: '#fffbeb', border: '1px solid #fde68a', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <AlertCircle size={14} color="#f59e0b" style={{ flexShrink: 0, marginTop: 1 }} />
+        <p style={{ fontSize: 12, color: '#92400e', margin: 0 }}>
+          This is a paper (simulated) trading account. No real money is involved. Prices are entered manually and are not live market data.
+        </p>
+      </div>
+
+      {/* Account stats */}
+      {account && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          {[
+            { label: 'Balance',    value: `$${account.balance.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, color: '#1a1c3a' },
+            { label: 'Total P&L',  value: (totalPnl >= 0 ? '+$' : '-$') + Math.abs(totalPnl).toLocaleString(undefined, { maximumFractionDigits: 0 }), color: totalPnl >= 0 ? '#22c55e' : '#ef4444' },
+            { label: 'Win Rate',   value: closedTrades.length ? `${winRate}%` : '—', color: winRate >= 60 ? '#22c55e' : '#f59e0b' },
+            { label: 'Open Trades', value: openTrades.length, color: '#3d5af1' },
+          ].map(m => (
+            <div key={m.label} className="glass-card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: m.color }}>{m.value}</div>
+              <div style={{ fontSize: 11, color: '#8b8fa8', fontWeight: 600, marginTop: 2 }}>{m.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* New trade button */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button
+          onClick={() => setShowForm(v => !v)}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 12, border: 'none', background: '#3d5af1', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+        >
+          <Plus size={14} /> Open Trade
+        </button>
+      </div>
+
+      {/* Open trade form */}
+      {showForm && (
+        <div className="glass-card" style={{ padding: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 800, color: '#1a1c3a', margin: '0 0 16px' }}>New Paper Trade</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            {[
+              { label: 'Symbol', field: 'symbol', placeholder: 'AAPL' },
+              { label: 'Entry Price', field: 'entry_price', placeholder: '150.00' },
+              { label: 'Quantity', field: 'quantity', placeholder: '10' },
+            ].map(f => (
+              <div key={f.field}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#8b8fa8', display: 'block', marginBottom: 4, textTransform: 'uppercase' }}>{f.label}</label>
+                <input
+                  type={f.field === 'symbol' ? 'text' : 'number'}
+                  value={form[f.field as keyof TradeForm]}
+                  onChange={e => setForm(p => ({ ...p, [f.field]: e.target.value }))}
+                  placeholder={f.placeholder}
+                  style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1.5px solid #e8e9f2', fontSize: 13, color: '#1a1c3a', outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            {(['long', 'short'] as const).map(d => (
+              <button
+                key={d}
+                onClick={() => setForm(p => ({ ...p, direction: d }))}
+                style={{
+                  flex: 1, padding: '8px 0', borderRadius: 8, border: `1.5px solid ${form.direction === d ? (d === 'long' ? '#22c55e' : '#ef4444') : '#e8e9f2'}`,
+                  background: form.direction === d ? (d === 'long' ? '#f0fdf4' : '#fef2f2') : '#fff',
+                  color: form.direction === d ? (d === 'long' ? '#16a34a' : '#dc2626') : '#8b8fa8',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                {d === 'long' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                {d === 'long' ? 'Long' : 'Short'}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={form.notes}
+            onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+            placeholder="Notes (optional)"
+            style={{ width: '100%', padding: '8px 10px', borderRadius: 8, border: '1.5px solid #e8e9f2', fontSize: 13, color: '#1a1c3a', outline: 'none', marginBottom: 12, boxSizing: 'border-box' }}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setShowForm(false)} style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: '1.5px solid #e8e9f2', background: '#fff', fontSize: 13, fontWeight: 700, color: '#8b8fa8', cursor: 'pointer' }}>Cancel</button>
+            <button onClick={openTrade} disabled={saving} style={{ flex: 2, padding: '9px 0', borderRadius: 8, border: 'none', background: '#3d5af1', fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              {saving ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <CheckCircle2 size={14} />}
+              {saving ? 'Opening…' : 'Open Trade'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Open trades */}
+      {openTrades.length > 0 && (
+        <div className="glass-card" style={{ padding: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 800, color: '#1a1c3a', margin: '0 0 12px' }}>Open Positions</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {openTrades.map(t => (
+              <div key={t.id} style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid #e8e9f2', display: 'flex', alignItems: 'center', gap: 12, background: '#f7f8ff' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: t.direction === 'long' ? '#f0fdf4' : '#fef2f2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {t.direction === 'long'
+                    ? <TrendingUp size={18} color="#22c55e" />
+                    : <TrendingDown size={18} color="#ef4444" />
+                  }
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 14, fontWeight: 800, color: '#1a1c3a', margin: 0 }}>{t.symbol}</p>
+                  <p style={{ fontSize: 11, color: '#8b8fa8', margin: 0 }}>
+                    {t.direction.toUpperCase()} · Qty {t.quantity} · Entry ${t.entry_price.toLocaleString()}
+                  </p>
+                </div>
+                {closingId === t.id ? (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      type="number"
+                      value={closePrice}
+                      onChange={e => setClosePrice(e.target.value)}
+                      placeholder="Exit price"
+                      style={{ width: 100, padding: '6px 8px', borderRadius: 8, border: '1.5px solid #e8e9f2', fontSize: 12 }}
+                    />
+                    <button onClick={() => closeTrade(t)} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: '#22c55e', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Close</button>
+                    <button onClick={() => { setClosingId(null); setClosePrice(''); }} style={{ padding: '6px 8px', borderRadius: 8, border: '1.5px solid #e8e9f2', background: '#fff', cursor: 'pointer' }}><X size={12} color="#8b8fa8" /></button>
+                  </div>
+                ) : (
+                  <button onClick={() => setClosingId(t.id)} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#3d5af1', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Close</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Closed trades */}
+      {closedTrades.length > 0 && (
+        <div className="glass-card" style={{ padding: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 800, color: '#1a1c3a', margin: '0 0 12px' }}>Trade History</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {closedTrades.map(t => {
+              const pnl = t.pnl ?? 0;
+              return (
+                <div key={t.id} style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid #e8e9f2', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: '#1a1c3a', margin: 0 }}>
+                      {t.symbol} <span style={{ fontSize: 11, color: '#8b8fa8', fontWeight: 400 }}>{t.direction}</span>
+                    </p>
+                    <p style={{ fontSize: 11, color: '#8b8fa8', margin: 0 }}>
+                      ${t.entry_price} → ${t.exit_price ?? '—'} · Qty {t.quantity}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <p style={{ fontSize: 14, fontWeight: 800, color: pnl >= 0 ? '#22c55e' : '#ef4444', margin: 0 }}>
+                      {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
+                    </p>
+                    <p style={{ fontSize: 10, color: '#8b8fa8', margin: 0 }}>{new Date(t.closed_at ?? '').toLocaleDateString()}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {trades.length === 0 && !showForm && (
+        <div style={{ padding: 40, textAlign: 'center', background: '#fff', borderRadius: 16, border: '1px solid #e8e9f2' }}>
+          <BarChart3 size={28} color="#c7d2fe" style={{ margin: '0 auto 12px' }} />
+          <p style={{ fontSize: 14, color: '#8b8fa8' }}>No trades yet. Open your first paper trade to get started.</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const performanceData = [
   { name: 'Mon', pnl: 2400 },
@@ -41,6 +346,8 @@ const backtestResults = [
 ];
 
 export function TradingLab() {
+  const [activeSection, setActiveSection] = useState<'lab' | 'paper'>('lab');
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto h-full flex flex-col">
       <div className="space-y-0.5 shrink-0">
@@ -55,6 +362,28 @@ export function TradingLab() {
         </div>
         <p className="text-xs text-slate-500 font-medium mt-1">Learn, backtest, and simulate trading strategies.</p>
       </div>
+
+      {/* Section switcher */}
+      <div className="flex gap-2 bg-slate-100 rounded-xl p-1 w-fit shrink-0">
+        {[{ key: 'lab', label: 'Research Lab' }, { key: 'paper', label: 'Paper Account' }].map(s => (
+          <button
+            key={s.key}
+            onClick={() => setActiveSection(s.key as 'lab' | 'paper')}
+            className={cn(
+              "px-5 py-2 rounded-lg text-xs font-bold transition-all",
+              activeSection === s.key ? "bg-white text-[#1A2244] shadow-sm" : "text-slate-500 hover:text-[#1A2244]"
+            )}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {activeSection === 'paper' ? (
+        <div className="flex-1 overflow-y-auto scrollbar-hide pr-1">
+          <PaperTradingTab />
+        </div>
+      ) : (
 
       <div className="flex-1 overflow-y-auto scrollbar-hide space-y-6 pr-1">
         {/* Performance Snapshot */}
@@ -274,6 +603,7 @@ export function TradingLab() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

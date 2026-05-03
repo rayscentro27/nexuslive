@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Phone, Building2, Shield, CreditCard, Bell, Globe, LogOut, ChevronRight, CheckCircle2, Pencil, Save, X, Loader2 } from 'lucide-react';
+import { User, Mail, Building2, Shield, CreditCard, Bell, Globe, LogOut, ChevronRight, CheckCircle2, Pencil, Save, X, Loader2, Star } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from './AuthProvider';
 import { getProfile, updateProfile, getBusinessEntity, UserProfile, BusinessEntity } from '../lib/db';
+import { supabase } from '../lib/supabase';
 
 export function Account() {
   const { user, signOut } = useAuth();
@@ -12,16 +13,19 @@ export function Account() {
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [hasPilotAccess, setHasPilotAccess] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     Promise.all([
       getProfile(user.id),
       getBusinessEntity(user.id),
-    ]).then(([{ data: p }, { data: b }]) => {
+      supabase.from('user_access_overrides').select('subscription_required').eq('user_id', user.id).maybeSingle(),
+    ]).then(([{ data: p }, { data: b }, { data: override }]) => {
       setProfile(p);
       setBusiness(b);
       setNameInput(p?.full_name ?? user.user_metadata?.full_name ?? '');
+      setHasPilotAccess(override?.subscription_required === false);
       setLoading(false);
     });
   }, [user]);
@@ -106,9 +110,14 @@ export function Account() {
                     ) : (
                       <div className="flex items-center gap-2">
                         <h2 className="text-lg font-black text-[#1A2244]">{displayName}</h2>
-                        <span className={cn("px-1.5 py-0.5 text-[8px] font-black uppercase rounded-md", planColors[planLabel])}>
+                        <span className={cn("px-1.5 py-0.5 text-[8px] font-black uppercase rounded-md", planColors[planLabel] ?? 'bg-slate-100 text-slate-600')}>
                           {planLabel}
                         </span>
+                        {hasPilotAccess && (
+                          <span className="flex items-center gap-0.5 px-1.5 py-0.5 text-[8px] font-black uppercase rounded-md bg-amber-50 text-amber-600">
+                            <Star className="w-2.5 h-2.5" />Pilot
+                          </span>
+                        )}
                         <button onClick={() => setEditing(true)} className="text-slate-300 hover:text-[#5B7CFA] transition-colors">
                           <Pencil className="w-3.5 h-3.5" />
                         </button>
@@ -158,6 +167,41 @@ export function Account() {
               )}
             </div>
           </div>
+
+          {/* Profile Completion Widget */}
+          {(() => {
+            const checks = [
+              { label: 'Name set',             done: !!(profile?.full_name) },
+              { label: 'Email verified',        done: !!user?.email },
+              { label: 'Business name',         done: !!(business?.business_name) },
+              { label: 'Entity type',           done: !!(business?.entity_type) },
+              { label: 'EIN on file',           done: !!(business?.ein) },
+              { label: 'Formation state',       done: !!(business?.formation_state) },
+              { label: 'NAICS code',            done: !!(business?.naics_code) },
+              { label: 'DUNS number',           done: !!(business?.duns_number) },
+            ];
+            const doneCount = checks.filter(c => c.done).length;
+            const pct = Math.round((doneCount / checks.length) * 100);
+            return (
+              <div className="glass-card p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-black text-[#1A2244]">Profile Completion</h3>
+                  <span className="text-sm font-black" style={{ color: pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444' }}>{pct}%</span>
+                </div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#3d5af1' }} />
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {checks.map(c => (
+                    <div key={c.label} className="flex items-center gap-1.5">
+                      <CheckCircle2 className={cn("w-3 h-3 shrink-0", c.done ? "text-green-500" : "text-slate-200")} />
+                      <span className={cn("text-[10px] font-bold", c.done ? "text-[#1A2244]" : "text-slate-400")}>{c.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Right Column */}
           <div className="space-y-6">

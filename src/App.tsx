@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { AuthProvider, useAuth } from './components/AuthProvider';
+import { NotificationProvider, useNotifications as useNotificationsCtx } from './contexts/NotificationContext';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { Messages } from './components/Messages';
@@ -17,6 +18,8 @@ import { FundingRoadmap } from './components/FundingRoadmap';
 import { Account } from './components/Account';
 import { CreditAnalysis } from './components/CreditAnalysis';
 import { BusinessSetup } from './components/BusinessSetup';
+import { FundingReadiness } from './components/FundingReadiness';
+import { BankBehavior } from './components/BankBehavior';
 import { Auth } from './components/Auth';
 import { Bots } from './components/Bots';
 import { Pricing } from './components/Pricing';
@@ -28,18 +31,20 @@ import { Landing } from './components/Landing';
 import { PlanGate } from './components/PlanGate';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AppShell } from './components/AppShell';
-import { Zap, Lock, AlertCircle } from 'lucide-react';
+import { FloatingChat } from './components/FloatingChat';
+import { NotificationToasts } from './components/NotificationToasts';
+import { Zap, Lock, AlertCircle, Bell } from 'lucide-react';
 
 const DOCK_ITEMS = [
   { id: 'home',          emoji: '🏠', label: 'Home' },
   { id: 'action-center', emoji: '⚡', label: 'Actions', badge: '2' },
+  { id: 'credit',        emoji: '🛡️', label: 'Credit' },
   { id: 'funding',       emoji: '💰', label: 'Funding' },
-  { id: 'messages',      emoji: '💬', label: 'Messages' },
-  { id: 'documents',     emoji: '📄', label: 'Docs' },
   { id: 'grants',        emoji: '🏆', label: 'Grants' },
   { id: 'trading',       emoji: '📈', label: 'Trading' },
+  { id: 'messages',      emoji: '💬', label: 'Messages' },
+  { id: 'documents',     emoji: '📄', label: 'Docs' },
   { id: 'referral',      emoji: '🎁', label: 'Refer' },
-  { id: 'credit',        emoji: '🛡️', label: 'Credit' },
   { id: 'account',       emoji: '👤', label: 'Account' },
   { id: 'settings',      emoji: '⚙️', label: 'Settings' },
 ];
@@ -287,7 +292,7 @@ function AppContent() {
         <Header onNavigate={setActiveTab} />
 
         <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ padding: '16px 16px', paddingBottom: 100 }}>
-          {activeTab === 'home'           && <Dashboard />}
+          {activeTab === 'home'           && <Dashboard onNavigate={setActiveTab} />}
           {activeTab === 'action-center'  && <ActionCenter />}
           {activeTab === 'business-setup' && <BusinessSetup />}
           {activeTab === 'messages'       && <Messages />}
@@ -295,6 +300,10 @@ function AppContent() {
           {activeTab === 'account'        && <Account />}
           {activeTab === 'settings'       && <Settings />}
           {activeTab === 'auth'           && <Auth onBackToDashboard={() => setActiveTab('home')} />}
+
+          {activeTab === 'notifications'    && <NotificationsPage />}
+          {activeTab === 'funding-readiness' && <FundingReadiness onNavigate={setActiveTab} />}
+          {activeTab === 'bank-behavior'     && <BankBehavior />}
 
           {activeTab === 'funding' && (
             <PlanGate requiredPlan="pro" featureName="Funding Suite" onUpgrade={() => setShowUpgradeModal(true)}>
@@ -344,7 +353,7 @@ function AppContent() {
         <button
           onClick={() => setPortal('admin')}
           className="fixed z-[201] px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 transition-all"
-          style={{ bottom: 96, right: 16, background: '#1a1c3a', color: '#fff', border: '1px solid #2d3748', fontSize: 11, fontWeight: 700 }}
+          style={{ bottom: 96, right: 76, background: '#1a1c3a', color: '#fff', border: '1px solid #2d3748', fontSize: 11, fontWeight: 700 }}
         >
           <Zap className="w-3 h-3" style={{ color: '#818cf8' }} />
           Admin
@@ -353,6 +362,12 @@ function AppContent() {
 
       {/* Bottom dock — always visible */}
       <BottomDock activeTab={activeTab} setActiveTab={setActiveTab} />
+
+      {/* Floating chat */}
+      <FloatingChat activeTab={activeTab} />
+
+      {/* Toast notifications */}
+      <NotificationToasts />
 
       {/* Upgrade modal — shown when a locked feature is clicked */}
       {showUpgradeModal && (
@@ -372,9 +387,50 @@ function AppContent() {
   );
 }
 
+function NotificationsPage() {
+  const { notifications, unreadCount, markRead, markAllRead, dismiss } = useNotificationsCtx();
+  return (
+    <div style={{ padding: '16px 20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1a1c3a', margin: 0 }}>Notifications</h1>
+          {unreadCount > 0 && <p style={{ fontSize: 13, color: '#8b8fa8', marginTop: 4 }}>{unreadCount} unread</p>}
+        </div>
+        {unreadCount > 0 && (
+          <button onClick={markAllRead} style={{ padding: '8px 16px', borderRadius: 10, border: '1.5px solid #e8e9f2', background: '#fff', fontSize: 13, fontWeight: 700, color: '#3d5af1', cursor: 'pointer' }}>
+            Mark all read
+          </button>
+        )}
+      </div>
+      <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+        {notifications.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center' }}>
+            <Bell size={28} style={{ color: '#c7d2fe', margin: '0 auto 12px', display: 'block' }} />
+            <p style={{ fontSize: 14, color: '#8b8fa8' }}>No notifications yet</p>
+          </div>
+        ) : notifications.map((n) => (
+          <div key={n.id} style={{ padding: '14px 18px', borderBottom: '1px solid #f0f0f8', background: !n.read_at ? '#fafbff' : 'transparent', display: 'flex', gap: 12, alignItems: 'flex-start', cursor: 'pointer' }}
+            onClick={() => markRead(n.id)}>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontSize: 14, fontWeight: !n.read_at ? 700 : 600, color: '#1a1c3a', margin: 0 }}>{n.title}</p>
+              {n.body && <p style={{ fontSize: 13, color: '#8b8fa8', margin: '3px 0 0' }}>{n.body}</p>}
+              <p style={{ fontSize: 11, color: '#c7d2fe', margin: '4px 0 0' }}>{new Date(n.created_at).toLocaleDateString()}</p>
+            </div>
+            {!n.read_at && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3d5af1', flexShrink: 0, marginTop: 4 }} />}
+            <button onClick={e => { e.stopPropagation(); dismiss(n.id); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#c7d2fe', padding: 2 }}>
+              <AlertCircle size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <AuthProvider>
+      <NotificationProvider>
       <Routes>
         {/* ── /app/* — URL-based protected portal ───────────────────────── */}
         <Route
@@ -432,6 +488,7 @@ export default function App() {
         {/* ── public + legacy SPA (tab-based) ───────────────────────────── */}
         <Route path="/*" element={<AppContent />} />
       </Routes>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

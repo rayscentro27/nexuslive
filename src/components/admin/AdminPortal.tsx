@@ -14,10 +14,13 @@ import { AdminReports } from './AdminReports';
 import { AdminSettings } from './AdminSettings';
 import { AdminMessaging } from './AdminMessaging';
 import { AdminSubscriptionSettings } from './AdminSubscriptionSettings';
+import { AdminInviteUsers } from './AdminInviteUsers';
+import { AdminGrantReviews } from './AdminGrantReviews';
 
 const ADMIN_DOCK = [
   { id: 'dashboard',     emoji: '🏠', label: 'Overview' },
   { id: 'clients',       emoji: '👥', label: 'Clients' },
+  { id: 'invites',       emoji: '✉️', label: 'Invites' },
   { id: 'funding',       emoji: '💰', label: 'Funding' },
   { id: 'pipeline',      emoji: '📊', label: 'Pipeline' },
   { id: 'credit',        emoji: '🛡️', label: 'Credit' },
@@ -29,6 +32,7 @@ const ADMIN_DOCK = [
   { id: 'my-business',   emoji: '🏢', label: 'Business' },
   { id: 'reports',       emoji: '📋', label: 'Reports' },
   { id: 'subscriptions', emoji: '💳', label: 'Plans' },
+  { id: 'grants-review', emoji: '🔬', label: 'Grants' },
   { id: 'settings',      emoji: '⚙️', label: 'Settings' },
 ];
 
@@ -107,6 +111,7 @@ export function AdminPortal() {
         <div className="flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: 100 }}>
           {activeTab === 'dashboard'     && <AdminDashboard />}
           {activeTab === 'clients'       && <AdminClients />}
+          {activeTab === 'invites'       && <AdminInviteUsers />}
           {activeTab === 'pipeline'      && <AdminFunding />}
           {activeTab === 'credit'        && <AdminCreditOps />}
           {activeTab === 'funding'       && <AdminFunding />}
@@ -118,6 +123,7 @@ export function AdminPortal() {
           {activeTab === 'my-business'   && <AdminMyBusiness />}
           {activeTab === 'reports'       && <AdminReports />}
           {activeTab === 'subscriptions' && <AdminSubscriptionSettings />}
+          {activeTab === 'grants-review' && <AdminGrantReviews />}
           {activeTab === 'settings'      && <AdminSettings />}
         </div>
       </main>

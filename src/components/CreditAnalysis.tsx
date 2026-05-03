@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, TrendingUp, AlertCircle, FileText, Upload, Download, ArrowRight, CheckCircle2, Clock, Loader2 } from 'lucide-react';
+import { Shield, TrendingUp, AlertCircle, FileText, Upload, Download, ArrowRight, CheckCircle2, Clock, Loader2, Zap, Star } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from './AuthProvider';
 import { getCreditReport, getDisputes, CreditReport, CreditDispute } from '../lib/db';
+import { CreditBoostEngine } from './CreditBoostEngine';
+import { ApprovalSimulator } from './ApprovalSimulator';
 
 function scoreBandColor(band: string | null) {
   switch (band?.toLowerCase()) {
@@ -34,11 +36,14 @@ function formatRange(min: number | null, max: number | null) {
   return formatCurrency(min ?? max);
 }
 
+type CreditTab = 'analysis' | 'boost' | 'simulator';
+
 export function CreditAnalysis() {
   const { user } = useAuth();
   const [report, setReport] = useState<CreditReport | null>(null);
   const [disputes, setDisputes] = useState<CreditDispute[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<CreditTab>('analysis');
 
   useEffect(() => {
     if (!user) return;
@@ -70,8 +75,31 @@ export function CreditAnalysis() {
 
   return (
     <div className="p-4 max-w-6xl mx-auto space-y-4 h-full flex flex-col overflow-y-auto no-scrollbar">
-      <div className="flex flex-col space-y-1 shrink-0">
-        <h1 className="text-xl font-black text-[#1A2244]">Credit Analysis</h1>
+      <div className="flex flex-col space-y-3 shrink-0">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h1 className="text-xl font-black text-[#1A2244]">Credit Analysis</h1>
+          {/* Tab switcher */}
+          <div style={{ display: 'flex', gap: 6, background: '#f0f0f8', borderRadius: 12, padding: 4 }}>
+            {([
+              { id: 'analysis', label: 'Analysis', icon: Shield },
+              { id: 'boost', label: 'Boost Engine', icon: Zap },
+              { id: 'simulator', label: 'Simulator', icon: Star },
+            ] as { id: CreditTab; label: string; icon: React.ElementType }[]).map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '6px 12px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                  fontSize: 12, fontWeight: 700,
+                  background: activeTab === tab.id ? '#fff' : 'transparent',
+                  color: activeTab === tab.id ? '#3d5af1' : '#8b8fa8',
+                  boxShadow: activeTab === tab.id ? '0 2px 6px rgba(60,80,180,0.1)' : 'none',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}>
+                <tab.icon size={12} />{tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {activeTab === 'analysis' && (
         <div className="flex items-center gap-3">
           {hasReport && scoreBand ? (
             <span className={cn("px-2 py-0.5 text-[10px] font-black uppercase rounded-md flex items-center gap-1.5", scoreBandColor(scoreBand))}>
@@ -88,9 +116,13 @@ export function CreditAnalysis() {
             {hasReport ? 'Funding Readiness: Active' : 'Upload a report to get started'}
           </p>
         </div>
+        )}
       </div>
 
-      {loading ? (
+      {/* Tab content */}
+      {activeTab === 'boost' && <CreditBoostEngine />}
+      {activeTab === 'simulator' && <ApprovalSimulator />}
+      {activeTab === 'analysis' && (loading ? (
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="w-6 h-6 text-slate-300 animate-spin" />
         </div>
@@ -313,7 +345,7 @@ export function CreditAnalysis() {
             )}
           </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }
