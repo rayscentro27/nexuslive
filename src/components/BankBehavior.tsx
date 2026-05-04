@@ -106,7 +106,7 @@ export function BankBehavior() {
     if (!user) return;
     setSaving(true);
     const score = calcScore(form);
-    await supabase.from('bank_behavior_snapshots').insert({
+    await supabase.from('bank_behavior_snapshots').upsert({
       user_id:              user.id,
       bank_name:            form.bank_name || null,
       average_balance:      parseFloat(form.average_balance) || null,
@@ -118,7 +118,7 @@ export function BankBehavior() {
       bank_readiness_score: score,
       snapshot_month:       form.snapshot_month || null,
       notes:                form.notes || null,
-    });
+    }, { onConflict: 'user_id,snapshot_month' });
     setSaving(false);
     setSaved(true);
     setShowForm(false);

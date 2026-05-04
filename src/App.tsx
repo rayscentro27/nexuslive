@@ -295,10 +295,10 @@ function AppContent() {
           {activeTab === 'home'           && <Dashboard onNavigate={setActiveTab} />}
           {activeTab === 'action-center'  && <ActionCenter onNavigate={setActiveTab} />}
           {activeTab === 'business-setup' && <BusinessSetup />}
-          {activeTab === 'messages'       && <Messages />}
+          {activeTab === 'messages'       && <Messages onNavigate={setActiveTab} />}
           {activeTab === 'documents'      && <Documents />}
-          {activeTab === 'account'        && <Account />}
-          {activeTab === 'settings'       && <Settings />}
+          {activeTab === 'account'        && <Account onNavigate={setActiveTab} />}
+          {activeTab === 'settings'       && <Settings onNavigate={setActiveTab} />}
           {activeTab === 'auth'           && <Auth onBackToDashboard={() => setActiveTab('home')} />}
 
           {activeTab === 'notifications'    && <NotificationsPage />}

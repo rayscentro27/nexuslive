@@ -109,7 +109,7 @@ export function AdminPortal() {
         <AdminHeader />
 
         <div className="flex-1 overflow-y-auto no-scrollbar" style={{ paddingBottom: 100 }}>
-          {activeTab === 'dashboard'     && <AdminDashboard />}
+          {activeTab === 'dashboard'     && <AdminDashboard onNavigate={setActiveTab} />}
           {activeTab === 'clients'       && <AdminClients />}
           {activeTab === 'invites'       && <AdminInviteUsers />}
           {activeTab === 'pipeline'      && <AdminFunding />}
@@ -124,7 +124,7 @@ export function AdminPortal() {
           {activeTab === 'reports'       && <AdminReports />}
           {activeTab === 'subscriptions' && <AdminSubscriptionSettings />}
           {activeTab === 'grants-review' && <AdminGrantReviews />}
-          {activeTab === 'settings'      && <AdminSettings />}
+          {activeTab === 'settings'      && <AdminSettings onNavigate={setActiveTab} />}
         </div>
       </main>
 

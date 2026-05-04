@@ -20,7 +20,7 @@ function fmtMoney(n: number) {
   return '$' + n.toLocaleString();
 }
 
-export function AdminDashboard() {
+export function AdminDashboard({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const [clients, setClients] = useState<UserProfile[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [applications, setApplications] = useState<FundingApplication[]>([]);
@@ -111,7 +111,7 @@ export function AdminDashboard() {
               Last Sync: {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
           </div>
-          <button className="nexus-button-primary" style={{ padding: '8px 18px', fontSize: 12, borderRadius: 10 }}>
+          <button onClick={() => onNavigate?.('reports')} className="nexus-button-primary" style={{ padding: '8px 18px', fontSize: 12, borderRadius: 10 }}>
             System Report
           </button>
         </div>
@@ -232,6 +232,7 @@ export function AdminDashboard() {
                     </div>
                   </div>
                   <button
+                    onClick={() => onNavigate?.('clients')}
                     style={{
                       background: '#eef0fd',
                       color: '#3d5af1',

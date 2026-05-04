@@ -347,6 +347,7 @@ const backtestResults = [
 
 export function TradingLab() {
   const [activeSection, setActiveSection] = useState<'lab' | 'paper'>('lab');
+  const [backtestTab, setBacktestTab] = useState<'strategies' | 'watchlist' | 'journal'>('strategies');
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto h-full flex flex-col">
@@ -413,7 +414,7 @@ export function TradingLab() {
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-                <button className="w-full py-1.5 bg-slate-50 text-slate-600 font-bold text-[8px] rounded-lg border border-slate-100 hover:bg-slate-100 transition-all">Journal</button>
+                <button onClick={() => setBacktestTab('journal')} className="w-full py-1.5 bg-slate-50 text-slate-600 font-bold text-[8px] rounded-lg border border-slate-100 hover:bg-slate-100 transition-all">Journal</button>
               </div>
 
               <div className="glass-panel p-3 space-y-3">
@@ -432,7 +433,7 @@ export function TradingLab() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <button className="w-full py-1.5 bg-slate-50 text-slate-600 font-bold text-[8px] rounded-lg border border-slate-100 hover:bg-slate-100 transition-all">Journal</button>
+                <button onClick={() => setBacktestTab('journal')} className="w-full py-1.5 bg-slate-50 text-slate-600 font-bold text-[8px] rounded-lg border border-slate-100 hover:bg-slate-100 transition-all">Journal</button>
               </div>
 
               <div className="glass-panel p-3 space-y-3">
@@ -448,7 +449,7 @@ export function TradingLab() {
                   <div className="w-1.5 h-1.5 bg-[#5B7CFA] rounded-full animate-pulse" />
                   <span className="text-[8px] font-bold text-[#5B7CFA] uppercase tracking-widest">Weekly progress</span>
                 </div>
-                <button className="w-full py-1.5 bg-slate-50 text-slate-600 font-bold text-[8px] rounded-lg border border-slate-100 hover:bg-slate-100 transition-all">Journal</button>
+                <button onClick={() => setBacktestTab('journal')} className="w-full py-1.5 bg-slate-50 text-slate-600 font-bold text-[8px] rounded-lg border border-slate-100 hover:bg-slate-100 transition-all">Journal</button>
               </div>
             </div>
           </div>
@@ -509,7 +510,7 @@ export function TradingLab() {
                   <span className="text-[10px] text-slate-500 font-medium">220 trades</span>
                 </div>
                 <div className="flex gap-2">
-                  <button className="bg-[#5B7CFA] text-white py-1.5 px-4 text-[8px] font-bold rounded-lg shadow-lg shadow-blue-500/10 hover:bg-[#4A6BEB] transition-all">Try Demo</button>
+                  <button onClick={() => setActiveSection('paper')} className="bg-[#5B7CFA] text-white py-1.5 px-4 text-[8px] font-bold rounded-lg shadow-lg shadow-blue-500/10 hover:bg-[#4A6BEB] transition-all">Try Demo</button>
                   <button className="p-1.5 bg-slate-50 text-slate-400 rounded-lg border border-slate-100 hover:bg-slate-100 transition-all"><MessageSquare className="w-3.5 h-3.5" /></button>
                 </div>
               </div>
@@ -533,7 +534,7 @@ export function TradingLab() {
                   <span className="text-[10px] text-slate-500 font-medium">124 trades</span>
                 </div>
                 <div className="flex gap-2">
-                  <button className="bg-[#5B7CFA] text-white py-1.5 px-4 text-[8px] font-bold rounded-lg shadow-lg shadow-blue-500/10 hover:bg-[#4A6BEB] transition-all">Try Demo</button>
+                  <button onClick={() => setActiveSection('paper')} className="bg-[#5B7CFA] text-white py-1.5 px-4 text-[8px] font-bold rounded-lg shadow-lg shadow-blue-500/10 hover:bg-[#4A6BEB] transition-all">Try Demo</button>
                   <button className="p-1.5 bg-slate-50 text-slate-400 rounded-lg border border-slate-100 hover:bg-slate-100 transition-all"><MessageSquare className="w-3.5 h-3.5" /></button>
                 </div>
               </div>
@@ -546,9 +547,12 @@ export function TradingLab() {
           <div className="p-4 border-b border-slate-100 flex items-center justify-between">
             <h3 className="text-sm font-bold text-[#1A2244]">Backtest Results</h3>
             <div className="flex gap-4">
-              <button className="text-[10px] font-bold text-[#5B7CFA] border-b-2 border-[#5B7CFA] pb-0.5 uppercase tracking-widest">Strategies</button>
-              <button className="text-[10px] font-bold text-slate-400 hover:text-[#5B7CFA] transition-colors uppercase tracking-widest">Watchlist</button>
-              <button className="text-[10px] font-bold text-slate-400 hover:text-[#5B7CFA] transition-colors uppercase tracking-widest">Journal</button>
+              {(['strategies', 'watchlist', 'journal'] as const).map(t => (
+                <button key={t} onClick={() => setBacktestTab(t)}
+                  className={cn("text-[10px] font-bold transition-colors uppercase tracking-widest pb-0.5",
+                    backtestTab === t ? "text-[#5B7CFA] border-b-2 border-[#5B7CFA]" : "text-slate-400 hover:text-[#5B7CFA]"
+                  )}>{t}</button>
+              ))}
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -565,7 +569,12 @@ export function TradingLab() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {backtestResults.map((res, idx) => (
+                {backtestTab !== 'strategies' && (
+                  <tr><td colSpan={7} className="px-4 py-10 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    {backtestTab === 'journal' ? 'No journal entries yet — close a trade to log it' : 'Watchlist coming soon'}
+                  </td></tr>
+                )}
+                {backtestTab === 'strategies' && backtestResults.map((res, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/30 transition-colors group">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">

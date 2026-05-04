@@ -4,7 +4,7 @@ import { cn } from '../lib/utils';
 import { getChatResponse } from '../services/geminiService';
 import { botConfig, BotType } from './BotAvatar';
 import { useAuth } from './AuthProvider';
-import { getOrCreateConversation, getMessages, sendMessage, ChatMessage } from '../lib/db';
+import { getOrCreateConversation, getMessages, sendMessage, ChatMessage, getProfile } from '../lib/db';
 
 interface Message {
   id: string;
@@ -31,8 +31,9 @@ function dbMsgToUI(msg: ChatMessage, contactName: string): Message {
   };
 }
 
-export function Messages() {
+export function Messages({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user } = useAuth();
+  const [readinessScore, setReadinessScore] = useState<number | null>(null);
   const [selectedContact, setSelectedContact] = useState(initialContacts[0]);
   const [msgInput, setMsgInput] = useState('');
   const [chatHistory, setChatHistory] = useState<Record<string, Message[]>>({});
@@ -41,6 +42,13 @@ export function Messages() {
   const [isFetchingMessages, setIsFetchingMessages] = useState(false);
   const [mobileView, setMobileView] = useState<'contacts' | 'chat'>('contacts');
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    getProfile(user.id).then(({ data }) => {
+      if (data?.readiness_score != null) setReadinessScore(data.readiness_score);
+    });
+  }, [user]);
 
   // Initialize all conversations on mount
   useEffect(() => {
@@ -227,9 +235,9 @@ export function Messages() {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <button className="p-2 text-slate-400 hover:text-[#5B7CFA] hover:bg-slate-50 rounded-lg transition-all"><Phone className="w-4 h-4" /></button>
-            <button className="p-2 text-slate-400 hover:text-[#5B7CFA] hover:bg-slate-50 rounded-lg transition-all hidden sm:block"><Video className="w-4 h-4" /></button>
-            <button className="p-2 text-slate-400 hover:text-[#5B7CFA] hover:bg-slate-50 rounded-lg transition-all"><MoreVertical className="w-4 h-4" /></button>
+            <button title="Schedule a call — go to Action Center" onClick={() => onNavigate?.('action-center')} className="p-2 text-slate-400 hover:text-[#5B7CFA] hover:bg-slate-50 rounded-lg transition-all"><Phone className="w-4 h-4" /></button>
+            <button title="Schedule video call — go to Action Center" onClick={() => onNavigate?.('action-center')} className="p-2 text-slate-400 hover:text-[#5B7CFA] hover:bg-slate-50 rounded-lg transition-all hidden sm:block"><Video className="w-4 h-4" /></button>
+            <button title="More options" className="p-2 text-slate-400 hover:text-[#5B7CFA] hover:bg-slate-50 rounded-lg transition-all"><MoreVertical className="w-4 h-4" /></button>
           </div>
         </div>
 
@@ -311,13 +319,13 @@ export function Messages() {
           <div className="space-y-1">
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">User Readiness</h3>
             <div className="flex items-end justify-between">
-              <span className="text-2xl font-black text-[#5B7CFA]">65%</span>
-              <span className="text-[9px] font-bold text-green-600 uppercase tracking-widest flex items-center gap-1">
-                <TrendingUp className="w-3 h-3" /> +12% this week
+              <span className="text-2xl font-black text-[#5B7CFA]">{readinessScore !== null ? `${readinessScore}%` : '—'}</span>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                <TrendingUp className="w-3 h-3" /> Readiness
               </span>
             </div>
             <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1">
-              <div className="h-full bg-[#5B7CFA] w-[65%] rounded-full" />
+              <div className="h-full bg-[#5B7CFA] rounded-full" style={{ width: `${readinessScore ?? 0}%` }} />
             </div>
           </div>
 
@@ -335,10 +343,10 @@ export function Messages() {
             <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Suggested Actions</h3>
             <div className="space-y-1.5">
               {[
-                { label: 'Complete EIN Setup', impact: '+8%' },
-                { label: 'Upload ID Docs', impact: '+4%' }
+                { label: 'Complete EIN Setup', impact: '+8%', tab: 'business-setup' },
+                { label: 'Upload ID Docs', impact: '+4%', tab: 'action-center' }
               ].map((action, i) => (
-                <button key={i} className="w-full p-2 rounded-lg border border-slate-100 bg-white hover:border-[#5B7CFA]/30 transition-all flex items-center justify-between group">
+                <button key={i} onClick={() => onNavigate?.(action.tab)} className="w-full p-2 rounded-lg border border-slate-100 bg-white hover:border-[#5B7CFA]/30 transition-all flex items-center justify-between group">
                   <span className="text-[9px] font-bold text-slate-600">{action.label}</span>
                   <div className="flex items-center gap-1">
                     <span className="text-[8px] font-black text-green-500">{action.impact}</span>

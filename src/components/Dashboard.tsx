@@ -54,8 +54,8 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
   const pendingTasks = tasks.filter(t => t.status !== 'complete');
 
   const creditScore = credit?.score ?? null;
-  const fundingMin = credit?.funding_range_min ?? 13000;
-  const fundingMax = credit?.funding_range_max ?? 75000;
+  const fundingMin = credit?.funding_range_min ?? null;
+  const fundingMax = credit?.funding_range_max ?? null;
   const utilization = credit?.utilization_percent ?? null;
 
   const fundingLevel = profile?.current_funding_level ?? 1;
@@ -257,8 +257,10 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
             {/* Funding amount */}
             <div style={{ textAlign: 'center', marginBottom: 14 }}>
               <p style={{ fontSize: 14, color: '#8b8fa8', marginBottom: 4 }}>Estimated range</p>
-              <p style={{ fontSize: 34, fontWeight: 800, color: '#1a1c3a' }}>
-                ${(fundingMin / 1000).toFixed(0)}k – ${(fundingMax / 1000).toFixed(0)}k
+              <p style={{ fontSize: 34, fontWeight: 800, color: fundingMin !== null ? '#1a1c3a' : '#c7d2fe' }}>
+                {fundingMin !== null && fundingMax !== null
+                  ? `$${(fundingMin / 1000).toFixed(0)}k – $${(fundingMax / 1000).toFixed(0)}k`
+                  : 'No report yet'}
               </p>
             </div>
 
@@ -308,24 +310,11 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
                       </div>
                     </div>
                   ))
-                : [
-                    { actor: 'James Mitchell', action: 'Analyzed credit report. Found 2 new disputes.', time: '10m' },
-                    { actor: 'Nexus AI', action: 'Business entity filed Articles of Incorporation.', time: '2h' },
-                    { actor: 'Nexus AI', action: 'Credit report data parsed. 5 items found.', time: '4h' },
-                  ].map((item, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 8, background: '#eef0fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Zap size={17} color="#3d5af1" />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <p style={{ fontSize: 14, fontWeight: 600, color: '#1a1c3a', margin: 0 }}>{item.actor}</p>
-                          <span style={{ fontSize: 12, color: '#8b8fa8' }}>{item.time}</span>
-                        </div>
-                        <p style={{ fontSize: 13, color: '#8b8fa8', margin: 0 }}>{item.action}</p>
-                      </div>
+                : (
+                    <div style={{ textAlign: 'center', padding: '12px 0' }}>
+                      <p style={{ fontSize: 13, color: '#8b8fa8', margin: 0 }}>No activity yet — complete a task to get started.</p>
                     </div>
-                  ))}
+                  )}
             </div>
           </div>
         </div>

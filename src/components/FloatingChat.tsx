@@ -39,8 +39,6 @@ export function FloatingChat({ activeTab }: FloatingChatProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  if (!isFeatureEnabled('floating_chat') || !user) return null;
-
   const chips = PAGE_CHIPS[activeTab] ?? PAGE_CHIPS.home;
 
   const initConversation = async () => {
@@ -102,6 +100,8 @@ export function FloatingChat({ activeTab }: FloatingChatProps) {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  if (!isFeatureEnabled('floating_chat') || !user) return null;
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || sending) return;

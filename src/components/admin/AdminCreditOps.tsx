@@ -1,7 +1,57 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { ShieldCheck, AlertCircle, CheckCircle2, Clock, Search, FileText, TrendingUp, Zap, Loader2 } from 'lucide-react';
+import { ShieldCheck, AlertCircle, CheckCircle2, Clock, Search, FileText, TrendingUp, Zap, Loader2, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getAllCreditReports, getAllCreditDisputes, CreditReport, CreditDispute } from '../../lib/db';
+import { supabase } from '../../lib/supabase';
+
+function NewCaseModal({ onClose, onCreated }: { onClose: () => void; onCreated: (d: CreditDispute) => void }) {
+  const [creditor, setCreditor] = useState('');
+  const [reason, setReason] = useState('');
+  const [amount, setAmount] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!creditor || !reason) return;
+    setSaving(true);
+    const { data } = await supabase.from('credit_disputes').insert({
+      creditor,
+      reason,
+      amount: parseFloat(amount) || null,
+      status: 'pending',
+    }).select().single();
+    if (data) onCreated(data as CreditDispute);
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 space-y-5">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-black text-[#1A2244]">New Dispute Case</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+        </div>
+        {[
+          { label: 'Creditor *', value: creditor, set: setCreditor, placeholder: 'e.g. Capital One' },
+          { label: 'Reason *', value: reason, set: setReason, placeholder: 'e.g. Account not mine' },
+          { label: 'Amount ($)', value: amount, set: setAmount, placeholder: '0.00' },
+        ].map(f => (
+          <div key={f.label}>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">{f.label}</label>
+            <input value={f.value} onChange={e => f.set(e.target.value)} placeholder={f.placeholder}
+              className="w-full border border-slate-200 rounded-xl p-3 text-sm text-slate-600 focus:outline-none focus:border-[#5B7CFA]/50" />
+          </div>
+        ))}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-500 hover:bg-slate-50">Cancel</button>
+          <button onClick={save} disabled={saving || !creditor || !reason} className="flex-1 py-3 rounded-xl bg-[#3d5af1] text-white text-sm font-bold disabled:opacity-50 hover:bg-[#2e4be0]">
+            {saving ? 'Saving…' : 'Create Case'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function disputeStatusColor(status: string) {
   switch (status) {
@@ -18,6 +68,7 @@ export function AdminCreditOps() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'reports' | 'disputes'>('disputes');
+  const [showNewCase, setShowNewCase] = useState(false);
 
   useEffect(() => {
     Promise.all([getAllCreditReports(), getAllCreditDisputes()]).then(([{ data: r }, { data: d }]) => {
@@ -59,7 +110,7 @@ export function AdminCreditOps() {
           <h1 className="text-3xl font-black text-[#1A2244] tracking-tight">Credit Ops</h1>
           <p className="text-slate-500 font-medium mt-1 text-sm">Manage credit repair cases, dispute letters, and bureau integrations.</p>
         </div>
-        <button className="px-6 py-2 rounded-xl bg-[#5B7CFA] text-white text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all flex items-center gap-2">
+        <button onClick={() => setShowNewCase(true)} className="px-6 py-2 rounded-xl bg-[#5B7CFA] text-white text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all flex items-center gap-2">
           <Zap className="w-4 h-4" /> New Case
         </button>
       </div>
@@ -120,7 +171,7 @@ export function AdminCreditOps() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-50">
-                  {['Creditor', 'Reason', 'Amount', 'Status', 'Submitted'].map(h => (
+                  {['Creditor', 'Reason', 'Amount', 'Status', 'Submitted', ''].map(h => (
                     <th key={h} className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
                   ))}
                 </tr>
@@ -137,9 +188,20 @@ export function AdminCreditOps() {
                       </span>
                     </td>
                     <td className="px-6 py-4"><span className="text-xs text-slate-400">{d.submitted_at ? new Date(d.submitted_at).toLocaleDateString() : '—'}</span></td>
+                    <td className="px-6 py-4">
+                      {d.status !== 'resolved' && (
+                        <button
+                          onClick={async () => {
+                            await supabase.from('credit_disputes').update({ status: 'resolved' }).eq('id', d.id);
+                            setDisputes(prev => prev.map(x => x.id === d.id ? { ...x, status: 'resolved' } : x));
+                          }}
+                          className="px-3 py-1.5 bg-green-50 text-green-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-green-500 hover:text-white transition-all"
+                        >Resolve</button>
+                      )}
+                    </td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={5} className="px-6 py-12 text-center">
+                  <tr><td colSpan={6} className="px-6 py-12 text-center">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{search ? 'No matches' : 'No disputes on file'}</p>
                   </td></tr>
                 )}
@@ -182,6 +244,13 @@ export function AdminCreditOps() {
           </div>
         )}
       </div>
+
+      {showNewCase && (
+        <NewCaseModal
+          onClose={() => setShowNewCase(false)}
+          onCreated={d => setDisputes(prev => [d, ...prev])}
+        />
+      )}
     </div>
   );
 }

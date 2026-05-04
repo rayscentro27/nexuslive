@@ -215,6 +215,7 @@ export function Funding() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [applications, setApplications] = useState<FundingApplication[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [simulations, setSimulations] = useState<{ lender_name: string; approval_odds: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
   const [showNewAppModal, setShowNewAppModal] = useState(false);
@@ -227,10 +228,25 @@ export function Funding() {
       getProfile(user.id),
       getFundingApplications(user.id),
       getTasks(user.id),
-    ]).then(([{ data: p }, { data: apps }, { data: t }]) => {
+      supabase.from('approval_simulations')
+        .select('lender_name, approval_odds')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(20),
+    ]).then(([{ data: p }, { data: apps }, { data: t }, { data: sims }]) => {
       setProfile(p);
       setApplications(apps);
       setTasks(t);
+      // Deduplicate sims: keep highest odds per lender
+      const byLender = new Map<string, number>();
+      (sims ?? []).forEach(s => {
+        const cur = byLender.get(s.lender_name) ?? 0;
+        if (s.approval_odds > cur) byLender.set(s.lender_name, s.approval_odds);
+      });
+      setSimulations(Array.from(byLender.entries())
+        .map(([lender_name, approval_odds]) => ({ lender_name, approval_odds }))
+        .sort((a, b) => b.approval_odds - a.approval_odds)
+        .slice(0, 3));
       setLoading(false);
     });
   }, [user]);
@@ -279,20 +295,17 @@ export function Funding() {
     .filter(a => a.status === 'approved')
     .reduce((sum, a) => sum + (a.approved_amount ?? a.requested_amount ?? 0), 0);
 
-  // Static fallback pipeline data
+  // Pipeline bars computed from real application statuses
+  const appTotal = Math.max(applications.length, 1);
   const pipelineStages = [
-    { label: 'Submitted', pct: 85, color: '#3d5af1' },
-    { label: 'Under Review', pct: 60, color: '#f59e0b' },
-    { label: 'Pre-Approved', pct: 40, color: '#22c55e' },
-    { label: 'Funded', pct: 20, color: '#8b8fa8' },
+    { label: 'Submitted', pct: Math.round((applications.filter(a => ['submitted', 'pending', 'approved', 'funded'].includes(a.status)).length / appTotal) * 100), color: '#3d5af1' },
+    { label: 'Under Review', pct: Math.round((applications.filter(a => ['submitted', 'approved', 'funded'].includes(a.status)).length / appTotal) * 100), color: '#f59e0b' },
+    { label: 'Pre-Approved', pct: Math.round((applications.filter(a => ['approved', 'funded'].includes(a.status)).length / appTotal) * 100), color: '#22c55e' },
+    { label: 'Funded', pct: Math.round((applications.filter(a => a.status === 'funded').length / appTotal) * 100), color: '#8b8fa8' },
   ];
 
-  // Static lender matches
-  const lenderMatches = [
-    { name: 'Fundbox', match: 94 },
-    { name: 'OnDeck', match: 87 },
-    { name: 'Lendio', match: 81 },
-  ];
+  // Lender matches from approval_simulations (top 3 by odds)
+  const lenderMatches = simulations.map(s => ({ name: s.lender_name, match: s.approval_odds }));
 
   // Approval odds checklist — static placeholders, real data preferred if available
   const oddsItems = [
@@ -302,15 +315,7 @@ export function Funding() {
     { label: 'Annual Revenue', ok: ((profile as any)?.annual_revenue ?? 0) >= 50000 },
   ];
 
-  // Table data: real apps or static fallback
-  const tableApps: (FundingApplication | { id: string; lender_name: string; requested_amount: number; status: string; product_type?: string })[] =
-    applications.length > 0
-      ? applications
-      : [
-          { id: 's1', lender_name: 'Chase Business', requested_amount: 50000, status: 'pending', product_type: 'Business Line' },
-          { id: 's2', lender_name: 'Fundbox',        requested_amount: 25000, status: 'approved', product_type: 'Invoice Financing' },
-          { id: 's3', lender_name: 'OnDeck',         requested_amount: 35000, status: 'submitted', product_type: 'Term Loan' },
-        ];
+  const tableApps = applications;
 
   const readinessColor = readiness >= 80 ? '#22c55e' : readiness >= 50 ? '#3d5af1' : '#f59e0b';
   const readinessRisk = readiness >= 80 ? 'Low Risk' : readiness >= 50 ? 'Medium' : 'High Risk';
@@ -346,28 +351,32 @@ export function Funding() {
                 icon: DollarSign,
                 iconBg: '#eef0fd',
                 iconColor: '#3d5af1',
-                value: totalApplied > 0 ? '$' + (totalApplied / 1000).toFixed(0) + 'k' : '$128k',
+                value: totalApplied > 0 ? '$' + (totalApplied / 1000).toFixed(0) + 'k' : '—',
                 label: 'Total Applied',
               },
               {
                 icon: Award,
                 iconBg: '#f0fdf4',
                 iconColor: '#22c55e',
-                value: preApprovedAmt > 0 ? '$' + (preApprovedAmt / 1000).toFixed(0) + 'k' : '$25k',
+                value: preApprovedAmt > 0 ? '$' + (preApprovedAmt / 1000).toFixed(0) + 'k' : '—',
                 label: 'Pre-Approved',
               },
               {
                 icon: TrendingUp,
                 iconBg: '#fff7ed',
                 iconColor: '#f59e0b',
-                value: '$23.5k',
+                value: applications.filter(a => a.status === 'funded').length > 0
+                  ? '$' + (applications.filter(a => a.status === 'funded').reduce((s, a) => s + (a.approved_amount ?? 0), 0) / 1000).toFixed(0) + 'k'
+                  : '—',
                 label: 'Funded (All Time)',
               },
               {
                 icon: Percent,
                 iconBg: '#fef2f2',
                 iconColor: '#ef4444',
-                value: '68%',
+                value: applications.length > 0
+                  ? Math.round((applications.filter(a => a.status === 'approved' || a.status === 'funded').length / applications.length) * 100) + '%'
+                  : '—',
                 label: 'Approval Rate',
               },
             ].map(({ icon: Icon, iconBg, iconColor, value, label }) => (
@@ -488,6 +497,11 @@ export function Funding() {
 
                 {/* Table Rows */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {tableApps.length === 0 && (
+                    <p style={{ fontSize: 13, color: '#8b8fa8', textAlign: 'center', padding: '20px 0' }}>
+                      No applications yet. Click "New Application" to get started.
+                    </p>
+                  )}
                   {tableApps.map((app: any) => {
                     const { color } = statusColors(app.status);
                     const amount = app.approved_amount ?? app.requested_amount;
@@ -536,7 +550,7 @@ export function Funding() {
               <div className="glass-card" style={{ padding: 18 }}>
                 <h3 style={{ fontSize: 13, fontWeight: 700, color: '#1a1c3a', marginBottom: 14 }}>Lender Matches</h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {lenderMatches.map(({ name, match }) => (
+                  {lenderMatches.length > 0 ? lenderMatches.map(({ name, match }) => (
                     <div key={name}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: '#1a1c3a' }}>{name}</span>
@@ -546,7 +560,11 @@ export function Funding() {
                         <div style={{ width: `${match}%`, height: '100%', background: '#3d5af1', borderRadius: 10 }} />
                       </div>
                     </div>
-                  ))}
+                  )) : (
+                    <p style={{ fontSize: 12, color: '#8b8fa8', textAlign: 'center', padding: '8px 0' }}>
+                      Run the Approval Simulator to see lender matches.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

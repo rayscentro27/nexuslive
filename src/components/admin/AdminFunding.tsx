@@ -1,7 +1,71 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { TrendingUp, DollarSign, CheckCircle2, Clock, Search, Briefcase, Loader2 } from 'lucide-react';
+import { TrendingUp, DollarSign, CheckCircle2, Clock, Search, Briefcase, Loader2, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { getAllFundingApplications, FundingApplication } from '../../lib/db';
+import { supabase } from '../../lib/supabase';
+
+const APP_STATUSES = ['pending', 'submitted', 'approved', 'rejected'];
+
+function ReviewModal({ app, onClose, onSave }: {
+  app: FundingApplication;
+  onClose: () => void;
+  onSave: (id: string, status: string, notes: string) => void;
+}) {
+  const [status, setStatus] = useState(app.status);
+  const [notes, setNotes] = useState((app as any).admin_notes ?? '');
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    setSaving(true);
+    await supabase.from('funding_applications').update({ status, admin_notes: notes }).eq('id', app.id);
+    onSave(app.id, status, notes);
+    setSaving(false);
+    onClose();
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <div>
+            <h2 className="text-xl font-black text-[#1A2244]">Review Application</h2>
+            <p className="text-sm text-slate-400 mt-0.5">{app.lender_name} · {app.product_type}</p>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8b8fa8' }}><X size={20} /></button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Update Status</label>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {APP_STATUSES.map(s => (
+                <button key={s} onClick={() => setStatus(s)}
+                  className={cn("px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                    status === s ? "bg-[#3d5af1] text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+                  )}>{s}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">Admin Notes</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder="Add review notes..."
+              rows={4}
+              className="w-full border border-slate-200 rounded-xl p-4 text-sm text-slate-600 focus:outline-none focus:border-[#5B7CFA]/50 resize-none"
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-all">Cancel</button>
+            <button onClick={save} disabled={saving} className="flex-1 py-3 rounded-xl bg-[#3d5af1] text-white text-sm font-bold hover:bg-[#2e4be0] transition-all disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save Review'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function fmtMoney(n: number | null) {
   if (!n) return '—';
@@ -24,6 +88,7 @@ export function AdminFunding() {
   const [applications, setApplications] = useState<FundingApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [reviewApp, setReviewApp] = useState<FundingApplication | null>(null);
 
   useEffect(() => {
     getAllFundingApplications().then(({ data }) => {
@@ -105,8 +170,8 @@ export function AdminFunding() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-slate-50">
-                  {['Lender', 'Product', 'Requested', 'Approved', 'Odds', 'Status'].map(h => (
-                    <th key={h} className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
+                  {['Lender', 'Product', 'Requested', 'Approved', 'Odds', 'Status', ''].map((h, i) => (
+                    <th key={i} className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -139,9 +204,17 @@ export function AdminFunding() {
                         {app.status}
                       </span>
                     </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={() => setReviewApp(app)}
+                        className="px-3 py-1.5 bg-blue-50 text-[#5B7CFA] text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-[#5B7CFA] hover:text-white transition-all"
+                      >
+                        Review
+                      </button>
+                    </td>
                   </tr>
                 )) : (
-                  <tr><td colSpan={6} className="px-6 py-12 text-center">
+                  <tr><td colSpan={7} className="px-6 py-12 text-center">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{search ? 'No matches' : 'No applications yet'}</p>
                   </td></tr>
                 )}
@@ -153,6 +226,16 @@ export function AdminFunding() {
           </div>
         )}
       </div>
+
+      {reviewApp && (
+        <ReviewModal
+          app={reviewApp}
+          onClose={() => setReviewApp(null)}
+          onSave={(id, status, notes) => {
+            setApplications(prev => prev.map(a => a.id === id ? { ...a, status, admin_notes: notes } as any : a));
+          }}
+        />
+      )}
     </div>
   );
 }

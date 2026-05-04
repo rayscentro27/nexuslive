@@ -19,7 +19,7 @@ import { AdminSubscriptionSettings } from './AdminSubscriptionSettings';
 
 type Section = 'general' | 'security' | 'notifications' | 'users' | 'integrations' | 'subscriptions';
 
-export function AdminSettings() {
+export function AdminSettings({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const [activeSection, setActiveSection] = useState<Section>('general');
 
   const navItems: { label: string; icon: React.ElementType; id: Section }[] = [
@@ -106,7 +106,7 @@ export function AdminSettings() {
             <p className="text-[10px] text-slate-400 font-medium leading-relaxed mb-4">
               Version 2.4.0-stable. Last backup completed 2 hours ago.
             </p>
-            <button className="w-full py-2 rounded-lg bg-white/10 hover:bg-white/20 text-[9px] font-black uppercase tracking-widest transition-all">
+            <button onClick={() => onNavigate?.('reports')} className="w-full py-2 rounded-lg bg-white/10 hover:bg-white/20 text-[9px] font-black uppercase tracking-widest transition-all">
               View System Logs
             </button>
           </div>
@@ -118,7 +118,13 @@ export function AdminSettings() {
 
           {activeSection !== 'subscriptions' && (
             <div className="space-y-8">
-              {sections.map((section, i) => (
+              {sections.filter((_, i) =>
+                activeSection === 'general' ? i === 0 :
+                activeSection === 'security' ? i === 1 :
+                activeSection === 'integrations' ? i === 2 :
+                activeSection === 'users' ? i === 0 :
+                activeSection === 'notifications' ? i === 0 : true
+              ).map((section, i) => (
                 <div key={i} className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
                   <div className="p-6 border-b border-slate-100 bg-slate-50/30">
                     <h3 className="text-sm font-black text-[#1A2244] uppercase tracking-widest">{section.title}</h3>

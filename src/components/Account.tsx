@@ -5,7 +5,7 @@ import { useAuth } from './AuthProvider';
 import { getProfile, updateProfile, getBusinessEntity, UserProfile, BusinessEntity } from '../lib/db';
 import { supabase } from '../lib/supabase';
 
-export function Account() {
+export function Account({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [business, setBusiness] = useState<BusinessEntity | null>(null);
@@ -226,7 +226,7 @@ export function Account() {
                     <span>0 Remaining</span>
                   </div>
                 </div>
-                <button className="w-full bg-white text-nexus-700 font-bold py-3 rounded-xl shadow-lg hover:bg-nexus-50 transition-all">
+                <button title="Credit top-ups coming soon" onClick={() => onNavigate?.('settings')} className="w-full bg-white text-nexus-700 font-bold py-3 rounded-xl shadow-lg hover:bg-nexus-50 transition-all">
                   Add Credits
                 </button>
               </div>
@@ -235,11 +235,11 @@ export function Account() {
             <div className="glass-card p-6 space-y-2">
               <h3 className="px-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">Quick Settings</h3>
               {[
-                { icon: Shield, label: 'Security & Privacy', color: 'text-blue-500' },
-                { icon: Bell, label: 'Notifications', color: 'text-amber-500' },
-                { icon: Globe, label: 'Integrations', color: 'text-purple-500' },
+                { icon: Shield, label: 'Security & Privacy', color: 'text-blue-500', tab: 'settings' },
+                { icon: Bell, label: 'Notifications', color: 'text-amber-500', tab: 'settings' },
+                { icon: Globe, label: 'Integrations', color: 'text-purple-500', tab: 'settings' },
               ].map((item, i) => (
-                <button key={i} className="w-full flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-all group">
+                <button key={i} onClick={() => onNavigate?.(item.tab)} className="w-full flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-all group">
                   <div className="flex items-center gap-3">
                     <item.icon className={cn("w-5 h-5", item.color)} />
                     <span className="font-semibold text-slate-700">{item.label}</span>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   User,
   Shield,
@@ -18,11 +18,13 @@ import {
   MessageSquare,
   Loader2,
   Save,
+  CheckCircle2,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { BotAvatar } from './BotAvatar';
 import { useAuth } from './AuthProvider';
 import { getProfile, updateProfile, getSettings, updateSettings, getBusinessEntity, UserProfile, UserSettings, BusinessEntity } from '../lib/db';
+import { supabase } from '../lib/supabase';
 
 const tabs = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -50,13 +52,17 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
   );
 }
 
-export function Settings() {
+export function Settings({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [settings, setSettings] = useState<UserSettings | null>(null);
   const [business, setBusiness] = useState<BusinessEntity | null>(null);
   const [loading, setLoading] = useState(true);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [passwordResetSent, setPasswordResetSent] = useState(false);
+  const [downloadingData, setDownloadingData] = useState(false);
 
   // Profile edit state
   const [nameInput, setNameInput] = useState('');
@@ -93,6 +99,45 @@ export function Settings() {
     const optimistic = { ...settings, [key]: value } as UserSettings;
     setSettings(optimistic);
     await updateSettings(user.id, { [key]: value });
+  };
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!user) return;
+    setUploadingAvatar(true);
+    const ext = file.name.split('.').pop();
+    const path = `${user.id}/avatar.${ext}`;
+    const { error } = await supabase.storage.from('avatars').upload(path, file, { upsert: true });
+    if (!error) {
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+      const { data } = await updateProfile(user.id, { avatar_url: publicUrl });
+      if (data) setProfile(data);
+    }
+    setUploadingAvatar(false);
+  };
+
+  const handlePasswordReset = async () => {
+    if (!user?.email) return;
+    await supabase.auth.resetPasswordForEmail(user.email, { redirectTo: window.location.origin });
+    setPasswordResetSent(true);
+    setTimeout(() => setPasswordResetSent(false), 5000);
+  };
+
+  const handleDownloadData = async () => {
+    if (!user) return;
+    setDownloadingData(true);
+    const [{ data: p }, { data: b }, { data: s }] = await Promise.all([
+      getProfile(user.id),
+      getBusinessEntity(user.id),
+      getSettings(user.id),
+    ]);
+    const blob = new Blob([JSON.stringify({ profile: p, business: b, settings: s }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nexuslive-data-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setDownloadingData(false);
   };
 
   const displayName = profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
@@ -159,8 +204,15 @@ export function Settings() {
                           <span className="text-2xl font-black text-[#5B7CFA]">{displayName.charAt(0).toUpperCase()}</span>
                         </div>
                       )}
-                      <button className="absolute -bottom-1 -right-1 p-1.5 bg-[#5B7CFA] text-white rounded-lg shadow-lg hover:scale-110 transition-transform">
-                        <Upload className="w-3 h-3" />
+                      <input
+                        ref={avatarInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={e => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f); }}
+                      />
+                      <button onClick={() => avatarInputRef.current?.click()} className="absolute -bottom-1 -right-1 p-1.5 bg-[#5B7CFA] text-white rounded-lg shadow-lg hover:scale-110 transition-transform">
+                        {uploadingAvatar ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
                       </button>
                     </div>
                     <div className="space-y-0.5">
@@ -301,7 +353,7 @@ export function Settings() {
                       <p className="text-[10px] text-slate-500 font-medium">Manage your subscription below</p>
                     </div>
                   </div>
-                  <button className="w-full py-3 bg-[#5B7CFA] text-white font-black text-xs rounded-xl shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all">
+                  <button onClick={() => setActiveTab('billing')} className="w-full py-3 bg-[#5B7CFA] text-white font-black text-xs rounded-xl shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all">
                     Manage Subscription
                   </button>
                 </div>
@@ -322,12 +374,12 @@ export function Settings() {
               <div className="glass-card p-5 space-y-5">
                 <h3 className="text-sm font-bold text-[#1A2244]">Quick Actions</h3>
                 <div className="space-y-1.5">
-                  <button className="w-full flex items-center justify-between p-2.5 bg-slate-50 border border-slate-100 rounded-lg hover:bg-slate-100 transition-all group">
+                  <button onClick={handlePasswordReset} className="w-full flex items-center justify-between p-2.5 bg-slate-50 border border-slate-100 rounded-lg hover:bg-slate-100 transition-all group">
                     <div className="flex items-center gap-2.5">
-                      <Shield className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#5B7CFA]" />
-                      <span className="text-[10px] font-bold text-slate-700">Change Password</span>
+                      {passwordResetSent ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <Shield className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#5B7CFA]" />}
+                      <span className="text-[10px] font-bold text-slate-700">{passwordResetSent ? 'Reset email sent!' : 'Change Password'}</span>
                     </div>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                    {!passwordResetSent && <ChevronRight className="w-3.5 h-3.5 text-slate-300" />}
                   </button>
                   <div className="w-full flex items-center justify-between p-2.5 bg-slate-50 border border-slate-100 rounded-lg">
                     <div className="flex items-center gap-2.5">
@@ -339,12 +391,12 @@ export function Settings() {
                       onChange={(v) => handleToggle('two_factor_enabled', v)}
                     />
                   </div>
-                  <button className="w-full flex items-center justify-between p-2.5 bg-slate-50 border border-slate-100 rounded-lg hover:bg-slate-100 transition-all group">
+                  <button onClick={handleDownloadData} disabled={downloadingData} className="w-full flex items-center justify-between p-2.5 bg-slate-50 border border-slate-100 rounded-lg hover:bg-slate-100 transition-all group disabled:opacity-60">
                     <div className="flex items-center gap-2.5">
-                      <Download className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#5B7CFA]" />
+                      {downloadingData ? <Loader2 className="w-3.5 h-3.5 text-[#5B7CFA] animate-spin" /> : <Download className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#5B7CFA]" />}
                       <span className="text-[10px] font-bold text-slate-700">Download My Data</span>
                     </div>
-                    <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                    {!downloadingData && <ChevronRight className="w-3.5 h-3.5 text-slate-300" />}
                   </button>
                 </div>
                 <button
@@ -385,14 +437,14 @@ export function Settings() {
               <div className="glass-card p-5 space-y-3">
                 <h3 className="text-sm font-bold text-[#1A2244]">Support & Help</h3>
                 <div className="space-y-1">
-                  <button className="w-full flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg transition-all group">
+                  <button onClick={() => onNavigate?.('messages')} className="w-full flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg transition-all group">
                     <div className="flex items-center gap-2.5">
                       <HelpCircle className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#5B7CFA]" />
                       <span className="text-[10px] font-bold text-slate-700">Help Center</span>
                     </div>
                     <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
                   </button>
-                  <button className="w-full flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg transition-all group">
+                  <button onClick={() => onNavigate?.('messages')} className="w-full flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg transition-all group">
                     <div className="flex items-center gap-2.5">
                       <Mail className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#5B7CFA]" />
                       <span className="text-[10px] font-bold text-slate-700">Contact Support</span>

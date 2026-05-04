@@ -46,6 +46,7 @@ export function CreditAnalysis({ onNavigate }: { onNavigate?: (tab: string) => v
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<CreditTab>('analysis');
   const [uploading, setUploading] = useState(false);
+  const [showAllDisputes, setShowAllDisputes] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFileUpload(file: File) {
@@ -170,7 +171,10 @@ export function CreditAnalysis({ onNavigate }: { onNavigate?: (tab: string) => v
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                <button className="bg-[#5B7CFA] text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all flex items-center gap-2">
+                <button
+                  onClick={() => setActiveTab('boost')}
+                  className="bg-[#5B7CFA] text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all flex items-center gap-2"
+                >
                   Generate Dispute Letters
                   <ArrowRight className="w-3 h-3" />
                 </button>
@@ -232,7 +236,7 @@ export function CreditAnalysis({ onNavigate }: { onNavigate?: (tab: string) => v
               <p className="text-xs text-slate-500">Opportunities to dispute derogatory marks</p>
               {disputes.length > 0 ? (
                 <ul className="space-y-1.5">
-                  {disputes.slice(0, 3).map(d => (
+                  {(showAllDisputes ? disputes : disputes.slice(0, 3)).map(d => (
                     <li key={d.id} className="flex items-center gap-2 text-xs text-slate-600">
                       <div className="w-1 h-1 bg-red-400 rounded-full shrink-0" />
                       {d.creditor} — {d.reason}
@@ -242,9 +246,14 @@ export function CreditAnalysis({ onNavigate }: { onNavigate?: (tab: string) => v
               ) : (
                 <p className="text-xs text-slate-400">No disputes on file.</p>
               )}
-              <button className="w-full py-2 bg-slate-50 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-100 transition-all flex items-center justify-center gap-2">
-                View Disputes <ArrowRight className="w-3 h-3" />
-              </button>
+              {disputes.length > 0 && (
+                <button
+                  onClick={() => setShowAllDisputes(v => !v)}
+                  className="w-full py-2 bg-slate-50 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+                >
+                  {showAllDisputes ? 'Show Less' : `View All ${disputes.length} Disputes`} <ArrowRight className="w-3 h-3" />
+                </button>
+              )}
             </div>
 
             {/* Utilization */}
@@ -273,8 +282,11 @@ export function CreditAnalysis({ onNavigate }: { onNavigate?: (tab: string) => v
                   <span className="text-slate-600">{formatCurrency(totalDebt)}</span>
                 </div>
               </div>
-              <button className="w-full py-2 bg-slate-50 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-100 transition-all flex items-center justify-center gap-2">
-                View Utilization <ArrowRight className="w-3 h-3" />
+              <button
+                onClick={() => onNavigate?.('action-center')}
+                className="w-full py-2 bg-slate-50 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+              >
+                Improve Utilization <ArrowRight className="w-3 h-3" />
               </button>
             </div>
           </div>
