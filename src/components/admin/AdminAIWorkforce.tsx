@@ -53,14 +53,27 @@ export function AdminAIWorkforce() {
   const [runs,       setRuns]      = useState<AgentRun[]>([]);
   const [events,     setEvents]    = useState<AgentEvent[]>([]);
   const [runsLoading, setRunsLoading] = useState(false);
+  const [promptValue, setPromptValue] = useState('');
+  const [savingPrompt, setSavingPrompt] = useState(false);
+  const [agentSearch, setAgentSearch] = useState('');
+  const [showDeployModal, setShowDeployModal] = useState(false);
+  const [deployForm, setDeployForm] = useState({ name: '', role: '', agent_key: '' });
 
   useEffect(() => {
     getBotProfiles().then(({ data }) => {
       setBots(data);
-      if (data.length > 0) setSelectedId(data[0].agent_key);
+      if (data.length > 0) {
+        setSelectedId(data[0].agent_key);
+        setPromptValue((data[0] as any).system_prompt ?? `You are ${data[0].name}, the ${data[0].role} for Nexus.\n\nYour mission is to help clients achieve their funding goals.\n\nGuidelines:\n- Professional yet encouraging\n- Data-driven and precise\n- Action-oriented`);
+      }
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    const bot = bots.find(b => b.agent_key === selectedId);
+    if (bot) setPromptValue((bot as any).system_prompt ?? `You are ${bot.name}, the ${bot.role} for Nexus.\n\nYour mission is to help clients achieve their funding goals.\n\nGuidelines:\n- Professional yet encouraging\n- Data-driven and precise\n- Action-oriented`);
+  }, [selectedId]);
 
   const loadActivity = useCallback(async () => {
     setRunsLoading(true);
@@ -78,6 +91,38 @@ export function AdminAIWorkforce() {
   }, [activeTab, loadActivity]);
 
   const current = bots.find(b => b.agent_key === selectedId);
+  const filteredBots = agentSearch
+    ? bots.filter(b => b.name.toLowerCase().includes(agentSearch.toLowerCase()) || (b.role ?? '').toLowerCase().includes(agentSearch.toLowerCase()))
+    : bots;
+
+  const savePrompt = async () => {
+    if (!selectedId) return;
+    setSavingPrompt(true);
+    await supabase.from('bot_profiles').update({ system_prompt: promptValue }).eq('agent_key', selectedId);
+    setSavingPrompt(false);
+  };
+
+  const updateStatus = async (status: 'active' | 'idle') => {
+    if (!selectedId) return;
+    await supabase.from('bot_profiles').update({ status }).eq('agent_key', selectedId);
+    setBots(prev => prev.map(b => b.agent_key === selectedId ? { ...b, status } : b));
+  };
+
+  const deployAgent = async () => {
+    if (!deployForm.name || !deployForm.agent_key) return;
+    const { data } = await supabase.from('bot_profiles').insert({
+      name: deployForm.name,
+      role: deployForm.role,
+      agent_key: deployForm.agent_key,
+      status: 'idle',
+    }).select().single();
+    if (data) {
+      setBots(prev => [...prev, data as BotProfile]);
+      setSelectedId(deployForm.agent_key);
+    }
+    setShowDeployModal(false);
+    setDeployForm({ name: '', role: '', agent_key: '' });
+  };
 
   return (
     <div className="p-8 space-y-8 bg-slate-50/50 min-h-full text-slate-600">
@@ -93,7 +138,10 @@ export function AdminAIWorkforce() {
           >
             <Activity className="w-4 h-4" /> Refresh
           </button>
-          <button className="px-6 py-2 rounded-xl bg-[#5B7CFA] text-white text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all flex items-center gap-2">
+          <button
+            onClick={() => setShowDeployModal(true)}
+            className="px-6 py-2 rounded-xl bg-[#5B7CFA] text-white text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all flex items-center gap-2"
+          >
             <UserPlus className="w-4 h-4" /> Deploy New AI
           </button>
         </div>
@@ -142,12 +190,14 @@ export function AdminAIWorkforce() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
+                value={agentSearch}
+                onChange={e => setAgentSearch(e.target.value)}
                 placeholder="Search agents..."
                 className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:border-[#5B7CFA]/40 shadow-sm"
               />
             </div>
             <div className="space-y-2">
-              {bots.map(bot => (
+              {filteredBots.map(bot => (
                 <button
                   key={bot.agent_key}
                   onClick={() => setSelectedId(bot.agent_key)}
@@ -195,14 +245,14 @@ export function AdminAIWorkforce() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:text-[#1A2244] border border-slate-200 transition-all">
+                    <button onClick={() => updateStatus('idle')} title="Pause" className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:text-[#1A2244] border border-slate-200 transition-all">
                       <Pause className="w-5 h-5" />
                     </button>
-                    <button className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:text-[#1A2244] border border-slate-200 transition-all">
+                    <button onClick={() => updateStatus('active')} title="Restart" className="p-2.5 bg-slate-50 text-slate-400 rounded-xl hover:text-[#1A2244] border border-slate-200 transition-all">
                       <RotateCcw className="w-5 h-5" />
                     </button>
-                    <button className="p-2.5 bg-[#5B7CFA] text-white rounded-xl hover:bg-[#4A6BEB] shadow-lg shadow-blue-500/20 transition-all">
-                      <Save className="w-5 h-5" />
+                    <button onClick={savePrompt} disabled={savingPrompt} title="Save prompt" className="p-2.5 bg-[#5B7CFA] text-white rounded-xl hover:bg-[#4A6BEB] shadow-lg shadow-blue-500/20 transition-all">
+                      {savingPrompt ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                     </button>
                   </div>
                 </div>
@@ -244,7 +294,8 @@ export function AdminAIWorkforce() {
                     </div>
                     <textarea
                       className="w-full h-48 bg-white border border-slate-200 rounded-2xl p-6 text-xs font-mono text-slate-600 focus:outline-none focus:border-[#5B7CFA]/50 transition-all leading-relaxed no-scrollbar shadow-inner"
-                      defaultValue={`You are ${current.name}, the ${current.role} for Nexus.\n\nYour mission is to help clients achieve their funding goals.\n\nGuidelines:\n- Professional yet encouraging\n- Data-driven and precise\n- Action-oriented`}
+                      value={promptValue}
+                      onChange={e => setPromptValue(e.target.value)}
                     />
                   </div>
                 </div>
@@ -345,6 +396,37 @@ export function AdminAIWorkforce() {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Deploy New AI Modal */}
+      {showDeployModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
+            <h2 className="text-xl font-black text-[#1A2244] mb-6">Deploy New AI Agent</h2>
+            <div className="space-y-4">
+              {[
+                { label: 'Agent Name', key: 'name', placeholder: 'e.g. CreditBot' },
+                { label: 'Role', key: 'role', placeholder: 'e.g. Credit Specialist' },
+                { label: 'Agent Key', key: 'agent_key', placeholder: 'e.g. credit_bot (unique)' },
+              ].map(f => (
+                <div key={f.key}>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">{f.label}</label>
+                  <input
+                    type="text"
+                    value={(deployForm as any)[f.key]}
+                    onChange={e => setDeployForm(prev => ({ ...prev, [f.key]: e.target.value }))}
+                    placeholder={f.placeholder}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-[#5B7CFA]/50"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setShowDeployModal(false)} className="flex-1 py-3 rounded-xl border border-slate-200 text-sm font-bold text-slate-500 hover:bg-slate-50 transition-all">Cancel</button>
+              <button onClick={deployAgent} disabled={!deployForm.name || !deployForm.agent_key} className="flex-1 py-3 rounded-xl bg-[#5B7CFA] text-white text-sm font-bold hover:bg-[#4A6BEB] transition-all disabled:opacity-50">Deploy</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

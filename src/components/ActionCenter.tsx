@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, Circle, Play, ArrowRight, Clock, Zap, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { CheckCircle2, Circle, ArrowRight, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from './AuthProvider';
-import { getTasks, updateTaskStatus, Task } from '../lib/db';
+import { getTasks, updateTaskStatus, getBusinessEntity, Task, BusinessEntity } from '../lib/db';
+import { supabase } from '../lib/supabase';
+
+interface Notification {
+  id: string;
+  title: string;
+  body: string | null;
+  type: string;
+  created_at: string;
+}
 
 // Fallback tasks shown when database is empty or not yet connected
 const STARTER_TASKS: Omit<Task, 'id' | 'user_id' | 'created_at'>[] = [
@@ -13,16 +22,6 @@ const STARTER_TASKS: Omit<Task, 'id' | 'user_id' | 'created_at'>[] = [
   { title: 'Generate Dispute Letters',          category: 'credit',          status: 'pending',   priority: 2, readiness_impact: 6,  is_primary: false, duration_minutes: 15,  description: null,                                                      due_date: null, completed_at: null },
   { title: 'LLC Formation Verified',            category: 'business_setup',  status: 'complete',  priority: 1, readiness_impact: 10, is_primary: false, duration_minutes: 20,  description: null,                                                      due_date: null, completed_at: new Date().toISOString() },
   { title: 'EIN Obtained',                      category: 'business_setup',  status: 'complete',  priority: 1, readiness_impact: 5,  is_primary: false, duration_minutes: 10,  description: null,                                                      due_date: null, completed_at: new Date().toISOString() },
-];
-
-// Static business setup steps used as fallback display data
-const setupSteps = [
-  { label: 'LLC Formation', done: true },
-  { label: 'EIN Registration', done: true },
-  { label: 'Business Bank Account', done: false },
-  { label: 'DUNS Number', done: false },
-  { label: 'Business Address', done: false },
-  { label: 'Phone & Website', done: false },
 ];
 
 // Priority badge colors
@@ -38,26 +37,37 @@ function priorityLabel(priority: number): string {
   return 'Low';
 }
 
-export function ActionCenter() {
+export function ActionCenter({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [entity, setEntity] = useState<BusinessEntity | null>(null);
+  const [alerts, setAlerts] = useState<Notification[]>([]);
+  const [grantsCount, setGrantsCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [isCompletedExpanded, setIsCompletedExpanded] = useState(false);
   const [isSetupExpanded, setIsSetupExpanded] = useState(false);
 
-  useEffect(() => {
+  const load = async () => {
     if (!user) return;
-    (async () => {
-      const { data } = await getTasks(user.id);
-      // If DB has no tasks yet (pre-migration or empty account), use starters as display
-      setTasks(
-        data.length > 0
-          ? data
-          : STARTER_TASKS.map((t, i) => ({ ...t, id: String(i), user_id: user.id, created_at: new Date().toISOString() }))
-      );
-      setLoading(false);
-    })();
-  }, [user]);
+    setLoading(true);
+    const [{ data: taskData }, { data: entityData }, { data: notifData }, { count }] = await Promise.all([
+      getTasks(user.id),
+      getBusinessEntity(user.id),
+      supabase.from('notifications').select('id,title,body,type,created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(3),
+      supabase.from('grants_catalog').select('id', { count: 'exact', head: true }).eq('is_active', true),
+    ]);
+    setTasks(
+      taskData.length > 0
+        ? taskData
+        : STARTER_TASKS.map((t, i) => ({ ...t, id: String(i), user_id: user.id, created_at: new Date().toISOString() }))
+    );
+    setEntity(entityData);
+    setAlerts((notifData ?? []) as Notification[]);
+    setGrantsCount(count ?? 0);
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [user]);
 
   const handleComplete = async (taskId: string) => {
     if (!user || taskId.length <= 1) return; // skip fake starter IDs
@@ -75,6 +85,18 @@ export function ActionCenter() {
 
   // All pending tasks for the main list (primary + remaining)
   const allPending = [...(primaryTask ? [primaryTask] : []), ...remainingTasks];
+
+  // Live business setup steps derived from entity data
+  const setupSteps = [
+    { label: 'LLC Formation',       done: !!(entity?.entity_type) },
+    { label: 'EIN Registration',    done: !!(entity?.ein) },
+    { label: 'Business Bank Acct',  done: false },
+    { label: 'DUNS Number',         done: !!(entity?.duns_number) },
+    { label: 'Formation State',     done: !!(entity?.formation_state) },
+    { label: 'NAICS Code',          done: !!(entity?.naics_code) },
+  ];
+  const setupDone = setupSteps.filter(s => s.done).length;
+  const setupPct = Math.round((setupDone / setupSteps.length) * 100);
 
   return (
     <div style={{ padding: '16px 20px', background: '#eaebf6' }}>
@@ -101,6 +123,7 @@ export function ActionCenter() {
             Completed: {completedTasks.length}/{tasks.length}
           </span>
           <button
+            onClick={load}
             style={{
               padding: '7px 16px',
               borderRadius: 8,
@@ -170,7 +193,7 @@ export function ActionCenter() {
                       fontWeight: 600,
                     }}
                   >
-                    65% Ready
+                    {setupPct}% Ready
                   </span>
                 </div>
                 {isSetupExpanded
@@ -367,35 +390,29 @@ export function ActionCenter() {
             {/* 1. Recent Alerts card */}
             <div className="glass-card" style={{ padding: 20 }}>
               <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a1c3a', marginBottom: 14 }}>Recent Alerts</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {[
-                  { label: 'Credit Score Updated', sub: 'Your score changed by +12 pts', color: '#22c55e', icon: '📈' },
-                  { label: 'Grant Deadline', sub: 'SBIR application closes in 3 days', color: '#f59e0b', icon: '⏰' },
-                  { label: 'Document Required', sub: 'Upload your bank statements', color: '#ef4444', icon: '📄' },
-                ].map((alert, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        background: alert.color + '18',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                        fontSize: 15,
-                      }}
-                    >
-                      {alert.icon}
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: '#1a1c3a', margin: 0 }}>{alert.label}</p>
-                      <p style={{ fontSize: 11, color: '#8b8fa8', margin: '2px 0 0' }}>{alert.sub}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {alerts.length === 0 ? (
+                <p style={{ fontSize: 12, color: '#8b8fa8', textAlign: 'center', padding: '12px 0' }}>No alerts yet.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {alerts.map(alert => {
+                    const iconMap: Record<string, string> = { credit: '📈', grant: '⏰', document: '📄', funding: '💰', task: '✅' };
+                    const colorMap: Record<string, string> = { credit: '#22c55e', grant: '#f59e0b', document: '#ef4444', funding: '#3d5af1', task: '#22c55e' };
+                    const icon = iconMap[alert.type] ?? '🔔';
+                    const color = colorMap[alert.type] ?? '#8b8fa8';
+                    return (
+                      <div key={alert.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: color + '18', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 15 }}>
+                          {icon}
+                        </div>
+                        <div>
+                          <p style={{ fontSize: 12, fontWeight: 600, color: '#1a1c3a', margin: 0 }}>{alert.title}</p>
+                          {alert.body && <p style={{ fontSize: 11, color: '#8b8fa8', margin: '2px 0 0' }}>{alert.body}</p>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* 2. AI Advisor card */}
@@ -414,6 +431,7 @@ export function ActionCenter() {
               </p>
               <button
                 className="nexus-button-primary"
+                onClick={() => onNavigate?.('messages')}
                 style={{
                   width: '100%',
                   padding: '10px 0',
@@ -436,7 +454,7 @@ export function ActionCenter() {
                   { label: 'Credit Score', value: '—', color: '#3d5af1' },
                   { label: 'Funding Readiness', value: `${progress}%`, color: '#3d5af1' },
                   { label: 'Tasks Completed', value: `${completedTasks.length}`, color: '#22c55e' },
-                  { label: 'Grants Eligible', value: '3', color: '#f59e0b' },
+                  { label: 'Grants Available', value: `${grantsCount}`, color: '#f59e0b' },
                 ].map((stat, i) => (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 12, color: '#8b8fa8' }}>{stat.label}</span>

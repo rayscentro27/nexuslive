@@ -293,7 +293,7 @@ function AppContent() {
 
         <div className="flex-1 overflow-y-auto scrollbar-hide" style={{ padding: '16px 16px', paddingBottom: 100 }}>
           {activeTab === 'home'           && <Dashboard onNavigate={setActiveTab} />}
-          {activeTab === 'action-center'  && <ActionCenter />}
+          {activeTab === 'action-center'  && <ActionCenter onNavigate={setActiveTab} />}
           {activeTab === 'business-setup' && <BusinessSetup />}
           {activeTab === 'messages'       && <Messages />}
           {activeTab === 'documents'      && <Documents />}
@@ -322,7 +322,7 @@ function AppContent() {
           )}
           {activeTab === 'credit' && (
             <PlanGate requiredPlan="pro" featureName="Credit Analysis" onUpgrade={() => setShowUpgradeModal(true)}>
-              <CreditAnalysis />
+              <CreditAnalysis onNavigate={setActiveTab} />
             </PlanGate>
           )}
           {activeTab === 'referral' && (
@@ -337,7 +337,7 @@ function AppContent() {
           )}
           {activeTab === 'roadmap' && (
             <PlanGate requiredPlan="elite" featureName="Funding Roadmap" onUpgrade={() => setShowUpgradeModal(true)}>
-              <FundingRoadmap />
+              <FundingRoadmap onNavigate={setActiveTab} />
             </PlanGate>
           )}
           {activeTab === 'bots' && (

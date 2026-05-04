@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Shield, TrendingUp, AlertCircle, FileText, Upload, Download, ArrowRight, CheckCircle2, Clock, Loader2, Zap, Star } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from './AuthProvider';
 import { getCreditReport, getDisputes, CreditReport, CreditDispute } from '../lib/db';
 import { CreditBoostEngine } from './CreditBoostEngine';
 import { ApprovalSimulator } from './ApprovalSimulator';
+import { supabase } from '../lib/supabase';
 
 function scoreBandColor(band: string | null) {
   switch (band?.toLowerCase()) {
@@ -38,12 +39,33 @@ function formatRange(min: number | null, max: number | null) {
 
 type CreditTab = 'analysis' | 'boost' | 'simulator';
 
-export function CreditAnalysis() {
+export function CreditAnalysis({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user } = useAuth();
   const [report, setReport] = useState<CreditReport | null>(null);
   const [disputes, setDisputes] = useState<CreditDispute[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<CreditTab>('analysis');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileUpload(file: File) {
+    if (!user) return;
+    setUploading(true);
+    const ext = file.name.split('.').pop();
+    const path = `${user.id}/${Date.now()}.${ext}`;
+    const { data: storageData, error: storageError } = await supabase.storage
+      .from('credit-reports')
+      .upload(path, file, { upsert: true });
+    if (storageError || !storageData) { setUploading(false); return; }
+    const { data: { publicUrl } } = supabase.storage.from('credit-reports').getPublicUrl(path);
+    const { data: inserted } = await supabase.from('credit_reports').insert({
+      user_id: user.id,
+      report_file_url: publicUrl,
+      report_date: new Date().toISOString().split('T')[0],
+    }).select().single();
+    if (inserted) setReport(inserted as CreditReport);
+    setUploading(false);
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -121,7 +143,7 @@ export function CreditAnalysis() {
 
       {/* Tab content */}
       {activeTab === 'boost' && <CreditBoostEngine />}
-      {activeTab === 'simulator' && <ApprovalSimulator />}
+      {activeTab === 'simulator' && <ApprovalSimulator onNavigate={onNavigate} />}
       {activeTab === 'analysis' && (loading ? (
         <div className="flex-1 flex items-center justify-center">
           <Loader2 className="w-6 h-6 text-slate-300 animate-spin" />
@@ -261,15 +283,26 @@ export function CreditAnalysis() {
           <div className="space-y-3">
             <h2 className="text-lg font-bold text-slate-900 px-2">History & Upload</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="glass-card p-6 border-dashed border-2 flex flex-col items-center justify-center text-center space-y-3 hover:bg-slate-50/50 transition-all cursor-pointer">
+              <label
+                className="glass-card p-6 border-dashed border-2 flex flex-col items-center justify-center text-center space-y-3 hover:bg-slate-50/50 transition-all cursor-pointer"
+                onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f); }}
+                onDragOver={e => e.preventDefault()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }}
+                />
                 <div className="w-10 h-10 bg-blue-50 text-[#5B7CFA] rounded-full flex items-center justify-center">
-                  <Upload className="w-5 h-5" />
+                  {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
                 </div>
                 <div className="space-y-0.5">
-                  <h3 className="text-sm font-bold text-slate-900">Upload New Report</h3>
-                  <p className="text-[10px] text-slate-500">Supported: PDF, JPG, PNG</p>
+                  <h3 className="text-sm font-bold text-slate-900">{uploading ? 'Uploading…' : 'Upload New Report'}</h3>
+                  <p className="text-[10px] text-slate-500">Click or drag & drop — PDF, JPG, PNG</p>
                 </div>
-              </div>
+              </label>
 
               {report?.report_file_url ? (
                 <div className="glass-card p-5 flex flex-col justify-between">

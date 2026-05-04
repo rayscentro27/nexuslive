@@ -71,6 +71,13 @@ export function GrantsFinder() {
     const matchesSearch = !search || g.title.toLowerCase().includes(search.toLowerCase()) || (g.grantor ?? '').toLowerCase().includes(search.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  const opportunities = visibleGrants.slice(0, 4).map(g => ({
+    title: g.title,
+    date: g.deadline ? new Date(g.deadline).toLocaleDateString() : 'Open',
+    amount: formatAmount(g.amount_min, g.amount_max),
+    status: 'In-Progress' as const,
+  }));
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto h-full flex flex-col">
       <div className="flex items-center justify-between shrink-0">

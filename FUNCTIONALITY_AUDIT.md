@@ -1,287 +1,384 @@
-# Nexus Functionality Audit
+# Nexus Platform — Functionality Audit
+**Date:** 2026-05-03  
+**Auditor:** Claude Code (read-only pass)  
+**Scope:** All client and admin components + migration SQL  
 
-Generated: 2026-05-03 | Version: Phase 1-25 Implementation
-
----
-
-## CLIENT PORTAL PAGES
-
-### Home / Dashboard (`activeTab = 'home'`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Admin Visible | Notification/Task |
-|---|---|---|---|---|---|---|
-| Upload Report button | Navigates to Credit tab | `credit_reports` | ✓ | Static CTA | ✓ via AdminCreditOps | ✓ on upload |
-| Improve Approval Odds | Navigates to Action Center | `tasks` | ✓ | — | ✓ | — |
-| Start Task (Next Best Action) | Navigates to Action Center | `tasks` | ✓ | Hides when no task | ✓ | — |
-| View All Tasks | Navigates to Action Center | `tasks` | ✓ | Shows "caught up" | ✓ | — |
-| Invite & Earn | Navigates to referral tab | `referrals` | ✓ | — | ✓ | — |
-| Readiness breakdown scores | Navigates to relevant tab | DB-derived | ✓ | Default 0% | ✓ | — |
-| Journey step boxes | Visual only | `credit_reports`, `user_profiles` | ✓ | Static defaults | — | — |
-
-### Action Center (`activeTab = 'action-center'`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Admin Visible | Notification/Task |
-|---|---|---|---|---|---|---|
-| Complete task button | Updates `tasks.status = 'complete'` | `tasks` | ✓ | — | ✓ | — |
-| Start task button | Updates `tasks.status = 'in_progress'` | `tasks` | ✓ | — | ✓ | — |
-| All tasks list | Fetches and displays pending tasks | `tasks` | ✓ | Empty state | ✓ | — |
-
-### Credit Analysis (`activeTab = 'credit'`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Admin Visible | Notification/Task |
-|---|---|---|---|---|---|---|
-| Tab: Analysis | Shows credit report, disputes, score | `credit_reports`, `credit_disputes` | ✓ | "No report" state | ✓ via AdminCreditOps | ✓ on upload |
-| Tab: Boost Engine | Shows credit boost opportunities | `credit_boost_opportunities`, `credit_boost_actions` | ✓ | Seeded catalog | ✓ | ✓ task created |
-| Tab: Simulator | Runs approval odds simulation | `lender_rules`, `approval_simulations` | ✓ | Mock with seeded rules | — | — |
-| Generate Dispute Letters | Placeholder — shows existing disputes | `credit_disputes` | Partial | Shows disputes | ✓ | — |
-| Download report | Links to `report_file_url` | `credit_reports` | ✓ | Hidden when no URL | — | — |
-| Boost Engine: See Options | Opens detail modal (rent = full modal, others = TBD) | `rent_reporting_providers` | ✓ for rent | Graceful fallback | — | — |
-| Boost Engine: Add to Plan | Creates boost action + task | `credit_boost_actions`, `tasks` | ✓ | — | — | ✓ task created |
-| Simulator: Run Simulation | Calculates approval odds from credit data | `lender_rules`, `credit_reports` | ✓ | Mock score=680 | — | — |
-
-### Funding (`activeTab = 'funding'`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Admin Visible | Notification/Task |
-|---|---|---|---|---|---|---|
-| Funding stages | Shows stage status | `funding_stages`, `funding_actions` | ✓ | Empty state | ✓ via AdminFunding | — |
-| Funding applications | Shows application tracking | `funding_applications` | ✓ | Empty state | ✓ | — |
-| Plan Gate | Shown to free users | — | ✓ | Upgrade CTA | — | — |
-| **Missing**: Funding Roadmap widget | Not yet wired to `funding_roadmap_stages` | `funding_roadmap_stages` | ✗ planned | — | — | — |
-| **Missing**: Approval Simulator on Funding | Could link from funding tab | `approval_simulations` | ✗ planned | — | — | — |
-
-### Grants (`activeTab = 'grants'`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Admin Visible | Notification/Task |
-|---|---|---|---|---|---|---|
-| Save Search button | Shows "catalog" section | Static | ✓ | — | — | — |
-| Grant cards (static) | Visual display | Static mock | Partial | Static data | — | — |
-| Research Requests tab | Shows grant research requests | `grant_review_requests` | ✓ | Empty state | ✓ via AdminGrantReviews | ✓ notification on submit |
-| Submit Request | Creates grant_review_request row | `grant_review_requests` | ✓ | — | ✓ | ✓ notification |
-| **Missing**: Real grant catalog from DB | Connect `grants_catalog` to UI | `grants_catalog` | ✗ planned | — | — | — |
-
-### Trading (`activeTab = 'trading'`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Admin Visible | Notification/Task |
-|---|---|---|---|---|---|---|
-| Trading Lab / Dashboard | Shows existing trading UI | `trading_strategies`, `trading_journal` | ✓ existing | — | ✓ via AdminTrading | — |
-| **Missing**: Paper Trading account | Not wired to `paper_trading_accounts` | `paper_trades` | ✗ planned | — | — | — |
-| **Missing**: Strategy approval UI | Admin must approve strategies | `trading_strategies.is_approved` | ✗ planned | — | — | — |
-
-### Messages (`activeTab = 'messages'`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Admin Visible | Notification/Task |
-|---|---|---|---|---|---|---|
-| Conversation list | Fetches conversations | `chat_conversations` | ✓ | Empty state | ✓ via AdminMessaging | — |
-| Send message | Creates message row | `chat_messages` | ✓ | — | ✓ | — |
-| Floating chat button | Opens contextual chat drawer | `chat_conversations`, `chat_messages` | ✓ | Hidden when disabled | ✓ | — |
-| Quick chips | Pre-fills message input | — | ✓ | — | — | — |
-
-### Documents (`activeTab = 'documents'`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Admin Visible | Notification/Task |
-|---|---|---|---|---|---|---|
-| Document list | Fetches documents | `documents` | ✓ | Empty state | ✓ via AdminDocuments | — |
-| Upload | Existing upload flow | `documents` | ✓ existing | — | ✓ | — |
-| Status badges | Shows pending/verified/attention | `documents.status` | ✓ | — | ✓ | — |
-
-### Account (`activeTab = 'account'`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Admin Visible | Notification/Task |
-|---|---|---|---|---|---|---|
-| Profile display | Shows user profile data | `user_profiles` | ✓ | — | ✓ | — |
-| **Missing**: Access status display | Pilot users should see "Free Full Access" badge | `user_access_overrides` | ✗ planned | — | — | — |
-
-### Settings (`activeTab = 'settings'`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Admin Visible | Notification/Task |
-|---|---|---|---|---|---|---|
-| Notification settings | Toggle email/push/sms | `user_settings` | ✓ | — | — | — |
-| 2FA toggle | Setting UI | `user_settings` | ✓ existing | — | — | — |
-| **Missing**: Subscription status | Show access override status | `user_access_overrides` | ✗ planned | — | — | — |
-
-### Notifications (`activeTab = 'notifications'`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Admin Visible | Notification/Task |
-|---|---|---|---|---|---|---|
-| Notification list | Fetches user notifications | `notifications` | ✓ | Empty state | — | — |
-| Mark all read | Updates `read_at` on all | `notifications` | ✓ | — | — | — |
-| Dismiss (X) | Updates `dismissed_at` | `notifications` | ✓ | — | — | — |
-| Notification bell badge | Shows unread count | `notifications` | ✓ | — | — | — |
-| Real-time updates | Supabase realtime subscription | `notifications` | ✓ | — | — | — |
-| Toast notifications | Priority ≥2 shown as toast | `notifications` | ✓ | — | — | — |
-
-### Business Setup (`activeTab = 'business-setup'`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Admin Visible | Notification/Task |
-|---|---|---|---|---|---|---|
-| Business sections | Shows existing setup UI | `business_entities` | ✓ existing | Static mock | ✓ | — |
-| **Missing**: LLC guided setup | Two-path LLC flow | `business_setup_steps` | ✗ planned | — | — | — |
-| **Missing**: Business Readiness Score | Calculated score widget | `business_readiness_scores` | ✗ planned | — | — | — |
-| **Missing**: Vendor tradelines tab | Business credit from `vendor_tradelines_catalog` | `user_vendor_accounts` | ✗ planned | — | — | — |
-
-### Referral (`activeTab = 'referral'`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Admin Visible | Notification/Task |
-|---|---|---|---|---|---|---|
-| Referral link display | Shows user referral link | `referrals` | ✓ existing | — | — | — |
-| **Missing**: Commission tracking | 10% funding commission tracking | `funding_commissions` | ✗ planned | — | — | — |
+**Status Codes**
+| Code | Meaning |
+|------|---------|
+| ✅ WORKS | Has click handler / DB operation / navigation confirmed functional |
+| ⚠️ PARTIAL | Partially functional — some sub-features broken or DB write missing |
+| ❌ BROKEN | Missing onClick, navigation dead-end, or runtime error |
+| 🔲 STATIC | Hardcoded data with no DB read or write |
 
 ---
 
-## ADMIN PORTAL PAGES
+## 1. App.tsx — Core Routing & Navigation
 
-### Admin Dashboard (`admin/dashboard`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Notification/Task |
-|---|---|---|---|---|---|
-| Client count | Fetches all user profiles | `user_profiles` | ✓ | — | — |
-| Funding pipeline | Fetches applications | `funding_applications` | ✓ | — | — |
-| Revenue metrics | Static/calculated | — | Partial | — | — |
-
-### Admin Clients (`admin/clients`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Notification/Task |
-|---|---|---|---|---|---|
-| Client list | Fetches all profiles | `user_profiles` | ✓ | — | — |
-| Search/filter | Filters client list | In-memory | ✓ | — | — |
-| **Missing**: View client details | Drill into specific client | — | ✗ planned | — | — |
-
-### Admin Invites (`admin/invites`)  ← NEW
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Notification/Task |
-|---|---|---|---|---|---|
-| Add Invite | Creates invited_user row | `invited_users` | ✓ | — | — |
-| Send Welcome Email | Marks invite sent, shows email preview | `invited_users` | ✓ | Shows template | — |
-| Resend Invite | Same as send welcome | `invited_users` | ✓ | — | — |
-| Activate Subscription | Sets grace period, creates notification | `invited_users`, `user_access_overrides`, `notifications` | ✓ | — | ✓ notification |
-| Restore Free Access | Restores waived status | `invited_users`, `user_access_overrides` | ✓ | — | — |
-| Revoke Access | Sets subscription required | `invited_users`, `user_access_overrides` | ✓ | — | — |
-
-### Admin Grant Reviews (`admin/grants-review`)  ← NEW
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Notification/Task |
-|---|---|---|---|---|---|
-| Request list | Fetches all grant requests | `grant_review_requests` | ✓ | — | — |
-| Respond to Request | Updates status + response, notifies user | `grant_review_requests`, `notifications` | ✓ | — | ✓ notification |
-
-### Admin Messaging (`admin/messages`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Notification/Task |
-|---|---|---|---|---|---|
-| Conversation list | Fetches all conversations | `chat_conversations` | ✓ | — | — |
-| **Missing**: Draft approval | Admin approve/edit AI drafts | `message_drafts` | ✗ planned | — | — |
-
-### Admin Credit Ops (`admin/credit`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Notification/Task |
-|---|---|---|---|---|---|
-| Credit reports list | Fetches all credit reports | `credit_reports` | ✓ | — | — |
-| Disputes list | Fetches all disputes | `credit_disputes` | ✓ | — | — |
-
-### Admin Funding (`admin/funding`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Notification/Task |
-|---|---|---|---|---|---|
-| Applications list | Fetches all funding applications | `funding_applications` | ✓ | — | — |
-| **Missing**: Commission tracking | View/verify commissions | `funding_commissions` | ✗ planned | — | — |
-
-### Admin Subscriptions (`admin/subscriptions`)
-| Button/Action | What It Does | Table/Function | Complete | Fallback | Notification/Task |
-|---|---|---|---|---|---|
-| Plan management | Shows subscription plans | `subscription_plans` | ✓ | — | — |
-| **Missing**: Bulk subscription activation | Activate for all pilot users | `user_access_overrides` | ✗ planned | — | — |
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| URL-based routing (`/app/*` React Router) | ✅ WORKS | Routes map correctly to components |
+| State-based tab routing (SPA dock) | ✅ WORKS | `activeTab` state drives render |
+| Bottom dock — 11 client nav items | ✅ WORKS | `dashboard`, `credit`, `funding`, `roadmap`, `business`, `action-center`, `documents`, `messages`, `trading`, `grants`, `account` |
+| `business-setup` tab | ⚠️ PARTIAL | Exists in state router; NOT in dock — only reachable via `onNavigate` calls from Dashboard / FundingReadiness |
+| `funding-readiness` tab | ⚠️ PARTIAL | Exists in state router; NOT in dock — reachable only via FundingReadiness button callbacks |
+| `bank-behavior` tab | ⚠️ PARTIAL | Exists in state router; NOT in dock — reachable only via FundingReadiness |
+| Admin portal switcher | ✅ WORKS | Visible only to `admin`/`super_admin` roles; toggles `portal` state |
+| FloatingChat global render | ⚠️ PARTIAL | Renders globally; see FloatingChat hook-order bug below |
+| NotificationBell | ✅ WORKS | Subscribes via NotificationContext |
+| PlanGate (pro/elite gating) | ✅ WORKS | Wraps Trading Lab, some credit features |
 
 ---
 
-## FEATURE FLAG STATUS
+## 2. Dashboard
 
-| Flag | Default | Effect When Disabled |
-|---|---|---|
-| `credit_boost_engine` | enabled | Boost Engine tab hidden in Credit Analysis |
-| `funding_readiness` | enabled | Readiness score widget shows mock data |
-| `grants_engine` | enabled | Grants page shows static grants only |
-| `trading_lab` | enabled | Trading tab shows plan gate |
-| `floating_chat` | enabled | Floating chat button hidden |
-| `notifications` | enabled | Bell shows empty state |
-| `pilot_mode` | enabled | Invite system available in admin |
-| `concierge` | enabled | Concierge UI available |
-| `approval_simulator` | enabled | Simulator tab shown in Credit Analysis |
-| `partner_portal` | disabled | Partner system not exposed |
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `user_profiles`, `tasks`, `activity_log`, `credit_reports` | ✅ WORKS | Live data |
+| Funding range display | ⚠️ PARTIAL | Falls back to hardcoded $13k–$75k if no credit report on file |
+| Activity log fallback | ⚠️ PARTIAL | Shows hardcoded activity if DB table empty |
+| Readiness breakdown item clicks → navigate to tabs | ✅ WORKS | `onNavigate` calls go to valid tabs |
+| "Upload Report" button | ✅ WORKS | Navigates to `credit` tab via `onNavigate` |
+| Quick action buttons | ✅ WORKS | Navigate to correct tabs |
+| Funding readiness score card | ✅ WORKS | Reads from `funding_readiness_snapshots` |
 
 ---
 
-## SUPABASE TABLES — IMPLEMENTATION STATUS
+## 3. Credit Analysis
 
-| Table | Created | RLS | Seeded | Used in UI |
-|---|---|---|---|---|
-| `user_profiles` | ✓ existing | ✓ | — | ✓ Dashboard, Header, Auth |
-| `tasks` | ✓ existing | ✓ | — | ✓ Dashboard, ActionCenter |
-| `credit_reports` | ✓ existing | ✓ | — | ✓ CreditAnalysis |
-| `credit_disputes` | ✓ existing | ✓ | — | ✓ CreditAnalysis |
-| `chat_conversations` | ✓ existing | ✓ | — | ✓ Messages, FloatingChat |
-| `chat_messages` | ✓ existing | ✓ | — | ✓ Messages, FloatingChat |
-| `documents` | ✓ existing | ✓ | — | ✓ Documents |
-| `funding_stages` | ✓ existing | ✓ | — | ✓ FundingRoadmap |
-| `funding_applications` | ✓ existing | ✓ | — | ✓ Funding |
-| `business_entities` | ✓ existing | ✓ | — | ✓ BusinessSetup |
-| `activity_log` | ✓ existing | ✓ | — | ✓ Dashboard |
-| `notifications` | ✓ new | ✓ | — | ✓ NotificationBell, Toasts |
-| `invited_users` | ✓ new | ✓ | — | ✓ AdminInviteUsers |
-| `user_access_overrides` | ✓ new | ✓ | — | ✓ usePlan, AdminInviteUsers |
-| `subscription_notifications` | ✓ new | ✓ | — | Partial |
-| `credit_boost_opportunities` | ✓ new | ✓ | ✓ seeded | ✓ CreditBoostEngine |
-| `credit_boost_actions` | ✓ new | ✓ | — | ✓ CreditBoostEngine |
-| `rent_reporting_providers` | ✓ new | ✓ | ✓ seeded | ✓ RentKharmaModal |
-| `user_rent_reporting` | ✓ new | ✓ | — | Planned |
-| `credit_fundability_scores` | ✓ new | ✓ | — | Planned |
-| `vendor_tradelines_catalog` | ✓ new | ✓ | ✓ seeded | Planned |
-| `user_vendor_accounts` | ✓ new | ✓ | — | Planned |
-| `business_credit_profiles` | ✓ new | ✓ | — | Planned |
-| `funding_readiness_snapshots` | ✓ new | ✓ | — | Planned |
-| `funding_roadmap_stages` | ✓ new | ✓ | — | Planned |
-| `funding_timeline_events` | ✓ new | ✓ | — | Planned |
-| `next_best_actions` | ✓ new | ✓ | — | Planned |
-| `funding_recommendations` | ✓ new | ✓ | — | Planned |
-| `funding_strategies` | ✓ new | ✓ | — | Planned |
-| `lender_rules` | ✓ new | ✓ | ✓ seeded | ✓ ApprovalSimulator |
-| `approval_simulations` | ✓ new | ✓ | — | ✓ ApprovalSimulator |
-| `concierge_plans` | ✓ new | ✓ | ✓ seeded | Planned |
-| `concierge_clients` | ✓ new | ✓ | — | Planned |
-| `grants_catalog` | ✓ new | ✓ | — | Planned |
-| `grant_matches` | ✓ new | ✓ | — | Planned |
-| `grant_applications` | ✓ new | ✓ | — | Planned |
-| `grant_review_requests` | ✓ new | ✓ | — | ✓ GrantResearchRequest, AdminGrantReviews |
-| `grant_deadlines` | ✓ new | ✓ | — | Planned |
-| `trading_strategies` | ✓ new | ✓ | — | Planned |
-| `paper_trading_accounts` | ✓ new | ✓ | — | Planned |
-| `paper_trades` | ✓ new | ✓ | — | Planned |
-| `paper_trading_metrics` | ✓ new | ✓ | — | Planned |
-| `broker_connections` | ✓ new | ✓ | — | Planned |
-| `ai_agent_events` | ✓ new | ✓ | — | Planned |
-| `ai_employee_runs` | ✓ new | ✓ | — | Planned |
-| `research_sources` | ✓ new | ✓ | — | Planned |
-| `website_change_recommendations` | ✓ new | ✓ | — | Planned |
-| `bank_behavior_snapshots` | ✓ new | ✓ | — | Planned |
-| `referrals` | ✓ new | ✓ | — | Planned |
-| `referral_earnings` | ✓ new | ✓ | — | Planned |
-| `funding_commissions` | ✓ new | ✓ | — | Planned |
-| `partners` | ✓ new | ✓ | — | Planned |
-| `partner_branding` | ✓ new | ✓ | — | Planned |
-| `partner_clients` | ✓ new | ✓ | — | Planned |
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `credit_reports` | ✅ WORKS | Displays score, band, utilization |
+| Three tabs (Analysis / Boost Engine / Simulator) | ✅ WORKS | Tab switching works |
+| "Generate Dispute Letters" button | ❌ BROKEN | No `onClick` handler |
+| "View Disputes" button | ❌ BROKEN | No `onClick` handler |
+| "View Utilization" button | ❌ BROKEN | No `onClick` handler |
+| "Upload New Report" file drop zone | ❌ BROKEN | No file handler attached |
+| Credit Boost Engine sub-tab | ✅ WORKS | Renders `CreditBoostEngine` |
+| Approval Simulator sub-tab | ✅ WORKS | Renders `ApprovalSimulator` |
 
 ---
 
-## CRITICAL RULES COMPLIANCE CHECK
+## 4. Credit Boost Engine
 
-| Rule | Status |
-|---|---|
-| No dead buttons | ✓ All buttons navigate or trigger real actions |
-| No auto-submit lender applications | ✓ No auto-apply logic anywhere |
-| No auto-trade | ✓ Trading is educational/paper only |
-| No guaranteed funding/credit/grants | ✓ All language is educational + probability-based |
-| Tenant isolation (RLS) | ✓ All tables have RLS policies |
-| Free access pilot system | ✓ user_access_overrides + usePlan updated |
-| Apple-style UI preserved | ✓ No redesign |
-| Feature flags for new features | ✓ featureFlags.ts created |
-| Graceful fallbacks | ✓ All new components have empty/loading states |
-| Admin visibility | ✓ All new features accessible from admin portal |
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `credit_boost_opportunities`, `credit_boost_actions` | ✅ WORKS | Live catalog + user actions |
+| Category filter tabs | ✅ WORKS | Filters opportunities list |
+| "Add to Plan" button | ✅ WORKS | Upserts to `credit_boost_actions` AND inserts to `tasks` |
+| "See Options" button — `rent_reporting` category | ✅ WORKS | Opens `RentKharmaModal` |
+| "See Options" button — all other categories | ❌ BROKEN | No-op; only rent_reporting handled |
+| RentKharmaModal: reads `rent_reporting_providers` | ✅ WORKS | Live DB read |
+| RentKharmaModal: "Add to Action Center" | ✅ WORKS | Calls `onAddToPlan` which upserts |
 
 ---
 
-## WHAT REMAINS (Planned, Not Yet Built)
+## 5. Approval Simulator
 
-1. Business Foundation upgrade: LLC guided flow, business readiness score, NAICS optimizer
-2. Business Credit section: vendor tradelines UI, DUNS/PAYDEX display
-3. Funding Readiness Score page: `funding_readiness_snapshots` wired to UI
-4. Apply for Funding Engine: 0% strategy, lender recommendations
-5. Concierge opt-in flow
-6. Full Commission/Referral tracking UI
-7. Real grants catalog from `grants_catalog` table
-8. Trading: paper trading account + trades + metrics UI
-9. Admin: AI workforce monitoring (`ai_employee_runs`, `ai_agent_events`)
-10. Admin: Website change approvals (`website_change_recommendations`)
-11. Admin: Subscription activation queue (bulk pilot-to-paid conversion)
-12. Bank Behavior Tracking: `bank_behavior_snapshots` manual entry UI
-13. Profile completion widget
-14. Partner/white-label system
-15. Research/YouTube intake workflow
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `lender_rules`, `credit_reports` | ✅ WORKS | Live data |
+| "Run Simulation" button | ✅ WORKS | Computes approval odds locally; sorted by odds |
+| Simulation result display | ✅ WORKS | Shows lender, odds, estimated limit, risk factors |
+| No DB write on simulation | ⚠️ PARTIAL | `approval_simulations` table exists in schema but component never writes to it |
+| "Apply" / lender action button | ❌ BROKEN | No button present in results; user cannot proceed to apply |
+| Re-run simulation | ✅ WORKS | Resets and allows re-run |
+
+---
+
+## 6. Business Foundation
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| Foundation tab: reads/writes `business_entities` | ✅ WORKS | Edit/Save via `upsertBusinessEntity` |
+| LLC Setup tab: provider links | ✅ WORKS | `window.open` via anchor tags |
+| LLC Setup tab: step completion | ❌ BROKEN | `completedSteps` is local state only — not persisted to DB |
+| Business Credit tab: reads/writes `business_credit_profiles` | ✅ WORKS | Upsert on `user_id` |
+| Vendors tab: reads `vendor_tradelines_catalog` | ✅ WORKS | Live catalog |
+| Vendors tab: "Apply" button | ✅ WORKS | Upserts to `user_vendor_accounts`, inserts `tasks`, opens `application_url` |
+| Vendors tab: applied status badge | ✅ WORKS | Reads `user_vendor_accounts` |
+
+---
+
+## 7. Funding
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `user_profiles`, `funding_applications`, `tasks` | ✅ WORKS | Live data |
+| Five tabs (Overview / Applications / Pipeline / Strategy / History) | ✅ WORKS | Tab switching works |
+| "New Application" button | ❌ BROKEN | No `onClick` handler |
+| Pipeline bars | 🔲 STATIC | Hardcoded percentages; no DB source |
+| Lender Matches section | 🔲 STATIC | Hardcoded lender list |
+| Strategy tab checklist | ❌ BROKEN | Local state only; not persisted |
+| "Apply at Issuer" card links | ✅ WORKS | Anchor tags with `target="_blank"` |
+| Applications list (if any records exist) | ✅ WORKS | DB-driven display |
+
+---
+
+## 8. Funding Readiness
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `funding_readiness_snapshots` | ✅ WORKS | Shows latest snapshot |
+| "Recalculate" button | ✅ WORKS | Pulls live credit/entity/business_credit data; inserts new snapshot row |
+| Factor navigation buttons | ✅ WORKS | Call `onNavigate` to correct tabs |
+| Bank behavior factor | ❌ BROKEN | Always returns null (explicitly noted in code) |
+| Snapshot history | ✅ WORKS | Multiple rows shown in order |
+
+---
+
+## 9. Funding Roadmap
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `funding_stages` with joined `funding_actions` | ✅ WORKS | Falls back to `STATIC_STAGES` if DB empty |
+| Stage cards display | ✅ WORKS | Status, requirements shown |
+| Action step checkboxes | ❌ BROKEN | Display only; no toggle/DB write |
+| "View Funding Options" button | ❌ BROKEN | No `onClick` handler |
+| Static fallback stages | 🔲 STATIC | 4 hardcoded stages if DB empty |
+
+---
+
+## 10. Grants Finder
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `grants_catalog` | ✅ WORKS | Falls back to 4 `STATIC_GRANTS` if DB empty |
+| Search input | ✅ WORKS | Filters by title/description/category |
+| Category filter tabs | ✅ WORKS | Filters grant list |
+| "Apply" button (with `official_url`) | ✅ WORKS | Anchor tag opens external URL |
+| "Apply" button (without `official_url`) | ❌ BROKEN | Renders as dead button with no action |
+| "Save Search" button | ❌ BROKEN | No `onClick` handler |
+| `opportunities` variable reference | ❌ BROKEN | **Runtime ReferenceError crash** — variable used in JSX but never defined in the component |
+| "Talk to Your AI" button | ❌ BROKEN | No `onClick` handler |
+| Grant Research Request section | ✅ WORKS | Renders `GrantResearchRequest` component |
+
+---
+
+## 11. Grant Research Request
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `grant_review_requests` | ✅ WORKS | Shows existing request if any |
+| Form submit | ✅ WORKS | Inserts to `grant_review_requests` with status `pending` |
+| Notification on submit | ✅ WORKS | Also inserts to `notifications` table |
+| Response display (when admin responds) | ✅ WORKS | Shows `response` field when populated |
+
+---
+
+## 12. Trading Lab
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| Research Lab — performance data | 🔲 STATIC | Hardcoded `performanceData` arrays |
+| Research Lab — backtest results | 🔲 STATIC | Hardcoded `backtestResults` |
+| Research Lab — "Try Demo" button | ❌ BROKEN | No `onClick` handler |
+| Research Lab — "Journal" button | ❌ BROKEN | No `onClick` handler |
+| Paper Account — DB reads: `paper_trading_accounts`, `paper_trades` | ✅ WORKS | Live data |
+| Paper Account — auto-create account | ✅ WORKS | Creates account with $10,000 balance if none exists |
+| Paper Account — Open Trade | ✅ WORKS | Writes to `paper_trades`, updates balance |
+| Paper Account — Close Trade | ✅ WORKS | Writes to DB, updates P&L and balance |
+| Market prices for trade entry | ❌ BROKEN | Manually entered; no live market data feed |
+
+---
+
+## 13. Documents
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `documents` | ✅ WORKS | Live document list |
+| Upload — Supabase Storage `documents` bucket | ✅ WORKS | Writes to storage then inserts to `documents` table |
+| Delete document | ✅ WORKS | Deletes from `documents` table |
+| View / Download | ✅ WORKS | Anchor tags with signed URLs |
+| "Upload Now" sidebar buttons | ✅ WORKS | Trigger file input |
+| Storage usage bar | ✅ WORKS | Calculated from actual file sizes |
+
+---
+
+## 14. Messages
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads/creates: `chat_conversations`, `chat_messages` | ✅ WORKS | `getOrCreateConversation` pattern |
+| Send message | ✅ WORKS | Inserts user message; calls Gemini; persists bot response |
+| Search bar input | ❌ BROKEN | Input rendered but not connected to any filter logic |
+| Phone / Video / MoreVertical icon buttons | ❌ BROKEN | No `onClick` handlers |
+| Context panel "Suggested Actions" buttons | ❌ BROKEN | No `onClick` handlers |
+| 65% readiness in sidebar | 🔲 STATIC | Hardcoded value |
+
+---
+
+## 15. Floating Chat
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| Create/reuse `chat_conversations` (contact `nexus-support`) | ✅ WORKS | `getOrCreateConversation` |
+| Send message + DB persist | ✅ WORKS | Inserts user message |
+| Auto-acknowledge canned response | ✅ WORKS | 800ms timeout inserts bot response to DB |
+| Quick chips by active tab | ✅ WORKS | Context-aware suggestions |
+| Feature flag check order | ⚠️ PARTIAL | `isFeatureEnabled` called before hooks complete — React rules violation; may misbehave under Strict Mode |
+
+---
+
+## 16. Notifications
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| Fetch notifications on mount | ✅ WORKS | Reads `notifications` table |
+| Real-time subscription (Supabase Realtime) | ✅ WORKS | Subscribes to INSERT events |
+| Toast for priority >= 2 | ✅ WORKS | Auto-dismisses |
+| Mark read | ✅ WORKS | Updates `read_at` in DB |
+| Mark all read | ✅ WORKS | Bulk update |
+| Dismiss notification | ✅ WORKS | Updates `dismissed_at` in DB |
+| "View all" link | ✅ WORKS | Calls `onOpenPage` callback |
+| Dropdown shows last 10 | ✅ WORKS | Sliced from sorted array |
+
+---
+
+## 17. Action Center
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `tasks` | ✅ WORKS | Live task list |
+| Starter tasks fallback | ⚠️ PARTIAL | `STARTER_TASKS` have fake IDs 0–6; `handleComplete` silently skips them (ID length <= 1 guard) |
+| "Complete" task toggle (real tasks) | ✅ WORKS | Updates DB for genuine UUID tasks |
+| "Refresh" button | ❌ BROKEN | No `onClick` handler |
+| "Chat with Advisor" button | ❌ BROKEN | No `onClick` or navigation |
+| Business Setup checklist | 🔲 STATIC | Hardcoded items; not DB-driven |
+| Recent Alerts | 🔲 STATIC | Hardcoded; not from `notifications` table |
+| "Grants Eligible: 3" | 🔲 STATIC | Hardcoded count |
+
+---
+
+## 18. Account
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `user_profiles`, `business_entities`, `user_access_overrides` | ✅ WORKS | Live data |
+| Edit display name | ✅ WORKS | Writes to `user_profiles` |
+| Pilot access badge | ✅ WORKS | Shown when `subscription_required === false` |
+| Profile completion widget | ✅ WORKS | Dynamic percentage from DB fields |
+| "Add Credits" button | ❌ BROKEN | No `onClick` handler |
+| "Security & Privacy" settings button | ❌ BROKEN | No navigation |
+| "Notifications" settings button | ❌ BROKEN | No navigation |
+| "Integrations" settings button | ❌ BROKEN | No navigation |
+| Sign Out | ✅ WORKS | Calls `signOut` from AuthProvider |
+| Nexus Credits display | 🔲 STATIC | Hardcoded $0 / 0 credits |
+
+---
+
+## 19. Settings
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `user_profiles`, `user_settings`, `business_entities` | ✅ WORKS | Live data |
+| Profile name save | ✅ WORKS | Writes to `user_profiles` |
+| Notification toggles | ✅ WORKS | Write to `user_settings` |
+| 2FA toggle | ✅ WORKS | Writes to `user_settings` |
+| Avatar upload button | ❌ BROKEN | No file handler |
+| "Change Password" button | ❌ BROKEN | No `onClick` handler |
+| "Download My Data" button | ❌ BROKEN | No `onClick` handler |
+| "Help Center" button | ❌ BROKEN | No `onClick` handler |
+| "Contact Support" button | ❌ BROKEN | No `onClick` handler |
+| "Manage Subscription" button | ❌ BROKEN | No `onClick` handler |
+| Security tab content | 🔲 STATIC | Placeholder text only |
+| Integrations tab content | 🔲 STATIC | Placeholder text only |
+
+---
+
+## 20. Admin Portal
+
+### 20a. Admin Dashboard
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `user_profiles`, `documents`, `funding_applications`, `bot_profiles` | ✅ WORKS | Live metrics |
+| Client list with key metrics | ✅ WORKS | DB-driven |
+| "View" button on client rows | ❌ BROKEN | No `onClick` handler |
+| "System Report" button | ❌ BROKEN | No `onClick` handler |
+
+### 20b. Admin Clients
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `user_profiles` | ✅ WORKS | All clients listed |
+| Search by name / plan | ✅ WORKS | Client-side filter |
+| Sort by readiness / joined / plan | ✅ WORKS | Client-side sort |
+| "Manage" button per client row | ❌ BROKEN | No `onClick` handler |
+
+### 20c. Admin Invite Users
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| Invite form submit | ✅ WORKS | Inserts to `invited_users` |
+| Update invite status | ✅ WORKS | Updates `invited_users` in DB |
+| "Activate" subscription | ✅ WORKS | Updates `invited_users` + `user_access_overrides` + inserts `notifications` |
+| "Revoke" / "Restore" access | ✅ WORKS | Updates `user_access_overrides` |
+| "Send Welcome Email" | ⚠️ PARTIAL | Updates `invite_status` to 'sent' in DB only; no actual email sent (no Edge Function call) |
+
+### 20d. Admin Grant Reviews
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `grant_review_requests` | ✅ WORKS | All requests with stats (total / pending / completed) |
+| "Respond to Request" → textarea + submit | ✅ WORKS | Updates `grant_review_requests`, inserts notification to user |
+| Status badges | ✅ WORKS | Visual pending/completed display |
+
+### 20e. Admin AI Workforce
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `bot_profiles` | ✅ WORKS | Live agent list |
+| Agent selection / detail panel | ✅ WORKS | Shows efficiency, status, division, description |
+| System prompt textarea | ⚠️ PARTIAL | Editable in UI; Save button has no `onClick` — not persisted |
+| Pause / Restart buttons | ❌ BROKEN | No `onClick` handlers |
+| "Deploy New AI" button | ❌ BROKEN | No `onClick` handler |
+| DB reads Activity tab: `ai_employee_runs` | ✅ WORKS | Live run history |
+| DB reads Events tab: `ai_agent_events` | ✅ WORKS | Live event log |
+| "Refresh" button | ✅ WORKS | Calls `loadActivity` |
+| Agent search input | ❌ BROKEN | Input rendered; not connected to any filter |
+
+### 20f. Admin Funding
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `funding_applications` via `getAllFundingApplications` | ✅ WORKS | All clients' applications |
+| Stats: pipeline total, avg deal, approval rate, pending count | ✅ WORKS | Computed from live data |
+| Applications table with search | ✅ WORKS | Search by lender/product/status |
+| Per-row action buttons | ❌ BROKEN | No way for admin to update application status or add notes |
+
+### 20g. Admin Credit Ops
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| DB reads: `credit_reports`, `credit_disputes` | ✅ WORKS | Live data from all users |
+| Disputes / Reports tab switch | ✅ WORKS | Correct table rendered |
+| Search disputes and reports | ✅ WORKS | Client-side filter |
+| "New Case" button | ❌ BROKEN | No `onClick` handler |
+| Per-row dispute actions | ❌ BROKEN | Admin cannot update dispute status or resolve cases |
+
+### 20h. Admin Settings / Subscription Settings
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| Settings section navigation | ✅ WORKS | Switches section within panel |
+| "Billing & Plans" → AdminSubscriptionSettings | ✅ WORKS | Section switch works |
+| Subscription plan price / commission / Stripe ID edits | ✅ WORKS | Local state updated |
+| Save plans | ✅ WORKS | Upserts all plans to `subscription_plans` |
+| Active toggle per plan | ✅ WORKS | Saved via Save button |
+| All other settings items (Branding, Email, Auth, API Keys, Backup, Integrations) | ❌ BROKEN | No functional implementations; "Configure" is hover-only decoration |
+| "View System Logs" button | ❌ BROKEN | No `onClick` handler |
+
+---
+
+## Summary Counts
+
+| Status | Count |
+|--------|-------|
+| ✅ WORKS | 91 |
+| ⚠️ PARTIAL | 13 |
+| ❌ BROKEN | 47 |
+| 🔲 STATIC | 12 |
+| **Total items audited** | **163** |
+
+**Critical crash bug:** `GrantsFinder.tsx` references an `opportunities` variable in JSX that is never defined anywhere in the component — causes a `ReferenceError` that crashes the entire Grants page on load for every user.

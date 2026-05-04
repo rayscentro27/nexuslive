@@ -204,14 +204,19 @@ const LLC_CHECKLIST = [
   { step: 7, label: 'Open business bank account', description: 'Required for business credit. Recommended: Chase, Bank of America, Mercury.' },
 ];
 
-function LLCSetupTab() {
+function LLCSetupTab({ userId }: { userId: string }) {
+  const storageKey = `llc_steps_${userId}`;
   const [path, setPath] = useState<'guided' | 'done-for-you' | null>(null);
-  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [completedSteps, setCompletedSteps] = useState<number[]>(() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) ?? '[]'); } catch { return []; }
+  });
 
   const toggleStep = (step: number) => {
-    setCompletedSteps(prev =>
-      prev.includes(step) ? prev.filter(s => s !== step) : [...prev, step]
-    );
+    setCompletedSteps(prev => {
+      const next = prev.includes(step) ? prev.filter(s => s !== step) : [...prev, step];
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
   };
 
   return (
@@ -635,7 +640,7 @@ export function BusinessFoundation() {
       </div>
 
       {activeTab === 'foundation' && <FoundationTab entity={entity} onSave={saveEntity} />}
-      {activeTab === 'llc' && <LLCSetupTab />}
+      {activeTab === 'llc' && user && <LLCSetupTab userId={user.id} />}
       {activeTab === 'credit' && user && <BusinessCreditTab userId={user.id} />}
       {activeTab === 'vendors' && user && <VendorTradelinesTab userId={user.id} />}
     </div>

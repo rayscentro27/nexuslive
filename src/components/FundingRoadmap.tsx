@@ -3,6 +3,7 @@ import { CheckCircle2, Lock, ArrowRight, TrendingUp, Flag, AlertCircle, Zap, Loa
 import { cn } from '../lib/utils';
 import { useAuth } from './AuthProvider';
 import { getFundingStages, FundingStage, FundingAction } from '../lib/db';
+import { supabase } from '../lib/supabase';
 
 type StageWithActions = FundingStage & { funding_actions: FundingAction[] };
 
@@ -22,7 +23,7 @@ function fmtK(n: number) {
   return `$${(n / 1000).toFixed(0)}k`;
 }
 
-export function FundingRoadmap() {
+export function FundingRoadmap({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user } = useAuth();
   const [stages, setStages] = useState<StageWithActions[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +36,17 @@ export function FundingRoadmap() {
       setLoading(false);
     })();
   }, [user]);
+
+  const toggleAction = async (stageId: string, actionId: string, currentStatus: string) => {
+    // Skip static fallback IDs (single char)
+    if (actionId.length <= 1) return;
+    const newStatus = currentStatus === 'complete' ? 'pending' : 'complete';
+    await supabase.from('funding_actions').update({ status: newStatus }).eq('id', actionId);
+    setStages(prev => prev.map(s => s.id === stageId
+      ? { ...s, funding_actions: s.funding_actions.map(a => a.id === actionId ? { ...a, status: newStatus } : a) }
+      : s
+    ));
+  };
 
   const completedStages = stages.filter(s => s.status === 'completed').length;
   const overallProgress = stages.length > 0 ? Math.round((completedStages / stages.length) * 100) : 32;
@@ -145,7 +157,10 @@ export function FundingRoadmap() {
                           {stage.timeline_weeks && ` • ~${stage.timeline_weeks} weeks`}
                         </p>
                       </div>
-                      <button className="bg-[#5B7CFA] text-white py-3 px-6 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all flex items-center gap-2">
+                      <button
+                        onClick={() => onNavigate?.('funding')}
+                        className="bg-[#5B7CFA] text-white py-3 px-6 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] transition-all flex items-center gap-2"
+                      >
                         View Funding Options
                         <ArrowRight className="w-4 h-4" />
                       </button>
@@ -159,7 +174,11 @@ export function FundingRoadmap() {
                         </p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {stage.funding_actions.map((action) => (
-                            <div key={action.id} className="flex items-center justify-between p-3.5 bg-white border border-slate-100 rounded-xl hover:border-[#5B7CFA]/30 transition-all group shadow-sm">
+                            <div
+                              key={action.id}
+                              onClick={() => toggleAction(stage.id, action.id, action.status)}
+                              className="flex items-center justify-between p-3.5 bg-white border border-slate-100 rounded-xl hover:border-[#5B7CFA]/30 transition-all group shadow-sm cursor-pointer"
+                            >
                               <div className="flex items-center gap-3">
                                 <div className={cn(
                                   "w-5 h-5 rounded-full border-2 flex items-center justify-center",
@@ -170,7 +189,7 @@ export function FundingRoadmap() {
                                     : <div className="w-2.5 h-2.5 rounded-full bg-[#5B7CFA] opacity-0 group-hover:opacity-100 transition-opacity" />
                                   }
                                 </div>
-                                <span className="text-xs font-bold text-slate-700">{action.title}</span>
+                                <span className={cn("text-xs font-bold", action.status === 'complete' ? "text-slate-400 line-through" : "text-slate-700")}>{action.title}</span>
                               </div>
                               <span className="text-[8px] font-black text-green-600 uppercase tracking-widest">+{action.readiness_impact}%</span>
                             </div>

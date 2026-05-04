@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, XCircle, TrendingUp, DollarSign, Award, Percent, Loader2, Plus, CreditCard, Zap, Info, ExternalLink } from 'lucide-react';
+import { CheckCircle2, XCircle, TrendingUp, DollarSign, Award, Percent, Loader2, Plus, CreditCard, Zap, Info, ExternalLink, X } from 'lucide-react';
 import { useAuth } from './AuthProvider';
 import { getProfile, getFundingApplications, getTasks, UserProfile, FundingApplication, Task } from '../lib/db';
+import { supabase } from '../lib/supabase';
 
 function statusColors(status: string): { text: string; color: string } {
   switch (status.toLowerCase()) {
@@ -71,11 +72,22 @@ const STRATEGY_STEPS = [
   { step: 6, title: 'Payoff before promo ends', detail: 'Set a calendar alert 60 days before each card\'s intro period ends.', done: false },
 ];
 
-function ZeroPctStrategy() {
-  const [steps, setSteps] = useState(STRATEGY_STEPS.map(s => ({ ...s })));
+function ZeroPctStrategy({ userId }: { userId: string }) {
+  const storageKey = `zero_pct_steps_${userId}`;
+  const [steps, setSteps] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
+      if (Array.isArray(saved) && saved.length === STRATEGY_STEPS.length) return saved;
+    } catch {}
+    return STRATEGY_STEPS.map(s => ({ ...s }));
+  });
 
   const toggle = (i: number) =>
-    setSteps(prev => prev.map((s, idx) => idx === i ? { ...s, done: !s.done } : s));
+    setSteps(prev => {
+      const next = prev.map((s, idx) => idx === i ? { ...s, done: !s.done } : s);
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
 
   const doneCount = steps.filter(s => s.done).length;
 
@@ -205,6 +217,9 @@ export function Funding() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
+  const [showNewAppModal, setShowNewAppModal] = useState(false);
+  const [newAppForm, setNewAppForm] = useState({ lender_name: '', product_type: 'Business Loan', requested_amount: '' });
+  const [savingApp, setSavingApp] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -219,6 +234,23 @@ export function Funding() {
       setLoading(false);
     });
   }, [user]);
+
+  async function handleCreateApp() {
+    if (!user || !newAppForm.lender_name) return;
+    setSavingApp(true);
+    const amount = parseFloat(newAppForm.requested_amount) || 0;
+    const { data } = await supabase.from('funding_applications').insert({
+      user_id: user.id,
+      lender_name: newAppForm.lender_name,
+      product_type: newAppForm.product_type,
+      requested_amount: amount,
+      status: 'pending',
+    }).select().single();
+    if (data) setApplications(prev => [data as FundingApplication, ...prev]);
+    setShowNewAppModal(false);
+    setNewAppForm({ lender_name: '', product_type: 'Business Loan', requested_amount: '' });
+    setSavingApp(false);
+  }
 
   const readiness = profile?.readiness_score ?? 0;
   const circumference = 314;
@@ -292,7 +324,11 @@ export function Funding() {
           <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1a1c3a', margin: 0 }}>Funding Suite</h1>
           <p style={{ fontSize: 15, color: '#8b8fa8', marginTop: 4 }}>Track your funding applications and opportunities.</p>
         </div>
-        <button className="nexus-button-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', fontSize: 14 }}>
+        <button
+          className="nexus-button-primary"
+          onClick={() => setShowNewAppModal(true)}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', fontSize: 14 }}
+        >
           <Plus size={15} /> New Application
         </button>
       </div>
@@ -434,7 +470,7 @@ export function Funding() {
               )}
 
               {/* Strategy tab — full width, no sidebar */}
-              {activeTab === 'Strategy' && <ZeroPctStrategy />}
+              {activeTab === 'Strategy' && user && <ZeroPctStrategy userId={user.id} />}
 
               {/* Active Applications Table — hidden on Strategy tab */}
               {activeTab !== 'Strategy' && (
@@ -516,6 +552,70 @@ export function Funding() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ── New Application Modal ── */}
+      {showNewAppModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div className="glass-card" style={{ width: '100%', maxWidth: 440, padding: 28 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 800, color: '#1a1c3a', margin: 0 }}>New Application</h2>
+              <button onClick={() => setShowNewAppModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8b8fa8' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: '#1a1c3a', display: 'block', marginBottom: 6 }}>Lender Name *</label>
+                <input
+                  type="text"
+                  value={newAppForm.lender_name}
+                  onChange={e => setNewAppForm(f => ({ ...f, lender_name: e.target.value }))}
+                  placeholder="e.g. Chase Business, Fundbox"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e8e9f2', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: '#1a1c3a', display: 'block', marginBottom: 6 }}>Product Type</label>
+                <select
+                  value={newAppForm.product_type}
+                  onChange={e => setNewAppForm(f => ({ ...f, product_type: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e8e9f2', fontSize: 14, outline: 'none', background: '#fff' }}
+                >
+                  {['Business Loan', 'Line of Credit', 'SBA Loan', 'Invoice Financing', 'Equipment Financing', 'Business Credit Card', 'Merchant Cash Advance'].map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 700, color: '#1a1c3a', display: 'block', marginBottom: 6 }}>Requested Amount</label>
+                <input
+                  type="number"
+                  value={newAppForm.requested_amount}
+                  onChange={e => setNewAppForm(f => ({ ...f, requested_amount: e.target.value }))}
+                  placeholder="0"
+                  min="0"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1.5px solid #e8e9f2', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                <button
+                  onClick={() => setShowNewAppModal(false)}
+                  style={{ flex: 1, padding: '11px', borderRadius: 10, border: '1.5px solid #e8e9f2', background: '#fff', fontSize: 14, fontWeight: 700, color: '#8b8fa8', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCreateApp}
+                  disabled={savingApp || !newAppForm.lender_name}
+                  style={{ flex: 1, padding: '11px', borderRadius: 10, border: 'none', background: '#3d5af1', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: savingApp || !newAppForm.lender_name ? 0.6 : 1 }}
+                >
+                  {savingApp ? 'Saving…' : 'Save Application'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

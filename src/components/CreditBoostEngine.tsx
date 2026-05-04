@@ -288,6 +288,7 @@ export function CreditBoostEngine() {
   const [actions, setActions] = useState<BoostAction[]>([]);
   const [loading, setLoading] = useState(true);
   const [showRentModal, setShowRentModal] = useState(false);
+  const [selectedOpp, setSelectedOpp] = useState<BoostOpportunity | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>('all');
 
@@ -336,7 +337,8 @@ export function CreditBoostEngine() {
   };
 
   const learnMore = (opp: BoostOpportunity) => {
-    if (opp.category === 'rent_reporting') setShowRentModal(true);
+    if (opp.category === 'rent_reporting') { setShowRentModal(true); return; }
+    setSelectedOpp(opp);
   };
 
   const filtered = filter === 'all' ? opportunities : opportunities.filter(o => o.category === filter);
@@ -405,6 +407,54 @@ export function CreditBoostEngine() {
             if (opp) addToPlan(opp);
           }}
         />
+      )}
+
+      {selectedOpp && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: 28, maxWidth: 480, width: '100%', maxHeight: '80vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 800, color: '#1a1c3a', margin: 0 }}>{selectedOpp.name}</h2>
+              <button onClick={() => setSelectedOpp(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8b8fa8' }}><X size={20} /></button>
+            </div>
+            {selectedOpp.description && (
+              <p style={{ fontSize: 14, color: '#8b8fa8', marginBottom: 20, lineHeight: 1.6 }}>{selectedOpp.description}</p>
+            )}
+            {/* Provider list from JSONB if available */}
+            {Array.isArray(selectedOpp.providers) && selectedOpp.providers.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#1a1c3a', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>Recommended Providers</p>
+                {selectedOpp.providers.map((p: any, i: number) => (
+                  <div key={i} style={{ padding: '12px 16px', borderRadius: 12, border: '1px solid #e8e9f2', background: '#fafbff' }}>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: '#1a1c3a', margin: '0 0 4px' }}>{p.name ?? p}</p>
+                    {p.description && <p style={{ fontSize: 13, color: '#8b8fa8', margin: 0 }}>{p.description}</p>}
+                    {p.url && (
+                      <a href={p.url} target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize: 12, color: '#3d5af1', fontWeight: 700, display: 'inline-block', marginTop: 6 }}>
+                        Visit ↗
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ padding: '16px', background: '#fafbff', borderRadius: 12, border: '1px solid #e8e9f2', marginBottom: 20 }}>
+                <p style={{ fontSize: 13, color: '#8b8fa8', margin: 0, lineHeight: 1.6 }}>
+                  Research providers for <strong>{selectedOpp.category.replace(/_/g, ' ')}</strong> strategies. Look for options that report to Experian, Equifax, or TransUnion to maximize score impact.
+                </p>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setSelectedOpp(null)}
+                style={{ flex: 1, padding: '11px', borderRadius: 10, border: '1.5px solid #e8e9f2', background: '#fff', fontSize: 14, fontWeight: 700, color: '#8b8fa8', cursor: 'pointer' }}>
+                Close
+              </button>
+              <button onClick={() => { addToPlan(selectedOpp); setSelectedOpp(null); }}
+                style={{ flex: 1, padding: '11px', borderRadius: 10, border: 'none', background: '#3d5af1', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+                Add to Plan
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

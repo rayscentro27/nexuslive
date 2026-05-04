@@ -48,7 +48,7 @@ function OddsGauge({ value }: { value: number }) {
   );
 }
 
-export function ApprovalSimulator() {
+export function ApprovalSimulator({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user } = useAuth();
   const [lenders, setLenders] = useState<LenderRule[]>([]);
   const [results, setResults] = useState<SimResult[]>([]);
@@ -71,7 +71,7 @@ export function ApprovalSimulator() {
     fetchAll();
   }, [user]);
 
-  const runSimulation = () => {
+  const runSimulation = async () => {
     const score = creditScore ?? 680;
     const util = utilization ?? 30;
 
@@ -114,6 +114,23 @@ export function ApprovalSimulator() {
     simResults.sort((a, b) => b.approval_odds - a.approval_odds);
     setResults(simResults);
     setSimulated(true);
+
+    // Persist each result to approval_simulations
+    if (user) {
+      const rows = simResults.map(r => ({
+        user_id: user.id,
+        lender_name: r.lender.lender_name,
+        product_type: r.lender.product_type,
+        approval_odds: r.approval_odds,
+        estimated_limit_min: r.lender.estimated_limit_min,
+        estimated_limit_max: r.lender.estimated_limit_max,
+        credit_score_used: score,
+        utilization_used: util,
+        risk_factors: r.risk_factors,
+        improvements: r.improvements,
+      }));
+      await supabase.from('approval_simulations').insert(rows);
+    }
   };
 
   if (loading) {
@@ -227,11 +244,23 @@ export function ApprovalSimulator() {
                   )}
 
                   {result.risk_factors.length === 0 && (
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 10 }}>
                       <CheckCircle2 size={12} color="#22c55e" />
                       <span style={{ fontSize: 12, color: '#16a34a' }}>Profile meets basic requirements</span>
                     </div>
                   )}
+                  <button
+                    onClick={() => onNavigate?.('funding')}
+                    style={{
+                      marginTop: 8, padding: '7px 14px', borderRadius: 10, border: 'none',
+                      background: result.approval_odds >= 50 ? '#3d5af1' : '#f1f5f9',
+                      color: result.approval_odds >= 50 ? '#fff' : '#8b8fa8',
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                    }}
+                  >
+                    Apply Now <ArrowRight size={12} />
+                  </button>
                 </div>
               </div>
             );

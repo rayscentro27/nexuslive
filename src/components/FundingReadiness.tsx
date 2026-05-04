@@ -265,16 +265,16 @@ export function FundingReadiness({ onNavigate }: { onNavigate?: (tab: string) =>
     const business_foundation = entity ? Math.round((entityFields / 6) * 20) : null;
 
     // Business credit: 0-15
-    const { data: bizCredit } = await supabase
-      .from('business_credit_profiles')
-      .select('paydex_score, experian_score, equifax_score')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    const [{ data: bizCredit }, { data: bankSnap }] = await Promise.all([
+      supabase.from('business_credit_profiles').select('paydex_score, experian_score, equifax_score').eq('user_id', user.id).maybeSingle(),
+      supabase.from('bank_behavior_snapshots').select('bank_readiness_score').eq('user_id', user.id).order('snapshot_month', { ascending: false }).limit(1).maybeSingle(),
+    ]);
     const scores = [bizCredit?.paydex_score, bizCredit?.experian_score, bizCredit?.equifax_score].filter((s): s is number => s != null);
     const business_credit = scores.length === 0 ? null : Math.round((scores.reduce((a, b) => a + b, 0) / scores.length / 100) * 15);
 
-    // Bank behavior: placeholder — manual entry not yet available
-    const bank_behavior: number | null = null;
+    // Bank behavior: 0-10 from most recent bank_behavior_snapshots row
+    const rawBankScore = (bankSnap as any)?.bank_readiness_score ?? null;
+    const bank_behavior: number | null = rawBankScore != null ? Math.round((rawBankScore / 100) * 10) : null;
 
     // Risk control: use score as proxy (no negative_accounts field in schema)
     const risk_control = credit ? (fico >= 700 ? 5 : fico >= 620 ? 3 : 1) : null;
