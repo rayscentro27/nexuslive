@@ -1,6 +1,6 @@
 # Nexus Platform — Functionality Audit
-**Date:** 2026-05-03  
-**Auditor:** Claude Code (read-only pass)  
+**Date:** 2026-05-04 (updated)
+**Auditor:** Claude Code  
 **Scope:** All client and admin components + migration SQL  
 
 **Status Codes**
@@ -355,7 +355,8 @@
 | Disputes / Reports tab switch | ✅ WORKS | Correct table rendered |
 | Search disputes and reports | ✅ WORKS | Client-side filter |
 | "New Case" button | ❌ BROKEN | No `onClick` handler |
-| Per-row dispute actions | ❌ BROKEN | Admin cannot update dispute status or resolve cases |
+| Per-row dispute actions | ✅ WORKS | Inline "Resolve" button updates DB status + local state (P2-11) |
+| "New Case" button | ✅ WORKS | NewCaseModal inserts to credit_disputes + prepends to list (P2-11) |
 
 ### 20h. Admin Settings / Subscription Settings
 
@@ -367,18 +368,37 @@
 | Save plans | ✅ WORKS | Upserts all plans to `subscription_plans` |
 | Active toggle per plan | ✅ WORKS | Saved via Save button |
 | All other settings items (Branding, Email, Auth, API Keys, Backup, Integrations) | ❌ BROKEN | No functional implementations; "Configure" is hover-only decoration |
-| "View System Logs" button | ❌ BROKEN | No `onClick` handler |
+| "View System Logs" button | ✅ WORKS | Navigates to 'reports' tab (P2-12) |
+| Settings section filter | ✅ WORKS | Content filtered by active section (P2-12) |
+
+### 20i. Admin CEO Mode (new — 2026-05-04)
+
+| Widget / Action | Status | Notes |
+|----------------|--------|-------|
+| CEO Status widget | ✅ WORKS | Reads hermes_aggregates (critical/actionable) live |
+| Auto-Fix log widget | ✅ WORKS | Reads hermes_autofix_actions live |
+| Lead Pipeline widget | ✅ WORKS | Reads leads table with funnel stage badges |
+| Revenue widget | ✅ WORKS | Reads revenue_events filtered to current month |
+| Launch KPIs widget | ✅ WORKS | Reads launch_metrics for today with progress bars |
+| Comms Health widget | ✅ WORKS | Reads hermes_comms_log last 24h with send/fail/pending counts |
+| Pending Approvals widget | ✅ WORKS | Reads owner_approval_queue where status=pending |
+| Refresh button | ✅ WORKS | Remounts all widgets via React key |
+| CEO Mode dock tab (🧠) | ✅ WORKS | Wired in AdminPortal |
 
 ---
 
-## Summary Counts
+## Summary Counts (2026-05-04)
 
 | Status | Count |
 |--------|-------|
-| ✅ WORKS | 91 |
+| ✅ WORKS | 106 |
 | ⚠️ PARTIAL | 13 |
-| ❌ BROKEN | 47 |
+| ❌ BROKEN | 35 |
 | 🔲 STATIC | 12 |
-| **Total items audited** | **163** |
+| **Total items audited** | **166** |
 
-**Critical crash bug:** `GrantsFinder.tsx` references an `opportunities` variable in JSX that is never defined anywhere in the component — causes a `ReferenceError` that crashes the entire Grants page on load for every user.
+**P2 fixes applied (2026-05-04):** FloatingChat hook order, Dashboard fallback data, CreditAnalysis buttons, Funding live data, Messages readiness/buttons, Account quick settings, Settings avatar/password/download, BankBehavior upsert, TradingLab demo/journal buttons, AdminDashboard navigation, AdminCreditOps new case + resolve, AdminSettings section filter.
+
+**CEO Mode added (2026-05-04):** 7 new DB tables (hermes_aggregates, hermes_autofix_actions, leads, revenue_events, launch_metrics, hermes_comms_log, owner_approval_queue), AdminCEOMode React component with 7 live widgets, 7 Python services in nexus-ai, 11 new Telegram commands.
+
+**VS Code:** Fresh install complete (Homebrew cask).
