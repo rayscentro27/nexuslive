@@ -455,12 +455,29 @@ class NexusTelegramBot:
     def safe_help_text(self) -> str:
         return (
             "Safe commands\n"
-            "status\n"
-            "health\n"
-            "jobs\n"
-            "workers\n"
-            "brief\n"
-            "help\n\n"
+            "status    — system + worker status\n"
+            "health    — monitoring checks\n"
+            "jobs      — recent job activity\n"
+            "workers   — worker heartbeats\n"
+            "brief     — latest CEO briefing\n"
+            "queue     — signal proposal queue\n"
+            "help      — this message\n\n"
+            "CEO Mode\n"
+            "/ceo      — daily CEO summary\n"
+            "/leads    — lead pipeline report\n"
+            "/revenue  — revenue & MRR report\n"
+            "/launch   — launch KPIs today\n"
+            "/alerts   — run all 12 alert checks\n"
+            "/approvals — pending owner approvals\n"
+            "/checklist — daily launch checklist\n"
+            "/content  — content topics for today\n"
+            "/outreach — outreach targets for today\n"
+            "/comms    — comms delivery health\n"
+            "/autofix  — run safe auto-fixes\n\n"
+            "Mutating commands (require TELEGRAM_ALLOW_MUTATING_COMMANDS=true)\n"
+            "/approve &lt;id&gt;\n"
+            "/reject &lt;id&gt;\n"
+            "/needs_edits &lt;id&gt; &lt;notes&gt;\n\n"
             "Notes\n"
             "- basic commands do not call an LLM\n"
             "- unknown or long messages are rejected safely\n"
@@ -484,6 +501,31 @@ class NexusTelegramBot:
             "brief": "brief",
             "/brief": "brief",
             "/research": "research",
+            "queue": "queue",
+            "/queue": "queue",
+            # CEO Mode commands
+            "/ceo": "ceo_report",
+            "ceo": "ceo_report",
+            "/leads": "leads",
+            "leads": "leads",
+            "/revenue": "revenue",
+            "revenue": "revenue",
+            "/launch": "launch",
+            "launch": "launch",
+            "/alerts": "alerts",
+            "alerts": "alerts",
+            "/approvals": "approvals",
+            "approvals": "approvals",
+            "/checklist": "checklist",
+            "checklist": "checklist",
+            "/content": "content",
+            "content topics": "content",
+            "/outreach": "outreach",
+            "outreach targets": "outreach",
+            "/comms": "comms",
+            "comms": "comms",
+            "/autofix": "autofix",
+            "autofix": "autofix",
         }
         return mapping.get(normalized, "unknown"), raw
 
@@ -495,11 +537,193 @@ class NexusTelegramBot:
             "workers": self.safe_workers_summary,
             "help": self.safe_help_text,
             "brief": self.latest_stored_brief,
+            "queue": self.safe_queue_summary,
+            # CEO Mode
+            "ceo_report": self._cmd_ceo_report,
+            "leads": self._cmd_leads,
+            "revenue": self._cmd_revenue,
+            "launch": self._cmd_launch,
+            "alerts": self._cmd_alerts,
+            "approvals": self._cmd_approvals,
+            "checklist": self._cmd_checklist,
+            "content": self._cmd_content,
+            "outreach": self._cmd_outreach,
+            "comms": self._cmd_comms,
+            "autofix": self._cmd_autofix,
         }
         handler = handlers.get(command)
         if not handler:
             return self.safe_help_text()
         return handler()
+
+    # ── CEO Mode Command Handlers ─────────────────────────────────────────────
+
+    def _cmd_ceo_report(self) -> str:
+        try:
+            from ceo_agent.revenue_tracker import build_revenue_summary_text
+            from ceo_agent.lead_tracker import build_lead_summary_text
+            from ceo_agent.alert_engine import run_all_checks
+            lines = [
+                '<b>CEO Report</b>',
+                f"💰 {build_revenue_summary_text()}",
+                f"🎯 {build_lead_summary_text()}",
+            ]
+            alerts = run_all_checks()
+            lines.append(f"🚨 Active alerts: {len(alerts)}")
+            if alerts:
+                for a in alerts[:3]:
+                    lines.append(f"  • [{a['type']}] {a['summary'][:80]}")
+            return '\n'.join(lines)
+        except Exception as e:
+            return f"CEO report error: {e}"
+
+    def _cmd_leads(self) -> str:
+        try:
+            from ceo_agent.lead_tracker import build_lead_report
+            return build_lead_report()
+        except Exception as e:
+            return f"Leads error: {e}"
+
+    def _cmd_revenue(self) -> str:
+        try:
+            from ceo_agent.revenue_tracker import build_revenue_report
+            return build_revenue_report()
+        except Exception as e:
+            return f"Revenue error: {e}"
+
+    def _cmd_launch(self) -> str:
+        try:
+            from ceo_agent.launch_tracker import build_launch_report
+            return build_launch_report(period='daily')
+        except Exception as e:
+            return f"Launch error: {e}"
+
+    def _cmd_alerts(self) -> str:
+        try:
+            from ceo_agent.alert_engine import run_all_checks, format_alerts_telegram
+            alerts = run_all_checks()
+            if not alerts:
+                return "✅ No active alerts — all systems green."
+            return format_alerts_telegram(alerts)
+        except Exception as e:
+            return f"Alerts error: {e}"
+
+    def _cmd_approvals(self) -> str:
+        try:
+            from ceo_agent.owner_approval import format_pending_list
+            return format_pending_list()
+        except Exception as e:
+            return f"Approvals error: {e}"
+
+    def _cmd_checklist(self) -> str:
+        try:
+            from ceo_agent.launch_tracker import build_daily_checklist
+            return build_daily_checklist()
+        except Exception as e:
+            return f"Checklist error: {e}"
+
+    def _cmd_content(self) -> str:
+        try:
+            from ceo_agent.launch_tracker import get_content_topics
+            return get_content_topics(5)
+        except Exception as e:
+            return f"Content error: {e}"
+
+    def _cmd_outreach(self) -> str:
+        try:
+            from ceo_agent.launch_tracker import get_outreach_targets
+            return get_outreach_targets(3)
+        except Exception as e:
+            return f"Outreach error: {e}"
+
+    def _cmd_comms(self) -> str:
+        try:
+            from ceo_agent.comms_reliability import get_comms_health
+            return get_comms_health()
+        except Exception as e:
+            return f"Comms error: {e}"
+
+    def _cmd_autofix(self) -> str:
+        try:
+            from ceo_agent.autofix_service import run_safe_fixes
+            results = run_safe_fixes()
+            if not any(v for v in results.values() if isinstance(v, dict) and any(v.values())):
+                return "✅ No issues found — no auto-fixes needed."
+            lines = ['<b>Auto-Fix Results</b>']
+            for k, v in results.items():
+                if isinstance(v, dict):
+                    parts = ', '.join(f"{kk}={vv}" for kk, vv in v.items())
+                    lines.append(f"  {k}: {parts}")
+            return '\n'.join(lines)
+        except Exception as e:
+            return f"Auto-fix error: {e}"
+
+    def safe_queue_summary(self) -> str:
+        try:
+            from scripts.prelaunch_utils import rest_select
+            rows = rest_select(
+                "reviewed_signal_proposals"
+                "?select=id,symbol,side,timeframe,strategy_id,entry_price,stop_loss,take_profit,ai_confidence,status,created_at"
+                "&status=not.in.(executed,blocked,rejected)"
+                "&order=created_at.desc&limit=10",
+                timeout=8,
+            ) or []
+        except Exception as e:
+            return f"Signal queue unavailable: {e}"
+
+        if not rows:
+            return "No pending proposals in signal queue."
+
+        lines = [f"Signal queue — pending ({len(rows)})"]
+        for r in rows:
+            sym  = (r.get("symbol") or "?").replace("_", "")
+            side = (r.get("side") or "?").upper()
+            tf   = r.get("timeframe") or "?"
+            conf = r.get("ai_confidence")
+            conf_str = f"{conf*100:.0f}%" if conf is not None else "?"
+            created = (r.get("created_at") or "")[:16].replace("T", " ")
+            lines.append(f"ID:{r.get('id','?')[:8]} | {sym} {side} {tf} | conf={conf_str} | {created}")
+
+        lines.append("\nTo block: /reject <id>  |  auto-executor runs all unblocked")
+        return "\n".join(lines)
+
+    def _queue_action(self, raw_text: str, action: str) -> str:
+        """Block or allow a reviewed_signal_proposals entry by short or full ID."""
+        parts = raw_text.strip().split(None, 1)
+        if len(parts) < 2:
+            return f"Usage: /{action} &lt;proposal-id&gt;"
+        item_id = parts[1].strip()
+        if not item_id:
+            return f"Usage: /{action} &lt;proposal-id&gt;"
+
+        new_status = "pending" if action == "approve" else "blocked"
+        try:
+            from scripts.prelaunch_utils import rest_select, supabase_request
+            rows = rest_select(
+                "reviewed_signal_proposals"
+                "?select=id,symbol,side,status"
+                "&status=not.in.(executed,blocked,rejected)&limit=20",
+                timeout=8,
+            ) or []
+            match = next((r for r in rows if r.get("id", "").startswith(item_id) or r.get("id") == item_id), None)
+            if not match:
+                return f"No pending proposal matching ID '{item_id}'."
+
+            full_id = match["id"]
+            supabase_request(
+                f"reviewed_signal_proposals?id=eq.{full_id}",
+                method="PATCH",
+                body={"status": new_status},
+                prefer="return=minimal",
+                timeout=8,
+            )
+            sym  = (match.get("symbol") or "?").replace("_", "")
+            side = (match.get("side") or "?").upper()
+            if new_status == "blocked":
+                return f"BLOCKED: {sym} {side} (ID: {full_id[:8]}) — auto-executor will skip it"
+            return f"ALLOWED: {sym} {side} (ID: {full_id[:8]}) — auto-executor will run it"
+        except Exception as e:
+            return f"Queue action failed: {e}"
 
     def handle_coordination_command(self, text: str) -> Optional[str]:
         raw = text.strip()
@@ -523,6 +747,46 @@ class NexusTelegramBot:
 
         if normalized in {"/coord", "/coord-help", "coord help", "coordination help"}:
             return self.format_pre(self.safe_help_text())
+
+        if normalized.startswith("/approve ") or normalized.startswith("/reject "):
+            action = "approve" if normalized.startswith("/approve ") else "reject"
+            if not self.allow_mutating_commands:
+                return (
+                    f"⛔ Mutating commands are disabled.\n"
+                    f"Set TELEGRAM_ALLOW_MUTATING_COMMANDS=true to use /{action}."
+                )
+            # Try owner_approval_queue first, fall back to signal queue action
+            parts = raw.strip().split(None, 1)
+            short_id = parts[1].strip() if len(parts) > 1 else ''
+            if short_id:
+                try:
+                    from ceo_agent.owner_approval import find_item, approve, reject
+                    item = find_item(short_id)
+                    if item:
+                        ok = approve(item['id']) if action == 'approve' else reject(item['id'])
+                        status = action + 'd' if ok else 'not found'
+                        return f"Approval [{short_id}]: {status}"
+                except Exception:
+                    pass
+            return self.format_pre(self._queue_action(raw, action))
+
+        if normalized.startswith("/needs_edits "):
+            if not self.allow_mutating_commands:
+                return "⛔ Mutating commands disabled. Set TELEGRAM_ALLOW_MUTATING_COMMANDS=true."
+            parts = raw.strip().split(None, 2)
+            if len(parts) < 2:
+                return "Usage: /needs_edits &lt;id&gt; &lt;notes&gt;"
+            short_id = parts[1].strip()
+            notes = parts[2].strip() if len(parts) > 2 else ''
+            try:
+                from ceo_agent.owner_approval import find_item, needs_edits
+                item = find_item(short_id)
+                if item:
+                    ok = needs_edits(item['id'], notes)
+                    return f"Needs-edits [{short_id}]: {'saved' if ok else 'not found'}"
+                return f"No pending approval matching '{short_id}'."
+            except Exception as e:
+                return f"needs_edits error: {e}"
 
         if not self.allow_mutating_commands:
             return self.safe_help_text()

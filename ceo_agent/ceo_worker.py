@@ -132,10 +132,126 @@ def _send_email(briefing: dict) -> None:
         logger.warning(f"CEO email: {e}")
 
 
+def _send_telegram_text(text: str) -> None:
+    """Send raw text (non-briefing) to Telegram."""
+    if not TELEGRAM_ENABLED or not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return
+    url  = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    body = json.dumps({'chat_id': TELEGRAM_CHAT_ID, 'text': text[:4096], 'parse_mode': 'HTML'}).encode()
+    req  = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json'})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as _:
+            pass
+    except Exception as e:
+        logger.warning(f"Telegram text: {e}")
+
+
+def run_hourly_health_check() -> None:
+    """Hourly: system status snapshot — workers, error count, queue depth."""
+    from monitoring.monitoring_worker import run_checks
+    result = run_checks()
+    alerts = result.get('alerts', [])
+
+    lines = ['<b>Nexus Hourly Health Check</b>']
+    lines.append(f"Workers stale: {len(result.get('stale_workers', []))}")
+    lines.append(f"Signals queue: {result['queue']['signals_pending']}")
+    lines.append(f"Errors (15m): {result['errors_15m']}")
+    lines.append(f"AI cost today: ${result['ai_cost_today']:.2f}")
+
+    if alerts:
+        lines.append('')
+        lines.append('<b>⚠ Active Alerts:</b>')
+        for a in alerts:
+            lines.append(f"  • {a}")
+    else:
+        lines.append('✅ All checks green')
+
+    _send_telegram_text('\n'.join(lines))
+
+
+def run_daily_ceo_report() -> None:
+    """Daily: revenue, leads, grants, funding pipeline, blockers."""
+    lines = ['<b>🏆 Daily CEO Report</b>',
+             f"<i>{datetime.now(timezone.utc).strftime('%B %d, %Y')}</i>", '']
+
+    try:
+        from ceo_agent.revenue_tracker import build_revenue_summary_text
+        lines.append(f"💰 Revenue: {build_revenue_summary_text()}")
+    except Exception as e:
+        lines.append(f"💰 Revenue: unavailable ({e})")
+
+    try:
+        from ceo_agent.lead_tracker import build_lead_summary_text
+        lines.append(f"🎯 Leads: {build_lead_summary_text()}")
+    except Exception as e:
+        lines.append(f"🎯 Leads: unavailable ({e})")
+
+    try:
+        from ceo_agent.autofix_service import run_safe_fixes
+        fixes = run_safe_fixes()
+        fix_summary = ', '.join(f"{k}={v}" for k, v in fixes.items() if isinstance(v, dict) and any(v.values()))
+        lines.append(f"🔧 Auto-fixes: {fix_summary or 'none needed'}")
+    except Exception as e:
+        lines.append(f"🔧 Auto-fixes: {e}")
+
+    try:
+        from ceo_agent.alert_engine import run_all_checks
+        alerts = run_all_checks()
+        lines.append(f"🚨 Alerts fired: {len(alerts)}")
+    except Exception as e:
+        lines.append(f"🚨 Alerts: {e}")
+
+    # Standard briefing
+    from ceo_agent.ceo_agent import run_briefing
+    run_briefing(hours=24, brief_type='daily_ceo', min_updates=0)
+
+    _send_telegram_text('\n'.join(lines))
+
+
+def run_weekly_ceo_report() -> None:
+    """Weekly: MRR delta, lead conversion, content performance, marketing plan."""
+    from ceo_agent.revenue_tracker import get_mrr, get_revenue_last_n_days
+    from ceo_agent.lead_tracker import get_leads
+    from ceo_agent.launch_tracker import get_week_metrics, get_content_topics, get_outreach_targets
+
+    mrr = get_mrr()
+    rev_7d = get_revenue_last_n_days(7)
+    leads = get_leads(limit=200)
+    won = sum(1 for l in leads if l.get('status') == 'won')
+    active = sum(1 for l in leads if l.get('status') not in ('won', 'lost', 'cold'))
+    conversion = round((won / len(leads) * 100) if leads else 0, 1)
+
+    week_metrics = get_week_metrics()
+    kpi_lines = []
+    for m in week_metrics[:5]:
+        val = float(m.get('metric_value', 0))
+        tgt = m.get('target_value')
+        name = m.get('metric_name', '?')
+        kpi_lines.append(f"  {name}: {val:.1f}" + (f" / {float(tgt):.1f}" if tgt else ''))
+
+    lines = [
+        '<b>📊 Weekly CEO Report</b>',
+        f"<i>Week of {datetime.now(timezone.utc).strftime('%B %d, %Y')}</i>",
+        '',
+        f"💰 MRR: ${mrr:,.2f} | Revenue 7d: ${rev_7d:,.2f}",
+        f"🎯 Leads: {len(leads)} total | {active} active | {won} won ({conversion}% CVR)",
+    ]
+
+    if kpi_lines:
+        lines.append('\n<b>Launch KPIs:</b>')
+        lines.extend(kpi_lines)
+
+    lines.append('\n' + get_content_topics(3))
+    lines.append('\n' + get_outreach_targets(2))
+
+    _send_telegram_text('\n'.join(lines)[:4000])
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--type', default='periodic',
-                        choices=['periodic', 'on_demand', 'critical'])
+                        choices=['periodic', 'on_demand', 'critical',
+                                 'hourly_health', 'daily_ceo', 'weekly_ceo'])
     parser.add_argument('--hours', type=int, default=BRIEFING_HOURS)
     args = parser.parse_args()
 
@@ -148,22 +264,29 @@ def main():
     from monitoring.heartbeat_service import send_heartbeat
     send_heartbeat('ceo_worker', 'running')
 
-    from ceo_agent.ceo_agent import run_briefing
-    briefing_id = run_briefing(
-        hours=args.hours,
-        brief_type=args.type,
-        min_updates=MIN_UPDATES,
-    )
-
-    if briefing_id:
-        from ceo_agent.briefing_service import get_latest_briefing
-        briefing = get_latest_briefing()
-        if briefing:
-            _send_telegram(briefing)
-            _send_email(briefing)
-        logger.info(f"CEO briefing complete: {briefing_id}")
+    if args.type == 'hourly_health':
+        run_hourly_health_check()
+    elif args.type == 'daily_ceo':
+        run_daily_ceo_report()
+    elif args.type == 'weekly_ceo':
+        run_weekly_ceo_report()
     else:
-        logger.info("No briefing generated (insufficient activity)")
+        from ceo_agent.ceo_agent import run_briefing
+        briefing_id = run_briefing(
+            hours=args.hours,
+            brief_type=args.type,
+            min_updates=MIN_UPDATES,
+        )
+
+        if briefing_id:
+            from ceo_agent.briefing_service import get_latest_briefing
+            briefing = get_latest_briefing()
+            if briefing:
+                _send_telegram(briefing)
+                _send_email(briefing)
+            logger.info(f"CEO briefing complete: {briefing_id}")
+        else:
+            logger.info("No briefing generated (insufficient activity)")
 
     send_heartbeat('ceo_worker', 'idle')
     logger.info("CEO worker done.")

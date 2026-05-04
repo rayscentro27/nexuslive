@@ -242,6 +242,28 @@ def main():
     else:
         logger.info("All checks passed — no alerts")
 
+    # CEO Mode: run business-level alert checks
+    try:
+        from ceo_agent.alert_engine import run_all_checks, format_alerts_telegram
+        ceo_alerts = run_all_checks()
+        if ceo_alerts:
+            alert_text = format_alerts_telegram(ceo_alerts)
+            _send_telegram(alert_text)
+            logger.warning(f"CEO alerts fired: {[a['type'] for a in ceo_alerts]}")
+        else:
+            logger.info("CEO alert checks: all clear")
+    except Exception as e:
+        logger.warning(f"CEO alert checks failed: {e}")
+
+    # CEO Mode: process comms retry queue
+    try:
+        from ceo_agent.comms_reliability import process_retry_queue
+        retry_result = process_retry_queue()
+        if retry_result.get('sent') or retry_result.get('failed'):
+            logger.info(f"Comms retry queue: {retry_result}")
+    except Exception as e:
+        logger.warning(f"Comms retry queue: {e}")
+
     logger.info("Monitoring check done.")
 
 
