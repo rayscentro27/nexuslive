@@ -24,7 +24,7 @@ import uuid
 import time
 import logging
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 try:
@@ -55,7 +55,12 @@ MAX_CONCURRENT  = int(os.environ.get("TOURNAMENT_MAX_CONCURRENT", "3"))   # slot
 MIN_SCORE       = float(os.environ.get("TOURNAMENT_MIN_SCORE", "40"))     # strategy_scores threshold
 MIN_RR          = float(os.environ.get("TOURNAMENT_MIN_RR", "2.0"))       # reward:risk gate
 
-GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_URL        = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODEL      = os.environ.get("TOURNAMENT_GROQ_MODEL", os.environ.get("GROQ_MODEL", "llama-3.1-8b-instant"))
+EVAL_CACHE_SECS = int(os.environ.get("TOURNAMENT_EVAL_CACHE_SECS", "14400"))  # 4h = one H4 candle
+
+# In-memory cache: strategy_id -> (evaluated_at, result)
+_eval_cache: dict[str, tuple[datetime, dict | None]] = {}
 
 # Forex pairs supported by Oanda demo
 FOREX_PAIRS = {
@@ -282,8 +287,18 @@ Rules:
 def evaluate_strategy(strategy: dict, price_context: dict) -> dict | None:
     """
     Ask Groq to evaluate whether this strategy has a current entry signal.
-    Returns a setup dict or None.
+    Returns a setup dict or None. Results are cached for EVAL_CACHE_SECS (one H4 candle).
     """
+    strategy_id = str(strategy.get("id", strategy.get("strategy_name", "?")))
+
+    # Return cached result if still within one H4 candle
+    if strategy_id in _eval_cache:
+        cached_at, cached_result = _eval_cache[strategy_id]
+        age = (datetime.now(timezone.utc) - cached_at).total_seconds()
+        if age < EVAL_CACHE_SECS:
+            log.info(f"  ↳ Cache hit ({int(age/60)}m old) — skipping Groq call")
+            return cached_result
+
     entry_rules = strategy.get("entry_rules") or {}
     conditions  = entry_rules.get("conditions", []) if isinstance(entry_rules, dict) else []
     exit_rules  = strategy.get("exit_rules") or {}
@@ -321,7 +336,7 @@ Does this strategy have a valid entry signal right now? Return JSON only."""
             GROQ_URL,
             headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
             json={
-                "model":       "llama-3.1-8b-instant",
+                "model":       GROQ_MODEL,
                 "messages":    [
                     {"role": "system", "content": EVALUATE_PROMPT},
                     {"role": "user",   "content": user_content},
@@ -339,7 +354,9 @@ Does this strategy have a valid entry signal right now? Return JSON only."""
             text = text.split("```")[1]
             if text.startswith("json"):
                 text = text[4:]
-        return json.loads(text.strip())
+        result = json.loads(text.strip())
+        _eval_cache[strategy_id] = (datetime.now(timezone.utc), result)
+        return result
     except Exception as e:
         log.warning(f"Groq evaluation error: {e}")
         return None

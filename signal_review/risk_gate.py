@@ -53,17 +53,11 @@ def _html(text: str) -> str:
 
 
 def _send_telegram(message: str):
-    if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
-        logger.warning("Telegram not configured — skipping alert")
-        return
-    url  = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    body = json.dumps({'chat_id': TELEGRAM_CHAT_ID, 'text': message, 'parse_mode': 'HTML'}).encode()
-    req  = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json'})
     try:
-        with urllib.request.urlopen(req, timeout=10) as r:
-            pass
+        from lib import hermes_gate
+        hermes_gate.record_digest_item('trading_digest', message)
     except Exception as e:
-        logger.error(f"Telegram send failed: {e}")
+        logger.error(f"Digest record failed: {e}")
 
 
 def run_risk_gate(signal: dict, ai_review: dict) -> dict:
@@ -124,6 +118,12 @@ def run_risk_gate(signal: dict, ai_review: dict) -> dict:
             f"Reason: {_html(reason)}"
         )
         logger.info(f"REJECTED — {symbol} {side} | reason={reason}")
+        try:
+            from lib import hermes_gate
+            hermes_gate.send_critical(msg, event_type='trading_risk_violation')
+            return {'approved': approved, 'reason': '; '.join(risk_issues) if not approved else 'passed'}
+        except Exception:
+            pass
 
     _send_telegram(msg)
     return {'approved': approved, 'reason': '; '.join(risk_issues) if not approved else 'passed'}

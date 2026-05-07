@@ -79,17 +79,16 @@ def _sb_get(path: str) -> list:
         return []
 
 
-def _send_telegram(text: str) -> None:
-    if not TELEGRAM_ENABLED or not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+def _send_telegram(text: str, event_type: str = 'coordination_alert', severity: str = 'warning') -> None:
+    if not TELEGRAM_ENABLED:
         return
-    url  = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    body = json.dumps({'chat_id': TELEGRAM_CHAT_ID, 'text': text, 'parse_mode': 'HTML'}).encode()
-    req  = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json'})
     try:
-        with urllib.request.urlopen(req, timeout=10) as _:
-            pass
+        import sys as _sys
+        _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from lib.hermes_gate import send as gate_send
+        gate_send(text, event_type=event_type, severity=severity)
     except Exception as e:
-        logger.warning(f"Telegram: {e}")
+        logger.warning(f"HermesGate send failed: {e}")
 
 
 def _send_email(subject: str, body: str) -> None:

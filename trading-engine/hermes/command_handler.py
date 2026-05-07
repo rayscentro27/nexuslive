@@ -67,10 +67,13 @@ class HermesCommandHandler:
         if not self.enabled:
             return
         try:
-            requests.post(
-                f'https://api.telegram.org/bot{self.token}/sendMessage',
-                json={'chat_id': self.chat_id, 'text': text, 'parse_mode': 'Markdown'},
-                timeout=10,
+            from lib import hermes_gate
+            hermes_gate.send_direct_response(
+                text,
+                event_type='trading_engine_command_reply',
+                bot_token=self.token,
+                chat_id=self.chat_id,
+                parse_mode='Markdown',
             )
         except Exception:
             pass

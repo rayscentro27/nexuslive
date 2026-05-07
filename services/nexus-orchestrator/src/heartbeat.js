@@ -23,6 +23,7 @@ async function beat() {
         worker_type:       'orchestrator',
         status:            'running',
         last_heartbeat_at: new Date().toISOString(),
+        last_seen_at:      new Date().toISOString(),
         pid:               process.pid,
         host:              process.env.HOSTNAME ?? 'mac-mini',
         metadata: {

@@ -26,6 +26,7 @@ from html import escape
 import requests
 
 from lib.telegram_role_config import get_ops_config
+from lib import hermes_gate
 
 VERSION = "1.0"
 
@@ -76,15 +77,11 @@ TG_BASE = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}'
 # ── Telegram helpers ───────────────────────────────────────────────────────────
 
 def send(text: str):
-    """Send a message to Ray's chat."""
+    """Send a message to Ray's chat through the Hermes gate (direct response path)."""
     if len(text) > 4000:
         text = text[:3950] + '\n\n_(truncated)_'
     try:
-        requests.post(
-            f'{TG_BASE}/sendMessage',
-            json={'chat_id': CHAT_ID, 'text': text, 'parse_mode': 'Markdown'},
-            timeout=10,
-        )
+        hermes_gate.send_direct_response(text, event_type='hermes_status_reply', parse_mode='Markdown')
     except Exception as e:
         log.warning(f'send error: {e}')
 

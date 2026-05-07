@@ -53,8 +53,12 @@ from lib.telegram_role_config import (
     get_chat_config,
     get_ops_config,
     get_reports_config,
+    telegram_auto_reports_enabled,
+    telegram_conversational_mode,
+    telegram_manual_only,
     validate_ops_polling,
 )
+from lib import hermes_gate
 
 
 def email_summaries_enabled() -> bool:
@@ -253,6 +257,18 @@ class NexusTelegramBot:
             except Exception as e:
                 return False, f"Command failed: {e}"
 
+    def _conversational_reply(self, raw: str) -> str:
+        """Natural-language Telegram reply path for conversational mode."""
+        try:
+            from hermes_claude_bot import ask_via_router
+            return str(ask_via_router(raw) or "")
+        except Exception:
+            try:
+                from hermes_command_router.router import run_command
+                return self.format_pre(run_command(raw, source="telegram"))
+            except Exception:
+                return self.safe_help_text()
+
     def send_message(self, message: str, parse_mode: str = "HTML") -> bool:
         """Send message to Telegram"""
         if not self.connected:
@@ -271,9 +287,17 @@ class NexusTelegramBot:
             if response.status_code == 200:
                 logger.debug(f"📤 Message sent to Telegram")
                 return True
-            else:
-                logger.error(f"Failed to send message: {response.text}")
-                return False
+            if response.status_code == 400 and "can't parse entities" in response.text.lower():
+                fallback_payload = {
+                    "chat_id": self.chat_id,
+                    "text": self._truncate_response(message),
+                }
+                retry = requests.post(f"{self.api_url}/sendMessage", json=fallback_payload, timeout=10)
+                if retry.status_code == 200:
+                    logger.warning("Telegram HTML parse failed; resent message without parse_mode")
+                    return True
+            logger.error(f"Failed to send message: {response.text}")
+            return False
 
         except Exception as e:
             logger.error(f"Error sending message: {e}")
@@ -460,10 +484,53 @@ class NexusTelegramBot:
             "jobs      — recent job activity\n"
             "workers   — worker heartbeats\n"
             "brief     — latest CEO briefing\n"
+            "models    — routing/model diagnostics\n"
             "queue     — signal proposal queue\n"
             "help      — this message\n\n"
             "CEO Mode\n"
             "/ceo      — daily CEO summary\n"
+            "/summarize — CEO daily executive summary\n"
+            "show trading digest\n"
+            "what strategies should we improve?\n"
+            "what business should we build next?\n"
+            "show best online opportunities\n"
+            "generate website brief for the top opportunity\n"
+            "show critical alerts\n"
+            "what needs my approval?\n"
+            "show recommendations\n"
+            "show pending recommendations\n"
+            "approve recommendation <id>\n"
+            "reject recommendation <id>\n"
+            "generate build plan for recommendation <id>\n"
+            "what should we focus on this week?\n"
+            "highest ROI opportunity\n"
+            "best business to launch\n"
+            "best performing strategy\n"
+            "what should we stop doing?\n"
+            "what should we automate next?\n"
+            "show recommendation rankings\n"
+            "what credit actions work best?\n"
+            "what is blocking funding approvals?\n"
+            "which lenders approve most often?\n"
+            "what profile patterns succeed?\n"
+            "what should improve before applying?\n"
+            "which clients are closest to Tier 1 readiness?\n"
+            "what credit strategies improve scores fastest?\n"
+            "which clients are closest to funding?\n"
+            "which clients are stuck?\n"
+            "who is likely to churn?\n"
+            "who needs intervention?\n"
+            "highest momentum clients\n"
+            "highest value clients\n"
+            "who should we prioritize this week?\n"
+            "which clients need outreach?\n"
+            "why did Hermes recommend this?\n"
+            "show recommendation reasoning\n"
+            "what signals influenced this score?\n"
+            "what data is missing?\n"
+            "why is this client high priority?\n"
+            "why is this strategy ranked highly?\n"
+            "show executive review snapshot\n"
             "/leads    — lead pipeline report\n"
             "/revenue  — revenue & MRR report\n"
             "/launch   — launch KPIs today\n"
@@ -500,6 +567,8 @@ class NexusTelegramBot:
             "/help": "help",
             "brief": "brief",
             "/brief": "brief",
+            "models": "models",
+            "/models": "models",
             "/research": "research",
             "queue": "queue",
             "/queue": "queue",
@@ -526,18 +595,80 @@ class NexusTelegramBot:
             "comms": "comms",
             "/autofix": "autofix",
             "autofix": "autofix",
+            "/summarize": "daily_summary",
+            "summarize today": "daily_summary",
+            "show trading digest": "trading_digest",
+            "what strategies should we improve?": "strategy_improve",
+            "what business should we build next?": "business_next",
+            "show best online opportunities": "online_opportunities",
+            "generate website brief for the top opportunity": "website_brief",
+            "show critical alerts": "critical_alerts",
+            "what needs my approval?": "approvals",
+            "show recommendations": "show_recommendations",
+            "show pending recommendations": "show_pending_recommendations",
+            "what should we focus on this week?": "weekly_focus",
+            "highest roi opportunity": "highest_roi",
+            "best business to launch": "best_business_launch",
+            "best performing strategy": "best_strategy",
+            "what should we stop doing?": "stop_doing",
+            "what should we automate next?": "automate_next",
+            "show recommendation rankings": "recommendation_rankings",
+            "what credit actions work best?": "credit_actions_best",
+            "what is blocking funding approvals?": "funding_blockers",
+            "which lenders approve most often?": "lender_approvals",
+            "what profile patterns succeed?": "profile_patterns",
+            "what should improve before applying?": "pre_apply_improvements",
+            "which clients are closest to tier 1 readiness?": "tier1_closest",
+            "what credit strategies improve scores fastest?": "credit_strategies_fastest",
+            "which clients are closest to funding?": "clients_closest_funding",
+            "which clients are stuck?": "clients_stuck",
+            "who is likely to churn?": "clients_churn",
+            "who needs intervention?": "clients_intervention",
+            "highest momentum clients": "clients_momentum",
+            "highest value clients": "clients_value",
+            "who should we prioritize this week?": "clients_weekly_priority",
+            "which clients need outreach?": "clients_outreach",
+            "why did hermes recommend this?": "why_recommended",
+            "show recommendation reasoning": "recommendation_reasoning",
+            "what signals influenced this score?": "score_signals",
+            "what data is missing?": "missing_data",
+            "why is this client high priority?": "client_priority_reason",
+            "why is this strategy ranked highly?": "strategy_priority_reason",
+            "show executive review snapshot": "executive_review_snapshot",
         }
         return mapping.get(normalized, "unknown"), raw
+
+    def _routed_health(self) -> str:
+        try:
+            from hermes_command_router.router import run_command
+            return run_command("check backend health", source="telegram")
+        except Exception as e:
+            return self.safe_health_summary()
+
+    def _routed_workers(self) -> str:
+        try:
+            from hermes_command_router.router import run_command
+            return run_command("worker status", source="telegram")
+        except Exception as e:
+            return self.safe_workers_summary()
+
+    def _routed_queue(self) -> str:
+        try:
+            from hermes_command_router.router import run_command
+            return run_command("queue status", source="telegram")
+        except Exception as e:
+            return self.safe_jobs_summary()
 
     def handle_basic_command(self, command: str) -> str:
         handlers: dict[str, Callable[[], str]] = {
             "status": self.safe_status_summary,
-            "health": self.safe_health_summary,
-            "jobs": self.safe_jobs_summary,
-            "workers": self.safe_workers_summary,
+            "health": self._routed_health,
+            "jobs": self._routed_queue,
+            "workers": self._routed_workers,
             "help": self.safe_help_text,
             "brief": self.latest_stored_brief,
-            "queue": self.safe_queue_summary,
+            "models": self._cmd_models,
+            "queue": self._routed_queue,
             # CEO Mode
             "ceo_report": self._cmd_ceo_report,
             "leads": self._cmd_leads,
@@ -550,6 +681,44 @@ class NexusTelegramBot:
             "outreach": self._cmd_outreach,
             "comms": self._cmd_comms,
             "autofix": self._cmd_autofix,
+            "daily_summary": self._cmd_daily_summary,
+            "trading_digest": self._cmd_trading_digest,
+            "strategy_improve": self._cmd_strategy_improve,
+            "business_next": self._cmd_business_next,
+            "online_opportunities": self._cmd_online_opportunities,
+            "website_brief": self._cmd_website_brief,
+            "critical_alerts": self._cmd_critical_alerts,
+            "show_recommendations": self._cmd_show_recommendations,
+            "show_pending_recommendations": self._cmd_show_pending_recommendations,
+            "weekly_focus": self._cmd_weekly_focus,
+            "highest_roi": self._cmd_highest_roi,
+            "best_business_launch": self._cmd_best_business_launch,
+            "best_strategy": self._cmd_best_strategy,
+            "stop_doing": self._cmd_stop_doing,
+            "automate_next": self._cmd_automate_next,
+            "recommendation_rankings": self._cmd_recommendation_rankings,
+            "credit_actions_best": self._cmd_credit_actions_best,
+            "funding_blockers": self._cmd_funding_blockers,
+            "lender_approvals": self._cmd_lender_approvals,
+            "profile_patterns": self._cmd_profile_patterns,
+            "pre_apply_improvements": self._cmd_pre_apply_improvements,
+            "tier1_closest": self._cmd_tier1_closest,
+            "credit_strategies_fastest": self._cmd_credit_strategies_fastest,
+            "clients_closest_funding": self._cmd_clients_closest_funding,
+            "clients_stuck": self._cmd_clients_stuck,
+            "clients_churn": self._cmd_clients_churn,
+            "clients_intervention": self._cmd_clients_intervention,
+            "clients_momentum": self._cmd_clients_momentum,
+            "clients_value": self._cmd_clients_value,
+            "clients_weekly_priority": self._cmd_clients_weekly_priority,
+            "clients_outreach": self._cmd_clients_outreach,
+            "why_recommended": self._cmd_why_recommended,
+            "recommendation_reasoning": self._cmd_recommendation_reasoning,
+            "score_signals": self._cmd_score_signals,
+            "missing_data": self._cmd_missing_data,
+            "client_priority_reason": self._cmd_client_priority_reason,
+            "strategy_priority_reason": self._cmd_strategy_priority_reason,
+            "executive_review_snapshot": self._cmd_executive_review_snapshot,
         }
         handler = handlers.get(command)
         if not handler:
@@ -576,6 +745,47 @@ class NexusTelegramBot:
             return '\n'.join(lines)
         except Exception as e:
             return f"CEO report error: {e}"
+
+    def _cmd_models(self) -> str:
+        try:
+            from lib.model_router import routing_preview
+
+            previews: list[str] = []
+            task_classes = [
+                "funding_strategy",
+                "credit_analysis",
+                "telegram_reply",
+                "cheap_summary",
+                "research_worker",
+                "coding_assistant",
+            ]
+            for task in task_classes:
+                try:
+                    p = routing_preview(task_type=task)
+                    previews.append(
+                        f"- {task}: {p.get('provider','?')} / {p.get('model','?')} / ctx={p.get('max_context','?')}"
+                    )
+                except Exception as e:
+                    previews.append(f"- {task}: unavailable ({type(e).__name__})")
+
+            default_provider = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+            default_model = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat")
+            ctx = os.getenv("OPENROUTER_CTX", os.getenv("MODEL_CONTEXT_LENGTH", "128000"))
+
+            lines = [
+                "<b>Model Diagnostics</b>",
+                f"default provider: {default_provider}",
+                f"default model: {default_model}",
+                f"configured context length: {ctx}",
+                f"telegram manual-only: {telegram_manual_only()}",
+                f"telegram auto reports enabled: {telegram_auto_reports_enabled()}",
+                "",
+                "<b>Routing Preview</b>",
+                *previews,
+            ]
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Models diagnostic error: {e}"
 
     def _cmd_leads(self) -> str:
         try:
@@ -657,6 +867,300 @@ class NexusTelegramBot:
             return '\n'.join(lines)
         except Exception as e:
             return f"Auto-fix error: {e}"
+
+    def _cmd_daily_summary(self) -> str:
+        try:
+            from ceo_agent.chief_of_staff import build_daily_executive_summary
+            return build_daily_executive_summary()
+        except Exception as e:
+            return f"Daily summary error: {e}"
+
+    def _cmd_trading_digest(self) -> str:
+        try:
+            from ceo_agent.chief_of_staff import build_trading_digest
+            return build_trading_digest().get("text", "Trading digest unavailable")
+        except Exception as e:
+            return f"Trading digest error: {e}"
+
+    def _cmd_strategy_improve(self) -> str:
+        try:
+            from ceo_agent.chief_of_staff import build_trading_digest
+            d = build_trading_digest()
+            recs = d.get("recommendations") or []
+            if not recs:
+                return "No strategy improvements detected right now."
+            lines = ["<b>Strategy Improvement Recommendations</b>"]
+            lines.extend([f"- {r}" for r in recs[:6]])
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Strategy recommendation error: {e}"
+
+    def _cmd_business_next(self) -> str:
+        try:
+            from ceo_agent.chief_of_staff import build_business_digest
+            d = build_business_digest()
+            return d.get("text", "Business digest unavailable")
+        except Exception as e:
+            return f"Business recommendation error: {e}"
+
+    def _cmd_online_opportunities(self) -> str:
+        try:
+            from ceo_agent.chief_of_staff import build_business_digest
+            d = build_business_digest()
+            ranked = d.get("ranked") or []
+            if not ranked:
+                return "No ranked online opportunities available."
+            lines = ["<b>Best Online Opportunities</b>"]
+            for row in ranked[:5]:
+                lines.append(f"- {row.get('title','Untitled')} | score {row.get('composite','?')}")
+            return "\n".join(lines)
+        except Exception as e:
+            return f"Online opportunities error: {e}"
+
+    def _cmd_website_brief(self) -> str:
+        try:
+            from ceo_agent.chief_of_staff import build_business_digest, build_website_brief
+            d = build_business_digest()
+            top = d.get("top")
+            if not top:
+                return "No top opportunity available to generate a website brief."
+            return build_website_brief(top)
+        except Exception as e:
+            return f"Website brief error: {e}"
+
+    def _cmd_critical_alerts(self) -> str:
+        try:
+            from ceo_agent.alert_engine import run_all_checks, format_alerts_telegram
+            alerts = run_all_checks()
+            critical = [a for a in alerts if str(a.get("severity", "")).lower() in {"critical", "high"}]
+            if not critical:
+                return "✅ No critical alerts right now."
+            return format_alerts_telegram(critical)
+        except Exception as e:
+            return f"Critical alerts error: {e}"
+
+    def _cmd_show_recommendations(self) -> str:
+        try:
+            from ceo_agent.recommendation_queue import format_recommendations
+            return format_recommendations(pending_only=False)
+        except Exception as e:
+            return f"Recommendations error: {e}"
+
+    def _cmd_show_pending_recommendations(self) -> str:
+        try:
+            from ceo_agent.recommendation_queue import format_recommendations
+            return format_recommendations(pending_only=True)
+        except Exception as e:
+            return f"Pending recommendations error: {e}"
+
+    def _cmd_weekly_focus(self) -> str:
+        try:
+            from ceo_agent.chief_of_staff import build_weekly_focus
+            return build_weekly_focus()
+        except Exception as e:
+            return f"Weekly focus error: {e}"
+
+    def _cmd_highest_roi(self) -> str:
+        try:
+            from ceo_agent.chief_of_staff import build_business_digest
+            top = (build_business_digest(hours=24 * 7).get("top") or {})
+            if not top:
+                return "No ROI-ranked business opportunity available."
+            return f"Highest ROI opportunity: {top.get('title','Untitled')} (score {top.get('composite','?')})"
+        except Exception as e:
+            return f"Highest ROI error: {e}"
+
+    def _cmd_best_business_launch(self) -> str:
+        try:
+            from ceo_agent.chief_of_staff import build_business_digest
+            top = (build_business_digest(hours=24 * 7).get("top") or {})
+            if not top:
+                return "No launch candidate available."
+            return f"Best business to launch now: {top.get('title','Untitled')} ({top.get('niche') or top.get('opportunity_type') or 'general'})"
+        except Exception as e:
+            return f"Best business error: {e}"
+
+    def _cmd_best_strategy(self) -> str:
+        try:
+            from ceo_agent.chief_of_staff import best_performing_strategy
+            return best_performing_strategy()
+        except Exception as e:
+            return f"Best strategy error: {e}"
+
+    def _cmd_stop_doing(self) -> str:
+        try:
+            from ceo_agent.chief_of_staff import stop_doing_recommendation
+            return stop_doing_recommendation()
+        except Exception as e:
+            return f"Stop-doing analysis error: {e}"
+
+    def _cmd_automate_next(self) -> str:
+        try:
+            from ceo_agent.chief_of_staff import automate_next_recommendation
+            return automate_next_recommendation()
+        except Exception as e:
+            return f"Automate-next error: {e}"
+
+    def _cmd_recommendation_rankings(self) -> str:
+        try:
+            from ceo_agent.recommendation_queue import format_rankings, category_outcomes
+            return f"{format_rankings(limit=10)}\n\n{category_outcomes()}"
+        except Exception as e:
+            return f"Recommendation ranking error: {e}"
+
+    def _cmd_credit_actions_best(self) -> str:
+        try:
+            from ceo_agent.credit_funding_intelligence import credit_actions_work_best
+            return credit_actions_work_best()
+        except Exception as e:
+            return f"Credit intelligence error: {e}"
+
+    def _cmd_funding_blockers(self) -> str:
+        try:
+            from ceo_agent.credit_funding_intelligence import funding_blockers
+            return funding_blockers()
+        except Exception as e:
+            return f"Funding blocker analysis error: {e}"
+
+    def _cmd_lender_approvals(self) -> str:
+        try:
+            from ceo_agent.credit_funding_intelligence import lenders_approve_most_often
+            return lenders_approve_most_often()
+        except Exception as e:
+            return f"Lender approval analysis error: {e}"
+
+    def _cmd_profile_patterns(self) -> str:
+        try:
+            from ceo_agent.credit_funding_intelligence import profile_patterns_succeed
+            return profile_patterns_succeed()
+        except Exception as e:
+            return f"Profile pattern analysis error: {e}"
+
+    def _cmd_pre_apply_improvements(self) -> str:
+        try:
+            from ceo_agent.credit_funding_intelligence import improve_before_applying
+            return improve_before_applying()
+        except Exception as e:
+            return f"Pre-application guidance error: {e}"
+
+    def _cmd_tier1_closest(self) -> str:
+        try:
+            from ceo_agent.credit_funding_intelligence import closest_to_tier1
+            return closest_to_tier1()
+        except Exception as e:
+            return f"Tier 1 readiness analysis error: {e}"
+
+    def _cmd_credit_strategies_fastest(self) -> str:
+        try:
+            from ceo_agent.credit_funding_intelligence import credit_strategies_improve_scores_fastest
+            return credit_strategies_improve_scores_fastest()
+        except Exception as e:
+            return f"Credit strategy velocity analysis error: {e}"
+
+    def _cmd_clients_closest_funding(self) -> str:
+        try:
+            from ceo_agent.client_success_intelligence import clients_closest_to_funding
+            return clients_closest_to_funding()
+        except Exception as e:
+            return f"Client funding proximity error: {e}"
+
+    def _cmd_clients_stuck(self) -> str:
+        try:
+            from ceo_agent.client_success_intelligence import clients_stuck
+            return clients_stuck()
+        except Exception as e:
+            return f"Client stalled analysis error: {e}"
+
+    def _cmd_clients_churn(self) -> str:
+        try:
+            from ceo_agent.client_success_intelligence import clients_likely_to_churn
+            return clients_likely_to_churn()
+        except Exception as e:
+            return f"Client churn analysis error: {e}"
+
+    def _cmd_clients_intervention(self) -> str:
+        try:
+            from ceo_agent.client_success_intelligence import clients_need_intervention
+            return clients_need_intervention()
+        except Exception as e:
+            return f"Client intervention analysis error: {e}"
+
+    def _cmd_clients_momentum(self) -> str:
+        try:
+            from ceo_agent.client_success_intelligence import highest_momentum_clients
+            return highest_momentum_clients()
+        except Exception as e:
+            return f"Client momentum analysis error: {e}"
+
+    def _cmd_clients_value(self) -> str:
+        try:
+            from ceo_agent.client_success_intelligence import highest_value_clients
+            return highest_value_clients()
+        except Exception as e:
+            return f"Client value analysis error: {e}"
+
+    def _cmd_clients_weekly_priority(self) -> str:
+        try:
+            from ceo_agent.client_success_intelligence import prioritize_this_week
+            return prioritize_this_week()
+        except Exception as e:
+            return f"Client weekly priority error: {e}"
+
+    def _cmd_clients_outreach(self) -> str:
+        try:
+            from ceo_agent.client_success_intelligence import clients_need_outreach
+            return clients_need_outreach()
+        except Exception as e:
+            return f"Client outreach analysis error: {e}"
+
+    def _cmd_why_recommended(self) -> str:
+        try:
+            from ceo_agent.executive_review_console import why_did_hermes_recommend_this
+            return why_did_hermes_recommend_this()
+        except Exception as e:
+            return f"Recommendation explainability error: {e}"
+
+    def _cmd_recommendation_reasoning(self) -> str:
+        try:
+            from ceo_agent.executive_review_console import show_recommendation_reasoning
+            return show_recommendation_reasoning()
+        except Exception as e:
+            return f"Recommendation reasoning error: {e}"
+
+    def _cmd_score_signals(self) -> str:
+        try:
+            from ceo_agent.executive_review_console import signals_influencing_score
+            return signals_influencing_score()
+        except Exception as e:
+            return f"Score signal explainability error: {e}"
+
+    def _cmd_missing_data(self) -> str:
+        try:
+            from ceo_agent.executive_review_console import sparse_data_diagnostics
+            return sparse_data_diagnostics()
+        except Exception as e:
+            return f"Missing data diagnostics error: {e}"
+
+    def _cmd_client_priority_reason(self) -> str:
+        try:
+            from ceo_agent.executive_review_console import why_client_high_priority
+            return why_client_high_priority()
+        except Exception as e:
+            return f"Client priority reasoning error: {e}"
+
+    def _cmd_strategy_priority_reason(self) -> str:
+        try:
+            from ceo_agent.executive_review_console import why_strategy_ranked_highly
+            return why_strategy_ranked_highly()
+        except Exception as e:
+            return f"Strategy reasoning error: {e}"
+
+    def _cmd_executive_review_snapshot(self) -> str:
+        try:
+            from ceo_agent.executive_review_console import executive_review_snapshot
+            return executive_review_snapshot()
+        except Exception as e:
+            return f"Executive review snapshot error: {e}"
 
     def safe_queue_summary(self) -> str:
         try:
@@ -788,7 +1292,37 @@ class NexusTelegramBot:
             except Exception as e:
                 return f"needs_edits error: {e}"
 
+        if normalized.startswith("approve recommendation "):
+            if not self.allow_mutating_commands:
+                return "⛔ Mutating commands disabled. Set TELEGRAM_ALLOW_MUTATING_COMMANDS=true."
+            rid = raw[len("approve recommendation "):].strip()
+            try:
+                from ceo_agent.recommendation_queue import set_recommendation_status
+                return set_recommendation_status(rid, "approved")
+            except Exception as e:
+                return f"Approve recommendation error: {e}"
+
+        if normalized.startswith("reject recommendation "):
+            if not self.allow_mutating_commands:
+                return "⛔ Mutating commands disabled. Set TELEGRAM_ALLOW_MUTATING_COMMANDS=true."
+            rid = raw[len("reject recommendation "):].strip()
+            try:
+                from ceo_agent.recommendation_queue import set_recommendation_status
+                return set_recommendation_status(rid, "rejected")
+            except Exception as e:
+                return f"Reject recommendation error: {e}"
+
+        if normalized.startswith("generate build plan for recommendation "):
+            rid = raw[len("generate build plan for recommendation "):].strip()
+            try:
+                from ceo_agent.recommendation_queue import generate_plan_for
+                return generate_plan_for(rid)
+            except Exception as e:
+                return f"Generate plan error: {e}"
+
         if not self.allow_mutating_commands:
+            if telegram_conversational_mode():
+                return self._conversational_reply(raw)
             return self.safe_help_text()
 
         if normalized in {"run lead check", "lead check"}:
@@ -863,6 +1397,8 @@ class NexusTelegramBot:
                 )
             return self._enqueue_research(url)
 
+        if telegram_conversational_mode():
+            return self._conversational_reply(raw)
         return self.safe_help_text()
 
     def _enqueue_research(self, url: str) -> str:
@@ -1055,118 +1591,119 @@ class NexusTelegramBot:
         self.save_update_offset()
 
     def alert_signal(self, signal: Dict[str, Any]) -> bool:
-        """Alert on new trading signal"""
-        message = f"""
-<b>📈 TRADING SIGNAL</b>
-
-<b>Symbol:</b> {signal.get('symbol', 'N/A')}
-<b>Action:</b> {signal.get('action', 'N/A')}
-<b>Entry:</b> {signal.get('entry_price', 'Market')}
-<b>Confidence:</b> {signal.get('confidence', 'N/A')}%
-
-<i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>
-"""
+        """Record trading signal for digest (no immediate Telegram spam)."""
+        message = (
+            f"<b>📈 TRADING SIGNAL</b>\n\n"
+            f"<b>Symbol:</b> {signal.get('symbol', 'N/A')}\n"
+            f"<b>Action:</b> {signal.get('action', 'N/A')}\n"
+            f"<b>Entry:</b> {signal.get('entry_price', 'Market')}\n"
+            f"<b>Confidence:</b> {signal.get('confidence', 'N/A')}%\n\n"
+            f"<i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>"
+        )
         self.send_email_summary(
             f"Nexus Trading Signal — {signal.get('symbol', 'N/A')}",
             json.dumps(signal, indent=2, default=str),
         )
-        return self.send_message(message)
+        hermes_gate.record_digest_item('trading_digest', message)
+        return True
 
     def alert_trade_execution(self, trade: Dict[str, Any]) -> bool:
-        """Alert on trade execution"""
-        message = f"""
-<b>✅ TRADE EXECUTED</b>
-
-<b>Symbol:</b> {trade.get('symbol', 'N/A')}
-<b>Action:</b> {trade.get('action', 'N/A')}
-<b>Entry Price:</b> {trade.get('entry_price', 'N/A')}
-<b>Position Size:</b> {trade.get('position_size', 'N/A')}
-<b>Order ID:</b> <code>{trade.get('order_id', 'N/A')}</code>
-<b>Broker:</b> {trade.get('broker', 'N/A')}
-
-<i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>
-"""
+        """Record trade execution for digest (no immediate Telegram spam)."""
+        message = (
+            f"<b>✅ TRADE EXECUTED</b>\n\n"
+            f"<b>Symbol:</b> {trade.get('symbol', 'N/A')}\n"
+            f"<b>Action:</b> {trade.get('action', 'N/A')}\n"
+            f"<b>Entry Price:</b> {trade.get('entry_price', 'N/A')}\n"
+            f"<b>Position Size:</b> {trade.get('position_size', 'N/A')}\n"
+            f"<b>Order ID:</b> <code>{trade.get('order_id', 'N/A')}</code>\n"
+            f"<b>Broker:</b> {trade.get('broker', 'N/A')}\n\n"
+            f"<i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>"
+        )
         self.send_email_summary(
             f"Nexus Trade Executed — {trade.get('symbol', 'N/A')}",
             json.dumps(trade, indent=2, default=str),
         )
-        return self.send_message(message)
+        hermes_gate.record_digest_item('trading_digest', message)
+        return True
 
     def alert_position_closed(self, position: Dict[str, Any]) -> bool:
-        """Alert on position closure"""
+        """Record position closure for digest (no immediate Telegram spam)."""
         pnl = position.get('pnl', 0)
         pnl_emoji = "💰" if pnl > 0 else "📉"
-
-        message = f"""
-<b>{pnl_emoji} POSITION CLOSED</b>
-
-<b>Symbol:</b> {position.get('symbol', 'N/A')}
-<b>Exit Price:</b> {position.get('exit_price', 'N/A')}
-<b>P&L:</b> <b>${pnl:.2f}</b>
-<b>Reason:</b> {position.get('reason', 'N/A')}
-
-<i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>
-"""
+        message = (
+            f"<b>{pnl_emoji} POSITION CLOSED</b>\n\n"
+            f"<b>Symbol:</b> {position.get('symbol', 'N/A')}\n"
+            f"<b>Exit Price:</b> {position.get('exit_price', 'N/A')}\n"
+            f"<b>P&L:</b> <b>${pnl:.2f}</b>\n"
+            f"<b>Reason:</b> {position.get('reason', 'N/A')}\n\n"
+            f"<i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>"
+        )
         self.send_email_summary(
             f"Nexus Position Closed — {position.get('symbol', 'N/A')}",
             json.dumps(position, indent=2, default=str),
         )
-        return self.send_message(message)
+        hermes_gate.record_digest_item('trading_digest', message)
+        return True
 
     def alert_risk_warning(self, warning: Dict[str, Any]) -> bool:
-        """Alert on risk warnings"""
-        message = f"""
-<b>⚠️ RISK WARNING</b>
-
-<b>Type:</b> {warning.get('type', 'N/A')}
-<b>Message:</b> {warning.get('message', 'N/A')}
-<b>Current Status:</b>
-  • Daily P&L: ${warning.get('daily_pnl', 0):.2f}
-  • Open Positions: {warning.get('open_positions', 0)}
-  • Max Allowed: {warning.get('max_allowed', 'N/A')}
-
-<i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>
-"""
+        """Send only true trading risk violations immediately; otherwise digest."""
+        message = (
+            f"<b>⚠️ RISK WARNING</b>\n\n"
+            f"<b>Type:</b> {warning.get('type', 'N/A')}\n"
+            f"<b>Message:</b> {warning.get('message', 'N/A')}\n"
+            f"<b>Current Status:</b>\n"
+            f"  • Daily P&L: ${warning.get('daily_pnl', 0):.2f}\n"
+            f"  • Open Positions: {warning.get('open_positions', 0)}\n"
+            f"  • Max Allowed: {warning.get('max_allowed', 'N/A')}\n\n"
+            f"<i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>"
+        )
         self.send_email_summary(
             f"Nexus Risk Warning — {warning.get('type', 'N/A')}",
             json.dumps(warning, indent=2, default=str),
         )
-        return self.send_message(message)
+        warn_type = str(warning.get('type', '')).lower()
+        is_violation = any(k in warn_type for k in ('violation', 'breach', 'max_loss', 'risk_limit'))
+        if is_violation:
+            return hermes_gate.send_critical(message, event_type='trading_risk_violation')
+        hermes_gate.record_digest_item('operations_digest', message)
+        return True
 
     def alert_system_status(self, status: Dict[str, Any]) -> bool:
-        """Alert on system status"""
-        message = f"""
-<b>🤖 SYSTEM STATUS</b>
-
-<b>Status:</b> {status.get('status', 'Unknown')}
-<b>Hermes:</b> {'✅ Connected' if status.get('hermes_connected') else '❌ Disconnected'}
-<b>Broker:</b> {'✅ Connected' if status.get('broker_connected') else '❌ Disconnected'}
-<b>Signals Processed:</b> {status.get('signals_processed', 0)}
-<b>Active Positions:</b> {status.get('active_positions', 0)}
-
-<i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>
-"""
+        """Record system status for operations digest; alert only on outages."""
+        message = (
+            f"<b>🤖 SYSTEM STATUS</b>\n\n"
+            f"<b>Status:</b> {status.get('status', 'Unknown')}\n"
+            f"<b>Hermes:</b> {'✅ Connected' if status.get('hermes_connected') else '❌ Disconnected'}\n"
+            f"<b>Broker:</b> {'✅ Connected' if status.get('broker_connected') else '❌ Disconnected'}\n"
+            f"<b>Signals Processed:</b> {status.get('signals_processed', 0)}\n"
+            f"<b>Active Positions:</b> {status.get('active_positions', 0)}\n\n"
+            f"<i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>"
+        )
         self.send_email_summary(
             "Nexus System Status",
             json.dumps(status, indent=2, default=str),
         )
-        return self.send_message(message)
+        system_state = str(status.get('status', '')).lower()
+        outage = any(k in system_state for k in ('offline', 'down', 'crash', 'failed'))
+        if outage or (status.get('hermes_connected') is False):
+            return hermes_gate.send_critical(message, event_type='backend_api_offline')
+        hermes_gate.record_digest_item('operations_digest', message)
+        return True
 
     def alert_research_complete(self, research: Dict[str, Any]) -> bool:
-        """Alert on research pipeline completion"""
-        message = f"""
-<b>📊 RESEARCH COMPLETE</b>
-
-<b>Strategies Found:</b> {research.get('strategies_found', 0)}
-<b>Videos Analyzed:</b> {research.get('videos_analyzed', 0)}
-
-<i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>
-"""
+        """Record research completion for operations digest (no immediate Telegram spam)."""
+        message = (
+            f"<b>📊 RESEARCH COMPLETE</b>\n\n"
+            f"<b>Strategies Found:</b> {research.get('strategies_found', 0)}\n"
+            f"<b>Videos Analyzed:</b> {research.get('videos_analyzed', 0)}\n\n"
+            f"<i>{datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</i>"
+        )
         self.send_email_summary(
             "Nexus Research Complete",
             json.dumps(research, indent=2, default=str),
         )
-        return self.send_message(message)
+        hermes_gate.record_digest_item('operations_digest', message)
+        return True
 
     def send_dashboard_link(self) -> bool:
         """Send dashboard access link"""
@@ -1206,20 +1743,13 @@ class TelegramReportSender:
         if not self.connected:
             logger.warning("Telegram reports bot not configured")
             return False
-        try:
-            payload = {
-                "chat_id": self.chat_id,
-                "text": message,
-                "parse_mode": parse_mode,
-            }
-            response = requests.post(f"{self.api_url}/sendMessage", json=payload, timeout=10)
-            if response.status_code == 200:
-                return True
-            logger.error("Reports send failed: %s", response.text[:200])
-            return False
-        except Exception as e:
-            logger.error("Reports send error: %s", e)
-            return False
+        return hermes_gate.send(
+            message,
+            event_type='reports_sender',
+            severity='summary',
+            bot_token=self.bot_token,
+            chat_id=self.chat_id,
+        )
 
 def monitor():
     """
@@ -1247,12 +1777,17 @@ def monitor():
         logger.warning("Telegram command polling not started because polling is not the active delivery mode")
         return
 
-    if bot.connected:
+    if bot.connected and telegram_auto_reports_enabled():
         bot.send_message(
             "<b>🟢 Nexus Telegram Monitor Started</b>\n"
             "<i>Nexus stack is online. Signal alerts are active.</i>"
         )
         logger.info("Telegram monitor running — heartbeat every 300s")
+    elif bot.connected:
+        logger.info(
+            "Telegram auto-report suppressed; conversational mode still enabled (conversational_mode=%s)",
+            telegram_conversational_mode(),
+        )
     else:
         logger.error("Telegram not connected — monitor will retry on each heartbeat")
 

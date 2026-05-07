@@ -254,17 +254,11 @@ def sync_openrouter_spend() -> Optional[float]:
 # ── Budget check + alert ──────────────────────────────────────────────────────
 
 def _send_telegram(text: str) -> None:
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        return
-    url  = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage'
-    data = json.dumps({'chat_id': TELEGRAM_CHAT_ID, 'text': text, 'parse_mode': 'HTML'}).encode()
-    req  = urllib.request.Request(url, data=data,
-                                  headers={'Content-Type': 'application/json'}, method='POST')
     try:
-        with urllib.request.urlopen(req, timeout=8):
-            pass
+        from lib import hermes_gate
+        hermes_gate.record_digest_item('operations_digest', text)
     except Exception as e:
-        logger.warning(f"Telegram alert failed: {e}")
+        logger.warning(f"Digest record failed: {e}")
 
 
 def check_budgets() -> list:
@@ -297,7 +291,16 @@ def check_budgets() -> list:
                 f"  {a['provider'].upper()}: ${a['spend']:.2f} / ${a['limit']:.2f} "
                 f"({a['pct']}% used)"
             )
-        _send_telegram('\n'.join(lines))
+        max_pct = max(a['pct'] for a in alerts)
+        msg = '\n'.join(lines)
+        if max_pct >= 100:
+            try:
+                from lib import hermes_gate
+                hermes_gate.send_critical(msg, event_type='ai_budget_overage')
+            except Exception:
+                _send_telegram(msg)
+        else:
+            _send_telegram(msg)
 
     return alerts
 

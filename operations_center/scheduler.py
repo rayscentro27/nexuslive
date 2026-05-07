@@ -18,6 +18,8 @@ import time
 import signal
 import logging
 import threading
+import subprocess
+import urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Callable, Dict, Any
@@ -40,10 +42,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger("Scheduler")
 
+
+def _track_retry(component: str, error_class: str, attempt: int = 1, max_attempts: int = 1):
+    try:
+        from lib.ai_ops_foundation import track_retry_event
+        track_retry_event(component=component, error_class=error_class, attempt=attempt, max_attempts=max_attempts)
+    except Exception:
+        pass
+
 STATE_FILE = Path(__file__).parent / "scheduler_state.json"
 PID_FILE = Path(__file__).parent / "scheduler.pid"
 _running = True
 _lock = threading.Lock()
+
+
+def _sb_get(path: str) -> list:
+    supabase_url = os.getenv("SUPABASE_URL", "")
+    supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY", "")
+    if not supabase_url or not supabase_key:
+        return []
+    req = urllib.request.Request(
+        f"{supabase_url}/rest/v1/{path}",
+        headers={
+            "apikey": supabase_key,
+            "Authorization": f"Bearer {supabase_key}",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            payload = json.loads(r.read())
+            return payload if isinstance(payload, list) else []
+    except Exception:
+        return []
 
 
 def telegram_enabled() -> bool:
@@ -488,18 +518,176 @@ def task_funding_recommendation_refresh():
         logger.error(f"Funding recommendation refresh failed: {e}")
 
 
-def _notify(message: str):
-    """Send a Telegram alert without crashing if bot is unavailable."""
+def task_daily_digest():
+    """Send one daily executive summary to Telegram."""
+    logger.info("▶ Running daily executive digest...")
+    try:
+        try:
+            from ceo_agent.telemetry_rollups import generate_daily_rollups
+
+            rollups = generate_daily_rollups()
+            logger.info("Telemetry rollups refreshed: %s", rollups.get("date"))
+        except Exception as rollup_err:
+            logger.warning(f"telemetry rollups unavailable: {rollup_err}")
+
+        try:
+            from ceo_agent.chief_of_staff import build_daily_executive_summary
+            summary = build_daily_executive_summary()
+            _notify(summary, event_type="daily_digest", severity="summary")
+            logger.info("✅ Daily executive digest sent (chief_of_staff)")
+            return
+        except Exception as chief_err:
+            logger.warning(f"chief_of_staff digest unavailable, using fallback: {chief_err}")
+
+        root = Path(__file__).parent.parent
+        snapshot = ""
+        attention = ""
+        coord = ""
+        approvals = ""
+
+        try:
+            snapshot_proc = subprocess.run(
+                ["python3", str(root / "scripts" / "autonomy_status.py"), "--format", "brief"],
+                capture_output=True,
+                text=True,
+                timeout=20,
+                cwd=str(root),
+            )
+            snapshot = (snapshot_proc.stdout or snapshot_proc.stderr or "").strip()
+        except Exception as e:
+            snapshot = f"snapshot unavailable: {e}"
+
+        try:
+            attention_proc = subprocess.run(
+                ["python3", str(root / "scripts" / "autonomy_status.py"), "--format", "attention"],
+                capture_output=True,
+                text=True,
+                timeout=20,
+                cwd=str(root),
+            )
+            attention = (attention_proc.stdout or attention_proc.stderr or "").strip()
+        except Exception as e:
+            attention = f"attention unavailable: {e}"
+
+        try:
+            coord_proc = subprocess.run(
+                ["python3", str(root / "nexus_coord.py"), "summary"],
+                capture_output=True,
+                text=True,
+                timeout=20,
+                cwd=str(root),
+            )
+            coord = (coord_proc.stdout or coord_proc.stderr or "").strip()
+        except Exception as e:
+            coord = f"coord summary unavailable: {e}"
+
+        try:
+            approvals_proc = subprocess.run(
+                ["python3", str(root / "nexus_coord.py"), "tasks", "hermes"],
+                capture_output=True,
+                text=True,
+                timeout=20,
+                cwd=str(root),
+            )
+            approvals = (approvals_proc.stdout or approvals_proc.stderr or "").strip()
+        except Exception as e:
+            approvals = f"pending approvals unavailable: {e}"
+
+        state = _load_state()
+        trading_last = state.get("signal_analysis", "never")
+        crm_last = state.get("lead_check", "never")
+        funding_last = state.get("funding_brief", "never")
+        grants_last = state.get("reputation_check", "never")
+
+        lines = [
+            "🧭 <b>Daily Executive Summary</b>",
+            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            "",
+            "<b>System Health</b>",
+            f"<pre>{snapshot[:900]}</pre>",
+            "<b>What Needs Attention</b>",
+            f"<pre>{attention[:900]}</pre>",
+            "<b>Worker / Queue / Approvals</b>",
+            f"<pre>{coord[:700]}</pre>",
+            f"<pre>{approvals[:700]}</pre>",
+            "<b>CRM / Funding / Grants / Trading Activity</b>",
+            f"CRM lead check last run: {crm_last}",
+            f"Funding brief last run: {funding_last}",
+            f"Grants/reputation check last run: {grants_last}",
+            f"Trading/signal analysis last run: {trading_last}",
+            "<b>Recommended Next Actions</b>",
+            "1) Resolve any FAIL/critical items from attention",
+            "2) Clear pending Hermes approvals/tasks",
+            "3) Confirm funding, CRM, and grant checks completed",
+        ]
+        _notify("\n".join(lines), event_type="daily_digest", severity="summary")
+        logger.info("✅ Daily executive digest sent")
+    except Exception as e:
+        logger.error(f"Daily digest failed: {e}")
+
+
+def task_critical_monitor():
+    """Run lightweight critical checks and alert only on critical signals."""
+    logger.info("▶ Running critical monitor...")
+    try:
+        root = Path(__file__).parent.parent
+        timeout_s = int(os.getenv("HERMES_CRITICAL_MONITOR_TIMEOUT_SECONDS", "45"))
+        proc = subprocess.run(
+            ["python3", str(root / "scripts" / "autonomy_status.py"), "--format", "attention"],
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            cwd=str(root),
+        )
+        output = (proc.stdout or proc.stderr or "").strip()
+        lowered = output.lower()
+        raw_tokens = os.getenv(
+            "HERMES_CRITICAL_TOKENS",
+            "worker crash,orchestrator failure,backend offline,api offline,payment failure,queue stuck,security issue,auth issue,provider outage,risk violation",
+        )
+        critical_tokens = tuple(t.strip().lower() for t in raw_tokens.split(",") if t.strip())
+
+        repeated_failed_automation = False
+        try:
+            cutoff = (datetime.now() - timedelta(hours=1)).isoformat()
+            rows = _sb_get(
+                f"job_events?status=eq.failed&created_at=gt.{cutoff}&select=id&limit=25"
+            )
+            threshold = int(os.getenv("HERMES_FAILED_AUTOMATION_THRESHOLD", "5"))
+            repeated_failed_automation = len(rows) >= threshold
+        except Exception:
+            repeated_failed_automation = False
+
+        if any(token in lowered for token in critical_tokens) or repeated_failed_automation:
+            _notify(
+                "🚨 <b>Critical Alert</b>\n"
+                "Immediate attention required.\n\n"
+                f"<pre>{output[:1200]}</pre>",
+                event_type="critical_ops_alert",
+                severity="critical",
+            )
+            logger.warning("Critical alert sent")
+        else:
+            logger.info("No critical alerts detected")
+    except Exception as e:
+        logger.error(f"Critical monitor failed: {e}")
+
+
+def _notify(message: str, event_type: str = 'scheduler_event', severity: str = 'default'):
+    """All scheduler Telegram sends route through the gate — no spam."""
     if not telegram_enabled():
+        return
+    # Policy: automated Telegram sends should be digest or critical only.
+    if severity not in {'summary', 'critical'}:
+        logger.info(f"Telegram suppressed for routine event: {event_type} severity={severity}")
         return
     try:
         import sys
         sys.path.insert(0, str(Path(__file__).parent.parent))
-        from telegram_bot import TelegramReportSender
-        bot = TelegramReportSender()
-        if bot.connected:
-            bot.send_message(message)
+        from lib.hermes_gate import send as gate_send
+        gate_send(message, event_type=event_type, severity=severity)
     except Exception as e:
+        _track_retry("scheduler.notify", type(e).__name__)
         logger.warning(f"Telegram notify failed: {e}")
 
 
@@ -562,6 +750,7 @@ def _notify_hermes(content: str):
 # ─────────────────────────────────────────────
 
 SCHEDULE = [
+    (task_critical_monitor,           0.25, "critical_monitor"),
     (task_research_pipeline,         12.0, "research_pipeline"),
     (task_signal_analysis,            6.0, "signal_analysis"),
     (task_strategy_worker,            6.0, "strategy_worker"),
@@ -572,6 +761,7 @@ SCHEDULE = [
     (task_ops_monitoring,    24.0,  "ops_monitoring"),
     (task_token_check,       24.0,  "token_check"),
     (task_browser_health,    12.0,  "browser_health"),
+    (task_daily_digest,      24.0,  "daily_digest"),
 ]
 
 TICK_INTERVAL = 60  # check every minute
@@ -640,6 +830,7 @@ def _run_task(fn: Callable, name: str):
         fn()
         _mark_done(name)
     except Exception as e:
+        _track_retry("scheduler.run_task", type(e).__name__)
         _release_claim(name)
         logger.error(f"Task {name} raised: {e}")
 
@@ -649,7 +840,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--status", action="store_true")
     p.add_argument("--run-now", metavar="TASK",
-                   choices=["research", "signals", "leads", "reputation", "funding_brief", "funding_recommendation_refresh"],
+                   choices=["research", "signals", "leads", "reputation", "funding_brief", "funding_recommendation_refresh", "daily_digest", "critical_monitor"],
                    help="Run a specific task immediately")
     args = p.parse_args()
 
@@ -663,6 +854,8 @@ if __name__ == "__main__":
             "reputation": task_reputation_check,
             "funding_brief": task_funding_brief,
             "funding_recommendation_refresh": task_funding_recommendation_refresh,
+            "daily_digest": task_daily_digest,
+            "critical_monitor": task_critical_monitor,
         }
         task_map[args.run_now]()
     else:

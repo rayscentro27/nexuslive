@@ -149,6 +149,7 @@ def fetch_unread_nexus_emails():
             ('UNSEEN SUBJECT "research"',),
             ('UNSEEN SUBJECT "tasks"',),
             ('UNSEEN SUBJECT "status"',),
+            ('UNSEEN SUBJECT "hermes"',),
             # Catch [RESEARCH EMAIL] that was marked read before the worker ran.
             (f'SINCE "{_imap_since_date(_RESEARCH_EMAIL_LOOKBACK_DAYS)}" SUBJECT "research email"',),
         ]
@@ -453,7 +454,7 @@ def groq_enhance(raw_recommendation):
         f"{raw_recommendation[:2500]}"
     )
     payload = json.dumps({
-        "model": "llama-3.3-70b-versatile",
+        "model": os.getenv("GROQ_EMAIL_MODEL", os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")),
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 500,
         "temperature": 0.4,
@@ -607,6 +608,45 @@ def process_status(msg):
     )
 
 
+def process_hermes_command(msg):
+    """
+    Route Hermes-style commands received via email.
+    Uses hermes_command_router to classify and run the check,
+    then replies with a structured Hermes Report.
+    """
+    body_text = (msg.get("body") or "").strip()
+    subject   = msg.get("subject", "")
+    reply_to  = msg.get("reply_to", "")
+
+    # Strip common email reply boilerplate (quoted previous messages)
+    clean_lines = []
+    for line in body_text.splitlines():
+        if line.startswith(">") or line.startswith("On ") and "wrote:" in line:
+            break
+        clean_lines.append(line)
+    command_text = "\n".join(clean_lines).strip() or body_text
+
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(NEXUS_DIR))
+        from hermes_command_router.router import run_command
+        report = run_command(command_text, source="email", sender=reply_to)
+    except Exception as e:
+        report = (
+            f"Hermes Report\n\n"
+            f"Status: ERROR\n\n"
+            f"Command: {command_text[:100]}\n"
+            f"Error: {e}\n\n"
+            f"Try rephrasing or contact the system operator."
+        )
+
+    send_reply(
+        reply_to,
+        subject,
+        f"{report}\n\n---\nNexus AI — {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}"
+    )
+
+
 def process_research_email_command(msg):
     reply_to = msg["reply_to"]
     subject = msg["subject"]
@@ -663,8 +703,20 @@ def process_research_email_command(msg):
 
 # ── Mode detection ────────────────────────────────────────────────────────────
 
+_HERMES_SUBJECT_TAGS = ["[hermes]", "hermes,", "hermes:"]
+_HERMES_BODY_TRIGGERS = [
+    "are we ready", "ready for pilot", "10-user pilot", "10 user pilot",
+    "next best move", "what should we do", "what do you recommend",
+    "recommend", "can you hear me", "comm check", "comms check",
+    "worker status", "queue status", "check backend", "system health",
+    "pilot readiness", "health check",
+]
+
+
 def detect_mode(subject, body):
     s = subject.lower().strip()
+    b = (body or "").lower()
+
     if "[research email]" in s or s == "research email" or s.startswith("re: [research email]"):
         return "research_email"
     if "[status]" in s or s == "status" or s.startswith("re: [status]"):
@@ -673,6 +725,13 @@ def detect_mode(subject, body):
         return "tasks"
     if "[nexus]" in s or "[research]" in s:
         return "research" if YT_RE.search(body) else None
+
+    # Hermes command: explicit subject tag or body contains known command phrases
+    if any(tag in s for tag in _HERMES_SUBJECT_TAGS):
+        return "hermes"
+    if any(trigger in b for trigger in _HERMES_BODY_TRIGGERS):
+        return "hermes"
+
     return None
 
 
@@ -708,6 +767,8 @@ def poll_once():
                 process_tasks(msg)
             elif mode == "status":
                 process_status(msg)
+            elif mode == "hermes":
+                process_hermes_command(msg)
             elif mode == "research_email":
                 process_research_email_command(msg)
 

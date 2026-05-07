@@ -76,6 +76,47 @@ Capture what matters. Decisions, context, things to remember. Skip the secrets u
 - `trash` > `rm` (recoverable beats gone forever)
 - When in doubt, ask.
 
+## Coding Agent Mandates
+
+Before modifying any code in this repo, all AI coding agents **must** follow these rules:
+
+### 1. Read Specifications First
+- Read `/specs` (and any relevant spec files) **before** changing code.
+- Do not assume behavior; verify against written specs.
+
+### 2. Protected Systems — Do Not Modify Unless Explicitly Requested
+Never modify the following without **explicit** user approval:
+- **Authentication** logic or flows
+- **Row-Level Security (RLS)** policies
+- **Funding / billing / payment** logic
+- **Worker routing** logic
+- **Production environment** behavior or configuration
+
+### 3. Run Tests and Checks After Changes
+- After any code change, run available tests, linters, type-checkers, or other validation scripts.
+- Do not consider a task complete if tests are failing.
+
+### 4. Summarize Changes and Risk
+- Provide a concise summary of **which files changed** and **why**.
+- State the **risk level** of the change (Low / Medium / High).
+
+### 5. Preserve Supabase and Hermes Roles
+- **Supabase** is the source of truth for data and schema.
+- **Hermes** is the operations copilot. Do not bypass or override Hermes-handled workflows.
+
+### 6. No New Paid APIs Without Approval
+- Do **not** add dependencies on paid third-party APIs unless the user has explicitly approved them.
+
+## Safe Development Workflow
+
+Every coding task should follow this workflow:
+
+1. **Inspect** — Read relevant specs, code, and tests. Understand the current state.
+2. **Plan** — Outline the intended change before writing code.
+3. **Change** — Implement the smallest viable change.
+4. **Test** — Run all available tests and checks. Fix failures before proceeding.
+5. **Summarize** — Report what changed, why, and the risk level.
+
 ## External vs Internal
 
 **Safe to do freely:**

@@ -75,23 +75,14 @@ def _sb_get(path: str) -> list:
         return []
 
 
-def _send_telegram(text: str) -> None:
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        return
-    url  = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    body = json.dumps({
-        'chat_id':    TELEGRAM_CHAT_ID,
-        'text':       text,
-        'parse_mode': 'HTML',
-    }).encode()
-    req = urllib.request.Request(
-        url, data=body, headers={'Content-Type': 'application/json'}
-    )
+def _send_telegram(text: str, event_type: str = 'monitoring_alert', severity: str = 'warning') -> None:
+    """All monitoring Telegram sends route through the gate — no direct API calls."""
     try:
-        with urllib.request.urlopen(req, timeout=10) as _:
-            pass
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from lib.hermes_gate import send as gate_send
+        gate_send(text, event_type=event_type, severity=severity)
     except Exception as e:
-        logger.warning(f"Telegram alert failed: {e}")
+        logger.warning(f"HermesGate send failed: {e}")
 
 
 # ─── Checks ───────────────────────────────────────────────────────────────────
@@ -118,6 +109,24 @@ def check_worker_heartbeats() -> list:
     for w in EXPECTED_WORKERS:
         if w not in seen:
             stale.append(f"{w} (never registered)")
+
+    try:
+        from lib.ai_ops_foundation import track_worker_health
+        if stale:
+            track_worker_health(
+                worker_id="heartbeat_summary",
+                status="warning",
+                detail=f"stale={len(stale)} expected={len(EXPECTED_WORKERS)}",
+            )
+        else:
+            track_worker_health(
+                worker_id="heartbeat_summary",
+                status="healthy",
+                detail=f"healthy={len(EXPECTED_WORKERS)}",
+            )
+    except Exception:
+        pass
+
     return stale
 
 
@@ -234,13 +243,14 @@ def main():
         logger.warning(f"Stale workers: {result['stale_workers']}")
 
     if result['alerts']:
-        msg = '<b>Nexus System Alert</b>\n\n' + '\n'.join(
-            f'⚠ {a}' for a in result['alerts']
+        msg = '<b>⚠ Nexus System Alert</b>\n\n' + '\n'.join(
+            f'• {a}' for a in result['alerts']
         )
-        _send_telegram(msg)
+        _send_telegram(msg, event_type='system_alert', severity='warning')
         logger.warning(f"Alerts sent: {result['alerts']}")
     else:
         logger.info("All checks passed — no alerts")
+        # Never send "all clear" or "nothing to report" messages
 
     # CEO Mode: run business-level alert checks
     try:
@@ -248,7 +258,12 @@ def main():
         ceo_alerts = run_all_checks()
         if ceo_alerts:
             alert_text = format_alerts_telegram(ceo_alerts)
-            _send_telegram(alert_text)
+            # Each CEO alert type gets its own cooldown via the gate
+            for alert in ceo_alerts:
+                atype = alert.get('type', 'CEO_ALERT')
+                severity = 'critical' if alert.get('severity') == 'critical' else 'warning'
+                alert_msg = f"<b>🚨 {atype}</b>\n{alert.get('summary','')}\n\n<i>Action: {alert.get('action','')}</i>"
+                _send_telegram(alert_msg, event_type=atype, severity=severity)
             logger.warning(f"CEO alerts fired: {[a['type'] for a in ceo_alerts]}")
         else:
             logger.info("CEO alert checks: all clear")

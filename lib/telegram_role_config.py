@@ -70,6 +70,22 @@ def hermes_chat_enabled() -> bool:
     return _env_truthy("ENABLE_HERMES_CHAT_BOT", "false")
 
 
+def telegram_auto_reports_enabled() -> bool:
+    return _env_truthy("TELEGRAM_AUTO_REPORTS_ENABLED", "false")
+
+
+def telegram_enabled() -> bool:
+    return _env_truthy("TELEGRAM_ENABLED", "true")
+
+
+def telegram_manual_only() -> bool:
+    return _env_truthy("TELEGRAM_MANUAL_ONLY", "true")
+
+
+def telegram_conversational_mode() -> bool:
+    return _env_truthy("TELEGRAM_CONVERSATIONAL_MODE", "true")
+
+
 def allow_shared_token() -> bool:
     return _env_truthy("TELEGRAM_ALLOW_SHARED_TOKEN", "false")
 

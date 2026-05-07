@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from lib.telegram_role_config import get_chat_config, get_ops_config, get_reports_config, hermes_chat_enabled
+from lib.model_router import get_provider, ModelRoutingError
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,13 +32,30 @@ BOT_TOKEN = CHAT_CONFIG.token
 ALLOWED_CHAT_ID = str(CHAT_CONFIG.chat_id or '')
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
 GROQ_BASE_URL = os.getenv('GROQ_BASE_URL', 'https://api.groq.com/openai/v1')
-GROQ_MODEL = 'llama-3.3-70b-versatile'
+GROQ_MODEL = os.getenv('GROQ_MODEL', '')
+OPENROUTER_MODEL = os.getenv('OPENROUTER_MODEL', 'deepseek/deepseek-chat')
+MODEL_CONTEXT_LENGTH = int(os.getenv('MODEL_CONTEXT_LENGTH', '128000'))
 
 TG_API = f'https://api.telegram.org/bot{BOT_TOKEN}'
 
-SYSTEM_PROMPT = """You are Claude, an AI assistant connected to Raymond's Nexus AI system via Telegram.
-You are helpful, concise, and aware that responses are read on a mobile device. Keep answers clear and practical.
-You have context about the Nexus project — an AI agent system for trading, research, and business automation."""
+SYSTEM_PROMPT = """You are Hermes, the AI Chief of Staff for Raymond's Nexus AI system.
+
+Primary behavior:
+- Be conversational for natural chat (greetings, quick questions, follow-ups).
+- Use structured operational briefings only when asked for status/health/summary/metrics.
+- Keep replies concise and practical.
+
+If the user asks an operational question, include clear next action.
+If the user sends casual conversation (e.g., 'good evening'), reply naturally first.
+
+Do not invent data. If system state is unknown, say so and suggest the exact check command.
+
+Nexus context:
+- Trading engine: live OANDA forex trades, auto-trading enabled
+- Research pipeline: YouTube/web research -> signals -> strategy candidates
+- Credit/funding: helping users become fundable (B2B SaaS)
+- Workers: orchestrator, research worker, monitoring, coordination, grant worker, strategy lab
+- CEO mode: daily/weekly briefings, lead tracking, revenue tracking, alert engine"""
 
 DEPLOY_TARGETS = {
     'nexuslive': {
@@ -61,6 +79,60 @@ DEPLOY_TARGETS = {
 }
 
 conversation_history = []
+_ROUTER_ERROR_WINDOW_SECONDS = int(os.getenv("HERMES_ROUTER_ERROR_WINDOW_SECONDS", "300"))
+_ROUTER_ERROR_MAX_ALERTS = int(os.getenv("HERMES_ROUTER_ERROR_MAX_ALERTS", "1"))
+_ROUTER_COOLDOWN_SECONDS = int(os.getenv("HERMES_ROUTER_COOLDOWN_SECONDS", "300"))
+_ROUTER_MAX_ATTEMPTS = int(os.getenv("HERMES_ROUTER_MAX_ATTEMPTS", "2"))
+_router_error_state: dict[str, dict[str, float | int]] = {}
+
+
+def _task_for_chat(text: str) -> tuple[str, int]:
+    t = text.lower().strip()
+    if any(k in t for k in ("summarize today", "what happened today", "executive summary", "next best move")):
+        return "premium_reasoning", 64000
+    if any(k in t for k in ("analyze", "full log", "deep dive", "plan", "architecture")):
+        return "planning", 64000
+    if any(k in t for k in ("urgent", "critical", "incident", "security", "payment failure")):
+        return "critical", 64000
+    return "telegram_reply", 4000
+
+
+def _should_alert_router_error(error_key: str) -> bool:
+    now = time.time()
+    state = _router_error_state.get(error_key) or {"count": 0, "window_start": now, "cooldown_until": 0.0}
+    if now < float(state.get("cooldown_until", 0.0)):
+        return False
+    if now - float(state.get("window_start", now)) > _ROUTER_ERROR_WINDOW_SECONDS:
+        state = {"count": 0, "window_start": now, "cooldown_until": 0.0}
+    state["count"] = int(state.get("count", 0)) + 1
+    if int(state["count"]) > _ROUTER_ERROR_MAX_ALERTS:
+        state["cooldown_until"] = now + _ROUTER_COOLDOWN_SECONDS
+        _router_error_state[error_key] = state
+        return False
+    _router_error_state[error_key] = state
+    return True
+
+
+def _router_admin_message(err: Exception) -> str:
+    key = f"{type(err).__name__}:{str(err)[:120]}"
+    if _should_alert_router_error(key):
+        return "Hermes paused this task because the selected model context is too small. Send /reset once after config is fixed."
+    return ""
+
+
+def _trim_history_for_context(history: list[dict], budget_chars: int) -> list[dict]:
+    kept: list[dict] = []
+    total = 0
+    for msg in reversed(history):
+        content = str(msg.get("content") or "")
+        if not content:
+            continue
+        cost = len(content)
+        if kept and total + cost > budget_chars:
+            break
+        kept.append({"role": msg.get("role", "user"), "content": content[:3000]})
+        total += min(cost, 3000)
+    return list(reversed(kept))
 
 
 def tg_get(method, params=None):
@@ -85,8 +157,9 @@ def send_typing(chat_id):
     tg_post('sendChatAction', {'chat_id': chat_id, 'action': 'typing'})
 
 
-def ask_groq(user_message):
-    conversation_history.append({'role': 'user', 'content': user_message})
+def ask_groq(user_message, append_user: bool = True):
+    if append_user:
+        conversation_history.append({'role': 'user', 'content': user_message})
 
     # Keep last 20 messages to avoid token limits
     history = conversation_history[-20:]
@@ -107,6 +180,101 @@ def ask_groq(user_message):
     reply = r.json()['choices'][0]['message']['content']
     conversation_history.append({'role': 'assistant', 'content': reply})
     return reply
+
+
+def ask_via_router(user_message):
+    """Route Hermes chat through the model router; fall back to Groq path on failure."""
+    conversation_history.append({'role': 'user', 'content': user_message})
+    task_type, required_ctx = _task_for_chat(user_message)
+    try:
+        provider = get_provider(task_type=task_type, model_source='auto', min_context=required_ctx)
+    except ModelRoutingError as e:
+        log.error("Model routing error: %s", e)
+        admin_msg = _router_admin_message(e)
+        if admin_msg:
+            return admin_msg
+        return "Hermes is temporarily suppressing repeated model-configuration alerts. Please check model routing config."
+
+    # Safety guard: never allow known 10K model for main Hermes workflows
+    if (
+        task_type in {"premium_reasoning", "planning", "critical", "funding_strategy", "credit_analysis"}
+        and provider.get('name') == 'groq'
+        and str(provider.get('model') or '') == 'llama-3.3-70b-versatile'
+        and int(provider.get('max_context') or MODEL_CONTEXT_LENGTH) < 64000
+    ):
+        msg = _router_admin_message(ValueError("groq model context too small for main workflow"))
+        return msg or "Hermes is temporarily suppressing repeated model-configuration alerts."
+
+    provider_ctx = int(provider.get('max_context') or required_ctx)
+    budget = max(1200, min(provider_ctx // 2, 24000))
+    history = _trim_history_for_context(conversation_history, budget)
+
+    if provider.get('format') != 'openai':
+        return ask_groq(user_message, append_user=False)
+
+    url = provider.get('url', '').rstrip('/')
+    if not url:
+        return ask_groq(user_message, append_user=False)
+    if not url.endswith('/chat/completions'):
+        url = f"{url}/chat/completions"
+
+    headers = {'Content-Type': 'application/json'}
+    key = provider.get('key', '')
+    if key:
+        headers['Authorization'] = f'Bearer {key}'
+
+    payload = {
+        'model': provider.get('model', GROQ_MODEL),
+        'messages': [{'role': 'system', 'content': SYSTEM_PROMPT}] + history,
+        'max_tokens': 1024,
+        'temperature': 0.7,
+    }
+
+    attempts = 0
+    last_err: Exception | None = None
+    while attempts < _ROUTER_MAX_ATTEMPTS:
+        attempts += 1
+        try:
+            r = requests.post(url, headers=headers, json=payload, timeout=45)
+            r.raise_for_status()
+            reply = r.json()['choices'][0]['message']['content']
+            conversation_history.append({'role': 'assistant', 'content': reply})
+            return reply
+        except ValueError as e:
+            log.error("Non-retriable model config/value error: %s", e)
+            admin_msg = _router_admin_message(e)
+            return admin_msg or "Hermes paused this task due to model configuration constraints."
+        except Exception as e:
+            last_err = e
+            if attempts >= _ROUTER_MAX_ATTEMPTS:
+                break
+            time.sleep(1)
+
+    try:
+        msg = str(last_err or "").lower()
+        if any(k in msg for k in ('context', 'token', 'length', 'maximum')):
+            log.warning('Context too large for provider=%s; retrying with compact history', provider.get('name'))
+            compact_history = _trim_history_for_context(conversation_history, 2000)
+            payload['messages'] = [{'role': 'system', 'content': SYSTEM_PROMPT}] + compact_history
+            try:
+                r = requests.post(url, headers=headers, json=payload, timeout=35)
+                r.raise_for_status()
+                reply = r.json()['choices'][0]['message']['content']
+                conversation_history.append({'role': 'assistant', 'content': reply})
+                return reply
+            except Exception as compact_err:
+                log.warning('Compact retry failed (%s): %s', provider.get('name'), compact_err)
+
+        log.warning(f'Router model call failed ({provider.get("name")}): {last_err}; falling back to Groq')
+        try:
+            return ask_groq(user_message, append_user=False)
+        except Exception:
+            return (
+                "I can still help, but model capacity is tight right now. "
+                "Try a shorter question or ask for a brief status summary first."
+            )
+    except Exception:
+        return "Hermes paused this task because the selected model context is too small."
 
 
 def run_shell(cmd, cwd=None, timeout=120):
@@ -210,7 +378,7 @@ def handle_message(msg):
     send_typing(chat_id)
 
     try:
-        reply = ask_groq(text)
+        reply = ask_via_router(text)
         log.info(f'Assistant: {reply[:80]}...')
         send_message(chat_id, reply)
     except Exception as e:
@@ -235,7 +403,12 @@ def run():
         log.error('Hermes chat bot token must not match TELEGRAM_REPORTS_BOT_TOKEN')
         return
 
-    log.info(f'Starting Hermes Claude Bot (model: {GROQ_MODEL})')
+    log.info(
+        'Starting Hermes Claude Bot | groq_model=%s | openrouter_model=%s | model_context_length=%s | min_main_ctx=64000',
+        GROQ_MODEL or '(unset)',
+        OPENROUTER_MODEL,
+        MODEL_CONTEXT_LENGTH,
+    )
 
     # Verify bot
     me = tg_get('getMe')

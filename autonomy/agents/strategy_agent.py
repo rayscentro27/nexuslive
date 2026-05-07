@@ -27,6 +27,8 @@ OPENROUTER_KEY     = os.getenv("OPENROUTER_API_KEY", "")
 GROQ_KEY           = os.getenv("GROQ_API_KEY", "")
 SUPABASE_URL       = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY       = os.getenv("SUPABASE_KEY", "")
+OPENROUTER_MODEL   = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat")
+GROQ_STRATEGY_MODEL = os.getenv("GROQ_STRATEGY_AGENT_MODEL", os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"))
 
 _EXTRACT_PROMPT = """\
 You are a forex trading assistant. Given a strategy description, extract the trading signal direction.
@@ -52,13 +54,13 @@ def _extract_action(strategy_text: str) -> dict:
         providers.append({
             "url": "https://openrouter.ai/api/v1/chat/completions",
             "key": OPENROUTER_KEY,
-            "model": "meta-llama/llama-3.3-70b-instruct",
+            "model": OPENROUTER_MODEL,
         })
     if GROQ_KEY:
         providers.append({
             "url": "https://api.groq.com/openai/v1/chat/completions",
             "key": GROQ_KEY,
-            "model": "llama-3.3-70b-versatile",
+            "model": GROQ_STRATEGY_MODEL,
         })
 
     logger = logging.getLogger("StrategyAgent")
@@ -99,13 +101,13 @@ def _extract_action_with_prompt(strategy_text: str, system_prompt: str) -> dict:
         providers.append({
             "url": "https://openrouter.ai/api/v1/chat/completions",
             "key": OPENROUTER_KEY,
-            "model": "meta-llama/llama-3.3-70b-instruct",
+            "model": OPENROUTER_MODEL,
         })
     if GROQ_KEY:
         providers.append({
             "url": "https://api.groq.com/openai/v1/chat/completions",
             "key": GROQ_KEY,
-            "model": "llama-3.3-70b-versatile",
+            "model": GROQ_STRATEGY_MODEL,
         })
 
     logger = logging.getLogger("StrategyAgent")

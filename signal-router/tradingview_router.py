@@ -273,20 +273,13 @@ class TradingViewSignalRouter:
             )
 
         try:
-            response = requests.post(
-                f"https://api.telegram.org/bot{self.bot_token}/sendMessage",
-                json={"chat_id": self.chat_id, "text": text, "parse_mode": "HTML"},
-                timeout=10
-            )
-            if response.status_code == 200:
-                logger.info(f"✅ Telegram alert sent: {action} {symbol}")
-                return {'status': 'notified', 'timestamp': datetime.now().isoformat()}
-            else:
-                error = response.json().get('description', response.text)
-                logger.error(f"Telegram error: {error}")
-                return {'status': 'error', 'error': error}
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Telegram request failed: {e}")
+            from lib import hermes_gate
+
+            hermes_gate.record_digest_item('trading_digest', text)
+            logger.info(f"✅ Trading signal recorded for digest: {action} {symbol}")
+            return {'status': 'digest_recorded', 'timestamp': datetime.now().isoformat()}
+        except Exception as e:
+            logger.error(f"Digest record failed: {e}")
             return {'status': 'error', 'error': str(e)}
 
     def start_router(self, host: str = '127.0.0.1', port: int = 8000, debug: bool = False):

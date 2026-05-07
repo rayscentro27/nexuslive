@@ -32,6 +32,8 @@ from api_health import is_available, mark_rate_limited, mark_ok
 WORKER_NAME = "strategy_ranker"
 STRATEGIES_DIR = Path(__file__).parent / "strategies"
 HIGH_RANK_THRESHOLD = float(os.getenv("STRATEGY_RANK_THRESHOLD", "7.0"))
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat")
+GROQ_MODEL = os.getenv("GROQ_STRATEGY_RANK_MODEL", os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"))
 
 RANK_SYSTEM_PROMPT = """\
 You are a forex trading strategy analyst. Score the given strategy text from 0 to 10
@@ -70,14 +72,14 @@ def _call_llm(strategy_text: str) -> dict | None:
         providers.append({
             "url":      "https://openrouter.ai/api/v1/chat/completions",
             "key":      OPENROUTER_KEY,
-            "model":    "meta-llama/llama-3.3-70b-instruct",
+            "model":    OPENROUTER_MODEL,
             "resource": "openrouter",
         })
     if GROQ_KEY and is_available("groq"):
         providers.append({
             "url":      "https://api.groq.com/openai/v1/chat/completions",
             "key":      GROQ_KEY,
-            "model":    "llama-3.3-70b-versatile",
+            "model":    GROQ_MODEL,
             "resource": "groq",
         })
     if NVIDIA_KEY and is_available("nvidia"):

@@ -15,7 +15,7 @@ logger = logging.getLogger('SignalReviewer')
 
 GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
 GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-GROQ_MODEL   = os.getenv('GROQ_SIGNAL_MODEL', 'llama-3.3-70b-versatile')
+GROQ_MODEL   = os.getenv('GROQ_SIGNAL_MODEL', os.getenv('GROQ_MODEL', 'llama-3.1-8b-instant'))
 
 SUPABASE_URL = os.getenv('SUPABASE_URL', '')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY', '')

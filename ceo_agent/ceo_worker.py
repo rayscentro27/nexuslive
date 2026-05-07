@@ -53,11 +53,17 @@ EMAIL_ENABLED     = os.getenv('SCHEDULER_EMAIL_ENABLED', 'false').lower() == 'tr
 
 
 def _send_telegram(briefing: dict) -> None:
-    if not TELEGRAM_ENABLED or not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+    """Send executive briefing — only if it has blockers or recommended actions."""
+    if not TELEGRAM_ENABLED:
         return
     blockers = briefing.get('blockers') or []
     updates  = briefing.get('top_updates') or []
     actions  = briefing.get('recommended_actions') or []
+
+    # Silence: no blockers, no actions = nothing CEO-worthy to say
+    if not blockers and not actions:
+        logger.info("CEO briefing suppressed — no blockers or recommended actions")
+        return
 
     lines = [f'<b>Nexus Executive Brief</b>', f"<i>{briefing.get('headline', '')}</i>", '']
 
@@ -79,15 +85,13 @@ def _send_telegram(briefing: dict) -> None:
         for a in actions[:3]:
             lines.append(f"• {a.get('action', '')[:100]}")
 
-    text = '\n'.join(lines)
-    url  = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    body = json.dumps({'chat_id': TELEGRAM_CHAT_ID, 'text': text, 'parse_mode': 'HTML'}).encode()
-    req  = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json'})
+    text     = '\n'.join(lines)
+    severity = 'critical' if blockers else 'summary'
     try:
-        with urllib.request.urlopen(req, timeout=10) as _:
-            pass
+        from lib.hermes_gate import send as gate_send
+        gate_send(text, event_type='executive_brief', severity=severity)
     except Exception as e:
-        logger.warning(f"Telegram: {e}")
+        logger.warning(f"HermesGate send failed: {e}")
 
 
 def _send_email(briefing: dict) -> None:
@@ -132,18 +136,15 @@ def _send_email(briefing: dict) -> None:
         logger.warning(f"CEO email: {e}")
 
 
-def _send_telegram_text(text: str) -> None:
-    """Send raw text (non-briefing) to Telegram."""
-    if not TELEGRAM_ENABLED or not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+def _send_telegram_text(text: str, event_type: str = 'ceo_report', severity: str = 'summary') -> None:
+    """Send raw CEO text — routes through gate, max once per 12h per event_type."""
+    if not TELEGRAM_ENABLED:
         return
-    url  = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    body = json.dumps({'chat_id': TELEGRAM_CHAT_ID, 'text': text[:4096], 'parse_mode': 'HTML'}).encode()
-    req  = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json'})
     try:
-        with urllib.request.urlopen(req, timeout=10) as _:
-            pass
+        from lib.hermes_gate import send as gate_send
+        gate_send(text, event_type=event_type, severity=severity)
     except Exception as e:
-        logger.warning(f"Telegram text: {e}")
+        logger.warning(f"HermesGate text send failed: {e}")
 
 
 def run_hourly_health_check() -> None:
@@ -163,10 +164,11 @@ def run_hourly_health_check() -> None:
         lines.append('<b>⚠ Active Alerts:</b>')
         for a in alerts:
             lines.append(f"  • {a}")
+        # Only send hourly health if there are actual alerts
+        _send_telegram_text('\n'.join(lines), event_type='hourly_health', severity='warning')
     else:
-        lines.append('✅ All checks green')
-
-    _send_telegram_text('\n'.join(lines))
+        # No alerts → no message (silence is correct)
+        logger.info("Hourly health check: all clear — no message sent")
 
 
 def run_daily_ceo_report() -> None:
@@ -205,7 +207,7 @@ def run_daily_ceo_report() -> None:
     from ceo_agent.ceo_agent import run_briefing
     run_briefing(hours=24, brief_type='daily_ceo', min_updates=0)
 
-    _send_telegram_text('\n'.join(lines))
+    _send_telegram_text('\n'.join(lines), event_type='daily_ceo_report', severity='summary')
 
 
 def run_weekly_ceo_report() -> None:
@@ -244,7 +246,7 @@ def run_weekly_ceo_report() -> None:
     lines.append('\n' + get_content_topics(3))
     lines.append('\n' + get_outreach_targets(2))
 
-    _send_telegram_text('\n'.join(lines)[:4000])
+    _send_telegram_text('\n'.join(lines)[:4000], event_type='weekly_ceo_report', severity='summary')
 
 
 def main():

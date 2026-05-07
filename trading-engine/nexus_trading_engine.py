@@ -40,23 +40,23 @@ from hermes.command_handler import HermesCommandHandler
 # ── Telegram Notifier ─────────────────────────────────────────────────────────
 
 class TelegramNotifier:
-    """Sends Telegram alerts for key trading engine events."""
+    """Digest-first notifier for trading engine events."""
 
     def __init__(self):
         self.token   = os.getenv('TELEGRAM_BOT_TOKEN', '')
         self.chat_id = os.getenv('TELEGRAM_CHAT_ID', '')
         self.enabled = bool(self.token and self.chat_id)
 
-    def _send(self, text: str):
+    def _send(self, text: str, critical: bool = False):
         if not self.enabled:
             return
         try:
-            import requests
-            requests.post(
-                f'https://api.telegram.org/bot{self.token}/sendMessage',
-                json={'chat_id': self.chat_id, 'text': text, 'parse_mode': 'Markdown'},
-                timeout=10,
-            )
+            from lib import hermes_gate
+
+            if critical:
+                hermes_gate.send_critical(text, event_type='trading_risk_violation')
+            else:
+                hermes_gate.record_digest_item('trading_digest', text)
         except Exception:
             pass
 
@@ -108,7 +108,8 @@ class TelegramNotifier:
         self._send(
             f"⛔ *Risk Limit Hit — Trading Halted*\n"
             f"Daily P&L: `${status.get('daily_pnl', 0):+.2f}` | "
-            f"Positions: `{status.get('positions', 0)}`"
+            f"Positions: `{status.get('positions', 0)}`",
+            critical=True,
         )
 from risk.risk_manager import NexusRiskManager
 from execution.broker_api import BrokerAPI

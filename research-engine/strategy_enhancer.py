@@ -39,6 +39,8 @@ COHERE_API_KEY      = os.getenv("COHERE_API_KEY", "")
 GEMINI_KEY_1        = os.getenv("GEMINI_API_KEY_1", "")
 GEMINI_KEY_2        = os.getenv("GEMINI_API_KEY_2", "")
 HIGH_RANK_THRESHOLD = float(os.getenv("STRATEGY_RANK_THRESHOLD", "7.0"))
+OPENROUTER_MODEL    = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat")
+GROQ_MODEL          = os.getenv("GROQ_STRATEGY_ENHANCER_MODEL", os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"))
 
 RERANK_QUERY = (
     "Actionable automated trading strategy with specific entry conditions, "
@@ -135,14 +137,14 @@ def _call_llm(strategy_text: str, original_score: float, rank_reasons: dict) -> 
         providers.append({
             "url":      "https://openrouter.ai/api/v1/chat/completions",
             "key":      OPENROUTER_KEY,
-            "model":    "meta-llama/llama-3.3-70b-instruct",
+            "model":    OPENROUTER_MODEL,
             "resource": "openrouter",
         })
     if GROQ_KEY and is_available("groq"):
         providers.append({
             "url":      "https://api.groq.com/openai/v1/chat/completions",
             "key":      GROQ_KEY,
-            "model":    "llama-3.3-70b-versatile",
+            "model":    GROQ_MODEL,
             "resource": "groq",
         })
     if NVIDIA_KEY and is_available("nvidia"):

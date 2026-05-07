@@ -13,7 +13,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, jsonify, render_template_string, request
 
 try:
     from dotenv import load_dotenv
@@ -28,6 +28,36 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger("ControlCenter")
 
 app = Flask(__name__)
+
+
+def _admin_authorized(req) -> bool:
+    token = (os.getenv("CONTROL_CENTER_ADMIN_TOKEN") or "").strip()
+    if not token:
+        return False
+    supplied = (req.headers.get("X-Admin-Token") or req.args.get("admin_token") or "").strip()
+    return supplied == token
+
+
+def _write_env_flag(name: str, value: bool) -> bool:
+    """Persist flag to .env in a minimal, additive way."""
+    env_path = Path(__file__).parent.parent / ".env"
+    text = env_path.read_text(encoding="utf-8") if env_path.exists() else ""
+    lines = text.splitlines()
+    needle = f"{name}="
+    rendered = f"{name}={'true' if value else 'false'}"
+    replaced = False
+    out: list[str] = []
+    for line in lines:
+        if line.startswith(needle):
+            out.append(rendered)
+            replaced = True
+        else:
+            out.append(line)
+    if not replaced:
+        out.append(rendered)
+    env_path.write_text("\n".join(out) + "\n", encoding="utf-8")
+    os.environ[name] = "true" if value else "false"
+    return True
 
 # CORS — allow requests from Netlify functions (nexus-api.goclearonline.cc)
 @app.after_request
@@ -1003,6 +1033,416 @@ def api_all():
     return jsonify(_safe(get_full_ops_report))
 
 
+@app.route("/api/mission-control")
+def api_mission_control():
+    from scripts.prelaunch_utils import rest_select
+
+    def _safe_select(path: str) -> list[dict]:
+        try:
+            return rest_select(path) or []
+        except Exception:
+            return []
+
+    worker_rows = _safe_select(
+        "worker_heartbeats?select=worker_id,worker_type,status,last_seen_at&order=last_seen_at.desc&limit=120"
+    )
+    digest_rows = _safe_select(
+        "hermes_aggregates?select=event_type,aggregated_summary,created_at,event_source,classification"
+        "&order=created_at.desc&limit=200"
+    )
+    pending_recs = _safe_select(
+        "owner_approval_queue?select=id,status,priority,description,payload,created_at"
+        "&action_type=eq.chief_of_staff_recommendation&status=eq.pending&order=created_at.desc&limit=20"
+    )
+    failed_jobs = _safe_select("job_events?status=eq.failed&select=id,agent_name,created_at&order=created_at.desc&limit=20")
+    brief_rows = _safe_select(
+        "executive_briefings?select=briefing_type,content,urgency,created_at&order=created_at.desc&limit=6"
+    )
+
+    worker_cards = [
+        "Hermes CEO",
+        "Credit Repair Specialist",
+        "Funding Strategist",
+        "Grants Researcher",
+        "Trading Analyst",
+        "Opportunity Hunter",
+        "CRM Copilot",
+        "Operations Monitor",
+    ]
+
+    heartbeats_by_type: dict[str, dict] = {}
+    for row in worker_rows:
+        key = str(row.get("worker_type") or row.get("worker_id") or "unknown").lower()
+        if key and key not in heartbeats_by_type:
+            heartbeats_by_type[key] = row
+
+    def _pick_worker(label: str) -> dict:
+        lower = label.lower()
+        match = None
+        for k, row in heartbeats_by_type.items():
+            if any(token in k for token in lower.split()):
+                match = row
+                break
+        if not match:
+            status = "degraded"
+            return {
+                "name": label,
+                "worker_health": status,
+                "active_task": "Awaiting telemetry linkage",
+                "confidence_posture": "baseline confidence",
+                "queue_depth": len(pending_recs),
+                "recommendation_count": len(pending_recs),
+                "alert_count": len(failed_jobs),
+                "last_activity": "unknown",
+                "status_indicator": status,
+            }
+        status = str(match.get("status") or "unknown")
+        return {
+            "name": label,
+            "worker_health": status,
+            "active_task": "Digest + recommendation operations",
+            "confidence_posture": "emerging signal" if pending_recs else "baseline confidence",
+            "queue_depth": len(pending_recs),
+            "recommendation_count": len(pending_recs),
+            "alert_count": len(failed_jobs),
+            "last_activity": match.get("last_seen_at") or "unknown",
+            "status_indicator": "healthy" if status in {"ok", "healthy", "online", "running"} else "degraded",
+        }
+
+    workforce = [_pick_worker(label) for label in worker_cards]
+
+    grouped_feed: dict[str, list[dict]] = {
+        "critical": [],
+        "recommendations": [],
+        "digest": [],
+        "operations": [],
+    }
+    for row in digest_rows:
+        et = str(row.get("event_type") or "").lower()
+        text = str(row.get("aggregated_summary") or "")
+        item = {
+            "event_type": row.get("event_type"),
+            "summary": text[:220],
+            "created_at": row.get("created_at"),
+        }
+        if "critical" in et or "failed" in et:
+            grouped_feed["critical"].append(item)
+        elif "recommend" in et:
+            grouped_feed["recommendations"].append(item)
+        elif "digest" in et:
+            grouped_feed["digest"].append(item)
+        else:
+            grouped_feed["operations"].append(item)
+
+    top_recs = []
+    for row in pending_recs[:6]:
+        payload = row.get("payload") or {}
+        details = payload.get("details") or {}
+        top_recs.append(
+            {
+                "id": str(row.get("id") or "")[:8],
+                "type": payload.get("recommendation_type") or "unknown",
+                "title": payload.get("title") or row.get("description") or "untitled",
+                "status": row.get("status") or "pending",
+                "confidence": payload.get("confidence_band") or details.get("confidence_score") or "pending",
+                "why": payload.get("rationale") or "Awaiting richer signal history.",
+            }
+        )
+
+    weekly_focus = ""
+    strategic_focus = ""
+    try:
+        from ceo_agent.chief_of_staff import build_weekly_focus
+
+        weekly_focus = build_weekly_focus()
+    except Exception:
+        weekly_focus = "Weekly focus unavailable."
+
+    try:
+        from ceo_agent.client_success_intelligence import prioritize_this_week
+
+        strategic_focus = prioritize_this_week()
+    except Exception:
+        strategic_focus = "Client strategic focus unavailable."
+
+    sparse_warnings = []
+    try:
+        from ceo_agent.executive_review_console import sparse_data_diagnostics
+
+        sparse_warnings.append(sparse_data_diagnostics())
+    except Exception:
+        sparse_warnings.append("Sparse-data diagnostics unavailable.")
+
+    return jsonify(
+        {
+            "workforce": workforce,
+            "executive_panel": {
+                "weekly_priorities": weekly_focus,
+                "critical_alerts": len(failed_jobs),
+                "top_recommendations": top_recs,
+                "funding_readiness_signals": strategic_focus,
+                "client_momentum_churn": strategic_focus,
+                "highest_roi_opportunities": [r.get("title") for r in top_recs[:3]],
+                "strategic_focus": strategic_focus,
+            },
+            "operations_feed": grouped_feed,
+            "recommendation_queue": top_recs,
+            "review_drawer": {
+                "reasoning": top_recs[0]["why"] if top_recs else "No pending recommendations.",
+                "confidence": top_recs[0]["confidence"] if top_recs else "pending confidence",
+                "sparse_data_warnings": sparse_warnings,
+                "missing_telemetry": sparse_warnings,
+                "historical_outcomes": [r.get("briefing_type") for r in brief_rows[:4]],
+                "contributing_signals": ["ROI", "confidence", "automation", "alignment", "outcome history"],
+            },
+            "briefings": brief_rows,
+        }
+    )
+
+
+@app.route("/api/admin/ai-ops/status")
+def api_admin_ai_ops_status():
+    if not _admin_authorized(request):
+        return jsonify({"error": "unauthorized"}), 403
+
+    from scripts.prelaunch_utils import rest_select
+
+    def _safe_select(path: str) -> list[dict]:
+        try:
+            return rest_select(path) or []
+        except Exception:
+            return []
+
+    def _flag(name: str, default: str) -> bool:
+        return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+    routing_tasks = [
+        "funding_strategy",
+        "credit_analysis",
+        "telegram_reply",
+        "cheap_summary",
+        "research_worker",
+        "coding_assistant",
+    ]
+    routing_preview_rows: list[dict] = []
+    provider_default = "unknown"
+    default_model = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat")
+    configured_context = int(os.getenv("OPENROUTER_CTX", os.getenv("MODEL_CONTEXT_LENGTH", "128000")) or 128000)
+
+    try:
+        from lib.model_router import routing_preview, provider_summary
+
+        providers = provider_summary()
+        for p in providers:
+            if p.get("name") == "openrouter":
+                provider_default = "openrouter"
+                break
+
+        for task in routing_tasks:
+            try:
+                r = routing_preview(task)
+                routing_preview_rows.append(r)
+            except Exception as e:
+                routing_preview_rows.append(
+                    {
+                        "requested_task": task,
+                        "resolved_task": task,
+                        "provider": "unavailable",
+                        "model": "unavailable",
+                        "max_context": 0,
+                        "error": type(e).__name__,
+                    }
+                )
+    except Exception:
+        for task in routing_tasks:
+            routing_preview_rows.append(
+                {
+                    "requested_task": task,
+                    "resolved_task": task,
+                    "provider": "unavailable",
+                    "model": "unavailable",
+                    "max_context": 0,
+                    "error": "router_unavailable",
+                }
+            )
+
+    worker_rows = _safe_select(
+        "worker_heartbeats?select=worker_id,status,last_seen_at&order=last_seen_at.desc&limit=40"
+    )
+    worker_status_counts: dict[str, int] = {}
+    for row in worker_rows:
+        k = str(row.get("status") or "unknown").lower()
+        worker_status_counts[k] = worker_status_counts.get(k, 0) + 1
+
+    retry_rows = _safe_select(
+        "hermes_aggregates?event_source=eq.ai_ops_retries"
+        "&select=event_type,aggregated_summary,created_at"
+        "&order=created_at.desc&limit=20"
+    )
+    usage_rows = _safe_select(
+        "hermes_aggregates?event_source=eq.ai_ops_model_usage"
+        "&select=event_type,aggregated_summary,created_at"
+        "&order=created_at.desc&limit=20"
+    )
+
+    return jsonify(
+        {
+            "model_config": {
+                "active_default_provider": provider_default,
+                "active_default_model": default_model,
+                "configured_context_length": configured_context,
+            },
+            "telegram_mode": {
+                "enabled": _flag("TELEGRAM_ENABLED", "true"),
+                "manual_only": _flag("TELEGRAM_MANUAL_ONLY", "true"),
+                "auto_reports_enabled": _flag("TELEGRAM_AUTO_REPORTS_ENABLED", "false"),
+            },
+            "routing_preview": routing_preview_rows,
+            "worker_health_summary": {
+                "total_rows": len(worker_rows),
+                "status_counts": worker_status_counts,
+                "latest": worker_rows[:8],
+            },
+            "telemetry": {
+                "recent_retry_error_events": retry_rows,
+                "recent_model_usage_events": usage_rows,
+            },
+            "read_only": True,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+
+
+@app.route("/api/admin/ai-ops/telegram-mode", methods=["POST"])
+def api_admin_ai_ops_telegram_mode():
+    if not _admin_authorized(request):
+        return jsonify({"error": "unauthorized"}), 403
+
+    body = request.get_json(silent=True) or {}
+    allowed = {
+        "TELEGRAM_ENABLED": body.get("telegram_enabled"),
+        "TELEGRAM_MANUAL_ONLY": body.get("telegram_manual_only"),
+        "TELEGRAM_AUTO_REPORTS_ENABLED": body.get("telegram_auto_reports_enabled"),
+    }
+
+    updates: dict[str, bool] = {}
+    for key, value in allowed.items():
+        if value is None:
+            continue
+        updates[key] = bool(value)
+
+    if not updates:
+        return jsonify({"error": "no toggles provided"}), 400
+
+    try:
+        for key, value in updates.items():
+            _write_env_flag(key, value)
+        logger.info(
+            "ai_ops.telegram_mode_update by=%s ip=%s updates=%s",
+            request.headers.get("X-Admin-Actor", "control_center"),
+            request.remote_addr,
+            updates,
+        )
+        return jsonify({
+            "ok": True,
+            "updates": updates,
+            "note": "Restart telegram service to apply runtime changes safely.",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as e:
+        logger.error("ai_ops.telegram_mode_update failed: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/ai-ops/roles")
+def api_admin_ai_ops_roles():
+    if not _admin_authorized(request):
+        return jsonify({"error": "unauthorized"}), 403
+
+    from lib.ai_employee_registry import list_roles, role_routing_preview
+
+    rows = []
+    for role in list_roles():
+        rid = role.get("role_id", "unknown")
+        preview = role_routing_preview(rid)
+        rows.append(
+            {
+                "role_id": rid,
+                "display_name": role.get("display_name"),
+                "description": role.get("description"),
+                "allowed_task_types": role.get("allowed_task_types", []),
+                "preferred_model_class": role.get("preferred_model_class"),
+                "risk_level": role.get("risk_level"),
+                "can_auto_execute": bool(role.get("can_auto_execute", False)),
+                "requires_admin_approval": bool(role.get("requires_admin_approval", True)),
+                "telegram_allowed": bool(role.get("telegram_allowed", False)),
+                "telegram_scope": role.get("telegram_scope") or "none",
+                "routing_preview": preview.get("routing_preview"),
+                "routing_error": preview.get("error"),
+            }
+        )
+
+    return jsonify({
+        "roles": rows,
+        "read_only": True,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+@app.route("/api/admin/ai-ops/swarm-preview")
+def api_admin_ai_ops_swarm_preview():
+    if not _admin_authorized(request):
+        return jsonify({"error": "unauthorized"}), 403
+
+    from lib.swarm_orchestration_foundation import build_swarm_preview, get_allowed_delegates, list_handoff_rules
+
+    initiating_role = (request.args.get("initiating_role") or "ceo_router").strip()
+    objective = (request.args.get("objective") or "operator requested multi-role plan").strip()
+    roles_raw = (request.args.get("delegated_roles") or "").strip()
+    delegated_roles = [r.strip() for r in roles_raw.split(",") if r.strip()] if roles_raw else None
+
+    preview = build_swarm_preview(
+        initiating_role=initiating_role,
+        objective=objective,
+        delegated_roles=delegated_roles,
+    )
+    return jsonify({
+        "swarm_preview": preview,
+        "allowed_delegates": get_allowed_delegates(initiating_role),
+        "handoff_rules": list_handoff_rules().get(initiating_role, {}),
+        "read_only": True,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+@app.route("/api/admin/ai-ops/swarm-scenarios")
+def api_admin_ai_ops_swarm_scenarios():
+    if not _admin_authorized(request):
+        return jsonify({"error": "unauthorized"}), 403
+    from lib.swarm_scenarios import list_swarm_scenarios
+
+    return jsonify({
+        "scenarios": list_swarm_scenarios(),
+        "read_only": True,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+@app.route("/api/admin/ai-ops/swarm-scenario-preview")
+def api_admin_ai_ops_swarm_scenario_preview():
+    if not _admin_authorized(request):
+        return jsonify({"error": "unauthorized"}), 403
+    from lib.swarm_scenarios import build_scenario_preview
+
+    scenario_id = (request.args.get("scenario_id") or "funding_onboarding").strip()
+    payload = build_scenario_preview(scenario_id)
+    return jsonify({
+        "scenario_preview": payload,
+        "read_only": True,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
 # ─────────────────────────────────────────────
 # Bloomberg-style HTML terminal
 # ─────────────────────────────────────────────
@@ -1240,6 +1680,9 @@ TERMINAL_HTML = """<!DOCTYPE html>
   <div class="tab" onclick="showPage('prelaunch')">PRELAUNCH</div>
   <div class="tab" onclick="showPage('growth')">GROWTH</div>
   <div class="tab" onclick="showPage('messages')">MESSAGES</div>
+  <div class="tab" onclick="showPage('approvals')">SIGNAL QUEUE</div>
+  <div class="tab" onclick="showPage('mission')">MISSION CONTROL</div>
+  <div class="tab" onclick="showPage('aiops')">AI OPS</div>
 </div>
 
 <!-- WORKSPACE -->
@@ -1414,6 +1857,105 @@ TERMINAL_HTML = """<!DOCTYPE html>
     <div class="panel">
       <div class="panel-header"><span class="panel-title">🧾 RECENT MESSAGE LOGS</span></div>
       <div class="panel-body" id="message-log-panel">Loading...</div>
+    </div>
+  </div>
+
+  <!-- ── SIGNAL QUEUE ── -->
+  <div id="page-approvals" class="page two" style="display:none">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">⏳ PENDING SIGNAL APPROVALS</span>
+        <button class="refresh-btn" onclick="loadApprovalsPage()">↺ REFRESH</button>
+      </div>
+      <div class="panel-body" id="approvals-pending-panel">Loading...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">✅ RECENTLY ACTIONED</span></div>
+      <div class="panel-body" id="approvals-recent-panel">Loading...</div>
+    </div>
+  </div>
+
+  <div id="page-mission" class="page two" style="display:none">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">🧭 WORKFORCE GRID</span>
+        <button class="refresh-btn" onclick="loadMissionControlPage()">↺ REFRESH</button>
+      </div>
+      <div class="panel-body" id="mission-workforce-panel">Loading...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">🎯 EXECUTIVE INTELLIGENCE</span></div>
+      <div class="panel-body" id="mission-executive-panel">Loading...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">📰 LIVE OPERATIONS FEED</span></div>
+      <div class="panel-body" id="mission-feed-panel">Loading...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">✅ RECOMMENDATION QUEUE + REVIEW</span></div>
+      <div class="panel-body" id="mission-queue-panel">Loading...</div>
+    </div>
+  </div>
+
+  <div id="page-aiops" class="page two" style="display:none">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">🧠 AI OPS CONFIG</span>
+        <button class="refresh-btn" onclick="loadAiOpsPage()">↺ REFRESH</button>
+      </div>
+      <div class="panel-body" id="aiops-config-panel">Loading...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">🛡 OPERATOR CONTROLS (ADMIN)</span></div>
+      <div class="panel-body" id="aiops-controls-panel">
+        <div style="margin-bottom:8px;color:var(--amber)">Manual-only mode is recommended for production safety.</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+          <input id="aiops-admin-token" type="password" placeholder="Admin token" style="background:#0f131a;border:1px solid var(--border);color:var(--text);padding:6px;min-width:220px" />
+          <input id="aiops-admin-actor" type="text" placeholder="actor (optional)" style="background:#0f131a;border:1px solid var(--border);color:var(--text);padding:6px;min-width:180px" />
+        </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px">
+          <label><input type="checkbox" id="aiops-flag-enabled"/> Telegram enabled</label>
+          <label><input type="checkbox" id="aiops-flag-manual"/> Manual-only</label>
+          <label><input type="checkbox" id="aiops-flag-auto"/> Auto reports enabled</label>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="refresh-btn" onclick="saveAiOpsTelegramMode()">SAVE TELEGRAM MODE</button>
+          <button class="refresh-btn" onclick="loadAiOpsPage()">REFRESH PREVIEW</button>
+        </div>
+        <div id="aiops-controls-feedback" class="message-meta" style="margin-top:8px"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">🧭 ROUTING PREVIEW</span></div>
+      <div class="panel-body" id="aiops-routing-panel">Loading...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">🟢 WORKER HEALTH SUMMARY</span></div>
+      <div class="panel-body" id="aiops-workers-panel">Loading...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">📉 RETRIES / MODEL USAGE</span></div>
+      <div class="panel-body" id="aiops-telemetry-panel">Loading...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">👥 AI EMPLOYEES</span></div>
+      <div class="panel-body" id="aiops-roles-panel">Loading...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">🕸 SWARM PREVIEW (SAFE)</span></div>
+      <div class="panel-body" style="padding-bottom:0">
+        <label style="color:var(--dim);font-size:11px">Swarm Scenario</label>
+        <select id="aiops-swarm-scenario" style="margin-left:8px;background:#0f131a;border:1px solid var(--border);color:var(--text);padding:4px">
+          <option value="funding_onboarding">Funding Onboarding</option>
+          <option value="credit_remediation">Credit Remediation</option>
+          <option value="grant_research">Grant Research</option>
+          <option value="ops_incident_triage">Ops Incident Triage</option>
+          <option value="business_setup_readiness">Business Setup Readiness</option>
+          <option value="trading_research_review">Trading Research Review</option>
+        </select>
+        <button class="refresh-btn" style="margin-left:8px" onclick="loadSelectedSwarmScenario()">LOAD SCENARIO</button>
+      </div>
+      <div class="panel-body" id="aiops-swarm-panel">Loading...</div>
     </div>
   </div>
 
@@ -2333,6 +2875,87 @@ function renderGrowthApprovalCard(row) {
   </div>`;
 }
 
+function renderApprovalQueueCard(row) {
+  const sym    = (row.symbol || '?').replace('_','');
+  const side   = (row.side || '?').toUpperCase();
+  const conf   = row.ai_confidence != null ? (row.ai_confidence * 100).toFixed(0) + '%' : '—';
+  const strat  = (row.strategy_id || '—').slice(0, 24);
+  const tf     = row.timeframe || '—';
+  const entry  = row.entry_price != null ? row.entry_price : '—';
+  const sl     = row.stop_loss != null ? row.stop_loss : '—';
+  const tp     = row.take_profit != null ? row.take_profit : '—';
+  const notes  = (row.risk_notes || '').slice(0, 80);
+  const st     = row.status || 'pending';
+  const stBadge = st === 'pending' ? 'badge-amber' : st === 'executed' ? 'badge-green' : 'badge-red';
+  const shortId = (row.id || '').slice(0,8);
+  return `<div class="message-card">
+    <div class="draft-top">
+      <div>
+        <div class="draft-role">${esc(sym)} ${esc(side)} — ${esc(tf)}</div>
+        <div class="draft-meta">${ts(row.created_at)} | conf=${esc(conf)} | <span class="panel-badge ${stBadge}">${esc(st.toUpperCase())}</span></div>
+      </div>
+    </div>
+    <div class="message-title">${esc(sym)} ${esc(side)} @ ${esc(String(entry))}</div>
+    <div class="message-meta">SL: ${esc(String(sl))} | TP: ${esc(String(tp))}</div>
+    <div class="message-meta">Strategy: ${esc(strat)} | AI Confidence: ${esc(conf)}</div>
+    ${notes ? `<div class="message-meta" style="color:var(--dim)">${esc(notes)}</div>` : ''}
+    <div class="message-meta" style="color:var(--dim)">ID: ${esc(shortId)}</div>
+    <div class="draft-actions">
+      <button class="action-btn approve" onclick="actOnApproval('${esc(row.id)}','approve',this)">✅ Allow</button>
+      <button class="action-btn reject"  onclick="actOnApproval('${esc(row.id)}','block',this)">🚫 Block</button>
+      <span id="approval-flash-${esc(shortId)}" class="draft-flash"></span>
+    </div>
+  </div>`;
+}
+
+async function actOnApproval(itemId, action, btn) {
+  const shortId = itemId.slice(0,8);
+  const flash = document.getElementById(`approval-flash-${shortId}`);
+  if (flash) flash.textContent = 'Saving...';
+  if (btn) btn.disabled = true;
+  try {
+    await patchJson(`/api/trading/approval-queue/${itemId}`, { action });
+    if (flash) { flash.className = 'draft-flash ok'; flash.textContent = action === 'approve' ? '✅ Allowed — auto-executor will run it' : '🚫 Blocked'; }
+    setTimeout(loadApprovalsPage, 1000);
+  } catch (e) {
+    if (flash) { flash.className = 'draft-flash err'; flash.textContent = e.message; }
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function loadApprovalsPage() {
+  try {
+    const d = await get('/api/trading/approval-queue');
+    const pending  = d.pending  || [];
+    const recent   = d.recent   || [];
+    const pipeline = d.pipeline || [];
+    document.getElementById('approvals-pending-panel').innerHTML = pending.length
+      ? pending.map(renderApprovalQueueCard).join('')
+      : '<div style="color:var(--green)">No pending proposals. Queue is clear.</div>';
+    const recentHtml = recent.map(r => {
+      const sym  = (r.symbol||'?').replace('_','');
+      const side = (r.side||'?').toUpperCase();
+      const st   = r.status || '?';
+      const stBadge = st === 'executed' ? 'badge-green' : st === 'blocked' ? 'badge-red' : 'badge-amber';
+      const conf = r.ai_confidence != null ? (r.ai_confidence*100).toFixed(0)+'%' : '—';
+      return `<div class="feed-item">
+        <div class="feed-time">${ts(r.created_at)} | ${esc(sym)} ${esc(side)} | conf=${esc(conf)}</div>
+        <div class="feed-text"><span class="panel-badge ${stBadge}">${esc(st.toUpperCase())}</span> ${esc((r.risk_notes||'').slice(0,60))}</div>
+      </div>`;
+    }).join('');
+    const pipeHtml = pipeline.length ? `<div style="color:var(--accent);margin-top:12px;font-size:11px">SIGNAL PIPELINE</div>` + pipeline.map(r => {
+      const sym = (r.symbol||'?').replace('_','');
+      return `<div class="feed-item"><div class="feed-time">${ts(r.created_at)} | ${esc(sym)} ${esc((r.side||'').toUpperCase())} ${esc(r.timeframe||'')}</div><div class="feed-text">status: ${esc(r.status||'?')}</div></div>`;
+    }).join('') : '';
+    document.getElementById('approvals-recent-panel').innerHTML =
+      (recentHtml || '<div style="color:var(--dim)">No recently actioned proposals.</div>') + pipeHtml;
+  } catch (e) {
+    const msg = `<div class="red">Error loading signal queue: ${esc(e.message)}</div>`;
+    document.getElementById('approvals-pending-panel').innerHTML = msg;
+    document.getElementById('approvals-recent-panel').innerHTML = msg;
+  }
+}
+
 function renderGrowthVariantCard(row) {
   const topic = row.content_topics?.topic || row.topic_id || 'Unknown topic';
   return `<div class="message-card">
@@ -2417,6 +3040,277 @@ async function loadMessagesPage() {
   }
 }
 
+function renderMissionWorkerCard(row) {
+  const status = (row.status_indicator || 'degraded') === 'healthy' ? 'badge-green' : 'badge-amber';
+  return `<div class="message-card">
+    <div class="message-title">${esc(row.name || 'Worker')}</div>
+    <div class="message-meta"><span class="panel-badge ${status}">${esc((row.worker_health || 'unknown').toUpperCase())}</span> | last=${ts(row.last_activity)}</div>
+    <div class="message-body">active task: ${esc(row.active_task || 'n/a')}</div>
+    <div class="message-meta">confidence: ${esc(String(row.confidence_posture || 'pending confidence'))} | queue=${esc(String(row.queue_depth || 0))} | recs=${esc(String(row.recommendation_count || 0))} | alerts=${esc(String(row.alert_count || 0))}</div>
+  </div>`;
+}
+
+function renderMissionFeedGroup(title, rows) {
+  const body = (rows || []).slice(0, 6).map(r => `<div class="feed-item"><div class="feed-time">${ts(r.created_at)} | ${esc(r.event_type || 'event')}</div><div class="feed-text">${esc(r.summary || '')}</div></div>`).join('');
+  return `<div style="margin-bottom:10px"><div class="message-title">${esc(title)}</div>${body || '<div style="color:var(--dim)">No recent events.</div>'}</div>`;
+}
+
+function renderMissionQueueCard(row) {
+  const id = row.id || '';
+  const title = row.title || 'Untitled recommendation';
+  const kind = row.type || 'unknown';
+  const confidence = row.confidence || 'pending confidence';
+  const why = row.why || 'Awaiting richer outcome history.';
+  return `<div class="message-card">
+    <div class="message-title">[${esc(id)}] ${esc(kind)} — ${esc(title)}</div>
+    <div class="message-meta">status=${esc(row.status || 'pending')} | confidence=${esc(String(confidence))}</div>
+    <div class="message-body">why: ${esc(why)}</div>
+    <div class="draft-actions">
+      <button class="action-btn approve" onclick="missionCommand('approve recommendation ${esc(id)}')">Approve</button>
+      <button class="action-btn reject" onclick="missionCommand('reject recommendation ${esc(id)}')">Reject</button>
+      <button class="action-btn" onclick="missionCommand('generate website brief for the top opportunity')">Build Brief</button>
+      <button class="action-btn" onclick="missionCommand('generate build plan for recommendation ${esc(id)}')">Launch Plan</button>
+      <button class="action-btn revise" onclick="missionCommand('show recommendation reasoning')">Explain</button>
+    </div>
+  </div>`;
+}
+
+async function missionCommand(cmd) {
+  try {
+    await postJson('/api/route-job', { message: cmd, channel: 'mission_control' });
+    await loadMissionControlPage();
+  } catch (e) {
+    console.error('missionCommand error', e);
+  }
+}
+
+async function loadMissionControlPage() {
+  try {
+    const d = await get('/api/mission-control');
+    const workers = d.workforce || [];
+    const panel = d.executive_panel || {};
+    const feed = d.operations_feed || {};
+    const queue = d.recommendation_queue || [];
+    const review = d.review_drawer || {};
+
+    document.getElementById('mission-workforce-panel').innerHTML = workers.length
+      ? workers.map(renderMissionWorkerCard).join('')
+      : '<div style="color:var(--dim)">No workforce telemetry yet.</div>';
+
+    document.getElementById('mission-executive-panel').innerHTML = `
+      <div class="message-card"><div class="message-title">Weekly Priorities</div><div class="message-body">${esc(panel.weekly_priorities || 'n/a')}</div></div>
+      <div class="message-card"><div class="message-title">Strategic Focus</div><div class="message-body">${esc(panel.strategic_focus || 'n/a')}</div></div>
+      <div class="message-meta">critical alerts=${esc(String(panel.critical_alerts || 0))} | top ROI opportunities=${esc((panel.highest_roi_opportunities || []).join(', ') || 'none')}</div>
+    `;
+
+    document.getElementById('mission-feed-panel').innerHTML =
+      renderMissionFeedGroup('Critical', feed.critical) +
+      renderMissionFeedGroup('Recommendations', feed.recommendations) +
+      renderMissionFeedGroup('Digest', feed.digest) +
+      renderMissionFeedGroup('Operations', feed.operations);
+
+    document.getElementById('mission-queue-panel').innerHTML =
+      (queue.length ? queue.map(renderMissionQueueCard).join('') : '<div style="color:var(--dim)">No pending recommendations.</div>') +
+      `<div class="audit-pre" style="margin-top:10px">Review Drawer
+reasoning=${esc(String(review.reasoning || 'n/a'))}
+confidence=${esc(String(review.confidence || 'pending confidence'))}
+sparse_data_warnings=${esc(JSON.stringify(review.sparse_data_warnings || []))}
+missing_telemetry=${esc(JSON.stringify(review.missing_telemetry || []))}
+historical_outcomes=${esc(JSON.stringify(review.historical_outcomes || []))}
+contributing_signals=${esc(JSON.stringify(review.contributing_signals || []))}</div>`;
+  } catch (e) {
+    const msg = `<div class="red">Mission control unavailable: ${esc(e.message)}</div>`;
+    document.getElementById('mission-workforce-panel').innerHTML = msg;
+    document.getElementById('mission-executive-panel').innerHTML = msg;
+    document.getElementById('mission-feed-panel').innerHTML = msg;
+    document.getElementById('mission-queue-panel').innerHTML = msg;
+  }
+}
+
+function renderAiOpsConfig(d) {
+  const mc = d.model_config || {};
+  const tg = d.telegram_mode || {};
+  return `<div class="audit-pre">default_provider=${esc(String(mc.active_default_provider || 'unknown'))}
+default_model=${esc(String(mc.active_default_model || 'unknown'))}
+context_length=${esc(String(mc.configured_context_length || 'unknown'))}
+telegram_enabled=${esc(String(tg.enabled))}
+telegram_manual_only=${esc(String(tg.manual_only))}
+telegram_auto_reports_enabled=${esc(String(tg.auto_reports_enabled))}
+read_only=${esc(String(d.read_only === true))}</div>`;
+}
+
+function renderAiOpsRouting(rows) {
+  const list = rows || [];
+  if (!list.length) return '<div style="color:var(--dim)">No routing preview available.</div>';
+  return `<div class="audit-pre">` + list.map(r => {
+    const req = r.requested_task || 'unknown';
+    const res = r.resolved_task || 'unknown';
+    const p = r.provider || 'unknown';
+    const m = r.model || 'unknown';
+    const c = r.max_context || 0;
+    return `${req} -> ${res} | ${p} / ${m} / ctx=${c}`;
+  }).join('\n') + `</div>`;
+}
+
+function renderAiOpsWorkers(summary) {
+  const s = summary || {};
+  const counts = s.status_counts || {};
+  const latest = s.latest || [];
+  return `<div class="audit-pre">total_rows=${esc(String(s.total_rows || 0))}
+status_counts=${esc(JSON.stringify(counts))}
+latest=${esc(JSON.stringify(latest))}</div>`;
+}
+
+function renderAiOpsTelemetry(tel) {
+  const t = tel || {};
+  const retries = t.recent_retry_error_events || [];
+  const usage = t.recent_model_usage_events || [];
+  return `<div class="audit-pre">recent_retry_error_events=${esc(JSON.stringify(retries))}
+recent_model_usage_events=${esc(JSON.stringify(usage))}</div>`;
+}
+
+function renderAiOpsRoles(rows) {
+  const list = rows || [];
+  if (!list.length) return '<div style="color:var(--dim)">No role registry data available.</div>';
+  return list.map(r => {
+    const tasks = (r.allowed_task_types || []).join(', ') || 'none';
+    const preview = r.routing_preview
+      ? `${r.routing_preview.provider || '?'} / ${r.routing_preview.model || '?'} / ctx=${r.routing_preview.max_context || 0}`
+      : `unavailable (${r.routing_error || 'unknown'})`;
+    return `<div class="message-card">
+      <div class="message-title">${esc(r.display_name || r.role_id || 'role')}</div>
+      <div class="message-meta">role_id=${esc(r.role_id || '')} | risk=${esc(String(r.risk_level || 'unknown'))}</div>
+      <div class="message-body">${esc(r.description || '')}</div>
+      <div class="message-meta">allowed_tasks=${esc(tasks)}</div>
+      <div class="message-meta">preferred_model_class=${esc(String(r.preferred_model_class || 'unknown'))} | routing=${esc(preview)}</div>
+      <div class="message-meta">auto_execute=${esc(String(!!r.can_auto_execute))} | requires_admin_approval=${esc(String(!!r.requires_admin_approval))} | telegram_allowed=${esc(String(!!r.telegram_allowed))} (${esc(String(r.telegram_scope || 'none'))})</div>
+    </div>`;
+  }).join('');
+}
+
+function renderAiOpsSwarm(data) {
+  const wrapper = (data || {}).scenario_preview || {};
+  const scenario = wrapper.scenario || {};
+  const sp = wrapper.swarm_preview || {};
+  const seq = sp.task_sequence || [];
+  if (!sp || !Object.keys(sp).length) {
+    return '<div style="color:var(--dim)">No swarm preview available.</div>';
+  }
+  const header = `<div class="audit-pre">scenario=${esc(String(scenario.display_name || scenario.scenario_id || 'unknown'))}
+scenario_description=${esc(String(scenario.description || ''))}
+initiating_role=${esc(String(sp.initiating_role || 'unknown'))}
+objective=${esc(String(sp.objective || ''))}
+delegated_roles=${esc(JSON.stringify(sp.delegated_roles || []))}
+approval_required=${esc(String(!!sp.approval_required))}
+risk/status=${esc(String(sp.status || 'unknown'))}
+can_execute=${esc(String(!!sp.can_execute))}
+execution_mode=${esc(String(sp.execution_mode || 'preview_only'))}
+reason=${esc(String(sp.reason || ''))}</div>`;
+  const steps = seq.length
+    ? `<div class="audit-pre" style="margin-top:8px">` + seq.map(s =>
+        `step=${s.step} role=${s.role_id} task=${s.task_type} model=${s.model_class} risk=${s.risk_level} status=${s.status} allowed=${s.allowed} reason=${s.reason}`
+      ).join('\n') + `</div>`
+    : '<div style="color:var(--dim)">No task sequence generated.</div>';
+  return header + steps;
+}
+
+async function loadSelectedSwarmScenario() {
+  try {
+    const sel = document.getElementById('aiops-swarm-scenario');
+    const scenarioId = (sel?.value || 'funding_onboarding');
+    const data = await aiOpsGet(`/api/admin/ai-ops/swarm-scenario-preview?scenario_id=${encodeURIComponent(scenarioId)}`);
+    document.getElementById('aiops-swarm-panel').innerHTML = renderAiOpsSwarm(data);
+  } catch (e) {
+    const msg = `<div class="red">Swarm scenario unavailable: ${esc(e.message)}</div><div style="color:var(--dim)">Fallback mode active.</div>`;
+    document.getElementById('aiops-swarm-panel').innerHTML = msg;
+  }
+}
+
+function aiOpsAdminToken() {
+  return (document.getElementById('aiops-admin-token')?.value || '').trim();
+}
+
+function aiOpsAdminActor() {
+  return (document.getElementById('aiops-admin-actor')?.value || '').trim();
+}
+
+async function aiOpsGet(url) {
+  const token = aiOpsAdminToken();
+  const sep = url.includes('?') ? '&' : '?';
+  const finalUrl = token ? `${url}${sep}admin_token=${encodeURIComponent(token)}` : url;
+  const r = await fetch(finalUrl);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+async function aiOpsPost(url, body) {
+  const headers = { 'Content-Type': 'application/json' };
+  const token = aiOpsAdminToken();
+  if (token) headers['X-Admin-Token'] = token;
+  const actor = aiOpsAdminActor();
+  if (actor) headers['X-Admin-Actor'] = actor;
+  const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+async function loadAiOpsPage() {
+  try {
+    const d = await aiOpsGet('/api/admin/ai-ops/status');
+    const roleData = await aiOpsGet('/api/admin/ai-ops/roles');
+    const scenarios = await aiOpsGet('/api/admin/ai-ops/swarm-scenarios');
+    document.getElementById('aiops-config-panel').innerHTML = renderAiOpsConfig(d);
+    document.getElementById('aiops-routing-panel').innerHTML = renderAiOpsRouting(d.routing_preview);
+    document.getElementById('aiops-workers-panel').innerHTML = renderAiOpsWorkers(d.worker_health_summary);
+    document.getElementById('aiops-telemetry-panel').innerHTML = renderAiOpsTelemetry(d.telemetry);
+    document.getElementById('aiops-roles-panel').innerHTML = renderAiOpsRoles(roleData.roles);
+
+    const sel = document.getElementById('aiops-swarm-scenario');
+    const rows = scenarios.scenarios || [];
+    if (sel && rows.length) {
+      sel.innerHTML = rows.map(r => `<option value="${esc(r.scenario_id)}">${esc(r.display_name)}</option>`).join('');
+    }
+    await loadSelectedSwarmScenario();
+
+    const tg = d.telegram_mode || {};
+    const enabledEl = document.getElementById('aiops-flag-enabled');
+    const manualEl = document.getElementById('aiops-flag-manual');
+    const autoEl = document.getElementById('aiops-flag-auto');
+    if (enabledEl) enabledEl.checked = !!tg.enabled;
+    if (manualEl) manualEl.checked = !!tg.manual_only;
+    if (autoEl) autoEl.checked = !!tg.auto_reports_enabled;
+    const fb = document.getElementById('aiops-controls-feedback');
+    if (fb) fb.textContent = `last updated: ${ts(d.updated_at)}`;
+  } catch (e) {
+    const msg = `<div class="red">AI Ops status unavailable: ${esc(e.message)}</div><div style="color:var(--dim)">Fallback mode active.</div>`;
+    document.getElementById('aiops-config-panel').innerHTML = msg;
+    document.getElementById('aiops-routing-panel').innerHTML = msg;
+    document.getElementById('aiops-workers-panel').innerHTML = msg;
+    document.getElementById('aiops-telemetry-panel').innerHTML = msg;
+    document.getElementById('aiops-roles-panel').innerHTML = msg;
+    document.getElementById('aiops-swarm-panel').innerHTML = msg;
+  }
+}
+
+async function saveAiOpsTelegramMode() {
+  const fb = document.getElementById('aiops-controls-feedback');
+  if (fb) fb.textContent = 'saving...';
+  try {
+    const payload = {
+      telegram_enabled: !!document.getElementById('aiops-flag-enabled')?.checked,
+      telegram_manual_only: !!document.getElementById('aiops-flag-manual')?.checked,
+      telegram_auto_reports_enabled: !!document.getElementById('aiops-flag-auto')?.checked,
+    };
+    const res = await aiOpsPost('/api/admin/ai-ops/telegram-mode', payload);
+    if (fb) fb.textContent = `saved @ ${ts(res.updated_at)} — restart telegram service to apply changes.`;
+    await loadAiOpsPage();
+  } catch (e) {
+    if (fb) fb.textContent = `save failed: ${e.message}`;
+  }
+}
+
 // ── Page routing ──
 function loadPage(name) {
   const map = {
@@ -2432,6 +3326,9 @@ function loadPage(name) {
     prelaunch:  loadPrelaunchPage,
     growth:     loadGrowthPage,
     messages:   loadMessagesPage,
+    approvals:  loadApprovalsPage,
+    mission:    loadMissionControlPage,
+    aiops:      loadAiOpsPage,
   };
   if (map[name]) map[name]();
 }
@@ -2808,6 +3705,62 @@ def api_funding_strategy_refresh():
         "estimated_funding_low": (result.get("strategy") or {}).get("estimated_funding_low"),
         "estimated_funding_high": (result.get("strategy") or {}).get("estimated_funding_high"),
     })
+
+
+@app.route("/api/trading/approval-queue")
+def api_trading_approval_queue():
+    from scripts.prelaunch_utils import rest_select
+    # Proposals queued for auto-execution (not yet executed/blocked/rejected)
+    pending = _safe(lambda: rest_select(
+        "reviewed_signal_proposals"
+        "?select=id,symbol,side,timeframe,strategy_id,entry_price,stop_loss,take_profit,ai_confidence,status,risk_notes,created_at"
+        "&status=not.in.(executed,blocked,rejected)"
+        "&order=created_at.desc&limit=20"
+    ) or [])
+    # Recently actioned (executed, blocked, rejected)
+    recent = _safe(lambda: rest_select(
+        "reviewed_signal_proposals"
+        "?select=id,symbol,side,timeframe,ai_confidence,status,risk_notes,created_at"
+        "&status=in.(executed,blocked,rejected)"
+        "&order=created_at.desc&limit=10"
+    ) or [])
+    # Pipeline view: enriched signals waiting for signal_poller review
+    pipeline = _safe(lambda: rest_select(
+        "tv_normalized_signals"
+        "?select=id,symbol,side,timeframe,status,created_at"
+        "&status=not.in.(skipped,reviewed,rejected)"
+        "&order=created_at.desc&limit=10"
+    ) or [])
+    return jsonify({"pending": pending, "recent": recent, "pipeline": pipeline})
+
+
+@app.route("/api/trading/approval-queue/<item_id>", methods=["PATCH"])
+def api_update_approval_queue(item_id: str):
+    from flask import request as flask_request
+    from scripts.prelaunch_utils import supabase_request
+
+    body = flask_request.get_json(silent=True) or {}
+    action = (body.get("action") or "").strip().lower()
+    if action not in {"approve", "block"}:
+        return jsonify({"error": "action must be approve or block"}), 400
+
+    # "approve" = leave as pending (auto_executor will run it)
+    # "block"   = set status=blocked so auto_executor skips it
+    new_status = "pending" if action == "approve" else "blocked"
+    try:
+        rows, _ = supabase_request(
+            f"reviewed_signal_proposals?id=eq.{item_id}",
+            method="PATCH",
+            body={"status": new_status},
+            prefer="return=representation",
+            timeout=10,
+        )
+        row = (rows or [None])[0]
+        if not row:
+            return jsonify({"ok": False, "error": "proposal not found"}), 404
+        return jsonify({"ok": True, "id": item_id, "status": new_status, "row": row})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/api/trading/status")

@@ -24,7 +24,8 @@ from datetime import datetime, timezone, timedelta
 logger = logging.getLogger('AlertEngine')
 
 SUPABASE_URL = os.getenv('SUPABASE_URL', '')
-SUPABASE_KEY = os.getenv('SUPABASE_KEY', '')
+# Use service role for writes to hermes_aggregates (cooldown table is admin-only)
+SUPABASE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY', '')
 
 # Configurable thresholds
 CLIENT_STUCK_HOURS      = int(os.getenv('ALERT_CLIENT_STUCK_HOURS',      '48'))
@@ -128,6 +129,12 @@ def check_clients_stuck() -> list:
 def check_no_revenue() -> list:
     alerts = []
     if _cooldown_active('no_revenue'):
+        return alerts
+    # Check if the revenue_events table has ANY historical rows at all.
+    # If there are zero rows ever, we're in pre-launch — suppress entirely.
+    all_rows = _sb_get("revenue_events?select=id&limit=1")
+    if not all_rows:
+        logger.debug("NO_REVENUE suppressed: revenue_events table is empty (pre-launch)")
         return alerts
     cutoff = (datetime.now(timezone.utc) - timedelta(days=NO_REVENUE_DAYS)).isoformat()
     rows = _sb_get(
