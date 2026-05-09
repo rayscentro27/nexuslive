@@ -5,9 +5,14 @@ Includes missing tasks, next best actions, and readiness score summary.
 """
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from readiness_engine.guidance_generator import SAFETY_DISCLAIMER
+
+
+def _knowledge_enabled() -> bool:
+    return (os.getenv("HERMES_KNOWLEDGE_BRAIN_ENABLED", "true") or "true").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def build_readiness_brief_section(snapshot: dict[str, Any]) -> dict[str, Any]:
@@ -20,6 +25,17 @@ def build_readiness_brief_section(snapshot: dict[str, Any]) -> dict[str, Any]:
 
     high_priority = [t for t in pending_tasks if t.get("priority") == "high"]
     medium_priority = [t for t in pending_tasks if t.get("priority") == "medium"]
+    credit_insights: list[str] = []
+    if _knowledge_enabled():
+        try:
+            from lib.hermes_knowledge_brain import get_credit_knowledge
+
+            for row in get_credit_knowledge(limit=2):
+                text = str(row.get("summary") or "").strip()
+                if text:
+                    credit_insights.append(text)
+        except Exception:
+            credit_insights = []
 
     lines = ["── Client Readiness Summary ──"]
     lines.append(f"Overall Readiness Score: {score}/100 (internal estimate only)")
@@ -54,6 +70,10 @@ def build_readiness_brief_section(snapshot: dict[str, Any]) -> dict[str, Any]:
     trading_eligible = snapshot.get("trading_eligible", False)
     lines.append(f"Grant Matching Ready: {'Yes' if grant_ready else 'No — complete grant eligibility profile'}")
     lines.append(f"Trading Access: {'Eligible' if trading_eligible else 'Locked — complete education, disclaimer, and paper trading'}")
+    lines.append("")
+    lines.append("Credit Knowledge Insights:")
+    for insight in (credit_insights or ["No recent credit insights available."]):
+        lines.append(f"- {insight}")
     lines.append("")
     lines.append(SAFETY_DISCLAIMER)
 

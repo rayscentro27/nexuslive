@@ -38,6 +38,33 @@ def _admin_authorized(req) -> bool:
     return supplied == token
 
 
+def _unauthorized_response():
+    return jsonify({
+        "ok": False,
+        "error": "unauthorized",
+        "code": 403,
+        "read_only": True,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "data": None,
+    }), 403
+
+
+def _ok_response(data: dict, *, read_only: bool = True, extra: dict | None = None):
+    payload = {
+        "ok": True,
+        "read_only": read_only,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "data": data,
+    }
+    if extra:
+        payload.update(extra)
+    return jsonify(payload)
+
+
+def _is_enabled(name: str, default: str = "false") -> bool:
+    return (os.getenv(name, default) or default).strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _write_env_flag(name: str, value: bool) -> bool:
     """Persist flag to .env in a minimal, additive way."""
     env_path = Path(__file__).parent.parent / ".env"
@@ -1203,7 +1230,7 @@ def api_mission_control():
 @app.route("/api/admin/ai-ops/status")
 def api_admin_ai_ops_status():
     if not _admin_authorized(request):
-        return jsonify({"error": "unauthorized"}), 403
+        return _unauthorized_response()
 
     from scripts.prelaunch_utils import rest_select
 
@@ -1284,9 +1311,16 @@ def api_admin_ai_ops_status():
         "&select=event_type,aggregated_summary,created_at"
         "&order=created_at.desc&limit=20"
     )
+    knowledge_visibility = {}
+    if _is_enabled("KNOWLEDGE_DASHBOARD_ENABLED", "true"):
+        try:
+            from lib.hermes_knowledge_brain import knowledge_dashboard_snapshot
 
-    return jsonify(
-        {
+            knowledge_visibility = knowledge_dashboard_snapshot()
+        except Exception:
+            knowledge_visibility = {}
+
+    data = {
             "model_config": {
                 "active_default_provider": provider_default,
                 "active_default_model": default_model,
@@ -1307,16 +1341,15 @@ def api_admin_ai_ops_status():
                 "recent_retry_error_events": retry_rows,
                 "recent_model_usage_events": usage_rows,
             },
-            "read_only": True,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "knowledge_visibility": knowledge_visibility,
         }
-    )
+    return _ok_response(data, read_only=True, extra={"updated_at": datetime.now(timezone.utc).isoformat(), **data})
 
 
 @app.route("/api/admin/ai-ops/telegram-mode", methods=["POST"])
 def api_admin_ai_ops_telegram_mode():
     if not _admin_authorized(request):
-        return jsonify({"error": "unauthorized"}), 403
+        return _unauthorized_response()
 
     body = request.get_json(silent=True) or {}
     allowed = {
@@ -1357,7 +1390,7 @@ def api_admin_ai_ops_telegram_mode():
 @app.route("/api/admin/ai-ops/roles")
 def api_admin_ai_ops_roles():
     if not _admin_authorized(request):
-        return jsonify({"error": "unauthorized"}), 403
+        return _unauthorized_response()
 
     from lib.ai_employee_registry import list_roles, role_routing_preview
 
@@ -1382,17 +1415,13 @@ def api_admin_ai_ops_roles():
             }
         )
 
-    return jsonify({
-        "roles": rows,
-        "read_only": True,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    })
+    return _ok_response({"roles": rows}, read_only=True, extra={"roles": rows, "updated_at": datetime.now(timezone.utc).isoformat()})
 
 
 @app.route("/api/admin/ai-ops/swarm-preview")
 def api_admin_ai_ops_swarm_preview():
     if not _admin_authorized(request):
-        return jsonify({"error": "unauthorized"}), 403
+        return _unauthorized_response()
 
     from lib.swarm_orchestration_foundation import build_swarm_preview, get_allowed_delegates, list_handoff_rules
 
@@ -1406,41 +1435,456 @@ def api_admin_ai_ops_swarm_preview():
         objective=objective,
         delegated_roles=delegated_roles,
     )
-    return jsonify({
+    data = {
         "swarm_preview": preview,
         "allowed_delegates": get_allowed_delegates(initiating_role),
         "handoff_rules": list_handoff_rules().get(initiating_role, {}),
-        "read_only": True,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    })
+        "dry_run_only": True,
+        "can_execute": False,
+    }
+    return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
 
 
 @app.route("/api/admin/ai-ops/swarm-scenarios")
 def api_admin_ai_ops_swarm_scenarios():
     if not _admin_authorized(request):
-        return jsonify({"error": "unauthorized"}), 403
+        return _unauthorized_response()
     from lib.swarm_scenarios import list_swarm_scenarios
 
-    return jsonify({
-        "scenarios": list_swarm_scenarios(),
-        "read_only": True,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    })
+    rows = list_swarm_scenarios()
+    return _ok_response({"scenarios": rows}, read_only=True, extra={"scenarios": rows, "updated_at": datetime.now(timezone.utc).isoformat()})
 
 
 @app.route("/api/admin/ai-ops/swarm-scenario-preview")
 def api_admin_ai_ops_swarm_scenario_preview():
     if not _admin_authorized(request):
-        return jsonify({"error": "unauthorized"}), 403
+        return _unauthorized_response()
     from lib.swarm_scenarios import build_scenario_preview
 
     scenario_id = (request.args.get("scenario_id") or "funding_onboarding").strip()
     payload = build_scenario_preview(scenario_id)
-    return jsonify({
-        "scenario_preview": payload,
-        "read_only": True,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    })
+    data = {"scenario_preview": payload, "dry_run_only": True, "can_execute": False}
+    return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-ops/planned-runs")
+def api_admin_ai_ops_planned_runs():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    from lib.swarm_approval_queue import list_planned_runs
+
+    rows = list_planned_runs()
+    data = {
+        "planned_runs": rows,
+        "execution_mode": "preview_only",
+        "dry_run_only": True,
+        "can_execute": False,
+    }
+    return _ok_response(data, read_only=False, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-ops/planned-run")
+def api_admin_ai_ops_planned_run():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    from lib.swarm_approval_queue import get_planned_run
+
+    planned_run_id = (request.args.get("planned_run_id") or "").strip()
+    if not planned_run_id:
+        return jsonify({"error": "planned_run_id_required"}), 400
+    row = get_planned_run(planned_run_id)
+    if not row:
+        return jsonify({"error": "planned_run_not_found", "planned_run_id": planned_run_id}), 404
+    data = {
+        "planned_run": row,
+        "execution_mode": "preview_only",
+        "dry_run_only": True,
+        "can_execute": False,
+    }
+    return _ok_response(data, read_only=False, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-ops/planned-run/create", methods=["POST"])
+def api_admin_ai_ops_planned_run_create():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    from lib.swarm_approval_queue import create_planned_run
+
+    body = request.get_json(silent=True) or {}
+    scenario_id = (body.get("scenario_id") or "funding_onboarding").strip()
+    actor = (request.headers.get("X-Admin-Actor") or body.get("requested_by") or "operator").strip()
+    row = create_planned_run(scenario_id=scenario_id, requested_by=actor)
+    if row.get("error"):
+        return jsonify(row), 400
+    logger.info("ai_ops.planned_run_create by=%s ip=%s planned_run_id=%s scenario_id=%s", actor, request.remote_addr, row.get("planned_run_id"), scenario_id)
+    data = {"planned_run": row, "execution_mode": "preview_only", "dry_run_only": True, "can_execute": False}
+    return _ok_response(data, read_only=False, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-ops/planned-run/approve", methods=["POST"])
+def api_admin_ai_ops_planned_run_approve():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    from lib.swarm_approval_queue import approve_planned_run
+
+    body = request.get_json(silent=True) or {}
+    planned_run_id = (body.get("planned_run_id") or "").strip()
+    actor = (request.headers.get("X-Admin-Actor") or "operator").strip() or "operator"
+    if not planned_run_id:
+        return jsonify({"error": "planned_run_id_required"}), 400
+    row = approve_planned_run(planned_run_id, actor=actor)
+    if row.get("error"):
+        code = 404 if row.get("error") == "planned_run_not_found" else 400
+        return jsonify(row), code
+    logger.info("ai_ops.planned_run_approve by=%s ip=%s planned_run_id=%s", actor, request.remote_addr, planned_run_id)
+    data = {"planned_run": row, "execution_mode": "preview_only", "dry_run_only": True, "can_execute": False}
+    return _ok_response(data, read_only=False, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-ops/planned-run/reject", methods=["POST"])
+def api_admin_ai_ops_planned_run_reject():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    from lib.swarm_approval_queue import reject_planned_run
+
+    body = request.get_json(silent=True) or {}
+    planned_run_id = (body.get("planned_run_id") or "").strip()
+    reason = (body.get("reason") or "").strip()
+    actor = (request.headers.get("X-Admin-Actor") or "operator").strip() or "operator"
+    if not planned_run_id:
+        return jsonify({"error": "planned_run_id_required"}), 400
+    row = reject_planned_run(planned_run_id, actor=actor, reason=reason)
+    if row.get("error"):
+        code = 404 if row.get("error") == "planned_run_not_found" else 400
+        return jsonify(row), code
+    logger.info("ai_ops.planned_run_reject by=%s ip=%s planned_run_id=%s", actor, request.remote_addr, planned_run_id)
+    data = {"planned_run": row, "execution_mode": "preview_only", "dry_run_only": True, "can_execute": False}
+    return _ok_response(data, read_only=False, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-ops/planned-run/cancel", methods=["POST"])
+def api_admin_ai_ops_planned_run_cancel():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    from lib.swarm_approval_queue import cancel_planned_run
+
+    body = request.get_json(silent=True) or {}
+    planned_run_id = (body.get("planned_run_id") or "").strip()
+    reason = (body.get("reason") or "").strip()
+    actor = (request.headers.get("X-Admin-Actor") or "operator").strip() or "operator"
+    if not planned_run_id:
+        return jsonify({"error": "planned_run_id_required"}), 400
+    row = cancel_planned_run(planned_run_id, actor=actor, reason=reason)
+    if row.get("error"):
+        code = 404 if row.get("error") == "planned_run_not_found" else 400
+        return jsonify(row), code
+    logger.info("ai_ops.planned_run_cancel by=%s ip=%s planned_run_id=%s", actor, request.remote_addr, planned_run_id)
+    data = {"planned_run": row, "execution_mode": "preview_only", "dry_run_only": True, "can_execute": False}
+    return _ok_response(data, read_only=False, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+def _safe_select(path: str) -> list[dict]:
+    from scripts.prelaunch_utils import rest_select
+
+    try:
+        return rest_select(path) or []
+    except Exception:
+        return []
+
+
+def _approval_rows(limit: int = 40) -> list[dict]:
+    return _safe_select(
+        f"owner_approval_queue?select=id,action_type,status,requested_by,resolution_note,resolved_by,created_at,updated_at&order=created_at.desc&limit={limit}"
+    )
+
+
+@app.route("/api/admin/ai-operations/session")
+def api_admin_ai_operations_session():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    from lib import hermes_ops_memory
+
+    mem = hermes_ops_memory.load_memory(updated_by="control_center")
+    active = hermes_ops_memory.get_active_work_session(mem)
+    data = {
+        "active_work_session": active,
+        "active_priorities": mem.get("active_priorities") or [],
+        "current_tasks": mem.get("task_lifecycle") or {},
+        "blocked_items": mem.get("blocked_priorities") or [],
+        "pending_approvals": mem.get("pending_approval_refs") or [],
+        "next_recommended_action": (mem.get("recent_recommendations") or ["Review top active priority"])[0],
+    }
+    return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-operations/tasks")
+def api_admin_ai_operations_tasks():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    from lib import hermes_ops_memory
+
+    mem = hermes_ops_memory.load_memory(updated_by="control_center")
+    summary = mem.get("task_lifecycle_summary") or {}
+    lifecycle = mem.get("task_lifecycle") or {}
+    rows = [{"task_id": k, "status": v} for k, v in lifecycle.items()]
+    rows = rows[:120]
+    data = {
+        "task_lifecycle_summary": {
+            "queued": int(summary.get("queued", 0)),
+            "running": int(summary.get("running", 0)),
+            "waiting_for_approval": len(mem.get("pending_approval_refs") or []),
+            "completed": int(summary.get("completed", 0)),
+            "failed": int(summary.get("failed", 0)),
+            "canceled": int(summary.get("canceled", 0)),
+        },
+        "task_lifecycle": rows,
+    }
+    return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-operations/approvals")
+def api_admin_ai_operations_approvals():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    rows = _approval_rows(limit=60)
+    pending = [r for r in rows if str(r.get("status") or "").lower() == "pending"]
+    data = {"pending_approvals": pending, "approval_history": rows}
+    return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-operations/swarm")
+def api_admin_ai_operations_swarm():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    from lib.swarm_coordinator import list_agents
+    from lib.swarm_approval_queue import list_planned_runs
+
+    agents = list_agents()
+    planned_runs = list_planned_runs()
+    latest_plan = planned_runs[0] if planned_runs else None
+    data = {
+        "swarm_execution_enabled": False,
+        "dry_run_only": True,
+        "can_execute": False,
+        "agents": agents,
+        "assigned_dry_run_tasks": planned_runs,
+        "suggested_delegation_plan": latest_plan,
+    }
+    return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-operations/workforce")
+def api_admin_ai_operations_workforce():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+
+    rows = _safe_select(
+        "worker_heartbeats?select=worker_id,status,last_seen_at,metadata&order=last_seen_at.desc&limit=100"
+    )
+    status_counts: dict[str, int] = {}
+    for row in rows:
+        key = str(row.get("status") or "unknown").lower()
+        status_counts[key] = status_counts.get(key, 0) + 1
+    data = {
+        "worker_heartbeats": rows,
+        "online_offline_summary": status_counts,
+        "queue_load": _safe_select("job_queue?select=id,status,created_at&order=created_at.desc&limit=60"),
+        "recent_activity": _safe_select("workflow_outputs?select=id,summary,status,created_at&order=created_at.desc&limit=30"),
+    }
+    return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-operations/timeline")
+def api_admin_ai_operations_timeline():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+
+    timeline: list[dict] = []
+    for row in _safe_select("system_events?select=id,event_type,status,created_at,payload&order=created_at.desc&limit=80"):
+        event_type = str(row.get("event_type") or "event")
+        status = str(row.get("status") or "unknown")
+        label = "event_recorded"
+        if status in {"pending", "queued"}:
+            label = "task_queued"
+        elif status in {"claimed", "running"}:
+            label = "task_running"
+        elif status == "completed":
+            label = "task_completed"
+        elif status == "failed":
+            label = "task_failed"
+        timeline.append({"at": row.get("created_at"), "type": label, "source": "system_events", "id": row.get("id"), "event_type": event_type, "status": status})
+
+    for row in _safe_select("workflow_outputs?select=id,summary,status,created_at,workflow_type&order=created_at.desc&limit=60"):
+        status = str(row.get("status") or "unknown").lower()
+        label = "task_completed" if status in {"completed", "approved", "ready"} else ("task_failed" if status == "failed" else "workflow_output")
+        timeline.append({"at": row.get("created_at"), "type": label, "source": "workflow_outputs", "id": row.get("id"), "event_type": row.get("workflow_type") or "workflow_output", "status": status, "summary": row.get("summary")})
+
+    for row in _approval_rows(limit=40):
+        status = str(row.get("status") or "unknown").lower()
+        label = "approval_requested" if status == "pending" else "approval_granted"
+        if status in {"rejected", "denied"}:
+            label = "approval_rejected"
+        timeline.append({"at": row.get("updated_at") or row.get("created_at"), "type": label, "source": "owner_approval_queue", "id": row.get("id"), "event_type": row.get("action_type") or "approval", "status": status})
+
+    timeline.sort(key=lambda x: str(x.get("at") or ""), reverse=True)
+    data = {"timeline": timeline[:160]}
+    return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-operations/overview")
+def api_admin_ai_operations_overview():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    from lib import hermes_ops_memory
+    from lib.hermes_knowledge_brain import knowledge_dashboard_snapshot
+    from lib.ai_ops_scorecard import build_ai_ops_scorecard
+    from lib.agent_collaboration import dry_run_collaboration_plan
+
+    mem = hermes_ops_memory.load_memory(updated_by="control_center")
+    active = hermes_ops_memory.get_active_work_session(mem)
+    approvals = _approval_rows(limit=40)
+    pending = [r for r in approvals if str(r.get("status") or "").lower() == "pending"]
+    workforce = _safe_select("worker_heartbeats?select=worker_id,status,last_seen_at&order=last_seen_at.desc&limit=40")
+    workforce_status_counts: dict[str, int] = {}
+    for row in workforce:
+        k = str(row.get("status") or "unknown").lower()
+        workforce_status_counts[k] = workforce_status_counts.get(k, 0) + 1
+    knowledge = knowledge_dashboard_snapshot() if _is_enabled("KNOWLEDGE_DASHBOARD_ENABLED", "true") else {}
+    task_lifecycle_summary = mem.get("task_lifecycle_summary") or {}
+    scorecard = build_ai_ops_scorecard(
+        worker_summary=workforce_status_counts,
+        task_summary=task_lifecycle_summary,
+        pending_approvals=len(pending),
+        knowledge_snapshot=knowledge,
+        agent_activation={
+            "ops_monitor": "read-only" if _is_enabled("OPS_MONITOR_READ_ONLY", "true") else "disabled",
+            "qa_test": "test-only" if _is_enabled("QA_TEST_AGENT_ENABLED", "false") else "disabled",
+            "report_writer": "email-only" if _is_enabled("REPORT_WRITER_AGENT_ENABLED", "false") else "disabled",
+            "telegram_comms": "approval-only" if _is_enabled("TELEGRAM_COMMS_AGENT_APPROVAL_ONLY", "false") else "disabled",
+            "funding_strategy": "review-only" if _is_enabled("FUNDING_STRATEGY_AGENT_REVIEW_ONLY", "false") else "disabled",
+            "credit_workflow": "review-only" if _is_enabled("CREDIT_WORKFLOW_AGENT_REVIEW_ONLY", "false") else "disabled",
+            "grants_research": "review-only" if _is_enabled("GRANTS_RESEARCH_AGENT_REVIEW_ONLY", "true") else "disabled",
+            "business_setup": "review-only" if _is_enabled("BUSINESS_SETUP_AGENT_REVIEW_ONLY", "true") else "disabled",
+            "trading_research": "research-only" if _is_enabled("TRADING_RESEARCH_AGENT_RESEARCH_ONLY", "true") else "disabled",
+        },
+        latest_agent_runs=mem.get("latest_agent_runs") or {},
+        stale_workers=int(workforce_status_counts.get("stale", 0)),
+        email_failures=0,
+    )
+    data = {
+        "feature_flags": {
+            "ai_operations_dashboard_enabled": _is_enabled("AI_OPERATIONS_DASHBOARD_ENABLED", "true"),
+            "swarm_visibility_enabled": _is_enabled("SWARM_VISIBILITY_ENABLED", "true"),
+            "swarm_execution_enabled": _is_enabled("SWARM_EXECUTION_ENABLED", "false"),
+            "ai_approval_center_enabled": _is_enabled("AI_APPROVAL_CENTER_ENABLED", "true"),
+            "live_operations_timeline_enabled": _is_enabled("LIVE_OPERATIONS_TIMELINE_ENABLED", "true"),
+            "ops_monitor_agent_enabled": _is_enabled("OPS_MONITOR_AGENT_ENABLED", "false"),
+            "qa_test_agent_enabled": _is_enabled("QA_TEST_AGENT_ENABLED", "false"),
+            "report_writer_agent_enabled": _is_enabled("REPORT_WRITER_AGENT_ENABLED", "false"),
+            "telegram_comms_agent_approval_only": _is_enabled("TELEGRAM_COMMS_AGENT_APPROVAL_ONLY", "false"),
+            "funding_strategy_agent_review_only": _is_enabled("FUNDING_STRATEGY_AGENT_REVIEW_ONLY", "false"),
+            "credit_workflow_agent_review_only": _is_enabled("CREDIT_WORKFLOW_AGENT_REVIEW_ONLY", "false"),
+            "controlled_agent_collaboration_enabled": _is_enabled("CONTROLLED_AGENT_COLLABORATION_ENABLED", "true"),
+            "executive_reports_enabled": _is_enabled("EXECUTIVE_REPORTS_ENABLED", "true"),
+            "ai_operations_scoring_enabled": _is_enabled("AI_OPERATIONS_SCORING_ENABLED", "true"),
+            "knowledge_source_ranking_enabled": _is_enabled("KNOWLEDGE_SOURCE_RANKING_ENABLED", "true"),
+        },
+        "agent_activation": {
+            "ops_monitor": "read-only" if _is_enabled("OPS_MONITOR_READ_ONLY", "true") else "disabled",
+            "qa_test": "test-only" if _is_enabled("QA_TEST_AGENT_ENABLED", "false") else "disabled",
+            "report_writer": "email-only" if _is_enabled("REPORT_WRITER_AGENT_ENABLED", "false") else "disabled",
+            "telegram_comms": "approval-only" if _is_enabled("TELEGRAM_COMMS_AGENT_APPROVAL_ONLY", "false") else "disabled",
+            "funding_strategy": "review-only" if _is_enabled("FUNDING_STRATEGY_AGENT_REVIEW_ONLY", "false") else "disabled",
+            "credit_workflow": "review-only" if _is_enabled("CREDIT_WORKFLOW_AGENT_REVIEW_ONLY", "false") else "disabled",
+        },
+        "active_work_session": active,
+        "operational_memory": {
+            "recent_recommendations": mem.get("recent_recommendations") or [],
+            "recent_completed": mem.get("recent_completed") or [],
+            "recent_failed": mem.get("recent_failed") or [],
+            "last_user_instruction": mem.get("last_user_instruction") or "",
+            "latest_ops_monitor_run": mem.get("latest_ops_monitor_run"),
+            "latest_agent_runs": mem.get("latest_agent_runs") or {},
+        },
+        "knowledge": knowledge,
+        "task_lifecycle_summary": task_lifecycle_summary,
+        "ai_ops_scorecard": scorecard,
+        "collaboration_preview": dry_run_collaboration_plan("daily operational intelligence"),
+        "pending_approval_count": len(pending),
+        "worker_count": len(workforce),
+        "dry_run_only": True,
+        "can_execute": False,
+        "swarm_execution_enabled": False,
+        "telegram_policy": {
+            "manual_only": _is_enabled("TELEGRAM_MANUAL_ONLY", "true"),
+            "auto_reports_enabled": _is_enabled("TELEGRAM_AUTO_REPORTS_ENABLED", "false"),
+            "conversational_mode": _is_enabled("TELEGRAM_CONVERSATIONAL_MODE", "true"),
+            "openrouter_only_for_chat": not _is_enabled("TELEGRAM_USE_OLLAMA", "false"),
+        },
+    }
+    return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-operations/executive-report")
+def api_admin_ai_operations_executive_report():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    from lib.executive_reports import build_executive_report, build_weekly_ceo_report, build_ai_workforce_summary, build_knowledge_brain_report
+
+    report_type = (request.args.get("type") or "daily").strip().lower()
+    if report_type == "weekly":
+        payload = build_weekly_ceo_report()
+    elif report_type == "workforce":
+        payload = {"report_type": "ai_workforce_summary", "timestamp": datetime.now(timezone.utc).isoformat(), "data": build_ai_workforce_summary()}
+    elif report_type == "knowledge":
+        payload = {"report_type": "knowledge_brain_summary", "timestamp": datetime.now(timezone.utc).isoformat(), "data": build_knowledge_brain_report()}
+    else:
+        payload = build_executive_report()
+    return _ok_response({"report": payload}, read_only=True, extra={"report": payload, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/api/admin/ai-operations/knowledge")
+def api_admin_ai_operations_knowledge():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    from lib.hermes_knowledge_brain import (
+        audit_knowledge_sources,
+        get_recent_knowledge,
+        search_knowledge,
+        get_related_workflows,
+        get_recent_recommendations,
+        get_funding_knowledge,
+        get_credit_knowledge,
+        knowledge_dashboard_snapshot,
+        get_top_ranked_knowledge,
+        build_source_aware_context_pack,
+        explain_knowledge_ranking,
+    )
+
+    category = (request.args.get("category") or "operations").strip().lower()
+    query = (request.args.get("query") or "").strip()
+    data = {
+        "audit": audit_knowledge_sources(),
+        "snapshot": knowledge_dashboard_snapshot(),
+        "recent": get_recent_knowledge(category, limit=20),
+        "search_results": search_knowledge(query, limit=20) if query else [],
+        "related_workflows": get_related_workflows(category, limit=12),
+        "recent_recommendations": get_recent_recommendations(limit=8),
+        "funding": get_funding_knowledge(limit=8),
+        "credit": get_credit_knowledge(limit=8),
+        "top_ranked": get_top_ranked_knowledge(category, limit=10),
+        "source_aware_context": build_source_aware_context_pack(category, limit=8),
+    }
+    if data["top_ranked"]:
+        data["ranking_explain_first"] = explain_knowledge_ranking(data["top_ranked"][0], category=category)
+    return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
+
+@app.route("/admin/ai-operations")
+def admin_ai_operations_page():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    return render_template_string(TERMINAL_HTML)
 
 
 # ─────────────────────────────────────────────
@@ -1899,6 +2343,14 @@ TERMINAL_HTML = """<!DOCTYPE html>
 
   <div id="page-aiops" class="page two" style="display:none">
     <div class="panel">
+      <div class="panel-header"><span class="panel-title">🧭 ACTIVE WORK SESSION</span></div>
+      <div class="panel-body" id="aiops-session-panel">Loading...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">🧠 HERMES OPERATIONAL MEMORY</span></div>
+      <div class="panel-body" id="aiops-memory-panel">Loading...</div>
+    </div>
+    <div class="panel">
       <div class="panel-header">
         <span class="panel-title">🧠 AI OPS CONFIG</span>
         <button class="refresh-btn" onclick="loadAiOpsPage()">↺ REFRESH</button>
@@ -1934,6 +2386,10 @@ TERMINAL_HTML = """<!DOCTYPE html>
       <div class="panel-body" id="aiops-workers-panel">Loading...</div>
     </div>
     <div class="panel">
+      <div class="panel-header"><span class="panel-title">📚 TASK LIFECYCLE</span></div>
+      <div class="panel-body" id="aiops-lifecycle-panel">Loading...</div>
+    </div>
+    <div class="panel">
       <div class="panel-header"><span class="panel-title">📉 RETRIES / MODEL USAGE</span></div>
       <div class="panel-body" id="aiops-telemetry-panel">Loading...</div>
     </div>
@@ -1956,6 +2412,22 @@ TERMINAL_HTML = """<!DOCTYPE html>
         <button class="refresh-btn" style="margin-left:8px" onclick="loadSelectedSwarmScenario()">LOAD SCENARIO</button>
       </div>
       <div class="panel-body" id="aiops-swarm-panel">Loading...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">✅ APPROVAL QUEUE</span></div>
+      <div class="panel-body" style="padding-bottom:0">
+        <div style="margin-bottom:8px;color:var(--amber)">Execution remains disabled in this phase.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="refresh-btn" onclick="createPlannedRunFromScenario()">CREATE PLANNED RUN</button>
+          <button class="refresh-btn" onclick="loadApprovalQueue()">REFRESH QUEUE</button>
+        </div>
+        <div id="aiops-approval-feedback" class="message-meta" style="margin-top:8px"></div>
+      </div>
+      <div class="panel-body" id="aiops-approval-panel">Loading...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><span class="panel-title">🕒 LIVE OPERATIONS TIMELINE</span></div>
+      <div class="panel-body" id="aiops-timeline-panel">Loading...</div>
     </div>
   </div>
 
@@ -3130,13 +3602,67 @@ contributing_signals=${esc(JSON.stringify(review.contributing_signals || []))}</
 function renderAiOpsConfig(d) {
   const mc = d.model_config || {};
   const tg = d.telegram_mode || {};
-  return `<div class="audit-pre">default_provider=${esc(String(mc.active_default_provider || 'unknown'))}
-default_model=${esc(String(mc.active_default_model || 'unknown'))}
-context_length=${esc(String(mc.configured_context_length || 'unknown'))}
-telegram_enabled=${esc(String(tg.enabled))}
+  const modelBadge = `${mc.active_default_provider || 'unknown'}:${mc.active_default_model || 'unknown'}`;
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <span class="panel-badge badge-green">Telegram: Conversational / Quiet</span>
+    <span class="panel-badge badge-blue">Reports: Email Only</span>
+    <span class="panel-badge badge-amber">Swarm: Dry Run Only</span>
+    <span class="panel-badge badge-red">Execution: Disabled</span>
+    <span class="panel-badge badge-blue">Model: ${esc(modelBadge)}</span>
+    <span class="panel-badge badge-green">Auth: Protected</span>
+  </div>
+  <div class="audit-pre">telegram_enabled=${esc(String(tg.enabled))}
 telegram_manual_only=${esc(String(tg.manual_only))}
 telegram_auto_reports_enabled=${esc(String(tg.auto_reports_enabled))}
-read_only=${esc(String(d.read_only === true))}</div>`;
+configured_context=${esc(String(mc.configured_context_length || 'unknown'))}
+reports_destination=email
+safety_notes=Swarm execution is disabled | Telegram full reports are suppressed | Approvals are required for risky actions</div>`;
+}
+
+function renderAiOpsSession(d) {
+  const s = d?.active_work_session || {};
+  if (!Object.keys(s).length) return '<div style="color:var(--dim)">No active work session. Start one from Telegram with "start work session".</div>';
+  return `<div class="audit-pre">goal=${esc(String(s.current_goal || 'n/a'))}
+status=${esc(String(s.status || 'unknown'))}
+active_tasks=${esc(JSON.stringify(s.active_tasks || []))}
+blocked_items=${esc(JSON.stringify(s.blocked_items || []))}
+pending_approvals=${esc(JSON.stringify(s.pending_approvals || []))}
+next_recommended_action=${esc(String(d.next_recommended_action || 'Review top active priority'))}</div>`;
+}
+
+function renderAiOpsMemory(d) {
+  const m = d?.operational_memory || {};
+  const latest = m.latest_ops_monitor_run || null;
+  const k = d?.knowledge || {};
+  const kc = k.category_counts || {};
+  return `<div class="audit-pre">last_user_instruction=${esc(String(m.last_user_instruction || ''))}
+recent_recommendations=${esc(JSON.stringify(m.recent_recommendations || []))}
+recent_completed=${esc(JSON.stringify(m.recent_completed || []))}
+recent_failed=${esc(JSON.stringify(m.recent_failed || []))}
+latest_ops_monitor_run=${esc(JSON.stringify(latest || { note: 'No ops monitor run yet' }))}
+knowledge_category_counts=${esc(JSON.stringify(kc || {}))}
+knowledge_stale_warnings=${esc(JSON.stringify((k.stale_warnings || []).slice(0, 4)))}</div>`;
+}
+
+function renderAiOpsLifecycle(d) {
+  const s = d?.task_lifecycle_summary || {};
+  const rows = d?.task_lifecycle || [];
+  const failed = Number(s.failed || 0);
+  return `<div class="audit-pre">queued=${esc(String(s.queued || 0))}
+running=${esc(String(s.running || 0))}
+waiting_for_approval=${esc(String(s.waiting_for_approval || 0))}
+completed=${esc(String(s.completed || 0))}
+failed=${esc(String(s.failed || 0))}
+canceled=${esc(String(s.canceled || 0))}
+sample=${esc(JSON.stringify(rows.slice(0, 12)))}</div>${failed === 0 ? '<div style="color:var(--dim);margin-top:6px">No failed tasks.</div>' : ''}`;
+}
+
+function renderAiOpsTimeline(d) {
+  const rows = d?.timeline || [];
+  if (!rows.length) return '<div style="color:var(--dim)">No timeline events yet.</div>';
+  return `<div class="audit-pre">` + rows.slice(0, 30).map(r =>
+    `${ts(r.at)} | ${r.type} | ${r.source} | ${r.event_type || 'event'} | status=${r.status || 'unknown'}`
+  ).join('\n') + `</div>`;
 }
 
 function renderAiOpsRouting(rows) {
@@ -3194,7 +3720,7 @@ function renderAiOpsSwarm(data) {
   const sp = wrapper.swarm_preview || {};
   const seq = sp.task_sequence || [];
   if (!sp || !Object.keys(sp).length) {
-    return '<div style="color:var(--dim)">No swarm preview available.</div>';
+    return '<div style="color:var(--dim)">No swarm plans yet.</div>';
   }
   const header = `<div class="audit-pre">scenario=${esc(String(scenario.display_name || scenario.scenario_id || 'unknown'))}
 scenario_description=${esc(String(scenario.description || ''))}
@@ -3214,12 +3740,88 @@ reason=${esc(String(sp.reason || ''))}</div>`;
   return header + steps;
 }
 
+function renderApprovalQueue(data) {
+  const rows = (data || {}).planned_runs || [];
+  if (!rows.length) return '<div style="color:var(--dim)">No pending approvals.</div>';
+  return rows.map(r => `
+    <div class="message-card">
+      <div class="message-title">${esc(r.planned_run_id || 'planned_run')}</div>
+      <div class="message-meta">scenario=${esc(r.scenario_id || 'unknown')} | role=${esc(r.initiating_role || 'unknown')} | risk=${esc(String(r.risk_level || 'unknown'))}</div>
+      <div class="message-meta">status=${esc(String(r.approval_status || 'planned'))} | requested_by=${esc(r.requested_by || 'operator')} | created_at=${esc(ts(r.created_at))}</div>
+      <div class="message-meta">approval_required=${esc(String(!!r.approval_required))} | can_execute=${esc(String(!!r.can_execute))} | execution_mode=${esc(String(r.execution_mode || 'preview_only'))}</div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="refresh-btn" onclick="approvePlannedRun('${esc(r.planned_run_id || '')}')">APPROVE</button>
+        <button class="refresh-btn" onclick="rejectPlannedRun('${esc(r.planned_run_id || '')}')">REJECT</button>
+        <button class="refresh-btn" onclick="cancelPlannedRun('${esc(r.planned_run_id || '')}')">CANCEL</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function loadApprovalQueue() {
+  try {
+    const q = await aiOpsGet('/api/admin/ai-ops/planned-runs');
+    const payload = q.data || q;
+    document.getElementById('aiops-approval-panel').innerHTML = renderApprovalQueue(payload);
+    const fb = document.getElementById('aiops-approval-feedback');
+    if (fb) fb.textContent = `queue updated: ${ts(q.timestamp || q.updated_at)}`;
+  } catch (e) {
+    const msg = `<div class="red">Approval queue unavailable: ${esc(e.message)}</div><div style="color:var(--dim)">Fallback mode active.</div>`;
+    document.getElementById('aiops-approval-panel').innerHTML = msg;
+  }
+}
+
+async function createPlannedRunFromScenario() {
+  const fb = document.getElementById('aiops-approval-feedback');
+  try {
+    const scenarioId = (document.getElementById('aiops-swarm-scenario')?.value || 'funding_onboarding');
+    const res = await aiOpsPost('/api/admin/ai-ops/planned-run/create', { scenario_id: scenarioId, requested_by: aiOpsAdminActor() || 'operator' });
+    if (fb) fb.textContent = `planned run created: ${res?.planned_run?.planned_run_id || 'ok'}`;
+    await loadApprovalQueue();
+  } catch (e) {
+    if (fb) fb.textContent = `create failed: ${e.message}`;
+  }
+}
+
+async function approvePlannedRun(plannedRunId) {
+  const fb = document.getElementById('aiops-approval-feedback');
+  try {
+    await aiOpsPost('/api/admin/ai-ops/planned-run/approve', { planned_run_id: plannedRunId });
+    if (fb) fb.textContent = `approved: ${plannedRunId}`;
+    await loadApprovalQueue();
+  } catch (e) {
+    if (fb) fb.textContent = `approve failed: ${e.message}`;
+  }
+}
+
+async function rejectPlannedRun(plannedRunId) {
+  const fb = document.getElementById('aiops-approval-feedback');
+  try {
+    await aiOpsPost('/api/admin/ai-ops/planned-run/reject', { planned_run_id: plannedRunId, reason: 'rejected in AI OPS review' });
+    if (fb) fb.textContent = `rejected: ${plannedRunId}`;
+    await loadApprovalQueue();
+  } catch (e) {
+    if (fb) fb.textContent = `reject failed: ${e.message}`;
+  }
+}
+
+async function cancelPlannedRun(plannedRunId) {
+  const fb = document.getElementById('aiops-approval-feedback');
+  try {
+    await aiOpsPost('/api/admin/ai-ops/planned-run/cancel', { planned_run_id: plannedRunId, reason: 'cancelled in AI OPS review' });
+    if (fb) fb.textContent = `cancelled: ${plannedRunId}`;
+    await loadApprovalQueue();
+  } catch (e) {
+    if (fb) fb.textContent = `cancel failed: ${e.message}`;
+  }
+}
+
 async function loadSelectedSwarmScenario() {
   try {
     const sel = document.getElementById('aiops-swarm-scenario');
     const scenarioId = (sel?.value || 'funding_onboarding');
     const data = await aiOpsGet(`/api/admin/ai-ops/swarm-scenario-preview?scenario_id=${encodeURIComponent(scenarioId)}`);
-    document.getElementById('aiops-swarm-panel').innerHTML = renderAiOpsSwarm(data);
+    document.getElementById('aiops-swarm-panel').innerHTML = renderAiOpsSwarm(data.data || data);
   } catch (e) {
     const msg = `<div class="red">Swarm scenario unavailable: ${esc(e.message)}</div><div style="color:var(--dim)">Fallback mode active.</div>`;
     document.getElementById('aiops-swarm-panel').innerHTML = msg;
@@ -3259,22 +3861,39 @@ async function aiOpsPost(url, body) {
 async function loadAiOpsPage() {
   try {
     const d = await aiOpsGet('/api/admin/ai-ops/status');
+    const overview = await aiOpsGet('/api/admin/ai-operations/overview');
+    const session = await aiOpsGet('/api/admin/ai-operations/session');
+    const tasks = await aiOpsGet('/api/admin/ai-operations/tasks');
+    const timeline = await aiOpsGet('/api/admin/ai-operations/timeline');
     const roleData = await aiOpsGet('/api/admin/ai-ops/roles');
     const scenarios = await aiOpsGet('/api/admin/ai-ops/swarm-scenarios');
-    document.getElementById('aiops-config-panel').innerHTML = renderAiOpsConfig(d);
-    document.getElementById('aiops-routing-panel').innerHTML = renderAiOpsRouting(d.routing_preview);
-    document.getElementById('aiops-workers-panel').innerHTML = renderAiOpsWorkers(d.worker_health_summary);
-    document.getElementById('aiops-telemetry-panel').innerHTML = renderAiOpsTelemetry(d.telemetry);
-    document.getElementById('aiops-roles-panel').innerHTML = renderAiOpsRoles(roleData.roles);
+    const statusData = d.data || d;
+    const overviewData = overview.data || overview;
+    const sessionData = session.data || session;
+    const tasksData = tasks.data || tasks;
+    const timelineData = timeline.data || timeline;
+    const roleRows = (roleData.data || roleData).roles || [];
+    const scenarioRows = (scenarios.data || scenarios).scenarios || [];
+
+    document.getElementById('aiops-session-panel').innerHTML = renderAiOpsSession(sessionData);
+    document.getElementById('aiops-memory-panel').innerHTML = renderAiOpsMemory(overviewData);
+    document.getElementById('aiops-config-panel').innerHTML = renderAiOpsConfig(statusData);
+    document.getElementById('aiops-routing-panel').innerHTML = renderAiOpsRouting(statusData.routing_preview);
+    document.getElementById('aiops-workers-panel').innerHTML = renderAiOpsWorkers(statusData.worker_health_summary);
+    document.getElementById('aiops-lifecycle-panel').innerHTML = renderAiOpsLifecycle(tasksData);
+    document.getElementById('aiops-telemetry-panel').innerHTML = renderAiOpsTelemetry(statusData.telemetry);
+    document.getElementById('aiops-roles-panel').innerHTML = renderAiOpsRoles(roleRows);
+    document.getElementById('aiops-timeline-panel').innerHTML = renderAiOpsTimeline(timelineData);
 
     const sel = document.getElementById('aiops-swarm-scenario');
-    const rows = scenarios.scenarios || [];
+    const rows = scenarioRows;
     if (sel && rows.length) {
       sel.innerHTML = rows.map(r => `<option value="${esc(r.scenario_id)}">${esc(r.display_name)}</option>`).join('');
     }
     await loadSelectedSwarmScenario();
+    await loadApprovalQueue();
 
-    const tg = d.telegram_mode || {};
+    const tg = statusData.telegram_mode || {};
     const enabledEl = document.getElementById('aiops-flag-enabled');
     const manualEl = document.getElementById('aiops-flag-manual');
     const autoEl = document.getElementById('aiops-flag-auto');
@@ -3282,7 +3901,7 @@ async function loadAiOpsPage() {
     if (manualEl) manualEl.checked = !!tg.manual_only;
     if (autoEl) autoEl.checked = !!tg.auto_reports_enabled;
     const fb = document.getElementById('aiops-controls-feedback');
-    if (fb) fb.textContent = `last updated: ${ts(d.updated_at)}`;
+    if (fb) fb.textContent = `last updated: ${ts(d.timestamp || d.updated_at)} | reports: email only | execution: disabled`;
   } catch (e) {
     const msg = `<div class="red">AI Ops status unavailable: ${esc(e.message)}</div><div style="color:var(--dim)">Fallback mode active.</div>`;
     document.getElementById('aiops-config-panel').innerHTML = msg;
@@ -3291,6 +3910,11 @@ async function loadAiOpsPage() {
     document.getElementById('aiops-telemetry-panel').innerHTML = msg;
     document.getElementById('aiops-roles-panel').innerHTML = msg;
     document.getElementById('aiops-swarm-panel').innerHTML = msg;
+    document.getElementById('aiops-approval-panel').innerHTML = msg;
+    document.getElementById('aiops-session-panel').innerHTML = msg;
+    document.getElementById('aiops-memory-panel').innerHTML = msg;
+    document.getElementById('aiops-lifecycle-panel').innerHTML = msg;
+    document.getElementById('aiops-timeline-panel').innerHTML = msg;
   }
 }
 
@@ -3334,6 +3958,13 @@ function loadPage(name) {
 }
 
 async function loadAll() { loadPage('overview'); }
+
+if (window.location.pathname === '/admin/ai-operations') {
+  setTimeout(() => {
+    const aiopsTab = [...document.querySelectorAll('.tab')].find(el => el.textContent.trim() === 'AI OPS');
+    if (aiopsTab) aiopsTab.click();
+  }, 0);
+}
 
 // ── Auto-refresh every 30s ──
 loadAll();

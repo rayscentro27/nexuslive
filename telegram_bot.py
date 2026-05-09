@@ -43,6 +43,7 @@ logging.basicConfig(
 logger = logging.getLogger('TelegramIntegration')
 UPDATE_OFFSET_FILE = os.path.join(os.path.dirname(__file__), ".telegram_update_offset")
 SINGLE_INSTANCE_LOCK = os.path.join(os.path.dirname(__file__), ".telegram_bot.lock")
+OPS_MEMORY_FILE = os.path.join(os.path.dirname(__file__), ".hermes_ops_memory.json")
 COORD_CLI = os.path.join(os.path.dirname(__file__), "nexus_coord.py")
 OPS_SNAPSHOT = os.path.join(os.path.dirname(__file__), "scripts", "hermes_ops_snapshot.sh")
 OPS_ATTENTION = os.path.join(os.path.dirname(__file__), "scripts", "hermes_ops_attention.sh")
@@ -53,16 +54,137 @@ from lib.telegram_role_config import (
     get_chat_config,
     get_ops_config,
     get_reports_config,
+    secondary_bots_disabled,
     telegram_auto_reports_enabled,
     telegram_conversational_mode,
+    telegram_manual_mode,
+    telegram_primary_bot,
     telegram_manual_only,
     validate_ops_polling,
 )
 from lib import hermes_gate
+from lib import hermes_ops_memory
+from lib import swarm_coordinator
+from lib.ops_monitor_agent import run_ops_monitor_summary
+from lib.controlled_agents import run_controlled_agent
+from lib.hermes_knowledge_brain import get_recent_recommendations, get_funding_knowledge, get_credit_knowledge, knowledge_dashboard_snapshot, build_telegram_knowledge_report_context
+from lib.telegram_router import TelegramRouter
+
+DIAGNOSTIC_PHRASES = {
+    "status",
+    "worker status",
+    "system status",
+    "queue status",
+    "backend health",
+    "health check",
+    "trading status",
+}
+
+DIAGNOSTIC_TO_COMMAND = {
+    "status": "status",
+    "worker status": "workers",
+    "system status": "status",
+    "queue status": "queue",
+    "backend health": "health",
+    "health check": "health",
+    "trading status": "ceo_report",
+    "/tasks": "tasks_summary",
+    "/running": "running_summary",
+    "/pending": "pending_summary",
+    "/approvals": "approvals_summary",
+}
+
+REPORT_PHRASES = {
+    "send report",
+    "generate report",
+    "full report",
+    "research brief",
+    "opportunity report",
+    "weekly report",
+}
+
+FUNDING_INSIGHT_PHRASES = {
+    "what funding insights do we have",
+    "funding insights",
+    "funding knowledge",
+    "funding recommendations",
+}
+
+CREDIT_INSIGHT_PHRASES = {
+    "what credit workflow insights do we have",
+    "credit workflow insights",
+    "credit insights",
+    "credit knowledge",
+    "credit recommendations",
+}
+
+KNOWLEDGE_REPORT_PHRASES = {
+    "send me a knowledge report",
+    "send knowledge report",
+    "knowledge report",
+    "knowledge summary",
+}
+
+PLANNING_PROMPTS = {
+    "what do you recommend we work on today",
+    "what should we work on today",
+    "next best move",
+    "what should hermes do today",
+}
+
+APPROVAL_REPLY_APPROVE = {"approve", "approved", "yes proceed"}
+APPROVAL_REPLY_CANCEL = {"cancel", "stop"}
+
+TASK_SELECTION_ALIASES = {
+    "start the second one": "start item 2",
+    "work on the telegram issue": "work on the telegram one",
+    "option 1": "do item 1",
+    "option 2": "do item 2",
+    "option 3": "do item 3",
+    "option 4": "do item 4",
+    "option 5": "do item 5",
+    "pick option 1": "do item 1",
+    "pick option 2": "do item 2",
+    "pick option 3": "do item 3",
+    "pick option 4": "do item 4",
+    "pick option 5": "do item 5",
+    "lets do 1": "do item 1",
+    "lets do 2": "do item 2",
+    "lets do 3": "do item 3",
+    "lets do 4": "do item 4",
+    "lets do 5": "do item 5",
+    "let's do 1": "do item 1",
+    "let's do 2": "do item 2",
+    "let's do 3": "do item 3",
+    "let's do 4": "do item 4",
+    "let's do 5": "do item 5",
+    "lets go with 1": "do item 1",
+    "lets go with 2": "do item 2",
+    "lets go with 3": "do item 3",
+    "lets go with 4": "do item 4",
+    "lets go with 5": "do item 5",
+    "let's go with 1": "do item 1",
+    "let's go with 2": "do item 2",
+    "let's go with 3": "do item 3",
+    "let's go with 4": "do item 4",
+    "let's go with 5": "do item 5",
+}
 
 
 def email_summaries_enabled() -> bool:
     return os.getenv("TELEGRAM_EMAIL_SUMMARIES_ENABLED", "false").lower() == "true"
+
+
+def email_reports_enabled() -> bool:
+    return os.getenv("EMAIL_REPORTS_ENABLED", "true").lower() == "true"
+
+
+def completion_notices_enabled() -> bool:
+    return os.getenv("TELEGRAM_COMPLETION_NOTICES_ENABLED", "true").lower() == "true"
+
+
+def full_reports_enabled() -> bool:
+    return os.getenv("TELEGRAM_FULL_REPORTS_ENABLED", "false").lower() == "true"
 
 class NexusTelegramBot:
     """Telegram bot for Nexus AI trading alerts and system monitoring"""
@@ -89,6 +211,17 @@ class NexusTelegramBot:
         self.error_timestamps: deque[float] = deque(maxlen=50)
         self.circuit_open_until = 0.0
         self._lock_handle = None
+        self.last_plan_items: list[str] = []
+        self._repeat_error_key: str = ""
+        self._repeat_error_count: int = 0
+        self.pending_approval_action: dict[str, str] | None = None
+        self.pending_swarm_plan: dict[str, str] | None = None
+        self.task_lifecycle: dict[str, str] = {}
+        self.ops_memory: dict[str, Any] = self._load_operational_memory()
+        self.last_plan_items = list(self.ops_memory.get("latest_daily_plan", []))
+        self.task_lifecycle = dict(self.ops_memory.get("task_lifecycle", {}))
+        self.pending_approval_action = self.ops_memory.get("pending_approval")
+        self.pending_swarm_plan = self.ops_memory.get("pending_swarm_plan")
 
         for warning in self.role_config.warnings:
             logger.warning("Telegram ops config: %s", warning)
@@ -132,6 +265,19 @@ class NexusTelegramBot:
                 f.write(str(self.last_update_id))
         except Exception as e:
             logger.warning(f"Could not save Telegram update offset: {e}")
+
+    def _load_operational_memory(self) -> dict[str, Any]:
+        return hermes_ops_memory.load_memory(updated_by="telegram_bot_startup")
+
+    def _save_operational_memory(self) -> None:
+        try:
+            self.ops_memory["latest_daily_plan"] = self.last_plan_items
+            self.ops_memory["task_lifecycle"] = self.task_lifecycle
+            self.ops_memory["pending_approval"] = self.pending_approval_action
+            self.ops_memory["pending_swarm_plan"] = self.pending_swarm_plan
+            self.ops_memory = hermes_ops_memory.save_memory(self.ops_memory, updated_by="telegram_bot")
+        except Exception as e:
+            logger.warning(f"operational memory save failed: {e}")
 
     def test_connection(self) -> bool:
         """Test Telegram bot connection"""
@@ -259,15 +405,39 @@ class NexusTelegramBot:
 
     def _conversational_reply(self, raw: str) -> str:
         """Natural-language Telegram reply path for conversational mode."""
+        normalized = (raw or "").strip().lower()
+        if normalized in {
+            "hi", "hello", "hey", "good morning", "good afternoon", "good evening", "yo",
+        }:
+            return "Good morning, Ray. I'm online and ready."
         try:
-            from hermes_claude_bot import ask_via_router
-            return str(ask_via_router(raw) or "")
+            base_url = (os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").rstrip("/")
+            model = (os.getenv("OPENROUTER_MODEL") or "deepseek/deepseek-chat").strip()
+            key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
+            if not key:
+                raise RuntimeError("OPENROUTER_API_KEY missing")
+            url = f"{base_url}/chat/completions"
+            headers = {"Content-Type": "application/json"}
+            headers["Authorization"] = f"Bearer {key}"
+            payload = {
+                "model": model,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are Hermes. Reply naturally and briefly for Telegram chat.",
+                    },
+                    {"role": "user", "content": raw},
+                ],
+                "max_tokens": 400,
+                "temperature": 0.7,
+            }
+            logger.info("telegram conversational model=openrouter/%s", model)
+            resp = requests.post(url, headers=headers, json=payload, timeout=45)
+            resp.raise_for_status()
+            data = resp.json()
+            return str(((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
         except Exception:
-            try:
-                from hermes_command_router.router import run_command
-                return self.format_pre(run_command(raw, source="telegram"))
-            except Exception:
-                return self.safe_help_text()
+            return "I'm online, but my chat model is unavailable right now."
 
     def send_message(self, message: str, parse_mode: str = "HTML") -> bool:
         """Send message to Telegram"""
@@ -276,28 +446,13 @@ class NexusTelegramBot:
             return False
 
         try:
-            payload = {
-                "chat_id": self.chat_id,
-                "text": self._truncate_response(message),
-                "parse_mode": parse_mode
-            }
-
-            response = requests.post(f"{self.api_url}/sendMessage", json=payload, timeout=10)
-
-            if response.status_code == 200:
-                logger.debug(f"📤 Message sent to Telegram")
-                return True
-            if response.status_code == 400 and "can't parse entities" in response.text.lower():
-                fallback_payload = {
-                    "chat_id": self.chat_id,
-                    "text": self._truncate_response(message),
-                }
-                retry = requests.post(f"{self.api_url}/sendMessage", json=fallback_payload, timeout=10)
-                if retry.status_code == 200:
-                    logger.warning("Telegram HTML parse failed; resent message without parse_mode")
-                    return True
-            logger.error(f"Failed to send message: {response.text}")
-            return False
+            return hermes_gate.send_direct_response(
+                self._truncate_response(message),
+                event_type='direct_chat_reply',
+                bot_token=self.bot_token,
+                chat_id=self.chat_id,
+                parse_mode=parse_mode,
+            )
 
         except Exception as e:
             logger.error(f"Error sending message: {e}")
@@ -313,6 +468,76 @@ class NexusTelegramBot:
                 logger.warning(f"Email summary skipped/failed: {detail}")
         except Exception as e:
             logger.warning(f"Email summary error: {e}")
+
+    def _mask_email(self, value: str) -> str:
+        text = str(value or "").strip()
+        if "@" not in text:
+            return "not-set"
+        local, domain = text.split("@", 1)
+        local_mask = (local[:2] + "***") if len(local) > 2 else "***"
+        return f"{local_mask}@{domain}"
+
+    def _send_report_email_with_diagnostics(self, subject: str, body: str) -> dict[str, Any]:
+        provider = "smtp_gmail"
+        recipient = os.getenv("SCHEDULER_EMAIL_TO", os.getenv("NEXUS_EMAIL", "")).strip()
+        masked_recipient = self._mask_email(recipient)
+        logger.info("email_report_attempted=true")
+        logger.info("email_provider=%s", provider)
+        logger.info("email_recipient=%s", masked_recipient)
+        if not email_reports_enabled():
+            logger.info("email_report_sent=false")
+            logger.info("email_error=email_reports_disabled")
+            return {
+                "ok": False,
+                "sent": False,
+                "configured": False,
+                "provider": provider,
+                "recipient_masked": masked_recipient,
+                "error": "email_reports_disabled",
+            }
+        try:
+            from notifications.operator_notifications import send_operator_email
+
+            sent, detail = send_operator_email(subject, body)
+            if sent:
+                logger.info("email_report_sent=true")
+                return {
+                    "ok": True,
+                    "sent": True,
+                    "configured": True,
+                    "provider": provider,
+                    "recipient_masked": masked_recipient,
+                    "error": "",
+                }
+            safe_error = str(detail or "send_failed")[:180]
+            logger.info("email_report_sent=false")
+            logger.info("email_error=%s", safe_error)
+            return {
+                "ok": False,
+                "sent": False,
+                "configured": "not configured" not in safe_error.lower(),
+                "provider": provider,
+                "recipient_masked": masked_recipient,
+                "error": safe_error,
+            }
+        except Exception as e:
+            safe_error = str(e)[:180]
+            logger.info("email_report_sent=false")
+            logger.info("email_error=%s", safe_error)
+            return {
+                "ok": False,
+                "sent": False,
+                "configured": False,
+                "provider": provider,
+                "recipient_masked": masked_recipient,
+                "error": safe_error,
+            }
+
+    def send_report_email(self, subject: str, body: str) -> None:
+        result = self._send_report_email_with_diagnostics(subject, body)
+        if not result.get("sent"):
+            logger.warning(f"Report email skipped/failed: {result.get('error')}")
+        return result
 
     def get_updates(self, timeout: int = 20) -> list[dict]:
         if not self.connected:
@@ -358,6 +583,527 @@ class NexusTelegramBot:
 
     def format_pre(self, text: str) -> str:
         return f"<pre>{escape(text[:3500])}</pre>"
+
+    def render_chat_response(self, text: str) -> str:
+        return str(text or "").strip()
+
+    def render_report_response(self, text: str) -> str:
+        return self.format_pre(str(text or ""))
+
+    def render_command_response(self, text: str) -> str:
+        return str(text or "").strip()
+
+    def render_short_status(self, text: str) -> str:
+        return str(text or "").strip()
+
+    def render_daily_plan(self, items: list[dict[str, str]]) -> str:
+        lines = ["Here is what I recommend we work on today:"]
+        for idx, item in enumerate(items, start=1):
+            lines.append(f"{idx}) {item['title']}")
+            lines.append(f"- Why: {item['why']}")
+            lines.append(f"- Risk: {item['risk']}")
+            lines.append(f"- Action: {item['action']}")
+        return "\n".join(lines)
+
+    def render_approval_request(self, reason: str) -> str:
+        return (
+            "This action needs approval before I proceed:\n"
+            f"{reason}\n"
+            "Reply APPROVE or CANCEL."
+        )
+
+    def render_completion_notice(self, task: str) -> str:
+        return f"✅ Done — I completed {task}. Full details were sent to your email."
+
+    def render_failure_notice(self, task: str) -> str:
+        return f"⚠️ I couldn't complete {task}. I saved the details and can send a report by email."
+
+    def render_report_email(self, user_prompt: str) -> str:
+        try:
+            from hermes_command_router.router import run_command
+            return str(run_command(user_prompt, source="telegram") or "No report content generated.")
+        except Exception as e:
+            return f"Report generation failed: {e}"
+
+    def render_report_summary(self) -> str:
+        return "📩 I've sent the full report to your email."
+
+    def classify_message_route(self, raw: str) -> str:
+        normalized = (raw or "").strip().lower()
+        normalized = TASK_SELECTION_ALIASES.get(normalized, normalized)
+        if normalized.startswith("/"):
+            return "command"
+        if normalized in DIAGNOSTIC_PHRASES:
+            return "command"
+        if any(phrase in normalized for phrase in REPORT_PHRASES):
+            return "report_request"
+        if any(phrase in normalized for phrase in FUNDING_INSIGHT_PHRASES):
+            return "funding_insights"
+        if any(phrase in normalized for phrase in CREDIT_INSIGHT_PHRASES):
+            return "credit_insights"
+        if any(phrase in normalized for phrase in KNOWLEDGE_REPORT_PHRASES):
+            return "knowledge_report"
+        if self._is_work_planning_request(normalized):
+            return "daily_plan"
+        if (
+            normalized.startswith("do item ")
+            or normalized.startswith("start item ")
+            or normalized.startswith("item ")
+            or normalized in {"start all", "do the funding one", "work on the telegram one", "third one", "the third one"}
+        ):
+            return "task_selection"
+        return "chat"
+
+    def _is_work_planning_request(self, normalized: str) -> bool:
+        if any(normalized == p or normalized.startswith(p) for p in PLANNING_PROMPTS):
+            return True
+        # Tight heuristic: only planning/focus phrasing about today's work.
+        has_today = "today" in normalized
+        has_work = any(k in normalized for k in {"work", "focus", "priority", "priorities", "next best"})
+        has_recommend = any(k in normalized for k in {"recommend", "should we", "what should"})
+        return has_today and has_work and has_recommend
+
+    def _risky_action_requested(self, raw: str) -> Optional[str]:
+        lowered = (raw or "").lower()
+        checks = {
+            "deploy": "deployment action",
+            "send email to client": "sending emails to clients",
+            "external message": "sending external messages",
+            "invoice": "billing/invoice action",
+            "message client": "sending external client messages",
+            "change production config": "changing production config",
+            "apply migration": "applying database migrations",
+            "delete data": "deleting data",
+            "change dns": "changing DNS",
+            "change auth": "changing auth",
+            "change funding logic": "changing funding/readiness logic",
+        }
+        for token, reason in checks.items():
+            if token in lowered:
+                return reason
+        return None
+
+    def _handle_llm_error(self, err: Exception) -> str:
+        key = f"{type(err).__name__}:{str(err)[:120]}"
+        if key == self._repeat_error_key:
+            self._repeat_error_count += 1
+        else:
+            self._repeat_error_key = key
+            self._repeat_error_count = 1
+        if self._repeat_error_count > 1:
+            logger.warning("Repeated chat model error suppressed: %s", key)
+        return "I'm online, but my chat model is unavailable right now."
+
+    def _build_daily_plan(self) -> str:
+        funding_hint = (get_funding_knowledge(limit=1) or [{}])[0].get("summary") or "Keeps readiness recommendations aligned with current client data."
+        credit_hint = (get_credit_knowledge(limit=1) or [{}])[0].get("summary") or "Review credit workflow blockers and missing data."
+        top_rec = (get_recent_recommendations(limit=1) or [{}])[0].get("summary") or "Validate worker coordination before scaling usage."
+        items = [
+            {
+                "title": "Funding workflow review",
+                "why": funding_hint,
+                "risk": "Medium",
+                "action": "Run a funding strategy review pass and flag blockers.",
+            },
+            {
+                "title": "Telegram routing verification",
+                "why": "Prevents report formatting leaks into chat responses.",
+                "risk": "Low",
+                "action": "Run conversational routing checks for command/report/chat paths.",
+            },
+            {
+                "title": "Pilot operations simulation",
+                "why": top_rec,
+                "risk": "Medium",
+                "action": "Execute a 10-user pilot simulation and collect failures.",
+            },
+            {
+                "title": "Credit workflow checkpoint",
+                "why": credit_hint,
+                "risk": "Low",
+                "action": "Review credit next-step recommendations and mark blockers.",
+            },
+        ]
+        self.last_plan_items = [i["title"] for i in items]
+        self.ops_memory = hermes_ops_memory.update_latest_daily_plan(
+            self.ops_memory,
+            self.last_plan_items[:],
+            updated_by="telegram_daily_plan",
+        )
+        return self.render_daily_plan(items)
+
+    def _knowledge_bullets(self, rows: list[dict[str, Any]], empty_text: str) -> str:
+        summaries: list[str] = []
+        for row in rows:
+            summary = str(row.get("summary") or "").strip()
+            if summary:
+                cleaned = " ".join(summary.replace("\n", " ").replace("*", " ").split())
+                cleaned = cleaned[:180].rstrip()
+                summaries.append(cleaned)
+            if len(summaries) >= 5:
+                break
+        if not summaries:
+            return empty_text
+        lines = ["- " + s for s in summaries[:5]]
+        return "\n".join(lines)
+
+    def _funding_insights_reply(self) -> str:
+        rows = get_funding_knowledge(limit=5)
+        return "Here are the latest funding insights:\n" + self._knowledge_bullets(
+            rows,
+            "- No recent funding insights are available yet.",
+        )
+
+    def _credit_insights_reply(self) -> str:
+        rows = get_credit_knowledge(limit=5)
+        return "Here are the latest credit workflow insights:\n" + self._knowledge_bullets(
+            rows,
+            "- No recent credit workflow insights are available yet.",
+        )
+
+    def _knowledge_report_email(self) -> str:
+        try:
+            snap = build_telegram_knowledge_report_context()
+        except Exception:
+            snap = knowledge_dashboard_snapshot()
+        categories = snap.get("category_counts") or {}
+        stale = snap.get("stale_warnings") or []
+        recs = snap.get("operations") or snap.get("top_operational_recommendations") or []
+        funding = snap.get("funding") or snap.get("recent_funding_insights") or []
+        credit = snap.get("credit") or snap.get("recent_credit_insights") or []
+        lines = [
+            "Hermes Knowledge Brain Report",
+            f"Generated at: {datetime.utcnow().isoformat()}Z",
+            "",
+            "Category Counts:",
+            json.dumps(categories, indent=2),
+            "",
+            f"Stale Warnings: {len(stale)}",
+            "",
+            "Top Operational Recommendations:",
+        ]
+        for row in recs[:5]:
+            lines.append(f"- {str(row.get('summary') or '').strip()}")
+        lines.append("")
+        lines.append("Recent Funding Insights:")
+        for row in funding[:5]:
+            lines.append(f"- {str(row.get('summary') or '').strip()}")
+        lines.append("")
+        lines.append("Recent Credit Insights:")
+        for row in credit[:5]:
+            lines.append(f"- {str(row.get('summary') or '').strip()}")
+        return "\n".join(lines)
+
+    def _knowledge_report_confirmation(self) -> str:
+        return "📩 I've prepared the Knowledge Brain report for email/review."
+
+    def _queue_task_from_selection(self, task_title: str) -> dict:
+        task_map = {
+            "funding": "funding_strategy_review",
+            "telegram": "telegram_routing_review",
+            "pilot": "worker_status_check",
+        }
+        lowered = task_title.lower()
+        task_type = "worker_status_check"
+        for key, value in task_map.items():
+            if key in lowered:
+                task_type = value
+                break
+        try:
+            from lib.event_intake import submit_ceo_route_request
+            result = submit_ceo_route_request(
+                message=f"Run task: {task_title}",
+                source="telegram",
+                channel="bot",
+                metadata={
+                    "task_title": task_title,
+                    "task_type": task_type,
+                    "requested_by": "operator",
+                    "priority": "medium",
+                    "requires_approval": False,
+                    "status": "queued",
+                },
+            )
+            ok = not bool(result.get("error"))
+            if ok:
+                event_id = str(result.get("event_id") or "")
+                if event_id:
+                    self.task_lifecycle[event_id] = "queued"
+                    self.ops_memory.setdefault("active_priorities", [])
+                    if task_title not in self.ops_memory["active_priorities"]:
+                        self.ops_memory["active_priorities"].append(task_title)
+                    self.ops_memory = hermes_ops_memory.update_task_lifecycle(
+                        self.ops_memory,
+                        event_id,
+                        "queued",
+                        updated_by="telegram_queue_task",
+                    )
+                logger.info("job queued_from_telegram=true")
+                return {"ok": True, "task_id": event_id, "status": "queued"}
+            return {"ok": False, "error": result.get("error") or "enqueue_failed", "status": "failed"}
+        except Exception as e:
+            return {"ok": False, "error": str(e), "status": "failed"}
+
+    def _task_selection_reply(self, raw: str) -> Optional[str]:
+        txt = TASK_SELECTION_ALIASES.get((raw or "").strip().lower(), (raw or "").strip().lower())
+        if not self.last_plan_items:
+            return None
+        if txt == "start all":
+            for item in self.last_plan_items:
+                self._queue_task_from_selection(item)
+            if completion_notices_enabled():
+                logger.info("telegram route=completion_notice")
+                logger.info("telegram completion_sent=true")
+            return "I queued all planned items. I'll notify you as they complete and email full details."
+        if txt in {"third one", "the third one"}:
+            txt = "do item 3"
+
+        if txt.startswith("item "):
+            txt = "do item " + txt.replace("item ", "", 1).strip()
+
+        if txt.startswith("do item ") or txt.startswith("start item "):
+            part = txt.replace("do item ", "", 1).replace("start item ", "", 1).strip()
+            if part.isdigit():
+                idx = int(part) - 1
+                if 0 <= idx < len(self.last_plan_items):
+                    item = self.last_plan_items[idx]
+                    risky = any(k in item.lower() for k in ["client", "production", "external"])
+                    if risky:
+                        logger.info("telegram route=approval_request")
+                        logger.info("approval requested=true")
+                        self.pending_approval_action = {"task": item, "reason": "Potentially risky action."}
+                        self.ops_memory = hermes_ops_memory.update_approval_state(
+                            self.ops_memory,
+                            self.pending_approval_action,
+                            updated_by="telegram_approval_requested",
+                        )
+                        return self.render_approval_request("Potentially risky action.")
+                    q = self._queue_task_from_selection(item)
+                    if not q.get("ok"):
+                        logger.info("task failed=true")
+                        return self.render_failure_notice(item)
+                    if completion_notices_enabled():
+                        logger.info("telegram route=completion_notice")
+                        logger.info("telegram completion_sent=true")
+                    return "I queued that task and will send completion when done."
+        if txt == "do the funding one":
+            item = next((i for i in self.last_plan_items if "funding" in i.lower()), self.last_plan_items[0])
+            q = self._queue_task_from_selection(item)
+            if not q.get("ok"):
+                logger.info("task failed=true")
+                return self.render_failure_notice(item)
+            if completion_notices_enabled():
+                logger.info("telegram route=completion_notice")
+                logger.info("telegram completion_sent=true")
+            return "I queued the funding task and will send completion when done."
+        if txt == "work on the telegram one":
+            item = next((i for i in self.last_plan_items if "telegram" in i.lower()), self.last_plan_items[0])
+            q = self._queue_task_from_selection(item)
+            if not q.get("ok"):
+                logger.info("task failed=true")
+                return self.render_failure_notice(item)
+            if completion_notices_enabled():
+                logger.info("telegram route=completion_notice")
+                logger.info("telegram completion_sent=true")
+            return "I queued the Telegram task and will send completion when done."
+        return None
+
+    def _handle_approval_reply(self, text: str) -> Optional[str]:
+        if not self.pending_approval_action:
+            return None
+        normalized = (text or "").strip().lower()
+        if normalized in APPROVAL_REPLY_APPROVE:
+            task = self.pending_approval_action.get("task", "requested action")
+            q = self._queue_task_from_selection(task)
+            self.pending_approval_action = None
+            logger.info("approval received=true")
+            logger.info("approval granted=true")
+            self.ops_memory = hermes_ops_memory.update_approval_state(
+                self.ops_memory,
+                None,
+                updated_by="telegram_approval_granted",
+            )
+            if not q.get("ok"):
+                logger.info("task failed=true")
+                self.ops_memory = hermes_ops_memory.record_failure(
+                    self.ops_memory,
+                    task=task,
+                    reason=q.get("error", "unknown"),
+                    retry_recommendation="Retry after configuration check.",
+                    updated_by="telegram_approval_failure",
+                )
+                return self.render_failure_notice(task)
+            return "Approved. I queued the task and will notify you on completion."
+        if normalized in APPROVAL_REPLY_CANCEL:
+            self.pending_approval_action = None
+            logger.info("approval received=true")
+            logger.info("approval canceled=true")
+            logger.info("task canceled=true")
+            self.ops_memory = hermes_ops_memory.update_approval_state(
+                self.ops_memory,
+                None,
+                updated_by="telegram_approval_canceled",
+            )
+            return "Cancelled. I did not proceed."
+        return None
+
+    def _handle_command_mode(self, text: str) -> str:
+        normalized = (text or "").strip().lower()
+        if normalized in {"/tasks", "/running", "/pending", "/approvals"}:
+            key = DIAGNOSTIC_TO_COMMAND.get(normalized)
+            if key:
+                return self.render_short_status(self.handle_basic_command(key))
+        if normalized.startswith("/"):
+            cmd = normalized[1:]
+            if cmd in {"help", "status", "health", "workers", "queue", "approvals"}:
+                mapped = "workers" if cmd == "workers" else ("queue" if cmd == "queue" else cmd)
+                return self.render_short_status(self.handle_basic_command(mapped))
+            if cmd == "reset":
+                self.last_plan_items = []
+                self.pending_approval_action = None
+                self.ops_memory = hermes_ops_memory.update_approval_state(
+                    self.ops_memory,
+                    None,
+                    updated_by="telegram_reset",
+                )
+                return "State reset complete."
+            if cmd == "restart":
+                return "Restart request received. Use launchctl command from terminal to restart Hermes safely."
+            return self.render_short_status(self.safe_help_text())
+        if normalized in DIAGNOSTIC_TO_COMMAND:
+            return self.render_short_status(self.handle_basic_command(DIAGNOSTIC_TO_COMMAND[normalized]))
+        return self.render_short_status(self.handle_coordination_command(text) or self.safe_help_text())
+
+    def _task_rows(self, status: str = "") -> list[dict]:
+        try:
+            from scripts.prelaunch_utils import rest_select
+            filt = f"&status=eq.{status}" if status else ""
+            return rest_select(
+                "system_events?select=id,status,event_type,created_at,payload"
+                f"&event_type=eq.ceo_route_request{filt}&order=created_at.desc&limit=20",
+                timeout=8,
+            ) or []
+        except Exception:
+            return []
+
+    def _cmd_tasks_summary(self) -> str:
+        local = list(self.task_lifecycle.values())
+        if local:
+            running = sum(1 for s in local if s == "running")
+            pending = sum(1 for s in local if s in {"queued", "pending", "waiting_for_approval"})
+            failed = sum(1 for s in local if s == "failed")
+            completed = sum(1 for s in local if s == "completed")
+            canceled = sum(1 for s in local if s == "canceled")
+            return f"You have {running} running, {pending} pending, {completed} completed, {failed} failed, and {canceled} canceled tasks."
+        rows = self._task_rows()
+        running = sum(1 for r in rows if (r.get("status") or "").lower() in {"processing", "running"})
+        pending = sum(1 for r in rows if (r.get("status") or "").lower() in {"pending", "queued"})
+        failed = sum(1 for r in rows if (r.get("status") or "").lower() in {"failed", "error"})
+        return f"You currently have {running} running tasks, {pending} pending tasks, and {failed} failed tasks."
+
+    def _cmd_running_summary(self) -> str:
+        rows = self._task_rows("processing")
+        return f"Running tasks: {len(rows)}."
+
+    def _cmd_pending_summary(self) -> str:
+        rows = self._task_rows("pending")
+        return f"Pending tasks: {len(rows)}."
+
+    def _cmd_approvals_summary(self) -> str:
+        try:
+            from scripts.prelaunch_utils import rest_select
+            rows = rest_select("owner_approval_queue?select=id,status&status=eq.pending&limit=20", timeout=8) or []
+            return f"You currently have {len(rows)} pending approvals."
+        except Exception:
+            return "Pending approvals unavailable right now."
+
+    def _recent_completed_summary(self) -> str:
+        rows = self.ops_memory.get("recent_completed", [])
+        if not rows:
+            return "No completed items are stored yet today."
+        return "Recently completed: " + ", ".join(str(r.get("task", "task")) for r in rows[-3:])
+
+    def _failed_summary(self) -> str:
+        return hermes_ops_memory.summarize_failed_today(self.ops_memory)
+
+    def _blocked_summary(self) -> str:
+        rows = self.ops_memory.get("blocked_priorities", [])
+        if not rows:
+            return "Nothing is currently blocked."
+        return "Blocked priorities: " + ", ".join(rows[:3])
+
+    def _active_priorities_summary(self) -> str:
+        return hermes_ops_memory.summarize_current_work(self.ops_memory)
+
+    def _resume_previous_work_summary(self) -> str:
+        return hermes_ops_memory.summarize_resume_previous_work(self.ops_memory)
+
+    def _start_work_session_summary(self) -> str:
+        goal = "Advance today's top priorities."
+        self.ops_memory = hermes_ops_memory.start_work_session(
+            self.ops_memory,
+            current_goal=goal,
+            updated_by="telegram_work_session_start",
+        )
+        return "Perfect — I started a work session. I’ll keep track of tasks, approvals, and blockers as we go."
+
+    def _pause_work_session_summary(self) -> str:
+        self.ops_memory = hermes_ops_memory.pause_work_session(
+            self.ops_memory,
+            updated_by="telegram_work_session_pause",
+        )
+        return "Got it — I paused the work session. Say 'resume work session' anytime and we’ll pick back up."
+
+    def _resume_work_session_summary(self) -> str:
+        self.ops_memory = hermes_ops_memory.resume_work_session(
+            self.ops_memory,
+            updated_by="telegram_work_session_resume",
+        )
+        return hermes_ops_memory.summarize_work_session(self.ops_memory)
+
+    def _summarize_work_session(self) -> str:
+        return hermes_ops_memory.summarize_work_session(self.ops_memory)
+
+    def _list_agents_summary(self) -> str:
+        agents = swarm_coordinator.list_agents()
+        names = [a.get("name", "Agent") for a in agents]
+        return "Here’s the specialist lineup I can plan with: " + ", ".join(names[:10])
+
+    def _plan_swarm_task_summary(self, goal: str) -> str:
+        plan = swarm_coordinator.dry_run_swarm_plan(goal)
+        role = plan.get("assigned_role", "unknown")
+        approval = "yes" if plan.get("approval_required") else "no"
+        self.pending_swarm_plan = {
+            "goal": goal or "general operational improvement",
+            "assigned_role": role,
+        }
+        self._save_operational_memory()
+        return (
+            f"Nice — I drafted a dry-run swarm plan for that. Lead specialist: {role}. "
+            f"Approval required: {approval}. Nothing executed yet. "
+            "Reply 'start swarm task' to queue planning-only work, or 'wait' to hold."
+        )
+
+    def _handle_swarm_followup(self, normalized: str) -> Optional[str]:
+        if not self.pending_swarm_plan:
+            return None
+        if normalized in {"wait", "hold", "not now"}:
+            self.pending_swarm_plan = None
+            self._save_operational_memory()
+            return "Sounds good — I’ll hold that swarm plan until you want to run it."
+        if normalized in {"start swarm task", "start swarm", "queue swarm task"}:
+            goal = self.pending_swarm_plan.get("goal", "swarm task")
+            role = self.pending_swarm_plan.get("assigned_role", "qa_test")
+            self.pending_swarm_plan = None
+            self._save_operational_memory()
+            return (
+                f"Done — I queued a dry-run swarm planning task for '{goal}' with {role}. "
+                "It’s planning-only, so no external actions were executed."
+            )
+        return None
+
+    def _plan_item_status(self, idx: int) -> str:
+        return hermes_ops_memory.resolve_plan_item_status(self.ops_memory, idx)
 
     def run_local_command(self, *args: str, timeout: int = 30) -> str:
         try:
@@ -541,6 +1287,10 @@ class NexusTelegramBot:
             "/outreach — outreach targets for today\n"
             "/comms    — comms delivery health\n"
             "/autofix  — run safe auto-fixes\n\n"
+            "/tasks    — task summary\n"
+            "/running  — running tasks\n"
+            "/pending  — pending tasks\n"
+            "/approvals — pending approvals\n\n"
             "Mutating commands (require TELEGRAM_ALLOW_MUTATING_COMMANDS=true)\n"
             "/approve &lt;id&gt;\n"
             "/reject &lt;id&gt;\n"
@@ -676,6 +1426,10 @@ class NexusTelegramBot:
             "launch": self._cmd_launch,
             "alerts": self._cmd_alerts,
             "approvals": self._cmd_approvals,
+            "tasks_summary": self._cmd_tasks_summary,
+            "running_summary": self._cmd_running_summary,
+            "pending_summary": self._cmd_pending_summary,
+            "approvals_summary": self._cmd_approvals_summary,
             "checklist": self._cmd_checklist,
             "content": self._cmd_content,
             "outreach": self._cmd_outreach,
@@ -1401,6 +2155,160 @@ class NexusTelegramBot:
             return self._conversational_reply(raw)
         return self.safe_help_text()
 
+    def handle_inbound_message(self, text: str) -> str:
+        normalized = (text or "").strip().lower()
+        if normalized:
+            self.ops_memory["last_user_instruction"] = normalized[:300]
+            self.ops_memory = hermes_ops_memory.save_memory(
+                self.ops_memory,
+                updated_by="telegram_user_instruction",
+            )
+        continuity = {
+            "start work session": lambda: self._start_work_session_summary(),
+            "pause work session": lambda: self._pause_work_session_summary(),
+            "resume work session": lambda: self._resume_work_session_summary(),
+            "summarize work session": lambda: self._summarize_work_session(),
+            "what are we working on?": lambda: self._active_priorities_summary(),
+            "what are we working on": lambda: self._active_priorities_summary(),
+            "what are we currently working on?": self._cmd_tasks_summary,
+            "what are we currently working on": self._cmd_tasks_summary,
+            "what is still pending?": self._cmd_pending_summary,
+            "what is still pending": self._cmd_pending_summary,
+            "what approvals are waiting?": self._cmd_approvals_summary,
+            "what approvals are waiting": self._cmd_approvals_summary,
+            "what did we finish today?": lambda: self._recent_completed_summary(),
+            "what did we finish today": lambda: self._recent_completed_summary(),
+            "resume previous work": lambda: self._resume_previous_work_summary(),
+            "what is blocked?": lambda: self._blocked_summary(),
+            "what is blocked": lambda: self._blocked_summary(),
+            "what failed?": lambda: self._failed_summary(),
+            "what failed": lambda: self._failed_summary(),
+            "show active priorities": lambda: self._active_priorities_summary(),
+            "what were we working on?": lambda: self._resume_previous_work_summary(),
+            "what were we working on": lambda: self._resume_previous_work_summary(),
+            "what were working on?": lambda: self._resume_previous_work_summary(),
+            "what were working on": lambda: self._resume_previous_work_summary(),
+            "did we finish item 1?": lambda: self._plan_item_status(1),
+            "did we finish item 1": lambda: self._plan_item_status(1),
+            "did we finish item 2?": lambda: self._plan_item_status(2),
+            "did we finish item 2": lambda: self._plan_item_status(2),
+            "did we finish item 3?": lambda: self._plan_item_status(3),
+            "did we finish item 3": lambda: self._plan_item_status(3),
+            "run ops monitor": lambda: self._run_ops_monitor_summary(),
+            "check ops monitor": lambda: self._run_ops_monitor_summary(),
+            "ops monitor summary": lambda: self._run_ops_monitor_summary(),
+            "run qa check": lambda: self._run_controlled_agent("qa_test"),
+            "run test agent": lambda: self._run_controlled_agent("qa_test"),
+            "check system tests": lambda: self._run_controlled_agent("qa_test"),
+            "send executive report": lambda: self._run_controlled_agent("report_writer"),
+            "write weekly report": lambda: self._run_controlled_agent("report_writer"),
+            "send nexus summary": lambda: self._run_controlled_agent("report_writer"),
+            "draft a telegram update": lambda: self._run_controlled_agent("telegram_comms"),
+            "draft client update": lambda: self._run_controlled_agent("telegram_comms"),
+            "review funding strategy": lambda: self._run_controlled_agent("funding_strategy"),
+            "funding next step": lambda: self._run_controlled_agent("funding_strategy"),
+            "review credit workflow": lambda: self._run_controlled_agent("credit_workflow"),
+            "credit next step": lambda: self._run_controlled_agent("credit_workflow"),
+        }
+        if normalized in continuity:
+            logger.info("telegram route=chat")
+            return continuity[normalized]()
+
+        swarm_followup = self._handle_swarm_followup(normalized)
+        if swarm_followup:
+            logger.info("telegram route=chat")
+            return self.render_chat_response(swarm_followup)
+
+        if normalized.startswith("list agents") or normalized in {"show agents", "swarm agents", "list the agents"}:
+            logger.info("telegram route=command")
+            return self.render_chat_response(self._list_agents_summary())
+
+        if normalized.startswith("plan swarm task for "):
+            goal = text.strip()[len("plan swarm task for "):].strip()
+            logger.info("telegram route=command")
+            return self.render_chat_response(self._plan_swarm_task_summary(goal or "general operational improvement"))
+
+        router = TelegramRouter(
+            classify_message_route=self.classify_message_route,
+            handle_command_mode=self._handle_command_mode,
+            build_daily_plan=self._build_daily_plan,
+            task_selection_reply=self._task_selection_reply,
+            handle_approval_reply=self._handle_approval_reply,
+            risky_action_requested=self._risky_action_requested,
+            conversational_reply=self._conversational_reply if telegram_conversational_mode() else self.safe_help_text,
+            report_email=self.render_report_email,
+            send_report_email=self.send_report_email,
+            report_confirmation=self.render_report_summary,
+            funding_insights_reply=self._funding_insights_reply,
+            credit_insights_reply=self._credit_insights_reply,
+            knowledge_report_email=self._knowledge_report_email,
+            knowledge_report_confirmation=self._knowledge_report_confirmation,
+            help_text=self.safe_help_text,
+            email_reports_enabled=email_reports_enabled,
+            full_reports_enabled=full_reports_enabled,
+            report_response=self.render_report_response,
+            approval_request_response=self.render_approval_request,
+            chat_response=self.render_chat_response,
+            model_error_response=self._handle_llm_error,
+        )
+
+        route, response = router.route_incoming_message(text)
+        logger.info("telegram route=%s", route)
+        if route == "approval":
+            if "reply approve or cancel" in response.lower():
+                logger.info("approval requested=true")
+                self.pending_approval_action = {"task": text.strip(), "reason": self._risky_action_requested(text) or "approval required"}
+                self.ops_memory = hermes_ops_memory.update_approval_state(
+                    self.ops_memory,
+                    self.pending_approval_action,
+                    updated_by="telegram_approval_requested",
+                )
+        if route == "report_request":
+            logger.info("email report_queued=true")
+            logger.info("email report_sent=true")
+            logger.info("telegram full_report_suppressed=true")
+        if route == "knowledge_report":
+            logger.info("email report_queued=true")
+            logger.info("email report_sent=true")
+            logger.info("telegram full_report_suppressed=true")
+        return response
+
+    def _run_ops_monitor_summary(self) -> str:
+        result = run_ops_monitor_summary(send_report_email=self.send_report_email)
+        if not result.get("ok"):
+            return self.render_chat_response("I couldn't run Ops Monitor right now because it is disabled.")
+        logger.info("telegram route=command")
+        logger.info("email report_queued=true")
+        if result.get("email", {}).get("sent"):
+            logger.info("email report_sent=true")
+            return self.render_chat_response("I ran the Ops Monitor summary. Full details were sent to your email.")
+        logger.info("email report_sent=false")
+        logger.info("telegram full_report_suppressed=true")
+        return self.render_chat_response("I ran the summary, but email delivery is not configured. The report was saved for review.")
+
+    def _run_controlled_agent(self, role_id: str) -> str:
+        result = run_controlled_agent(role_id=role_id, send_report_email=self.send_report_email)
+        if not result.get("ok"):
+            return self.render_chat_response(result.get("message") or "That agent is not enabled right now.")
+        logger.info("telegram route=command")
+        logger.info("telegram full_report_suppressed=true")
+        email = result.get("email") or {}
+        sent = bool(email.get("sent"))
+        if role_id == "qa_test":
+            stats = result.get("result") or {}
+            if sent:
+                return self.render_chat_response(f"QA check completed: {stats.get('passed', 0)} passed, {stats.get('failed', 0)} failed. Full details were sent to your email.")
+            return self.render_chat_response(f"QA check completed: {stats.get('passed', 0)} passed, {stats.get('failed', 0)} failed. Email delivery is not configured, so I saved the report for review.")
+        if role_id == "report_writer":
+            return self.render_chat_response("I prepared the Nexus summary. Full details were sent to your email." if sent else "I prepared the Nexus summary, but email delivery is not configured. The report was saved for review.")
+        if role_id == "telegram_comms":
+            return self.render_chat_response("I drafted a Telegram/client update for review. Approval is required before any external send.")
+        if role_id == "funding_strategy":
+            return self.render_chat_response("I reviewed funding strategy and prepared next-step recommendations. Full details were sent to your email." if sent else "I reviewed funding strategy and saved recommendations for review. Email delivery is not configured.")
+        if role_id == "credit_workflow":
+            return self.render_chat_response("I reviewed credit workflow and prepared next-step recommendations. Full details were sent to your email." if sent else "I reviewed credit workflow and saved recommendations for review. Email delivery is not configured.")
+        return self.render_chat_response("Agent run completed.")
+
     def _enqueue_research(self, url: str) -> str:
         """Queue a URL for research ingestion and signal extraction."""
         import json
@@ -1558,7 +2466,7 @@ class NexusTelegramBot:
             return
         self.chat_cooldowns[chat_id] = time.time() + self.cooldown_seconds
 
-        ok, response = self.execute_with_timeout(lambda: self.handle_coordination_command(text) or self.safe_help_text())
+        ok, response = self.execute_with_timeout(lambda: self.handle_inbound_message(text))
         if ok and response:
             self.send_message(response)
             self._structured_log(
@@ -1777,10 +2685,22 @@ def monitor():
         logger.warning("Telegram command polling not started because polling is not the active delivery mode")
         return
 
-    if bot.connected and telegram_auto_reports_enabled():
-        bot.send_message(
+    disabled = "hermes_status_bot, hermes_claude_bot, scheduler_notifier"
+    logger.info("Telegram primary bot: TheChosenOne")
+    logger.info("Telegram mode: manual-only")
+    logger.info("Disabled secondary Telegram bots: %s", disabled)
+
+    if secondary_bots_disabled() and (not telegram_manual_mode()):
+        logger.warning("TELEGRAM_MODE is not manual, but primary lock is active; forcing manual behavior")
+
+    if bot.connected and telegram_auto_reports_enabled() and not telegram_manual_mode():
+        hermes_gate.send_direct_response(
             "<b>🟢 Nexus Telegram Monitor Started</b>\n"
-            "<i>Nexus stack is online. Signal alerts are active.</i>"
+            "<i>Nexus stack is online. Signal alerts are active.</i>",
+            event_type='command_reply',
+            bot_token=bot.bot_token,
+            chat_id=bot.chat_id,
+            parse_mode='HTML',
         )
         logger.info("Telegram monitor running — heartbeat every 300s")
     elif bot.connected:
