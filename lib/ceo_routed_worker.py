@@ -254,9 +254,37 @@ _HANDLERS: dict[str, Callable] = {
     "research_analyst":   handle_research_analyst,
 }
 
+_ROLE_TASK_TYPES: dict[str, set[str]] = {
+    "content_creator": {"short_form_content"},
+    "compliance_reviewer": {"compliance_review"},
+    "marketing_strategist": {"marketing_strategy"},
+    "credit_analyst": {"credit_analysis"},
+    "business_formation": {"business_foundation"},
+    "funding_strategist": {"funding_strategy"},
+    "research_analyst": {"research"},
+}
+
 
 def get_handler(role: str) -> Callable:
     return _HANDLERS.get(role, handle_unknown)
+
+
+def _task_type_supported(role: str, task_type: str) -> bool:
+    allowed = _ROLE_TASK_TYPES.get(str(role or "").strip(), {"unclassified"})
+    return str(task_type or "").strip() in allowed
+
+
+def _audit_routed_event(event_id: str, status: str, payload: dict) -> None:
+    try:
+        from lib.event_intake import submit_system_event
+
+        submit_system_event(
+            "ceo_routed_worker_audit",
+            status=status,
+            payload={"event_id": event_id, **(payload or {})},
+        )
+    except Exception:
+        pass
 
 
 # ── Draft writer ───────────────────────────────────────────────────────────────
@@ -432,8 +460,25 @@ def process_one_event(event: dict, llm_fn: Optional[Callable] = None) -> dict:
 
     role = raw_payload.get("recommended_role", "unknown")
     task = raw_payload.get("task_description", "")
+    requested_task_type = str(raw_payload.get("task_type") or "").strip()
 
     result["role"] = role
+
+    if requested_task_type and role in _ROLE_TASK_TYPES and not _task_type_supported(role, requested_task_type):
+        result["skipped"] = True
+        result["error"] = f"Unsupported task_type '{requested_task_type}' for role '{role}'"
+        _audit_routed_event(
+            event_id,
+            "rejected",
+            {
+                "reason": "unsupported_task_type",
+                "role": role,
+                "task_type": requested_task_type,
+            },
+        )
+        if not DRY_RUN:
+            mark_draft_failed(event_id, result["error"])
+        return result
 
     try:
         handler = get_handler(role)
@@ -455,10 +500,29 @@ def process_one_event(event: dict, llm_fn: Optional[Callable] = None) -> dict:
 
         result["success"]  = True
         result["draft_ok"] = draft.get("success", False)
+        _audit_routed_event(
+            event_id,
+            "completed",
+            {
+                "role": role,
+                "task_type": draft.get("task_type") or requested_task_type or "unclassified",
+                "output_id": result.get("output_id"),
+                "draft_ok": bool(result.get("draft_ok")),
+            },
+        )
 
     except Exception as exc:
         result["error"] = str(exc)
         logger.exception("Error drafting event=%s", event_id)
+        _audit_routed_event(
+            event_id,
+            "failed",
+            {
+                "role": role,
+                "task_type": requested_task_type or "unclassified",
+                "error": str(exc)[:240],
+            },
+        )
         if not DRY_RUN:
             mark_draft_failed(event_id, str(exc))
 

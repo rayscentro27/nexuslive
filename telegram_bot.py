@@ -16,6 +16,7 @@ import subprocess
 import time
 import threading
 import concurrent.futures
+import hashlib
 from collections import deque
 
 try:
@@ -217,6 +218,8 @@ class NexusTelegramBot:
         self.pending_approval_action: dict[str, str] | None = None
         self.pending_swarm_plan: dict[str, str] | None = None
         self.task_lifecycle: dict[str, str] = {}
+        self._last_reply_hash: str = ""
+        self._last_reply_ts: float = 0.0
         self.ops_memory: dict[str, Any] = self._load_operational_memory()
         self.last_plan_items = list(self.ops_memory.get("latest_daily_plan", []))
         self.task_lifecycle = dict(self.ops_memory.get("task_lifecycle", {}))
@@ -402,6 +405,48 @@ class NexusTelegramBot:
                 return False, "Command timed out. Try again in a moment."
             except Exception as e:
                 return False, f"Command failed: {e}"
+
+    def execute_with_custom_timeout(self, func: Callable[[], str], timeout_seconds: float) -> tuple[bool, str]:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(func)
+            try:
+                result = future.result(timeout=max(1.0, float(timeout_seconds)))
+                return True, str(result or "")
+            except concurrent.futures.TimeoutError:
+                return False, "Command timed out. Try again in a moment."
+            except Exception as e:
+                return False, f"Command failed: {e}"
+
+    def _fallback_response_for_command(self, command: str) -> str:
+        cmd = (command or "").strip().lower()
+        if cmd in {"status", "health", "jobs", "workers", "queue", "approvals"}:
+            return "I hit a timeout while checking that command. Please retry in a moment."
+        if cmd in {"ceo_report", "daily_summary", "trading_digest"}:
+            return "I couldn't build that summary right now. I can retry or send a shorter status check."
+        return "I'm online, but I couldn't complete that request right now. Please try again."
+
+    def _log_telegram_event(self, event_type: str, status: str, payload: dict[str, Any]) -> None:
+        try:
+            from lib.event_intake import submit_system_event
+
+            submit_system_event(event_type, status=status, payload=payload)
+        except Exception:
+            pass
+
+    def _send_message_once(self, message: str, parse_mode: str = "HTML") -> bool:
+        text = self._truncate_response(message or "")
+        if not text:
+            return False
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+        now = time.time()
+        if digest == self._last_reply_hash and (now - self._last_reply_ts) < 4.0:
+            logger.info("telegram dedup reply_suppressed=true")
+            return True
+        sent = self.send_message(text, parse_mode=parse_mode)
+        if sent:
+            self._last_reply_hash = digest
+            self._last_reply_ts = now
+        return sent
 
     def _conversational_reply(self, raw: str) -> str:
         """Natural-language Telegram reply path for conversational mode."""
@@ -2287,7 +2332,19 @@ class NexusTelegramBot:
         return self.render_chat_response("I ran the summary, but email delivery is not configured. The report was saved for review.")
 
     def _run_controlled_agent(self, role_id: str) -> str:
-        result = run_controlled_agent(role_id=role_id, send_report_email=self.send_report_email)
+        role_timeout = float(os.getenv("TELEGRAM_CONTROLLED_AGENT_TIMEOUT_SECONDS", "18"))
+        ok, payload = self.execute_with_custom_timeout(
+            lambda: json.dumps(run_controlled_agent(role_id=role_id, send_report_email=self.send_report_email))
+        , role_timeout)
+        if not ok:
+            logger.error("controlled_agent timeout_or_error role=%s detail=%s", role_id, payload)
+            return self.render_chat_response(
+                f"{role_id.replace('_', ' ').title()} timed out. I did not run autonomous actions. Please retry in a moment."
+            )
+        try:
+            result = json.loads(payload or "{}")
+        except Exception:
+            result = {"ok": False, "message": "Agent returned invalid response.", "can_execute": False}
         if not result.get("ok"):
             return self.render_chat_response(result.get("message") or "That agent is not enabled right now.")
         logger.info("telegram route=command")
@@ -2467,8 +2524,11 @@ class NexusTelegramBot:
         self.chat_cooldowns[chat_id] = time.time() + self.cooldown_seconds
 
         ok, response = self.execute_with_timeout(lambda: self.handle_inbound_message(text))
-        if ok and response:
-            self.send_message(response)
+        if ok:
+            rendered = (response or "").strip()
+            if not rendered:
+                rendered = self._fallback_response_for_command(command)
+            self._send_message_once(rendered)
             self._structured_log(
                 update_id=update_id,
                 chat_id=chat_id,
@@ -2476,9 +2536,20 @@ class NexusTelegramBot:
                 duration_ms=int((time.time() - started) * 1000),
                 status="ok",
             )
+            self._log_telegram_event(
+                "telegram_inbound_handled",
+                "completed",
+                {
+                    "command": command,
+                    "chat_id": chat_id,
+                    "update_id": update_id,
+                    "duration_ms": int((time.time() - started) * 1000),
+                },
+            )
             return
         self._record_error()
-        self.send_message(response or "Command failed.")
+        logger.error("telegram inbound failure command=%s detail=%s", command, response)
+        self._send_message_once(response or self._fallback_response_for_command(command))
         self._structured_log(
             update_id=update_id,
             chat_id=chat_id,
@@ -2486,6 +2557,17 @@ class NexusTelegramBot:
             duration_ms=int((time.time() - started) * 1000),
             status="error",
             error_message=response,
+        )
+        self._log_telegram_event(
+            "telegram_inbound_handled",
+            "failed",
+            {
+                "command": command,
+                "chat_id": chat_id,
+                "update_id": update_id,
+                "duration_ms": int((time.time() - started) * 1000),
+                "error": (response or "unknown")[:200],
+            },
         )
 
     def poll_commands_once(self) -> None:

@@ -6,7 +6,7 @@ ceo_routing_loop picks it up, classifies it, and hands it off to the
 appropriate role worker.
 
 Usage:
-    from lib.event_intake import submit_ceo_route_request
+    from lib.event_intake import submit_ceo_route_request, submit_system_event
 
     result = submit_ceo_route_request(
         message="Create a TikTok script about business credit.",
@@ -128,3 +128,33 @@ def submit_ceo_route_request(
         event_id, source, channel,
     )
     return {"event_id": event_id, "status": "pending", "source": source}
+
+
+def submit_system_event(
+    event_type: str,
+    *,
+    status: str = "completed",
+    payload: Optional[dict] = None,
+    client_id: Optional[str] = None,
+) -> dict:
+    """Best-effort helper for additive operational event logging."""
+    event_name = (event_type or "").strip()
+    if not event_name:
+        return {"error": "event_type is required"}
+
+    row: dict = {
+        "event_type": event_name,
+        "status": (status or "completed").strip() or "completed",
+        "payload": payload or {},
+    }
+    if client_id:
+        row["client_id"] = client_id
+
+    inserted = _supabase_post(row, timeout=6)
+    if not inserted:
+        return {"error": "Failed to insert system event"}
+    return {
+        "event_id": inserted.get("id", ""),
+        "status": row["status"],
+        "event_type": event_name,
+    }

@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 import os
 import hashlib
+import time
 
 
 def _now() -> datetime:
@@ -26,6 +27,26 @@ def _safe_select(path: str) -> list[dict]:
         return rest_select(path) or []
     except Exception:
         return []
+
+
+_CACHE_TTL_SECONDS = int(os.getenv("HERMES_KNOWLEDGE_CACHE_TTL_SECONDS", "35") or 35)
+_CACHE: dict[str, tuple[float, Any]] = {}
+
+
+def _cache_get(key: str):
+    row = _CACHE.get(key)
+    if not row:
+        return None
+    expires_at, value = row
+    if time.time() >= expires_at:
+        _CACHE.pop(key, None)
+        return None
+    return value
+
+
+def _cache_set(key: str, value: Any, ttl: int = _CACHE_TTL_SECONDS):
+    _CACHE[key] = (time.time() + max(1, int(ttl)), value)
+    return value
 
 
 def _flag(name: str, default: str = "true") -> bool:
@@ -64,6 +85,24 @@ def _normalize(row: dict, source_type: str) -> dict[str, Any]:
     updated_at = row.get("updated_at") or created_at
     tags = [category, source_type]
     conf = 0.8 if summary else 0.3
+    payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+    tenant_hint = str(
+        row.get("tenant_id")
+        or payload.get("tenant_id")
+        or payload.get("tenant_scope")
+        or row.get("client_id")
+        or "global"
+    ).strip() or "global"
+    context_tokens = " ".join(
+        [
+            str(row.get("summary") or ""),
+            str(row.get("workflow_type") or ""),
+            str(row.get("event_type") or ""),
+            str(payload.get("message") or ""),
+            str(payload.get("task_description") or ""),
+        ]
+    ).lower()
+    prior_success = 1.0 if str(row.get("status") or "").lower() in {"completed", "approved", "ready"} else 0.0
     return {
         "source_type": source_type,
         "category": category,
@@ -71,7 +110,9 @@ def _normalize(row: dict, source_type: str) -> dict[str, Any]:
         "updated_at": updated_at,
         "confidence_score": conf,
         "relevance_tags": tags,
-        "tenant_scope": "global",
+        "tenant_scope": tenant_hint,
+        "context_text": context_tokens[:1200],
+        "prior_success_score": prior_success,
         "workflow_id": row.get("id") or row.get("workflow_id"),
         "summary": summary,
         "raw_source_reference": {
@@ -177,6 +218,38 @@ def _workflow_outcome_weight(row: dict[str, Any]) -> float:
     return 0.8
 
 
+def _topic_match_weight(row: dict[str, Any], category: str) -> float:
+    cat = str(category or "").lower().strip()
+    if not cat:
+        return 0.7
+    text = str(row.get("context_text") or row.get("summary") or "").lower()
+    if cat in text:
+        return 1.0
+    tags = [str(t).lower() for t in (row.get("relevance_tags") or [])]
+    if cat in tags:
+        return 0.95
+    return 0.65
+
+
+def _tenant_context_weight(row: dict[str, Any]) -> float:
+    active = str(
+        os.getenv("HERMES_ACTIVE_TENANT")
+        or os.getenv("NEXUS_ACTIVE_TENANT")
+        or ""
+    ).strip().lower()
+    if not active:
+        return 0.8
+    row_tenant = str(row.get("tenant_scope") or "global").strip().lower()
+    if row_tenant in {"global", "all", "*"}:
+        return 0.85
+    return 1.0 if row_tenant == active else 0.45
+
+
+def _historical_success_weight(row: dict[str, Any]) -> float:
+    score = float(row.get("prior_success_score") or 0.0)
+    return 1.0 if score >= 1.0 else 0.7
+
+
 def rank_knowledge_results(rows: list[dict[str, Any]], category: str = "operations") -> list[dict[str, Any]]:
     if not _flag("KNOWLEDGE_SOURCE_RANKING_ENABLED", "true"):
         return rows
@@ -186,18 +259,28 @@ def rank_knowledge_results(rows: list[dict[str, Any]], category: str = "operatio
         source_w = _source_weight(str(row.get("source_type") or ""))
         recency_w = _recency_weight(row)
         category_w = _category_match_weight(row, category)
+        topic_w = _topic_match_weight(row, category)
+        tenant_w = _tenant_context_weight(row)
+        history_w = _historical_success_weight(row)
         outcome_w = _workflow_outcome_weight(row)
         stale_penalty = 0.75 if detect_stale_knowledge([row], days=10) else 1.0
         relevance_bonus = 1.0
         tags = [str(t).lower() for t in (row.get("relevance_tags") or [])]
         if category and str(category).lower() in tags:
             relevance_bonus = 1.05
-        score = (0.35 * conf + 0.20 * source_w + 0.25 * recency_w + 0.10 * category_w + 0.10 * outcome_w)
+        score = (0.24 * conf + 0.18 * source_w + 0.20 * recency_w + 0.12 * category_w + 0.10 * outcome_w + 0.08 * topic_w + 0.05 * tenant_w + 0.03 * history_w)
         score = float(score * stale_penalty * relevance_bonus)
         out = dict(row)
         out["ranking_score"] = round(score, 4)
         ranked.append(out)
-    ranked.sort(key=lambda x: float(x.get("ranking_score") or 0.0), reverse=True)
+    ranked.sort(
+        key=lambda x: (
+            float(x.get("ranking_score") or 0.0),
+            str(x.get("updated_at") or x.get("created_at") or ""),
+            str((x.get("raw_source_reference") or {}).get("id") or ""),
+        ),
+        reverse=True,
+    )
     return ranked
 
 
@@ -207,6 +290,9 @@ def explain_knowledge_ranking(row: dict[str, Any], category: str = "operations")
         "recency_weight": _recency_weight(row),
         "confidence_score": float(row.get("confidence_score") or 0.0),
         "category_match_weight": _category_match_weight(row, category),
+        "topic_match_weight": _topic_match_weight(row, category),
+        "tenant_context_weight": _tenant_context_weight(row),
+        "historical_success_weight": _historical_success_weight(row),
         "workflow_outcome_weight": _workflow_outcome_weight(row),
         "stale": bool(detect_stale_knowledge([row], days=10)),
     }
@@ -219,8 +305,8 @@ def get_top_ranked_knowledge(category: str = "operations", limit: int = 12, fetc
     return ranked[: max(1, int(limit))]
 
 
-def build_source_aware_context_pack(category: str = "operations", limit: int = 8) -> dict[str, Any]:
-    ranked = get_top_ranked_knowledge(category, limit=limit)
+def build_source_aware_context_pack(category: str = "operations", limit: int = 8, fetch_limit: int = 60) -> dict[str, Any]:
+    ranked = get_top_ranked_knowledge(category, limit=limit, fetch_limit=fetch_limit)
     source_quality: dict[str, int] = {}
     for row in ranked:
         source = str(row.get("source_type") or "unknown")
@@ -270,6 +356,10 @@ def audit_knowledge_sources() -> dict[str, Any]:
 def get_recent_knowledge(category: str = "operations", limit: int = 20, fetch_limit: int = 240) -> list[dict[str, Any]]:
     if not _flag("KNOWLEDGE_RETRIEVAL_ENABLED", "true"):
         return []
+    key = f"recent:{category}:{int(limit)}:{int(fetch_limit)}"
+    cached = _cache_get(key)
+    if cached is not None:
+        return list(cached)
     fetch = max(20, int(fetch_limit))
     workflow = _safe_select(f"workflow_outputs?select=id,summary,status,workflow_type,created_at&order=created_at.desc&limit={fetch}")
     events = _safe_select(f"system_events?select=id,event_type,status,created_at,payload&order=created_at.desc&limit={fetch}")
@@ -277,19 +367,17 @@ def get_recent_knowledge(category: str = "operations", limit: int = 20, fetch_li
     rows = _non_empty(_dedupe(rows))
     filtered = [r for r in rows if str(r.get("category") or "") == category]
     filtered.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
-    return filtered[: max(1, int(limit))]
+    return _cache_set(key, filtered[: max(1, int(limit))])
 
 
 def search_knowledge(query: str, limit: int = 30) -> list[dict[str, Any]]:
     q = (query or "").strip().lower()
     if not q:
         return []
+    # Single compact fetch to avoid long dashboard/API latency
     merged = []
-    for cat in [
-        "funding", "credit", "grants", "business_setup", "trading",
-        "crm_client_success", "operations", "research", "ai_workforce", "reports", "workflows",
-    ]:
-        merged.extend(get_recent_knowledge(cat, limit=18))
+    for cat in ["funding", "credit", "operations", "reports", "workflows"]:
+        merged.extend(get_recent_knowledge(cat, limit=18, fetch_limit=80))
     out = [r for r in _dedupe(merged) if q in str(r.get("summary") or "").lower() or q in " ".join(r.get("relevance_tags") or []).lower()]
     out.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
     return out[: max(1, int(limit))]
@@ -366,11 +454,15 @@ def knowledge_dashboard_snapshot() -> dict[str, Any]:
 
 def build_hermes_context_pack(category: str = "operations") -> dict[str, Any]:
     """Context pack for planning and recommendation generation."""
+    recent = get_recent_knowledge(category, limit=8)
+    recs = get_recent_recommendations(limit=6)
+    compact = [str(r.get("summary") or "").strip() for r in recs[:4] if str(r.get("summary") or "").strip()]
     return {
-        "recent_knowledge": get_recent_knowledge(category, limit=8),
-        "recent_recommendations": get_recent_recommendations(limit=6),
+        "recent_knowledge": recent,
+        "recent_recommendations": recs,
         "funding_insights": get_funding_knowledge(limit=4),
         "credit_insights": get_credit_knowledge(limit=4),
+        "compact_summary": compact,
     }
 
 

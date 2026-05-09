@@ -271,6 +271,26 @@ def test_missing_role_uses_fallback():
     )
 
 
+def test_unsupported_job_type_rejected():
+    """Unsupported task_type for a valid role is rejected and skipped safely."""
+    event = {
+        "id": "test-unsupported-task-type",
+        "event_type": "ceo_routed",
+        "status": "pending",
+        "payload": {
+            "recommended_role": "credit_analyst",
+            "task_description": "Review credit file",
+            "task_type": "funding_strategy",
+        },
+    }
+    os.environ["CEO_ROUTING_DRY_RUN"] = "true"
+    result = process_one_event(event, llm_fn=mock_llm)
+    os.environ.pop("CEO_ROUTING_DRY_RUN", None)
+    check("Unsupported task_type marked skipped", result.get("skipped") is True, f"result={result}")
+    check("Unsupported task_type does not succeed", result.get("success") is False, f"result={result}")
+    check("Unsupported task_type reports clear error", "unsupported task_type" in str(result.get("error") or "").lower(), f"error={result.get('error')}")
+
+
 # ── Flag guard tests ───────────────────────────────────────────────────────────
 
 def test_flag_guard_disabled():
@@ -391,6 +411,7 @@ if __name__ == "__main__":
     test_process_ceo_routed_event()
     test_non_ceo_routed_event_is_skipped()
     test_missing_role_uses_fallback()
+    test_unsupported_job_type_rejected()
 
     test_flag_guard_disabled()
     test_flag_guard_enabled_returns_non_disabled()

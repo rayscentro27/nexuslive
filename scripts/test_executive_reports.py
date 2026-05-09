@@ -27,6 +27,8 @@ def main() -> int:
 
     daily = build_executive_report()
     ok &= check("daily report has sections", isinstance(daily.get("operational_memory"), dict) and isinstance(daily.get("knowledge"), dict))
+    ok &= check("daily report includes next actions", isinstance(daily.get("next_recommended_actions"), list) and len(daily.get("next_recommended_actions") or []) >= 1)
+    ok &= check("daily report includes telegram activity", isinstance(daily.get("telegram_activity"), dict))
 
     weekly = build_weekly_ceo_report()
     ok &= check("weekly report includes knowledge context", isinstance((weekly.get("knowledge") or {}).get("category_counts"), dict))

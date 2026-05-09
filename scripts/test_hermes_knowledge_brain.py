@@ -65,9 +65,12 @@ def main() -> int:
 
     context_pack = kb.build_hermes_context_pack("operations")
     ok &= check("context pack shape stable", isinstance(context_pack.get("recent_knowledge"), list) and isinstance(context_pack.get("recent_recommendations"), list))
+    ok &= check("context pack includes compact summary", isinstance(context_pack.get("compact_summary"), list))
 
     ranked = kb.rank_knowledge_results(normalized, category="funding")
     ok &= check("ranked funding knowledge returns ordered results", len(ranked) >= 2 and float(ranked[0].get("ranking_score") or 0.0) >= float(ranked[-1].get("ranking_score") or 0.0))
+    reranked = kb.rank_knowledge_results(normalized, category="funding")
+    ok &= check("ranking output deterministic", [r.get("workflow_id") for r in ranked] == [r.get("workflow_id") for r in reranked])
 
     credit_rows = [dict(r, category="credit") for r in normalized]
     credit_ranked = kb.rank_knowledge_results(credit_rows, category="credit")

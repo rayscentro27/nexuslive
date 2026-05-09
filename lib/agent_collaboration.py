@@ -34,6 +34,17 @@ def assign_collaboration_steps(goal: str) -> list[dict[str, Any]]:
     ]
 
 
+def _supported_goal_type(goal: str) -> str:
+    text = (goal or "").lower()
+    if any(tok in text for tok in {"funding", "lender", "readiness"}):
+        return "funding"
+    if any(tok in text for tok in {"credit", "score", "bureau"}):
+        return "credit"
+    if any(tok in text for tok in {"ops", "worker", "queue", "health", "qa"}):
+        return "operations"
+    return "unsupported"
+
+
 def validate_collaboration_safety(plan: dict[str, Any]) -> dict[str, Any]:
     risky_tokens = {"deploy", "migrate", "bill", "delete", "production", "client message", "auto-trade"}
     goal = str(plan.get("goal") or "").lower()
@@ -42,11 +53,15 @@ def validate_collaboration_safety(plan: dict[str, Any]) -> dict[str, Any]:
     for step in plan.get("steps") or []:
         if step.get("agent") == "telegram_comms":
             violations.append("telegram_comms_not_allowed_in_auto_chain")
+    goal_type = _supported_goal_type(goal)
+    if goal_type == "unsupported":
+        violations.append("unsupported_goal_type")
     return {
         "safe": (not risky) and (not violations),
         "approval_required": bool(risky or violations),
         "violations": violations,
         "risky": risky,
+        "goal_type": goal_type,
     }
 
 
@@ -62,6 +77,9 @@ def plan_agent_collaboration(goal: str) -> dict[str, Any]:
         "output_destination": "email_report",
     }
     plan["safety"] = validate_collaboration_safety(plan)
+    if "unsupported_goal_type" in (plan.get("safety") or {}).get("violations", []):
+        plan["steps"] = []
+        plan["output_destination"] = "operator_review"
     return plan
 
 

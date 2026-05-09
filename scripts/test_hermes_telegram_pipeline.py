@@ -178,6 +178,7 @@ route_bot._resume_work_session_summary = NexusTelegramBot._resume_work_session_s
 route_bot._summarize_work_session = NexusTelegramBot._summarize_work_session.__get__(route_bot, NexusTelegramBot)
 route_bot._handle_swarm_followup = NexusTelegramBot._handle_swarm_followup.__get__(route_bot, NexusTelegramBot)
 route_bot.pending_swarm_plan = None
+route_bot._fallback_response_for_command = NexusTelegramBot._fallback_response_for_command.__get__(route_bot, NexusTelegramBot)
 
 chat_resp = NexusTelegramBot.handle_inbound_message(route_bot, "good morning")
 how_are_you_resp = NexusTelegramBot.handle_inbound_message(route_bot, "How are you?")
@@ -345,6 +346,22 @@ fail_bot.ops_memory = {
 fail_bot._save_operational_memory = lambda: None
 llm_fail = NexusTelegramBot.handle_inbound_message(fail_bot, "hello there")
 check("llm failure fallback message", "chat model is unavailable" in llm_fail.lower())
+
+empty_fallback = NexusTelegramBot._fallback_response_for_command(route_bot, "status")
+check("empty response fallback exists", "timeout" in empty_fallback.lower() or "retry" in empty_fallback.lower())
+
+timeout_bot = NexusTelegramBot.__new__(NexusTelegramBot)
+timeout_bot.render_chat_response = NexusTelegramBot.render_chat_response.__get__(timeout_bot, NexusTelegramBot)
+timeout_bot.send_report_email = lambda subject, body: {"sent": False}
+timeout_bot.command_timeout_seconds = 0.1
+timeout_bot.execute_with_custom_timeout = NexusTelegramBot.execute_with_custom_timeout.__get__(timeout_bot, NexusTelegramBot)
+orig_run_controlled_agent = telegram_module.run_controlled_agent
+telegram_module.run_controlled_agent = lambda role_id, send_report_email=None: (_ for _ in ()).throw(TimeoutError("slow agent"))
+try:
+    timed = NexusTelegramBot._run_controlled_agent(timeout_bot, "qa_test")
+    check("telegram timeout handling for controlled agent", "timed out" in timed.lower())
+finally:
+    telegram_module.run_controlled_agent = orig_run_controlled_agent
 
 # ── Test 5: Gate — automated alerts respect cooldown ─────────────────────────
 
