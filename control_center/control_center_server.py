@@ -30,6 +30,17 @@ logger = logging.getLogger("ControlCenter")
 
 app = Flask(__name__)
 
+
+@app.route("/legal/disclaimer")
+@app.route("/disclaimer")
+def legal_disclaimer_page():
+    from lib.compliance_disclaimers import long_compliance_disclaimer
+
+    text = long_compliance_disclaimer().replace("\n", "<br>")
+    return f"""<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>Nexus Disclaimer</title>
+    <style>body{{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#f8fafc;color:#0f172a;padding:24px;max-width:860px;margin:0 auto}}h1{{font-size:26px}}.box{{background:#fff;border:1px solid #dbe2ea;border-radius:10px;padding:16px;line-height:1.6}}</style>
+    </head><body><h1>Nexus Legal Disclaimer</h1><div class='box'>{text}</div></body></html>"""
+
 _KNOWLEDGE_CACHE_TTL_SECONDS = 120
 _KNOWLEDGE_CACHE_LIMIT = 6
 _KNOWLEDGE_CACHE_FETCH_LIMIT = 30
