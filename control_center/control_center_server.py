@@ -10,10 +10,11 @@ Panels:
 import os
 import sys
 import json
+import time
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from flask import Flask, jsonify, render_template_string, request
+from flask import Flask, jsonify, make_response, render_template_string, request
 
 try:
     from dotenv import load_dotenv
@@ -28,6 +29,91 @@ logging.basicConfig(level=logging.INFO,
 logger = logging.getLogger("ControlCenter")
 
 app = Flask(__name__)
+
+_KNOWLEDGE_CACHE_TTL_SECONDS = 120
+_KNOWLEDGE_CACHE_LIMIT = 6
+_KNOWLEDGE_CACHE_FETCH_LIMIT = 30
+_knowledge_cache: dict[tuple, tuple[float, object]] = {}
+_response_cache: dict[str, tuple[float, object]] = {}
+
+
+def _cache_get(key: tuple):
+    row = _knowledge_cache.get(key)
+    if not row:
+        return None
+    expires_at, value = row
+    if time.time() >= expires_at:
+        _knowledge_cache.pop(key, None)
+        return None
+    return value
+
+
+def _cache_set(key: tuple, value, ttl_seconds: int = _KNOWLEDGE_CACHE_TTL_SECONDS):
+    _knowledge_cache[key] = (time.time() + max(1, int(ttl_seconds)), value)
+    return value
+
+
+def _response_cache_get(key: str, ttl: int = 60):
+    row = _response_cache.get(key)
+    if not row:
+        return None
+    expires_at, value = row
+    if time.time() >= expires_at:
+        _response_cache.pop(key, None)
+        return None
+    return value
+
+
+def _response_cache_set(key: str, value, ttl: int = 60):
+    _response_cache[key] = (time.time() + ttl, value)
+    return value
+
+
+def _cached_knowledge_pack(category: str, limit: int = None, fetch_limit: int = None):
+    limit = _KNOWLEDGE_CACHE_LIMIT if limit is None else int(limit)
+    fetch_limit = _KNOWLEDGE_CACHE_FETCH_LIMIT if fetch_limit is None else int(fetch_limit)
+    key = ("knowledge_pack", category, limit, fetch_limit)
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+    from lib.hermes_knowledge_brain import build_source_aware_context_pack
+
+    return _cache_set(key, build_source_aware_context_pack(category, limit=limit, fetch_limit=fetch_limit))
+
+
+def _cached_knowledge_visibility(limit: int = None, fetch_limit: int = None, stale_days: int = 10):
+    limit = _KNOWLEDGE_CACHE_LIMIT if limit is None else int(limit)
+    fetch_limit = _KNOWLEDGE_CACHE_FETCH_LIMIT if fetch_limit is None else int(fetch_limit)
+    key = ("knowledge_visibility", limit, fetch_limit, int(stale_days))
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+
+    from lib.hermes_knowledge_brain import detect_stale_knowledge
+
+    funding_ctx = _cached_knowledge_pack("funding", limit=limit, fetch_limit=fetch_limit)
+    credit_ctx = _cached_knowledge_pack("credit", limit=limit, fetch_limit=fetch_limit)
+    ops_ctx = _cached_knowledge_pack("operations", limit=limit, fetch_limit=fetch_limit)
+    merged = (funding_ctx.get("top_ranked") or []) + (credit_ctx.get("top_ranked") or []) + (ops_ctx.get("top_ranked") or [])
+    visibility = {
+        "source_quality_summary": {
+            **(funding_ctx.get("source_quality_summary") or {}),
+            **(credit_ctx.get("source_quality_summary") or {}),
+            **(ops_ctx.get("source_quality_summary") or {}),
+        },
+        "top_ranked_knowledge": {
+            "funding": funding_ctx.get("top_ranked") or [],
+            "credit": credit_ctx.get("top_ranked") or [],
+            "operations": ops_ctx.get("top_ranked") or [],
+        },
+        "stale_warnings": (detect_stale_knowledge(merged, days=stale_days) or [])[: max(6, limit * 2)],
+        "category_counts": {
+            "funding": len(funding_ctx.get("top_ranked") or []),
+            "credit": len(credit_ctx.get("top_ranked") or []),
+            "operations": len(ops_ctx.get("top_ranked") or []),
+        },
+    }
+    return _cache_set(key, visibility)
 
 
 def _admin_authorized(req) -> bool:
@@ -173,8 +259,13 @@ def _decorate_user_rows(rows: list[dict]) -> list[dict]:
 
 @app.route("/api/health")
 def api_health():
+    cached = _response_cache_get("health", ttl=60)
+    if cached is not None:
+        return jsonify(cached)
     from operations_center.operations_engine import get_system_health
-    return jsonify(_safe(get_system_health))
+    result = _safe(get_system_health)
+    _response_cache_set("health", result, ttl=60)
+    return jsonify(result)
 
 
 @app.route("/api/research")
@@ -190,8 +281,13 @@ def api_research():
 
 @app.route("/api/signals")
 def api_signals():
+    cached = _response_cache_get("signals", ttl=45)
+    if cached is not None:
+        return jsonify(cached)
     from operations_center.hedge_fund_panel import get_panel_data
-    return jsonify(_safe(get_panel_data))
+    result = _safe(get_panel_data)
+    _response_cache_set("signals", result, ttl=45)
+    return jsonify(result)
 
 
 @app.route("/api/leads")
@@ -280,6 +376,46 @@ def api_admin_users():
         "users": _decorate_user_rows(rows),
         "count": len(rows),
     })
+
+
+@app.route("/api/admin/knowledge-review")
+def api_admin_knowledge_review_list():
+    from flask import request as flask_request
+    from lib.knowledge_review_queue import list_records
+
+    status = (flask_request.args.get("status") or "").strip().lower()
+    rows = list_records(status=status)
+    return jsonify({"ok": True, "status": status or "all", "count": len(rows), "records": rows})
+
+
+@app.route("/api/admin/knowledge-review", methods=["POST"])
+def api_admin_knowledge_review_add():
+    from flask import request as flask_request
+    from lib.knowledge_review_queue import add_proposed_record
+
+    body = flask_request.get_json(silent=True) or {}
+    record = body.get("record") if isinstance(body.get("record"), dict) else {}
+    source = (body.get("source") or "admin_api").strip() or "admin_api"
+    added = add_proposed_record(record, source=source)
+    return jsonify({"ok": True, "record": added})
+
+
+@app.route("/api/admin/knowledge-review/<record_id>/status", methods=["POST"])
+def api_admin_knowledge_review_status(record_id: str):
+    from flask import request as flask_request
+    from lib.knowledge_review_queue import update_status
+
+    body = flask_request.get_json(silent=True) or {}
+    status = (body.get("status") or "").strip().lower()
+    reviewed_by = (body.get("reviewed_by") or "ray").strip() or "ray"
+    notes = (body.get("notes") or "").strip()
+    try:
+        updated = update_status(record_id, status=status, reviewed_by=reviewed_by, notes=notes)
+    except ValueError:
+        return jsonify({"error": "invalid status"}), 400
+    if not updated:
+        return jsonify({"error": "record not found"}), 404
+    return jsonify({"ok": True, "record": updated})
 
 
 def _send_tester_email_live(to_email: str, subject: str, body: str) -> None:
@@ -1314,11 +1450,78 @@ def api_admin_ai_ops_status():
     knowledge_visibility = {}
     if _is_enabled("KNOWLEDGE_DASHBOARD_ENABLED", "true"):
         try:
-            from lib.hermes_knowledge_brain import knowledge_dashboard_snapshot
-
-            knowledge_visibility = knowledge_dashboard_snapshot()
+            knowledge_visibility = _cached_knowledge_visibility()
+            knowledge_visibility["stale_warnings"] = (knowledge_visibility.get("stale_warnings") or [])[:8]
         except Exception:
             knowledge_visibility = {}
+
+    intelligence_visibility = {}
+    try:
+        from lib.operational_intelligence import build_operational_intelligence_snapshot
+        from lib.client_funding_intelligence import build_client_funding_intelligence_summary
+        from lib.trading_intelligence_lab import build_trading_intelligence_report
+        from lib.opportunity_intelligence import build_opportunity_intelligence_summary
+        from lib.executive_strategy import build_executive_strategy_summary
+        from lib.demo_readiness import run_demo_readiness_check
+
+        op = build_operational_intelligence_snapshot(mode="compact")
+        fi = build_client_funding_intelligence_summary()
+        ti = build_trading_intelligence_report()
+        oi = build_opportunity_intelligence_summary()
+        es = build_executive_strategy_summary()
+        dr = run_demo_readiness_check()
+        intelligence_visibility = {
+            "operational_intelligence": {
+                "status": "ok",
+                "enabled": bool(op.get("enabled")),
+                "latest_summary": op.get("executive_summary"),
+                "top_blocker": (op.get("degraded_components") or ["none"])[0],
+                "recommended_next_action": op.get("recommended_next_action"),
+                "confidence_risk_indicator": op.get("risk_level"),
+            },
+            "funding_intelligence": {
+                "status": "ok",
+                "enabled": bool(fi.get("enabled")),
+                "latest_summary": "Funding readiness and blockers prepared.",
+                "top_blocker": (fi.get("funding_blockers") or ["none"])[0],
+                "recommended_next_action": fi.get("next_best_funding_action"),
+                "confidence_risk_indicator": (fi.get("funding_readiness_summary") or {}).get("confidence", "low"),
+            },
+            "trading_intelligence_lab": {
+                "status": "ok",
+                "enabled": bool(ti.get("enabled")),
+                "latest_summary": "Educational paper-trading strategy lab is in review mode.",
+                "top_blocker": "live execution disabled by policy",
+                "recommended_next_action": "Continue demo validation on launch-focus strategies.",
+                "confidence_risk_indicator": ((ti.get("strategy_health") or {}).get("risk_score") or "moderate"),
+            },
+            "opportunity_intelligence": {
+                "status": "ok",
+                "enabled": bool(oi.get("enabled")),
+                "latest_summary": "Opportunity shortlist and blockers prepared.",
+                "top_blocker": (oi.get("application_readiness_blockers") or ["none"])[0],
+                "recommended_next_action": oi.get("opportunity_next_action"),
+                "confidence_risk_indicator": oi.get("opportunity_fit_score", "low"),
+            },
+            "executive_strategy_summary": {
+                "status": "ok",
+                "enabled": True,
+                "latest_summary": "Cross-domain priorities and risks are available.",
+                "top_blocker": (((es.get("cross_domain_risks") or {}).get("risks") or ["none"])[0]),
+                "recommended_next_action": (((es.get("next_domain_focus") or {}).get("reason")) or "maintain supervision"),
+                "confidence_risk_indicator": (((es.get("cross_domain_risks") or {}).get("overall_risk_level")) or "low"),
+            },
+            "demo_readiness": {
+                "status": dr.get("status") or "unknown",
+                "enabled": True,
+                "latest_summary": f"Score {int(dr.get('score') or 0)} with {len(dr.get('blockers') or [])} blockers.",
+                "top_blocker": ((dr.get("blockers") or ["none"])[0]),
+                "recommended_next_action": dr.get("next_action") or "Run readiness checklist.",
+                "confidence_risk_indicator": "high" if int(dr.get("score") or 0) >= 90 else "medium",
+            },
+        }
+    except Exception:
+        intelligence_visibility = {}
 
     data = {
             "model_config": {
@@ -1342,6 +1545,7 @@ def api_admin_ai_ops_status():
                 "recent_model_usage_events": usage_rows,
             },
             "knowledge_visibility": knowledge_visibility,
+            "intelligence_visibility": intelligence_visibility,
         }
     return _ok_response(data, read_only=True, extra={"updated_at": datetime.now(timezone.utc).isoformat(), **data})
 
@@ -1735,8 +1939,10 @@ def api_admin_ai_operations_timeline():
 def api_admin_ai_operations_overview():
     if not _admin_authorized(request):
         return _unauthorized_response()
+    cached_resp = _response_cache_get("overview", ttl=60)
+    if cached_resp is not None:
+        return jsonify(cached_resp)
     from lib import hermes_ops_memory
-    from lib.hermes_knowledge_brain import knowledge_dashboard_snapshot
     from lib.ai_ops_scorecard import build_ai_ops_scorecard
     from lib.agent_collaboration import dry_run_collaboration_plan
 
@@ -1749,7 +1955,13 @@ def api_admin_ai_operations_overview():
     for row in workforce:
         k = str(row.get("status") or "unknown").lower()
         workforce_status_counts[k] = workforce_status_counts.get(k, 0) + 1
-    knowledge = knowledge_dashboard_snapshot() if _is_enabled("KNOWLEDGE_DASHBOARD_ENABLED", "true") else {}
+    knowledge = {}
+    if _is_enabled("KNOWLEDGE_DASHBOARD_ENABLED", "true"):
+        try:
+            knowledge = _cached_knowledge_visibility()
+            knowledge["stale_warnings"] = (knowledge.get("stale_warnings") or [])[:10]
+        except Exception:
+            knowledge = {}
     task_lifecycle_summary = mem.get("task_lifecycle_summary") or {}
     scorecard = build_ai_ops_scorecard(
         worker_summary=workforce_status_counts,
@@ -1822,7 +2034,9 @@ def api_admin_ai_operations_overview():
             "openrouter_only_for_chat": not _is_enabled("TELEGRAM_USE_OLLAMA", "false"),
         },
     }
-    return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+    response_payload = _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+    _response_cache_set("overview", response_payload.get_json(), ttl=60)
+    return response_payload
 
 
 @app.route("/api/admin/ai-operations/executive-report")
@@ -1863,6 +2077,36 @@ def api_admin_ai_operations_knowledge():
 
     category = (request.args.get("category") or "operations").strip().lower()
     query = (request.args.get("query") or "").strip()
+    compact_arg = str(request.args.get("compact") or "").strip().lower()
+    compact = compact_arg not in {"0", "false", "no", "off"}
+    if compact:
+        source_ctx = _cached_knowledge_pack(category)
+        visibility = _cached_knowledge_visibility()
+        top = source_ctx.get("top_ranked") or []
+        top_by_category = visibility.get("top_ranked_knowledge") or {}
+        data = {
+            "audit": {
+                "normalization_mode": "retrieval_time",
+                "notes": ["compact mode"],
+            },
+            "snapshot": {
+                "top_ranked_knowledge": {category: top},
+                "source_quality_summary": source_ctx.get("source_quality_summary") or {},
+                "stale_warnings": (source_ctx.get("stale_warnings") or [])[:6],
+            },
+            "recent": top,
+            "search_results": [],
+            "related_workflows": get_related_workflows(category, limit=8),
+            "recent_recommendations": get_recent_recommendations(limit=6),
+            "funding": top_by_category.get("funding") or [],
+            "credit": top_by_category.get("credit") or [],
+            "top_ranked": top,
+            "source_aware_context": source_ctx,
+        }
+        if data["top_ranked"]:
+            data["ranking_explain_first"] = explain_knowledge_ranking(data["top_ranked"][0], category=category)
+        return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+
     data = {
         "audit": audit_knowledge_sources(),
         "snapshot": knowledge_dashboard_snapshot(),
@@ -1880,11 +2124,54 @@ def api_admin_ai_operations_knowledge():
     return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
 
 
+@app.route("/api/admin/ai-operations/dev-agents")
+def api_admin_ai_operations_dev_agents():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    cached = _response_cache_get("dev_agents", ttl=120)
+    if cached is not None:
+        return jsonify(cached)
+    try:
+        from lib.hermes_dev_agent_bridge import (
+            build_cli_agent_inventory,
+            get_recent_handoffs,
+            validate_cli_agent_config,
+        )
+        inventory = build_cli_agent_inventory()
+        recent_handoffs = get_recent_handoffs(limit=10)
+        pending = [h for h in recent_handoffs if h.get("status") == "pending_approval"]
+        failed = [h for h in recent_handoffs if h.get("status") == "failed"]
+        config_check = validate_cli_agent_config()
+        data = {
+            "inventory": inventory.get("inventory", []),
+            "installed_count": sum(1 for a in inventory.get("inventory", []) if a.get("installed")),
+            "total_count": len(inventory.get("inventory", [])),
+            "config": config_check,
+            "recent_handoffs": recent_handoffs,
+            "pending_handoff_count": len(pending),
+            "failed_handoff_count": len(failed),
+            "execution_enabled": False,
+            "dry_run_mode": inventory.get("dry_run_mode", True),
+            "can_execute": False,
+            "safe_for_execution": False,
+        }
+    except Exception as e:
+        logger.error("dev-agents endpoint error: %s", e)
+        data = {"error": str(e), "inventory": [], "execution_enabled": False, "can_execute": False}
+    result = _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
+    _response_cache_set("dev_agents", result.get_json(), ttl=120)
+    return result
+
+
 @app.route("/admin/ai-operations")
 def admin_ai_operations_page():
     if not _admin_authorized(request):
         return _unauthorized_response()
-    return render_template_string(TERMINAL_HTML)
+    response = make_response(render_template_string(TERMINAL_HTML))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 # ─────────────────────────────────────────────
@@ -2078,6 +2365,20 @@ TERMINAL_HTML = """<!DOCTYPE html>
   .audit-pre {
     white-space:pre-wrap; font-size:11px; line-height:1.5; color:var(--text);
   }
+  /* ── WORKER CARDS ── */
+  .worker-card {
+    background:#141820; border:1px solid var(--border);
+    border-radius:4px; padding:8px 10px; margin-bottom:6px;
+  }
+  .worker-header { display:flex; align-items:center; gap:6px; margin-bottom:2px; }
+  .worker-name { color:var(--text); font-size:11px; }
+  .worker-meta { color:var(--dim); font-size:10px; }
+  /* ── SCORE BARS ── */
+  .score-row { display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+  .score-label { color:var(--dim); font-size:10px; width:120px; flex-shrink:0; letter-spacing:.5px; }
+  .score-bar { flex:1; height:5px; background:#151b24; border-radius:3px; overflow:hidden; }
+  .score-fill { height:100%; border-radius:3px; }
+  .score-num { color:var(--text); font-size:10px; width:28px; text-align:right; font-weight:bold; }
   .message-card {
     background:#141820; border:1px solid var(--border);
     border-radius:4px; padding:10px; margin-bottom:10px;
@@ -2347,7 +2648,7 @@ TERMINAL_HTML = """<!DOCTYPE html>
       <div class="panel-body" id="aiops-session-panel">Loading...</div>
     </div>
     <div class="panel">
-      <div class="panel-header"><span class="panel-title">🧠 HERMES OPERATIONAL MEMORY</span></div>
+      <div class="panel-header"><span class="panel-title">📊 AI OPS SCORECARD & MEMORY</span></div>
       <div class="panel-body" id="aiops-memory-panel">Loading...</div>
     </div>
     <div class="panel">
@@ -2429,6 +2730,38 @@ TERMINAL_HTML = """<!DOCTYPE html>
       <div class="panel-header"><span class="panel-title">🕒 LIVE OPERATIONS TIMELINE</span></div>
       <div class="panel-body" id="aiops-timeline-panel">Loading...</div>
     </div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">📈 TRADING INTELLIGENCE LAB</span>
+        <span class="panel-badge badge-blue">ARCHITECTURE PREVIEW</span>
+      </div>
+      <div class="panel-body">
+        <div style="color:var(--amber);font-size:10px;margin-bottom:10px">Read-only intelligence layer — no broker execution. All outputs are CEO-gated research artifacts.</div>
+        <div class="metric-grid" style="margin-bottom:12px">
+          <div class="metric"><div class="val" style="color:var(--dim)">—</div><div class="lbl">SIGNALS</div></div>
+          <div class="metric"><div class="val" style="color:var(--dim)">—</div><div class="lbl">PATTERNS</div></div>
+          <div class="metric"><div class="val" style="color:var(--dim)">—</div><div class="lbl">RESEARCH CYCLES</div></div>
+          <div class="metric"><div class="val" style="color:var(--dim)">—</div><div class="lbl">CONFIDENCE</div></div>
+        </div>
+        <table class="data-table">
+          <thead><tr><th>MODULE</th><th>STATUS</th><th>ROLE</th><th>OUTPUT TYPE</th></tr></thead>
+          <tbody>
+            <tr><td>Strategy Research Agent</td><td class="amber">planned</td><td>research-only</td><td>pattern summaries</td></tr>
+            <tr><td>Signal Correlation Engine</td><td class="amber">planned</td><td>analysis-only</td><td>confidence scores</td></tr>
+            <tr><td>Risk Profile Scanner</td><td class="amber">planned</td><td>review-only</td><td>risk flags</td></tr>
+            <tr><td>Trade Setup Reviewer</td><td class="amber">planned</td><td>approval-required</td><td>CEO-gated proposals</td></tr>
+          </tbody>
+        </table>
+        <div style="color:var(--dim);font-size:10px;margin-top:10px">⚠ NO BROKER EXECUTION — Nexus AI is a data producer only.</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">🤖 DEV AGENT BRIDGE</span>
+        <button class="refresh-btn" onclick="loadDevAgentsPanel()">↺ REFRESH</button>
+      </div>
+      <div class="panel-body" id="aiops-dev-agents-panel">Loading...</div>
+    </div>
   </div>
 
 </div><!-- /workspace -->
@@ -2458,8 +2791,57 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.style.display='none');
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-'+name).style.display='grid';
-  event.target.classList.add('active');
+  const tabMap = {
+    overview: 'OVERVIEW',
+    research: 'RESEARCH BRAIN',
+    signals: 'HEDGE FUND',
+    leads: 'LEAD INTEL',
+    marketing: 'MARKETING',
+    reputation: 'REPUTATION',
+    health: 'SYSTEM HEALTH',
+    scheduler: 'SCHEDULER',
+    drafts: 'CEO DRAFTS',
+    prelaunch: 'PRELAUNCH',
+    growth: 'GROWTH',
+    messages: 'MESSAGES',
+    approvals: 'SIGNAL QUEUE',
+    mission: 'MISSION CONTROL',
+    aiops: 'AI OPS',
+  };
+  const label = tabMap[name];
+  const tab = label
+    ? [...document.querySelectorAll('.tab')].find(t => t.textContent.trim() === label)
+    : null;
+  if (tab) tab.classList.add('active');
   loadPage(name);
+}
+
+const TAB_NAME_BY_LABEL = {
+  'OVERVIEW': 'overview',
+  'RESEARCH BRAIN': 'research',
+  'HEDGE FUND': 'signals',
+  'LEAD INTEL': 'leads',
+  'MARKETING': 'marketing',
+  'REPUTATION': 'reputation',
+  'SYSTEM HEALTH': 'health',
+  'SCHEDULER': 'scheduler',
+  'CEO DRAFTS': 'drafts',
+  'PRELAUNCH': 'prelaunch',
+  'GROWTH': 'growth',
+  'MESSAGES': 'messages',
+  'SIGNAL QUEUE': 'approvals',
+  'MISSION CONTROL': 'mission',
+  'AI OPS': 'aiops',
+};
+
+function bindTabClicks() {
+  document.querySelectorAll('#tabnav .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const label = (tab.textContent || '').trim();
+      const name = TAB_NAME_BY_LABEL[label];
+      if (name) showPage(name);
+    });
+  });
 }
 
 function dot(up) {
@@ -2591,7 +2973,9 @@ async function loadAgents() {
     });
     html += '</div>';
     document.getElementById('agents-panel').innerHTML = html;
-  } catch(e) {}
+  } catch(e) {
+    document.getElementById('agents-panel').innerHTML = `<div class="red">Agent status error: ${esc(e.message)}</div>`;
+  }
 }
 
 async function loadSentiment() {
@@ -2599,7 +2983,8 @@ async function loadSentiment() {
     const d = await get('/api/signals');
     const s = d.market_sentiment||{};
     const dom = (s.dominant||'neutral').toUpperCase();
-    document.getElementById('sentiment-badge').textContent = dom;
+    const badge = document.getElementById('sentiment-badge');
+    if (badge) badge.textContent = dom;
     document.getElementById('sentiment-panel').innerHTML = `
       <div class="metric-grid">
         <div class="metric"><div class="val ${s.dominant==='bullish'?'green':s.dominant==='bearish'?'red':'amber'}">${dom}</div><div class="lbl">MARKET BIAS</div></div>
@@ -2609,24 +2994,30 @@ async function loadSentiment() {
       </div>
       ${pct_bar(s.bullish_pct||0, s.bearish_pct||0, s.neutral_pct||0)}
       <div style="margin-top:8px;color:var(--dim);font-size:10px">Updated: ${ts(s.updated)}</div>`;
-    document.getElementById('footer-signals').textContent = d.strategy_count+' strategies';
-  } catch(e) {}
+    const fsig = document.getElementById('footer-signals');
+    if (fsig) fsig.textContent = (d.strategy_count||0)+' strategies';
+  } catch(e) {
+    document.getElementById('sentiment-panel').innerHTML = `<div class="red">Sentiment error: ${esc(e.message)}</div>`;
+  }
 }
 
 async function loadResearchFeed() {
   try {
     const d = await get('/api/research');
     const strats = d.latest_strategies||[];
-    document.getElementById('research-count').textContent = strats.length+' recent';
+    const rc = document.getElementById('research-count');
+    if (rc) rc.textContent = strats.length+' recent';
     let html = strats.map(s =>
       `<div class="feed-item">
         <div class="feed-time">${ts(s.modified)}</div>
-        <div class="feed-text" style="color:var(--accent)">${s.title}</div>
-        <div class="feed-text" style="font-size:11px">${s.content.slice(0,300)}...</div>
+        <div class="feed-text" style="color:var(--accent)">${esc(s.title||'')}</div>
+        <div class="feed-text" style="font-size:11px">${esc((s.content||'').slice(0,300))}...</div>
       </div>`
     ).join('') || '<div style="color:var(--dim)">No strategies yet. Run research pipeline.</div>';
     document.getElementById('research-feed').innerHTML = html;
-  } catch(e) {}
+  } catch(e) {
+    document.getElementById('research-feed').innerHTML = `<div class="red">Research feed error: ${esc(e.message)}</div>`;
+  }
 }
 
 async function loadAlerts() {
@@ -2644,11 +3035,14 @@ async function loadAlerts() {
     (mkt.summary?.negative_alerts||[]).forEach(m =>
       items.push({icon:'📣',text:`Negative Mention on ${m.platform}: ${(m.text||'').slice(0,60)}`,cls:'red'})
     );
-    document.getElementById('alert-count').textContent = items.length+' alerts';
+    const ac = document.getElementById('alert-count');
+    if (ac) ac.textContent = items.length+' alerts';
     document.getElementById('alerts-panel').innerHTML = items.length
-      ? items.map(i=>`<div class="feed-item"><div class="feed-text ${i.cls}">${i.icon} ${i.text}</div></div>`).join('')
+      ? items.map(i=>`<div class="feed-item"><div class="feed-text ${i.cls}">${i.icon} ${esc(i.text)}</div></div>`).join('')
       : '<div style="color:var(--green)">✓ No active alerts</div>';
-  } catch(e) {}
+  } catch(e) {
+    document.getElementById('alerts-panel').innerHTML = `<div class="red">Alerts error: ${esc(e.message)}</div>`;
+  }
 }
 
 async function loadResearchPage() {
@@ -3029,7 +3423,7 @@ async function loadPrelaunchPage() {
       `telegram processes: ${(audit.runtime?.telegram_processes || []).length}`,
     ];
     document.getElementById('prelaunch-audit-panel').innerHTML =
-      `<div class="audit-pre">${esc(summaryLines.join('\n'))}</div>`;
+      `<div class="audit-pre">${esc(summaryLines.join('\\n'))}</div>`;
     const userRows = users.users || [];
     document.getElementById('prelaunch-users-panel').innerHTML = userRows.length
       ? userRows.map(renderUserCard).join('')
@@ -3080,24 +3474,24 @@ INFLUENCER_AUTO_SEND=${esc(flags.INFLUENCER_AUTO_SEND)}
 INFLUENCER_REQUIRE_APPROVAL=${esc(flags.INFLUENCER_REQUIRE_APPROVAL)}</div>
     `;
 
-    const recentTopics = (queue.recent_topics || []).map(row => `• ${row.topic} [${row.status}]`).join('\n') || '• none yet';
+    const recentTopics = (queue.recent_topics || []).map(row => `• ${row.topic} [${row.status}]`).join('\\n') || '• none yet';
     const recentVariants = (variantFeed.variants || []).map(renderGrowthVariantCard).join('') || '<div style="color:var(--dim)">No content variants yet.</div>';
     const approvalCards = approvalRows.map(renderGrowthApprovalCard).join('') || '<div style="color:var(--dim)">No pending content approvals.</div>';
-    const recentScores = (leadScores.recent || []).map(row => `• ${row.lead_ref}: ${row.lead_score} (${row.segment}) → ${row.recommended_agent}`).join('\n') || '• none yet';
-    const recentOnboarding = (onboarding.recent_recommendations || []).map(row => `• ${row.user_ref}: ${row.user_stage} → ${row.recommended_agent}`).join('\n') || '• none yet';
-    const learningNotes = noteRows.map(row => `• ${row.note}`).join('\n') || '• none yet';
+    const recentScores = (leadScores.recent || []).map(row => `• ${row.lead_ref}: ${row.lead_score} (${row.segment}) → ${row.recommended_agent}`).join('\\n') || '• none yet';
+    const recentOnboarding = (onboarding.recent_recommendations || []).map(row => `• ${row.user_ref}: ${row.user_stage} → ${row.recommended_agent}`).join('\\n') || '• none yet';
+    const learningNotes = noteRows.map(row => `• ${row.note}`).join('\\n') || '• none yet';
     const recentTierProgress = (funding.recent_tier_progress || []).map(
       row => `• ${row.user_id}: tier=${row.current_tier} | readiness=${row.business_readiness_score || 0} | relationship=${row.relationship_score || 0} | t2=${row.tier_2_status || 'n/a'}`
-    ).join('\n') || '• none yet';
+    ).join('\\n') || '• none yet';
     const recommendationNeeds = (funding.users_needing_recommendation_generation || []).map(
       row => `• ${row.user_id}: ${row.reason || 'needs generation'}`
-    ).join('\n') || '• none yet';
+    ).join('\\n') || '• none yet';
     const staleRecommendations = (funding.users_with_stale_recommendations || []).map(
       row => `• ${row.user_id}: ${row.product_name || 'recommendation'} | last=${row.last_generated_at || 'unknown'}`
-    ).join('\n') || '• none yet';
+    ).join('\\n') || '• none yet';
     const generationErrors = (funding.generation_errors || []).map(
       row => `• ${row.user_id}: ${row.error || row.skipped_reason || row.status}`
-    ).join('\n') || '• none yet';
+    ).join('\\n') || '• none yet';
 
     document.getElementById('growth-detail-panel').innerHTML = `
       <div style="margin-bottom:12px">
@@ -3603,96 +3997,197 @@ function renderAiOpsConfig(d) {
   const mc = d.model_config || {};
   const tg = d.telegram_mode || {};
   const modelBadge = `${mc.active_default_provider || 'unknown'}:${mc.active_default_model || 'unknown'}`;
-  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-    <span class="panel-badge badge-green">Telegram: Conversational / Quiet</span>
+  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+    <span class="panel-badge badge-green">Telegram: Conversational</span>
     <span class="panel-badge badge-blue">Reports: Email Only</span>
     <span class="panel-badge badge-amber">Swarm: Dry Run Only</span>
     <span class="panel-badge badge-red">Execution: Disabled</span>
     <span class="panel-badge badge-blue">Model: ${esc(modelBadge)}</span>
     <span class="panel-badge badge-green">Auth: Protected</span>
   </div>
-  <div class="audit-pre">telegram_enabled=${esc(String(tg.enabled))}
-telegram_manual_only=${esc(String(tg.manual_only))}
-telegram_auto_reports_enabled=${esc(String(tg.auto_reports_enabled))}
-configured_context=${esc(String(mc.configured_context_length || 'unknown'))}
-reports_destination=email
-safety_notes=Swarm execution is disabled | Telegram full reports are suppressed | Approvals are required for risky actions</div>`;
+  <table class="data-table"><tbody>
+    <tr><td style="color:var(--dim)">telegram_enabled</td><td>${esc(String(tg.enabled))}</td></tr>
+    <tr><td style="color:var(--dim)">manual_only</td><td>${esc(String(tg.manual_only))}</td></tr>
+    <tr><td style="color:var(--dim)">auto_reports</td><td>${esc(String(tg.auto_reports_enabled))}</td></tr>
+    <tr><td style="color:var(--dim)">context_length</td><td>${esc(String(mc.configured_context_length || 'unknown'))}</td></tr>
+    <tr><td style="color:var(--dim)">reports_destination</td><td>email</td></tr>
+    <tr><td style="color:var(--dim)">safety</td><td class="amber">Swarm disabled | Approvals required | No auto-execution</td></tr>
+  </tbody></table>`;
 }
 
 function renderAiOpsSession(d) {
   const s = d?.active_work_session || {};
   if (!Object.keys(s).length) return '<div style="color:var(--dim)">No active work session. Start one from Telegram with "start work session".</div>';
-  return `<div class="audit-pre">goal=${esc(String(s.current_goal || 'n/a'))}
-status=${esc(String(s.status || 'unknown'))}
-active_tasks=${esc(JSON.stringify(s.active_tasks || []))}
-blocked_items=${esc(JSON.stringify(s.blocked_items || []))}
-pending_approvals=${esc(JSON.stringify(s.pending_approvals || []))}
-next_recommended_action=${esc(String(d.next_recommended_action || 'Review top active priority'))}</div>`;
+  const activeTasks = s.active_tasks || [];
+  const blocked = s.blocked_items || [];
+  const pending = s.pending_approvals || [];
+  const st = (s.status || 'unknown').toLowerCase();
+  const stBadge = st === 'active' ? 'badge-green' : st === 'paused' ? 'badge-amber' : 'badge-blue';
+  const nextAction = d.next_recommended_action || 'Review top active priority';
+  return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+    <span class="panel-badge ${stBadge}" style="font-size:11px;padding:3px 10px">${esc(st.toUpperCase())}</span>
+    <span style="color:var(--text);font-size:12px">${esc(s.current_goal || 'No goal set')}</span>
+  </div>
+  <div class="metric-grid" style="margin-bottom:10px">
+    <div class="metric"><div class="val green">${activeTasks.length}</div><div class="lbl">ACTIVE TASKS</div></div>
+    <div class="metric"><div class="val ${blocked.length > 0 ? 'red' : ''}">${blocked.length}</div><div class="lbl">BLOCKED</div></div>
+    <div class="metric"><div class="val ${pending.length > 0 ? 'amber' : ''}">${pending.length}</div><div class="lbl">AWAITING APPROVAL</div></div>
+  </div>
+  <div style="color:var(--dim);font-size:10px;margin-bottom:4px">NEXT RECOMMENDED ACTION</div>
+  <div style="font-size:11px;padding:8px;background:#141820;border-left:3px solid var(--accent);border-radius:2px">${esc(nextAction)}</div>`;
 }
 
 function renderAiOpsMemory(d) {
   const m = d?.operational_memory || {};
-  const latest = m.latest_ops_monitor_run || null;
   const k = d?.knowledge || {};
+  const sc = d?.ai_ops_scorecard || {};
   const kc = k.category_counts || {};
-  return `<div class="audit-pre">last_user_instruction=${esc(String(m.last_user_instruction || ''))}
-recent_recommendations=${esc(JSON.stringify(m.recent_recommendations || []))}
-recent_completed=${esc(JSON.stringify(m.recent_completed || []))}
-recent_failed=${esc(JSON.stringify(m.recent_failed || []))}
-latest_ops_monitor_run=${esc(JSON.stringify(latest || { note: 'No ops monitor run yet' }))}
-knowledge_category_counts=${esc(JSON.stringify(kc || {}))}
-knowledge_stale_warnings=${esc(JSON.stringify((k.stale_warnings || []).slice(0, 4)))}</div>`;
+  const scoreItems = [
+    { key: 'operational_health', label: 'OPS HEALTH' },
+    { key: 'agent_readiness', label: 'AGENT READINESS' },
+    { key: 'knowledge_freshness', label: 'KNOWLEDGE' },
+    { key: 'funding_credit_intelligence', label: 'FUNDING/CREDIT' },
+    { key: 'risk_blocker', label: 'RISK BLOCKER' },
+  ];
+  let html = '';
+  if (Object.keys(sc).length > 1) {
+    html += '<div style="color:var(--dim);font-size:10px;margin-bottom:8px;letter-spacing:1px">AI OPS SCORECARD</div>';
+    html += scoreItems.map(({ key, label }) => {
+      const item = sc[key] || {};
+      const num = typeof item.score === 'number' ? item.score : null;
+      const clr = num === null ? 'var(--dim)' : num >= 75 ? 'var(--green)' : num >= 50 ? 'var(--accent)' : 'var(--red)';
+      const pct = num !== null ? num : 0;
+      return `<div class="score-row" title="${esc(item.reason || '')}"><div class="score-label">${label}</div><div class="score-bar"><div class="score-fill" style="width:${pct}%;background:${clr}"></div></div><div class="score-num" style="color:${clr}">${num !== null ? num : '—'}</div></div>`;
+    }).join('');
+    html += '<div style="margin-bottom:12px"></div>';
+  }
+  const lastInstr = m.last_user_instruction || '';
+  if (lastInstr) {
+    html += `<div style="color:var(--dim);font-size:10px;margin-bottom:4px">LAST INSTRUCTION</div><div style="font-size:11px;padding:6px 8px;background:#141820;border-left:2px solid var(--accent);border-radius:2px;margin-bottom:10px">${esc(lastInstr.slice(0, 120))}</div>`;
+  }
+  const recs = (m.recent_recommendations || []).slice(0, 3);
+  if (recs.length) {
+    html += '<div style="color:var(--dim);font-size:10px;margin-bottom:4px">RECOMMENDATIONS</div>';
+    html += recs.map(r => `<div class="feed-item"><div class="feed-text">${esc(typeof r === 'string' ? r.slice(0, 100) : JSON.stringify(r).slice(0, 100))}</div></div>`).join('');
+  }
+  const completed = (m.recent_completed || []).slice(0, 3);
+  if (completed.length) {
+    html += '<div style="color:var(--dim);font-size:10px;margin:8px 0 4px">RECENTLY COMPLETED</div>';
+    html += completed.map(r => `<div class="feed-item"><div class="feed-text green">✓ ${esc(typeof r === 'string' ? r.slice(0, 100) : JSON.stringify(r).slice(0, 100))}</div></div>`).join('');
+  }
+  const kcKeys = Object.keys(kc);
+  if (kcKeys.length) {
+    html += '<div style="color:var(--dim);font-size:10px;margin:8px 0 4px">KNOWLEDGE COVERAGE</div>';
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap">' + kcKeys.slice(0, 10).map(cat => `<span class="panel-badge badge-blue">${esc(cat)}: ${kc[cat]}</span>`).join('') + '</div>';
+  }
+  return html || '<div style="color:var(--dim)">No operational memory available.</div>';
 }
 
 function renderAiOpsLifecycle(d) {
   const s = d?.task_lifecycle_summary || {};
   const rows = d?.task_lifecycle || [];
   const failed = Number(s.failed || 0);
-  return `<div class="audit-pre">queued=${esc(String(s.queued || 0))}
-running=${esc(String(s.running || 0))}
-waiting_for_approval=${esc(String(s.waiting_for_approval || 0))}
-completed=${esc(String(s.completed || 0))}
-failed=${esc(String(s.failed || 0))}
-canceled=${esc(String(s.canceled || 0))}
-sample=${esc(JSON.stringify(rows.slice(0, 12)))}</div>${failed === 0 ? '<div style="color:var(--dim);margin-top:6px">No failed tasks.</div>' : ''}`;
+  const waiting = Number(s.waiting_for_approval || 0);
+  let html = `<div class="metric-grid" style="margin-bottom:12px">
+    <div class="metric"><div class="val blue">${s.queued || 0}</div><div class="lbl">QUEUED</div></div>
+    <div class="metric"><div class="val green">${s.running || 0}</div><div class="lbl">RUNNING</div></div>
+    <div class="metric"><div class="val ${waiting > 0 ? 'amber' : ''}">${waiting}</div><div class="lbl">AWAITING</div></div>
+    <div class="metric"><div class="val green">${s.completed || 0}</div><div class="lbl">COMPLETED</div></div>
+    <div class="metric"><div class="val ${failed > 0 ? 'red' : ''}">${failed}</div><div class="lbl">FAILED</div></div>
+    <div class="metric"><div class="val">${s.canceled || 0}</div><div class="lbl">CANCELED</div></div>
+  </div>`;
+  const failedRows = rows.filter(r => (r.status || '').toLowerCase() === 'failed').slice(0, 5);
+  if (failedRows.length) {
+    html += '<div style="color:var(--red);font-size:10px;margin-bottom:4px">FAILED TASKS</div>';
+    html += failedRows.map(r => `<div class="feed-item"><div class="feed-time">${ts(r.created_at || r.at)} | ${esc(r.task_type || r.type || 'task')}</div><div class="feed-text red">${esc(r.error || r.reason || 'failed')}</div></div>`).join('');
+  } else if (failed === 0) {
+    html += '<div style="color:var(--green);font-size:10px">All tasks nominal — no failures detected.</div>';
+  }
+  return html;
 }
 
 function renderAiOpsTimeline(d) {
   const rows = d?.timeline || [];
   if (!rows.length) return '<div style="color:var(--dim)">No timeline events yet.</div>';
-  return `<div class="audit-pre">` + rows.slice(0, 30).map(r =>
-    `${ts(r.at)} | ${r.type} | ${r.source} | ${r.event_type || 'event'} | status=${r.status || 'unknown'}`
-  ).join('\n') + `</div>`;
+  return rows.slice(0, 40).map(r => {
+    const st = (r.status || 'unknown').toLowerCase();
+    const stCls = st === 'success' || st === 'completed' ? 'green' : st === 'failed' || st === 'error' ? 'red' : 'amber';
+    const dotCls = st === 'success' || st === 'completed' ? 'dot-green' : st === 'failed' || st === 'error' ? 'dot-red' : 'dot-amber';
+    return `<div class="feed-item"><div class="feed-time"><span class="dot ${dotCls}"></span>${ts(r.at)} | <span class="${stCls}">${esc(r.type || 'event')}</span> | ${esc(r.source || '?')}</div><div class="feed-text">${esc(r.event_type || '')}${r.status ? ' — ' + esc(st) : ''}</div></div>`;
+  }).join('');
 }
 
 function renderAiOpsRouting(rows) {
   const list = rows || [];
   if (!list.length) return '<div style="color:var(--dim)">No routing preview available.</div>';
-  return `<div class="audit-pre">` + list.map(r => {
-    const req = r.requested_task || 'unknown';
-    const res = r.resolved_task || 'unknown';
-    const p = r.provider || 'unknown';
-    const m = r.model || 'unknown';
-    const c = r.max_context || 0;
-    return `${req} -> ${res} | ${p} / ${m} / ctx=${c}`;
-  }).join('\n') + `</div>`;
+  return `<table class="data-table"><thead><tr><th>TASK</th><th>PROVIDER</th><th>MODEL</th><th>CTX</th></tr></thead><tbody>` +
+    list.map(r => {
+      const req = r.requested_task || 'unknown';
+      const p = r.provider || 'unknown';
+      const m = r.model || 'unknown';
+      const c = Number(r.max_context || 0);
+      return `<tr><td>${esc(req)}</td><td class="blue">${esc(p)}</td><td>${esc(m)}</td><td style="color:var(--dim)">${c.toLocaleString()}</td></tr>`;
+    }).join('') +
+    `</tbody></table>`;
 }
 
 function renderAiOpsWorkers(summary) {
   const s = summary || {};
   const counts = s.status_counts || {};
   const latest = s.latest || [];
-  return `<div class="audit-pre">total_rows=${esc(String(s.total_rows || 0))}
-status_counts=${esc(JSON.stringify(counts))}
-latest=${esc(JSON.stringify(latest))}</div>`;
+  const total = Number(s.total_rows || 0);
+  const _workerCls = (st) => {
+    const s = (st || '').toLowerCase();
+    if (s === 'running' || s === 'active') return { dot: 'dot-green', badge: 'badge-green', val: 'green' };
+    if (s === 'idle' || s === 'stale') return { dot: 'dot-amber', badge: 'badge-amber', val: 'amber' };
+    return { dot: 'dot-red', badge: 'badge-red', val: 'red' };
+  };
+  const countKeys = Object.keys(counts);
+  const metricTiles = countKeys.map(k => {
+    const n = Number(counts[k]);
+    const cls = _workerCls(k).val;
+    return `<div class="metric"><div class="val ${cls}">${n}</div><div class="lbl">${esc(k.toUpperCase())}</div></div>`;
+  }).join('');
+  let html = `<div class="metric-grid" style="margin-bottom:12px">${metricTiles}<div class="metric"><div class="val blue">${total}</div><div class="lbl">TOTAL</div></div></div>`;
+  if (latest.length) {
+    html += latest.slice(0, 6).map(w => {
+      const wid = w.worker_id || 'unknown';
+      const st = (w.status || 'unknown').toLowerCase();
+      const cls = _workerCls(st);
+      return `<div class="worker-card"><div class="worker-header"><span class="dot ${cls.dot}"></span><span class="worker-name">${esc(wid)}</span><span class="panel-badge ${cls.badge}" style="margin-left:auto">${esc(st.toUpperCase())}</span></div><div class="worker-meta">last seen: ${ts(w.last_seen_at)}</div></div>`;
+    }).join('');
+  } else {
+    html += '<div style="color:var(--dim)">No worker heartbeat data available.</div>';
+  }
+  return html;
 }
 
 function renderAiOpsTelemetry(tel) {
   const t = tel || {};
   const retries = t.recent_retry_error_events || [];
   const usage = t.recent_model_usage_events || [];
-  return `<div class="audit-pre">recent_retry_error_events=${esc(JSON.stringify(retries))}
-recent_model_usage_events=${esc(JSON.stringify(usage))}</div>`;
+  let html = `<div class="metric-grid" style="margin-bottom:12px">
+    <div class="metric"><div class="val ${retries.length > 0 ? 'amber' : 'green'}">${retries.length}</div><div class="lbl">RETRY ERRORS</div></div>
+    <div class="metric"><div class="val blue">${usage.length}</div><div class="lbl">MODEL CALLS</div></div>
+  </div>`;
+  if (retries.length) {
+    html += '<div style="color:var(--amber);font-size:10px;margin-bottom:4px">RECENT RETRY ERRORS</div>';
+    html += retries.slice(0, 5).map(e => {
+      const payload = e.payload ? JSON.stringify(e.payload).slice(0, 80) : '';
+      return `<div class="feed-item"><div class="feed-time">${ts(e.created_at || e.at)} | ${esc(e.event_source || e.source || 'system')}</div><div class="feed-text amber">${esc(e.event_type || 'retry_error')}${payload ? ': ' + esc(payload) : ''}</div></div>`;
+    }).join('');
+  }
+  if (usage.length) {
+    html += '<div style="color:var(--dim);font-size:10px;margin:8px 0 4px">RECENT MODEL USAGE</div>';
+    html += usage.slice(0, 5).map(e => {
+      const payload = e.payload ? JSON.stringify(e.payload).slice(0, 80) : '';
+      return `<div class="feed-item"><div class="feed-time">${ts(e.created_at || e.at)} | ${esc(e.event_source || e.source || 'system')}</div><div class="feed-text">${esc(e.event_type || 'model_call')}${payload ? ': ' + esc(payload) : ''}</div></div>`;
+    }).join('');
+  }
+  if (!retries.length && !usage.length) {
+    html += '<div style="color:var(--dim)">No telemetry events recorded yet.</div>';
+  }
+  return html;
 }
 
 function renderAiOpsRoles(rows) {
@@ -3735,9 +4230,81 @@ reason=${esc(String(sp.reason || ''))}</div>`;
   const steps = seq.length
     ? `<div class="audit-pre" style="margin-top:8px">` + seq.map(s =>
         `step=${s.step} role=${s.role_id} task=${s.task_type} model=${s.model_class} risk=${s.risk_level} status=${s.status} allowed=${s.allowed} reason=${s.reason}`
-      ).join('\n') + `</div>`
+      ).join('\\n') + `</div>`
     : '<div style="color:var(--dim)">No task sequence generated.</div>';
   return header + steps;
+}
+
+function renderDevAgents(d) {
+  const data = d?.data || d || {};
+  const inventory = data.inventory || [];
+  const handoffs = data.recent_handoffs || [];
+  const pending = data.pending_handoff_count || 0;
+  const cfg = data.config || {};
+
+  // Safety status bar
+  const execEnabled = !!data.execution_enabled;
+  const dryRun = data.dry_run_mode !== false;
+  const safeColor = execEnabled ? 'var(--red)' : 'var(--green)';
+  let html = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <span class="panel-badge ${execEnabled ? 'badge-red' : 'badge-green'}">Execution: ${execEnabled ? 'ENABLED' : 'DISABLED'}</span>
+    <span class="panel-badge ${dryRun ? 'badge-green' : 'badge-amber'}">Dry-run: ${dryRun ? 'ON' : 'OFF'}</span>
+    <span class="panel-badge badge-blue">Approval Required: ${data.approval_required !== false ? 'YES' : 'NO'}</span>
+    ${pending > 0 ? `<span class="panel-badge badge-amber">${pending} PENDING APPROVAL</span>` : ''}
+  </div>`;
+
+  if (!inventory.length) {
+    return html + '<div style="color:var(--dim)">No agent inventory available.</div>';
+  }
+
+  // Agent cards
+  html += '<div style="color:var(--dim);font-size:10px;margin-bottom:6px">DETECTED CLI AGENTS</div>';
+  html += inventory.map(a => {
+    const inst = !!a.installed;
+    const dotCls = inst ? 'dot-green' : 'dot-red';
+    const badgeCls = inst ? 'badge-green' : 'badge-red';
+    const modeCls = a.effective_mode === 'read_only' ? 'badge-green' : a.effective_mode === 'dry_run' ? 'badge-blue' : 'badge-amber';
+    const ver = a.version ? ` v${esc(a.version)}` : '';
+    const bestFor = (a.best_for || []).slice(0, 3).join(', ');
+    return `<div class="worker-card">
+      <div class="worker-header">
+        <span class="dot ${dotCls}"></span>
+        <span class="worker-name">${esc(a.display_name || a.name)}</span>
+        <span class="panel-badge ${badgeCls}" style="margin-left:auto">${inst ? 'INSTALLED' : 'MISSING'}</span>
+      </div>
+      <div class="worker-meta">${inst ? esc(a.path || '') + ver : 'not found in PATH'}</div>
+      ${inst ? `<div class="worker-meta">mode: <span class="panel-badge ${modeCls}">${esc(a.effective_mode || 'unknown')}</span> | best for: ${esc(bestFor)}</div>` : ''}
+    </div>`;
+  }).join('');
+
+  // Recent handoffs
+  const recentHandoffs = handoffs.slice(0, 5);
+  if (recentHandoffs.length) {
+    html += '<div style="color:var(--dim);font-size:10px;margin:10px 0 4px">RECENT HANDOFFS</div>';
+    html += recentHandoffs.map(h => {
+      const st = (h.status || 'unknown');
+      const stCls = st === 'completed' ? 'badge-green' : st === 'failed' ? 'badge-red' : 'badge-amber';
+      return `<div class="feed-item">
+        <div class="feed-time">${ts(h.created_at)} | ${esc(h.display_name || h.target_agent || '?')}</div>
+        <div class="feed-text">${esc((h.goal || '').slice(0, 80))} <span class="panel-badge ${stCls}">${esc(st.toUpperCase())}</span></div>
+      </div>`;
+    }).join('');
+  } else {
+    html += '<div style="color:var(--dim);font-size:10px;margin-top:8px">No handoffs yet — use Telegram: "ask gemini to review..."</div>';
+  }
+
+  return html;
+}
+
+async function loadDevAgentsPanel() {
+  try {
+    const token = aiOpsAdminToken();
+    const sep = token ? '?admin_token=' + encodeURIComponent(token) : '';
+    const d = await aiOpsGet('/api/admin/ai-operations/dev-agents' + (token ? '?admin_token=' + encodeURIComponent(token) : ''));
+    document.getElementById('aiops-dev-agents-panel').innerHTML = renderDevAgents(d);
+  } catch(e) {
+    document.getElementById('aiops-dev-agents-panel').innerHTML = `<div class="red">Dev Agent Bridge unavailable: ${esc(e.message)}</div><div style="color:var(--dim)">Fallback mode.</div>`;
+  }
 }
 
 function renderApprovalQueue(data) {
@@ -3859,40 +4426,57 @@ async function aiOpsPost(url, body) {
 }
 
 async function loadAiOpsPage() {
-  try {
-    const d = await aiOpsGet('/api/admin/ai-ops/status');
-    const overview = await aiOpsGet('/api/admin/ai-operations/overview');
-    const session = await aiOpsGet('/api/admin/ai-operations/session');
-    const tasks = await aiOpsGet('/api/admin/ai-operations/tasks');
-    const timeline = await aiOpsGet('/api/admin/ai-operations/timeline');
-    const roleData = await aiOpsGet('/api/admin/ai-ops/roles');
-    const scenarios = await aiOpsGet('/api/admin/ai-ops/swarm-scenarios');
-    const statusData = d.data || d;
-    const overviewData = overview.data || overview;
-    const sessionData = session.data || session;
-    const tasksData = tasks.data || tasks;
-    const timelineData = timeline.data || timeline;
-    const roleRows = (roleData.data || roleData).roles || [];
-    const scenarioRows = (scenarios.data || scenarios).scenarios || [];
+  const errMsg = (label) => `<div class="red">${esc(label)} unavailable</div><div style="color:var(--dim)">Fallback mode active.</div>`;
+  const safe = (p) => p.catch(e => ({ _error: e.message }));
 
-    document.getElementById('aiops-session-panel').innerHTML = renderAiOpsSession(sessionData);
-    document.getElementById('aiops-memory-panel').innerHTML = renderAiOpsMemory(overviewData);
-    document.getElementById('aiops-config-panel').innerHTML = renderAiOpsConfig(statusData);
-    document.getElementById('aiops-routing-panel').innerHTML = renderAiOpsRouting(statusData.routing_preview);
-    document.getElementById('aiops-workers-panel').innerHTML = renderAiOpsWorkers(statusData.worker_health_summary);
-    document.getElementById('aiops-lifecycle-panel').innerHTML = renderAiOpsLifecycle(tasksData);
-    document.getElementById('aiops-telemetry-panel').innerHTML = renderAiOpsTelemetry(statusData.telemetry);
-    document.getElementById('aiops-roles-panel').innerHTML = renderAiOpsRoles(roleRows);
-    document.getElementById('aiops-timeline-panel').innerHTML = renderAiOpsTimeline(timelineData);
+  const [d, overview, session, tasks, timeline, roleData, scenarios, swarm, approvals] = await Promise.all([
+    safe(aiOpsGet('/api/admin/ai-ops/status')),
+    safe(aiOpsGet('/api/admin/ai-operations/overview')),
+    safe(aiOpsGet('/api/admin/ai-operations/session')),
+    safe(aiOpsGet('/api/admin/ai-operations/tasks')),
+    safe(aiOpsGet('/api/admin/ai-operations/timeline')),
+    safe(aiOpsGet('/api/admin/ai-ops/roles')),
+    safe(aiOpsGet('/api/admin/ai-ops/swarm-scenarios')),
+    safe(aiOpsGet('/api/admin/ai-ops/swarm-scenario-preview?scenario_id=funding_onboarding')),
+    safe(aiOpsGet('/api/admin/ai-ops/planned-runs')),
+  ]);
 
-    const sel = document.getElementById('aiops-swarm-scenario');
-    const rows = scenarioRows;
-    if (sel && rows.length) {
-      sel.innerHTML = rows.map(r => `<option value="${esc(r.scenario_id)}">${esc(r.display_name)}</option>`).join('');
-    }
-    await loadSelectedSwarmScenario();
-    await loadApprovalQueue();
+  const statusData = (!d._error) ? (d.data || d) : null;
+  const overviewData = (!overview._error) ? (overview.data || overview) : null;
+  const sessionData = (!session._error) ? (session.data || session) : null;
+  const tasksData = (!tasks._error) ? (tasks.data || tasks) : null;
+  const timelineData = (!timeline._error) ? (timeline.data || timeline) : null;
+  const roleRows = (!roleData._error) ? ((roleData.data || roleData).roles || []) : [];
+  const scenarioRows = (!scenarios._error) ? ((scenarios.data || scenarios).scenarios || []) : [];
 
+  document.getElementById('aiops-session-panel').innerHTML = sessionData ? renderAiOpsSession(sessionData) : errMsg('Session');
+  document.getElementById('aiops-memory-panel').innerHTML = overviewData ? renderAiOpsMemory(overviewData) : errMsg('Memory');
+  document.getElementById('aiops-config-panel').innerHTML = statusData ? renderAiOpsConfig(statusData) : errMsg('Config');
+  document.getElementById('aiops-routing-panel').innerHTML = statusData ? renderAiOpsRouting(statusData.routing_preview) : errMsg('Routing');
+  document.getElementById('aiops-workers-panel').innerHTML = statusData ? renderAiOpsWorkers(statusData.worker_health_summary) : errMsg('Workers');
+  document.getElementById('aiops-lifecycle-panel').innerHTML = tasksData ? renderAiOpsLifecycle(tasksData) : errMsg('Lifecycle');
+  document.getElementById('aiops-telemetry-panel').innerHTML = statusData ? renderAiOpsTelemetry(statusData.telemetry) : errMsg('Telemetry');
+  document.getElementById('aiops-roles-panel').innerHTML = renderAiOpsRoles(roleRows);
+  document.getElementById('aiops-timeline-panel').innerHTML = timelineData ? renderAiOpsTimeline(timelineData) : errMsg('Timeline');
+
+  // Dev Agent Bridge panel — loaded independently (has its own cache TTL)
+  loadDevAgentsPanel();
+
+  const sel = document.getElementById('aiops-swarm-scenario');
+  if (sel && scenarioRows.length) {
+    sel.innerHTML = scenarioRows.map(r => `<option value="${esc(r.scenario_id)}">${esc(r.display_name)}</option>`).join('');
+  }
+  if (!swarm._error) {
+    document.getElementById('aiops-swarm-panel').innerHTML = renderAiOpsSwarm(swarm.data || swarm);
+  }
+  if (!approvals._error) {
+    const approvalsPayload = approvals.data || approvals;
+    document.getElementById('aiops-approval-panel').innerHTML = renderApprovalQueue(approvalsPayload);
+    const fb = document.getElementById('aiops-approval-feedback');
+    if (fb) fb.textContent = `queue updated: ${ts(approvals.timestamp || approvals.updated_at)}`;
+  }
+
+  if (statusData) {
     const tg = statusData.telegram_mode || {};
     const enabledEl = document.getElementById('aiops-flag-enabled');
     const manualEl = document.getElementById('aiops-flag-manual');
@@ -3902,19 +4486,6 @@ async function loadAiOpsPage() {
     if (autoEl) autoEl.checked = !!tg.auto_reports_enabled;
     const fb = document.getElementById('aiops-controls-feedback');
     if (fb) fb.textContent = `last updated: ${ts(d.timestamp || d.updated_at)} | reports: email only | execution: disabled`;
-  } catch (e) {
-    const msg = `<div class="red">AI Ops status unavailable: ${esc(e.message)}</div><div style="color:var(--dim)">Fallback mode active.</div>`;
-    document.getElementById('aiops-config-panel').innerHTML = msg;
-    document.getElementById('aiops-routing-panel').innerHTML = msg;
-    document.getElementById('aiops-workers-panel').innerHTML = msg;
-    document.getElementById('aiops-telemetry-panel').innerHTML = msg;
-    document.getElementById('aiops-roles-panel').innerHTML = msg;
-    document.getElementById('aiops-swarm-panel').innerHTML = msg;
-    document.getElementById('aiops-approval-panel').innerHTML = msg;
-    document.getElementById('aiops-session-panel').innerHTML = msg;
-    document.getElementById('aiops-memory-panel').innerHTML = msg;
-    document.getElementById('aiops-lifecycle-panel').innerHTML = msg;
-    document.getElementById('aiops-timeline-panel').innerHTML = msg;
   }
 }
 
@@ -3968,6 +4539,7 @@ if (window.location.pathname === '/admin/ai-operations') {
 
 // ── Auto-refresh every 30s ──
 loadAll();
+bindTabClicks();
 setInterval(loadAll, 30000);
 </script>
 </body>
@@ -4439,7 +5011,11 @@ def api_trading_status():
 
 @app.route("/")
 def index():
-    return render_template_string(TERMINAL_HTML)
+    response = make_response(render_template_string(TERMINAL_HTML))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 if __name__ == "__main__":

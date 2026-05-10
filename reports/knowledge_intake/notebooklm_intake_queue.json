@@ -1,0 +1,17 @@
+[
+  {
+    "notebook_name": "Funding + Ops Research",
+    "topic": "travel-ready operations",
+    "summary": "NotebookLM notes suggest maintaining a concise pre-travel checklist and restart runbook visibility.",
+    "key_takeaways": [
+      "Keep Telegram and email health checks first",
+      "Use short operator updates and full email reports"
+    ],
+    "action_items": [
+      "Validate launchctl service restart commands before travel",
+      "Review daily priority queue each morning"
+    ],
+    "category": "operations",
+    "confidence": 0.76
+  }
+]
