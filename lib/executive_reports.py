@@ -2,10 +2,22 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Callable
+import json
+from pathlib import Path
 
 from lib import hermes_ops_memory
 from lib.hermes_knowledge_brain import knowledge_dashboard_snapshot
 from lib.agent_collaboration import dry_run_collaboration_plan
+from lib.hermes_operational_telemetry import build_operational_summary, executive_delta_report
+from lib.operational_intelligence import build_operational_intelligence_snapshot
+from lib.client_funding_intelligence import build_client_funding_intelligence_summary
+from lib.trading_intelligence_lab import build_trading_intelligence_report
+from lib.opportunity_intelligence import build_opportunity_intelligence_summary
+from lib.executive_strategy import build_executive_strategy_summary
+from lib.hermes_dev_agent_bridge import get_cli_agent_status, create_cli_handoff
+from lib.demo_readiness import run_demo_readiness_check
+from lib.ceo_report_formatter import format_ceo_brief
+from lib.notebooklm_ingest_adapter import load_dry_run_queue
 
 
 def _safe_select(path: str, timeout: int = 8) -> list[dict[str, Any]]:
@@ -70,6 +82,15 @@ def build_executive_report() -> dict[str, Any]:
     knowledge = build_knowledge_brain_report()
     collaboration = dry_run_collaboration_plan("daily operational intelligence")
     workforce = build_ai_workforce_summary()
+    ops_summary = build_operational_summary()
+    delta = executive_delta_report()
+    operational_intelligence = build_operational_intelligence_snapshot(mode="detailed")
+    funding_intelligence = build_client_funding_intelligence_summary()
+    trading_intelligence = build_trading_intelligence_report()
+    opportunity_intelligence = build_opportunity_intelligence_summary()
+    executive_strategy = build_executive_strategy_summary()
+    dev_agent_bridge = get_cli_agent_status()
+    demo_readiness = run_demo_readiness_check()
     recent_failures = workforce.get("recent_failures") or []
     if not recent_failures:
         recent_failures = [
@@ -101,13 +122,38 @@ def build_executive_report() -> dict[str, Any]:
         },
         "recent_failures": recent_failures[:10],
         "telegram_activity": workforce.get("recent_telegram_activity") or {},
+        "operational_telemetry": {
+            "telegram_reliability": (ops_summary.get("telegram_reliability") or {}),
+            "knowledge_metrics": (ops_summary.get("knowledge_metrics") or {}),
+            "worker_reliability": (ops_summary.get("worker_reliability") or {}),
+        },
+        "operational_intelligence": operational_intelligence,
+        "funding_intelligence": funding_intelligence,
+        "trading_intelligence_lab": trading_intelligence,
+        "opportunity_intelligence": opportunity_intelligence,
+        "executive_strategy_summary": executive_strategy,
+        "dev_agent_bridge": dev_agent_bridge,
+        "demo_readiness": demo_readiness,
+        "delta_summary": delta,
         "next_recommended_actions": next_actions,
         "collaboration_preview": collaboration,
         "funding_credit_summary": {
             "funding": knowledge.get("funding_insights") or [],
             "credit": knowledge.get("credit_insights") or [],
         },
+        "marketing_plan_inputs_needed": (demo_readiness.get("marketing_plan_inputs_needed") or {}),
     }
+
+
+def create_demo_readiness_handoff() -> dict[str, Any]:
+    return create_cli_handoff(
+        target_agent="gemini",
+        goal="Review Nexus repo readiness for demo next week.",
+        context_summary="Read-only review requested. No edits or execution.",
+        allowed_actions=["read", "analyze", "summarize", "plan", "review"],
+        expected_output="Demo readiness review with blockers, risks, and recommendations.",
+        requester="executive_reports",
+    )
 
 
 def build_weekly_ceo_report() -> dict[str, Any]:
@@ -134,21 +180,42 @@ def _as_text(payload: dict[str, Any]) -> str:
         "",
         "Credit Insights:",
         str((payload.get("funding_credit_summary") or {}).get("credit") or []),
+        "",
+        "Operational Intelligence:",
+        str((payload.get("operational_intelligence") or {}).get("executive_summary") or "n/a"),
+        "",
+        "Executive Strategy Next Focus:",
+        str(((payload.get("executive_strategy_summary") or {}).get("next_domain_focus") or {}).get("domain") or "operations"),
     ]
     return "\n".join(lines)
 
 
+def _save_local_report(subject: str, payload: dict[str, Any]) -> str:
+    root = Path(__file__).resolve().parent.parent
+    out_dir = root / "reports"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    safe_name = "executive_report_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + ".json"
+    out_path = out_dir / safe_name
+    out_path.write_text(json.dumps({"subject": subject, "report": payload}, indent=2), encoding="utf-8")
+    return str(out_path)
+
+
 def send_executive_report_email(send_report_email: Callable[[str, str], Any], report_type: str = "daily") -> dict[str, Any]:
     payload = build_weekly_ceo_report() if report_type == "weekly" else build_executive_report()
-    subject_prefix = "Nexus Weekly CEO Report" if report_type == "weekly" else "Nexus Executive Report"
-    subject = f"{subject_prefix} - {_now()}"
-    body = _as_text(payload)
+    root = Path(__file__).resolve().parent.parent
+    queue_path = root / "reports" / "knowledge_intake" / "notebooklm_intake_queue.json"
+    queue = load_dry_run_queue(str(queue_path))
+    payload["notebooklm_queue"] = {"count": len(queue)}
+    subject, body = format_ceo_brief(payload)
     result = send_report_email(subject, body)
     out = {
         "subject": subject,
         "report": payload,
         "email": result if isinstance(result, dict) else {"sent": bool(result), "configured": bool(result), "error": ""},
     }
+    email_sent = bool((out.get("email") or {}).get("sent"))
+    if not email_sent:
+        out["saved_report_path"] = _save_local_report(subject, payload)
     try:
         from lib.event_intake import submit_system_event
 
@@ -158,7 +225,9 @@ def send_executive_report_email(send_report_email: Callable[[str, str], Any], re
             payload={
                 "report_type": report_type,
                 "subject": subject,
+                "email_report_sent": email_sent,
                 "email": out.get("email") or {},
+                "saved_report_path": out.get("saved_report_path"),
                 "timestamp": payload.get("timestamp"),
             },
         )

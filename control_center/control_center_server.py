@@ -418,6 +418,62 @@ def api_admin_knowledge_review_status(record_id: str):
     return jsonify({"ok": True, "record": updated})
 
 
+@app.route("/admin/knowledge-review")
+def admin_knowledge_review_page():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    html = """<!doctype html>
+<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Nexus Knowledge Review</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:#f7f9fc;color:#0f172a;padding:18px}
+.card{background:#fff;border:1px solid #dbe2ea;border-radius:10px;padding:12px;margin-bottom:10px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill{font-size:12px;border:1px solid #dbe2ea;border-radius:999px;padding:3px 9px}
+button{border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer}
+textarea{width:100%;min-height:64px}
+</style></head><body>
+<h2>Knowledge Review (Manual, Dry-Run Safe)</h2>
+<div class='row' style='margin-bottom:12px'>
+<button onclick='loadRecords()'>Refresh</button>
+<span class='pill'>No auto-approve</span><span class='pill'>No auto-store</span>
+</div>
+<div id='flash'></div><div id='records'></div>
+<script>
+async function api(path, method='GET', body=null){
+  const opt={method,headers:{'Content-Type':'application/json'}};
+  if(body)opt.body=JSON.stringify(body);
+  const r=await fetch(path,opt); const d=await r.json(); if(!r.ok) throw new Error(d.error||('HTTP '+r.status)); return d;
+}
+function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]));}
+function card(r){
+  const id=esc(r.id||''); const st=esc(r.status||'proposed');
+  const conf=esc(r.confidence||'n/a'); const cat=esc(r.category||'operations');
+  const sum=esc(r.summary||''); const topic=esc(r.topic||''); const nb=esc(r.notebook_name||'');
+  const rev=esc((r.review||{}).reviewed_by||'');
+  return `<div class='card'><div class='row'><b>${topic||'Untitled'}</b><span class='pill'>${st}</span><span class='pill'>${cat}</span><span class='pill'>confidence=${conf}</span></div>
+  <div style='margin-top:6px'><div><b>Notebook:</b> ${nb||'n/a'}</div><div><b>Summary:</b> ${sum||'n/a'}</div><div><b>Reviewer:</b> ${rev||'n/a'}</div></div>
+  <div style='margin-top:8px'><textarea id='note_${id}' placeholder='Review note'></textarea></div>
+  <div class='row' style='margin-top:8px'>
+    <button onclick="setStatus('${id}','reviewed')">Mark Reviewed</button>
+    <button onclick="setStatus('${id}','approved')">Approve</button>
+    <button onclick="setStatus('${id}','rejected')">Reject</button>
+  </div></div>`;
+}
+async function loadRecords(){
+  try{const d=await api('/api/admin/knowledge-review');document.getElementById('records').innerHTML=(d.records||[]).map(card).join('')||'<div class="card">No records.</div>';document.getElementById('flash').textContent='';}
+  catch(e){document.getElementById('flash').textContent='Error: '+e.message;}
+}
+async function setStatus(id,status){
+  const notes=(document.getElementById('note_'+id)||{}).value||'';
+  try{await api('/api/admin/knowledge-review/'+id+'/status','POST',{status,reviewed_by:'ray',notes});await loadRecords();document.getElementById('flash').textContent='Saved '+status+' for '+id;}
+  catch(e){document.getElementById('flash').textContent='Error: '+e.message;}
+}
+loadRecords();
+</script></body></html>"""
+    return html
+
+
 def _send_tester_email_live(to_email: str, subject: str, body: str) -> None:
     import smtplib
     from email.mime.text import MIMEText
