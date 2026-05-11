@@ -2241,6 +2241,498 @@ def admin_ai_operations_page():
     return response
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Animated Workforce Operations Dashboard
+# Pixel-agents inspired, Apple/Atlas professional aesthetic
+# Real data only — no fake autonomy, no execution flags changed
+# ─────────────────────────────────────────────────────────────────────────────
+_WORKFORCE_OPS_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nexus Workforce Operations Center</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#07090d;--surf:#0d1117;--surf2:#111820;--surf3:#151f2a;
+  --border:#1a2535;--border2:#243040;
+  --text:#dde6f0;--muted:#4e6070;--dim:#2a3a4a;
+  --green:#10b981;--green-glow:rgba(16,185,129,.15);
+  --blue:#3b82f6;--blue-glow:rgba(59,130,246,.15);
+  --amber:#f59e0b;--amber-glow:rgba(245,158,11,.15);
+  --red:#ef4444;--red-glow:rgba(239,68,68,.15);
+  --indigo:#6366f1;
+}
+body{background:var(--bg);color:var(--text);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;min-height:100vh;font-size:13px}
+.wrap{max-width:1380px;margin:0 auto;padding:14px}
+
+/* ── Header ── */
+.hdr{display:flex;align-items:center;justify-content:space-between;
+     background:var(--surf);border:1px solid var(--border);border-radius:10px;
+     padding:12px 16px;margin-bottom:10px;gap:12px;flex-wrap:wrap}
+.hdr-logo{width:34px;height:34px;background:linear-gradient(135deg,#1d4ed8,#7c3aed);
+          border-radius:8px;display:flex;align-items:center;justify-content:center;
+          font-size:16px;flex-shrink:0}
+.hdr-title{font-size:15px;font-weight:700;letter-spacing:-.3px}
+.hdr-sub{font-size:10px;color:var(--muted);margin-top:2px}
+.hdr-r{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.clock{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;
+       background:var(--surf2);border:1px solid var(--border);border-radius:5px;padding:4px 8px}
+.rbtn{background:var(--surf2);border:1px solid var(--border2);color:var(--text);
+      padding:5px 11px;border-radius:6px;font-size:11px;cursor:pointer;transition:background .15s}
+.rbtn:hover{background:var(--surf3)}
+
+/* ── Safety strip ── */
+.safety{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;
+        background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);
+        border-radius:6px;padding:5px 10px;margin-bottom:10px;font-size:9px;color:var(--amber)}
+.sflag{background:rgba(245,158,11,.08);border-radius:3px;padding:2px 6px;
+       letter-spacing:.4px;font-weight:600}
+
+/* ── Metric strip ── */
+.metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:10px}
+.metric{background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.m-lbl{font-size:9px;color:var(--muted);letter-spacing:.7px;text-transform:uppercase}
+.m-val{font-size:22px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;line-height:1}
+.m-sub{font-size:9px;color:var(--muted);margin-top:3px}
+
+/* ── Main layout ── */
+.main{display:grid;grid-template-columns:1fr 270px;gap:10px;margin-bottom:10px}
+
+/* ── Floor plan ── */
+.floor{background:var(--surf);border:1px solid var(--border);border-radius:10px;padding:14px}
+.floor-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.section-title{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.8px;text-transform:uppercase}
+.floor-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;
+  background-image:radial-gradient(circle,var(--dim) 1px,transparent 1px);
+  background-size:18px 18px;background-position:9px 9px;
+  padding:12px;border-radius:6px;border:1px solid var(--border)
+}
+
+/* ── Worker station ── */
+.station{
+  background:var(--surf2);border:1px solid var(--border);border-radius:8px;
+  padding:11px 9px 9px;display:flex;flex-direction:column;align-items:center;
+  text-align:center;position:relative;transition:border-color .3s,box-shadow .3s;
+  min-height:126px;overflow:hidden
+}
+/* avatar */
+.av-wrap{position:relative;width:46px;height:46px;margin-bottom:7px;flex-shrink:0}
+.av{width:42px;height:42px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:800;color:#fff;letter-spacing:-.5px;
+    position:relative;z-index:1;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+.sring{position:absolute;inset:-3px;border-radius:9px;border:2px solid transparent;pointer-events:none}
+
+/* worker labels */
+.w-name{font-size:11px;font-weight:600;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.w-role{font-size:9px;color:var(--muted);margin-bottom:5px}
+.badge{font-size:8px;font-weight:700;letter-spacing:.8px;padding:2px 7px;border-radius:3px;
+       text-transform:uppercase;font-family:ui-monospace,monospace}
+.w-meta{font-size:8px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+.w-act{font-size:8px;color:var(--dim);margin-top:2px;max-width:100%;overflow:hidden;
+       text-overflow:ellipsis;white-space:nowrap}
+.desk-bar{position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:0 0 8px 8px}
+
+/* pixel desk decoration */
+.desk-icon{position:absolute;top:5px;right:6px;width:10px;height:8px;opacity:.25}
+.desk-icon::before{content:'';display:block;width:10px;height:4px;background:var(--muted);border-radius:1px;margin-bottom:1px}
+.desk-icon::after{content:'';display:block;width:6px;height:3px;background:var(--muted);border-radius:1px;margin:0 auto}
+
+/* ── Status themes ── */
+.st-active .station{border-color:rgba(16,185,129,.3);box-shadow:0 0 12px rgba(16,185,129,.06)}
+.st-active .sring{border-color:var(--green);animation:ring-breathe 2.8s ease-in-out infinite}
+.st-active .av{animation:bob 3.2s ease-in-out infinite}
+.st-active .badge{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.3)}
+.st-active .desk-bar{background:var(--green)}
+
+.st-working .station{border-color:rgba(59,130,246,.35);background:rgba(59,130,246,.03)}
+.st-working .sring{border-color:var(--blue);border-style:dashed;animation:ring-spin 1.4s linear infinite}
+.st-working .badge{background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.3)}
+.st-working .desk-bar{background:var(--blue)}
+.st-working .w-act::after{content:'\25ae';animation:blink .7s step-end infinite;margin-left:2px}
+
+.st-waiting .station{border-color:rgba(245,158,11,.3)}
+.st-waiting .sring{border-color:var(--amber);animation:ring-pulse 2s ease-in-out infinite}
+.st-waiting .badge{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.3)}
+.st-waiting .desk-bar{background:var(--amber)}
+
+.st-stale .station{opacity:.55}
+.st-stale .sring{border-color:var(--dim)}
+.st-stale .badge{background:rgba(42,58,74,.3);color:var(--muted);border:1px solid var(--border)}
+.st-stale .desk-bar{background:var(--dim)}
+
+.st-error .station{border-color:rgba(239,68,68,.4)}
+.st-error .sring{border-color:var(--red);animation:ring-flash .9s ease-in-out infinite}
+.st-error .badge{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.st-error .desk-bar{background:var(--red)}
+
+.st-offline .station{opacity:.38}
+.st-offline .badge{background:rgba(26,37,53,.5);color:var(--dim);border:1px solid var(--border)}
+
+/* ── Animations ── */
+@keyframes ring-breathe{
+  0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.5);opacity:1}
+  50%{box-shadow:0 0 0 5px rgba(16,185,129,.0);opacity:.7}
+}
+@keyframes ring-spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes ring-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,.6)}
+  50%{box-shadow:0 0 0 5px rgba(245,158,11,0)}
+}
+@keyframes ring-flash{
+  0%,100%{box-shadow:0 0 6px rgba(239,68,68,.8);opacity:1}
+  50%{box-shadow:none;opacity:.4}
+}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* Reduce motion */
+@media(prefers-reduced-motion:reduce){
+  .sring,.av,.w-act::after{animation:none!important}
+}
+
+/* ── Activity panel ── */
+.activity{background:var(--surf);border:1px solid var(--border);border-radius:10px;
+          padding:13px;display:flex;flex-direction:column;max-height:470px}
+.feed{overflow-y:auto;flex:1;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.fi{padding:6px 0;border-bottom:1px solid var(--border);animation:fadeIn .3s ease}
+.fi:last-child{border-bottom:none}
+.fi-time{color:var(--muted);font-size:8px;margin-bottom:2px;font-variant-numeric:tabular-nums}
+.fi-body{font-size:10px;line-height:1.45;color:var(--text)}
+.fi-tag{font-size:7px;padding:1px 5px;border-radius:2px;margin-right:4px;
+        font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+
+/* ── Queue strip ── */
+.qstrip{background:var(--surf);border:1px solid var(--border);border-radius:10px;
+        padding:13px 15px}
+.qhdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.qbars{display:flex;gap:5px;align-items:flex-end;height:36px}
+.qbar-wrap{display:flex;flex-direction:column;align-items:center;gap:3px}
+.qbar{width:32px;border-radius:3px 3px 0 0;transition:height .6s ease;min-height:3px}
+.qbar-lbl{font-size:8px;color:var(--muted);text-align:center}
+.qlegend{display:flex;gap:14px;margin-top:8px;flex-wrap:wrap}
+.ql-item{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--muted)}
+.ql-dot{width:8px;height:8px;border-radius:2px}
+
+/* ── Empty / no-data ── */
+.no-data{text-align:center;padding:20px;color:var(--muted);font-size:11px;
+         border:1px dashed var(--border);border-radius:6px}
+
+/* ── Accessibility ── */
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+
+/* ── Responsive ── */
+@media(max-width:1000px){
+  .main{grid-template-columns:1fr}
+  .floor-grid{grid-template-columns:repeat(3,1fr)}
+  .activity{max-height:300px}
+  .metrics{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:600px){
+  .floor-grid{grid-template-columns:repeat(2,1fr)}
+  .metrics{grid-template-columns:repeat(2,1fr)}
+  .hdr-title{font-size:13px}
+}
+</style>
+</head>
+<body>
+<div class="wrap" role="main">
+
+<!-- Header -->
+<header class="hdr" role="banner">
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="hdr-logo" aria-hidden="true">&#x2B21;</div>
+    <div>
+      <div class="hdr-title">Nexus Workforce Operations Center</div>
+      <div class="hdr-sub" id="last-upd">Initializing&hellip;</div>
+    </div>
+  </div>
+  <div class="hdr-r">
+    <div class="clock" id="clock" aria-label="Current time"></div>
+    <button class="rbtn" onclick="loadAll()" aria-label="Refresh workforce data">&#8635; Refresh</button>
+  </div>
+</header>
+
+<!-- Safety flags -->
+<div class="safety" role="status" aria-label="Active safety constraints">
+  <span style="font-weight:700;font-size:9px">SAFETY FLAGS ACTIVE &mdash;</span>
+  <span class="sflag">SWARM_EXEC=OFF</span>
+  <span class="sflag">CLI_EXEC=OFF</span>
+  <span class="sflag">TRADING=DRY-RUN</span>
+  <span class="sflag">TELEGRAM=MANUAL-ONLY</span>
+  <span class="sflag">AUTO-REPORTS=OFF</span>
+  <span class="sflag">KNOWLEDGE-AUTO-STORE=OFF</span>
+</div>
+
+<!-- Metrics -->
+<section class="metrics" aria-label="Workforce metrics summary">
+  <div class="metric">
+    <div class="m-lbl">Roster</div>
+    <div class="m-val" id="m-total">9</div>
+    <div class="m-sub">Registered agents</div>
+  </div>
+  <div class="metric">
+    <div class="m-lbl">Online</div>
+    <div class="m-val" id="m-online" style="color:var(--green)" aria-live="polite">&mdash;</div>
+    <div class="m-sub">Recent heartbeat</div>
+  </div>
+  <div class="metric">
+    <div class="m-lbl">Working</div>
+    <div class="m-val" id="m-working" style="color:var(--blue)" aria-live="polite">&mdash;</div>
+    <div class="m-sub">Active jobs</div>
+  </div>
+  <div class="metric">
+    <div class="m-lbl">Stale</div>
+    <div class="m-val" id="m-stale" style="color:var(--amber)" aria-live="polite">&mdash;</div>
+    <div class="m-sub">No recent heartbeat</div>
+  </div>
+  <div class="metric">
+    <div class="m-lbl">Queue Pending</div>
+    <div class="m-val" id="m-queue" style="color:var(--amber)" aria-live="polite">&mdash;</div>
+    <div class="m-sub">Awaiting execution</div>
+  </div>
+  <div class="metric">
+    <div class="m-lbl">Approvals</div>
+    <div class="m-val" id="m-approvals" style="color:var(--amber)" aria-live="polite">&mdash;</div>
+    <div class="m-sub">Pending owner review</div>
+  </div>
+</section>
+
+<!-- Main: floor plan + activity -->
+<div class="main">
+  <section class="floor" aria-label="AI workforce command center">
+    <div class="floor-hdr">
+      <div class="section-title">Command Center Floor Plan</div>
+      <div style="font-size:9px;color:var(--muted)" id="hb-count" aria-live="polite"></div>
+    </div>
+    <div class="floor-grid" id="floor-grid" role="list" aria-label="AI worker stations">
+      <div class="no-data" style="grid-column:1/-1">Loading worker data&hellip;</div>
+    </div>
+  </section>
+  <aside class="activity" aria-label="Live activity feed">
+    <div class="section-title" style="margin-bottom:10px">Live Activity</div>
+    <div class="feed" id="act-feed" aria-live="polite" aria-relevant="additions">
+      <div class="no-data">Loading&hellip;</div>
+    </div>
+  </aside>
+</div>
+
+<!-- Queue load -->
+<section class="qstrip" aria-label="Job queue status">
+  <div class="qhdr">
+    <div class="section-title">Queue Load</div>
+    <div style="font-size:9px;color:var(--muted)" id="q-summary" aria-live="polite">Loading&hellip;</div>
+  </div>
+  <div class="qbars" id="q-bars"></div>
+  <div class="qlegend">
+    <span class="ql-item"><span class="ql-dot" style="background:var(--blue)"></span>Running</span>
+    <span class="ql-item"><span class="ql-dot" style="background:var(--amber)"></span>Pending</span>
+    <span class="ql-item"><span class="ql-dot" style="background:var(--green)"></span>Completed</span>
+    <span class="ql-item"><span class="ql-dot" style="background:var(--red)"></span>Failed</span>
+  </div>
+</section>
+
+</div><!-- .wrap -->
+<script>
+// Token from URL — same pattern as main terminal
+const _p = new URLSearchParams(window.location.search);
+const _tok = _p.get('admin_token') || '';
+function apiUrl(p){const s=p.includes('?')?'&':'?';return _tok?p+s+'admin_token='+encodeURIComponent(_tok):p;}
+async function apiFetch(p){const r=await fetch(apiUrl(p));if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}
+const esc=s=>String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+// Static worker roster — matches real Nexus agent IDs
+const ROSTER=[
+  {id:'hermes',     name:'Hermes',        role:'Command & Routing',   color:'#6366f1',abbr:'HM'},
+  {id:'funding',    name:'Funding AI',    role:'Funding Intelligence',color:'#10b981',abbr:'FA'},
+  {id:'credit',     name:'Credit AI',     role:'Credit Workflow',     color:'#3b82f6',abbr:'CR'},
+  {id:'marketing',  name:'Marketing AI',  role:'Content & Growth',    color:'#f59e0b',abbr:'MK'},
+  {id:'grant',      name:'Grant AI',      role:'Grant Research',      color:'#8b5cf6',abbr:'GR'},
+  {id:'research',   name:'Research AI',   role:'Signal Research',     color:'#06b6d4',abbr:'RS'},
+  {id:'operations', name:'Operations AI', role:'Ops Monitor',         color:'#64748b',abbr:'OP'},
+  {id:'crm',        name:'CRM Copilot',   role:'Client Intelligence', color:'#ec4899',abbr:'CM'},
+  {id:'trading',    name:'Trading Lab',   role:'Market Research (RO)',color:'#f97316',abbr:'TL'},
+];
+
+// Match heartbeat row to roster entry by worker_id substring
+function matchHb(wid,hbs){
+  const w=wid.toLowerCase();
+  return hbs.find(h=>{const i=String(h.worker_id||'').toLowerCase();return i===w||i.includes(w)||w.includes(i);})||null;
+}
+
+// Classify worker state from live heartbeat data
+function classify(hb,jobCount){
+  if(!hb)return 'offline';
+  const s=String(hb.status||'').toLowerCase();
+  const age=hb.last_seen_at?((Date.now()-new Date(hb.last_seen_at).getTime())/60000):9999;
+  if(s==='error'||s==='failed')return 'error';
+  if(s==='pending_approval'||s==='waiting')return 'waiting';
+  if(s==='running'||s==='active'||s==='working')return jobCount>0?'working':'active';
+  if(s==='online'||s==='idle'){
+    if(age<10)return 'active';
+    if(age<60)return 'stale';
+    return 'offline';
+  }
+  if(s==='stale')return 'stale';
+  if(age<5)return 'active';
+  if(age<30)return 'active';
+  if(age<90)return 'stale';
+  return 'offline';
+}
+
+const ST_LABEL={active:'ACTIVE',working:'WORKING',waiting:'WAITING',stale:'STALE',error:'ERROR',offline:'OFFLINE'};
+const ST_DESC={active:'Online — recent heartbeat',working:'Active job in progress',waiting:'Pending owner approval',stale:'Heartbeat overdue',error:'Error or failed job',offline:'No heartbeat data'};
+
+function relTime(iso){
+  if(!iso)return '—';
+  const d=new Date(iso);
+  if(isNaN(d))return '—';
+  const s=Math.floor((Date.now()-d.getTime())/1000);
+  if(s<60)return s+'s ago';
+  if(s<3600)return Math.floor(s/60)+'m ago';
+  if(s<86400)return Math.floor(s/3600)+'h ago';
+  return Math.floor(s/86400)+'d ago';
+}
+
+function stationHTML(w,hb,jobs){
+  const st=classify(hb,jobs);
+  const act=hb?.metadata?.current_task||hb?.metadata?.activity||'';
+  return '<div class="station st-'+esc(st)+'" role="listitem" aria-label="'+esc(w.name)+': '+esc(ST_DESC[st]||'')+'">'+
+    '<div class="desk-icon" aria-hidden="true"></div>'+
+    '<div class="av-wrap" aria-hidden="true">'+
+      '<div class="av" style="background:'+esc(w.color)+'">'+esc(w.abbr)+'</div>'+
+      '<div class="sring" aria-hidden="true"></div>'+
+    '</div>'+
+    '<div class="w-name">'+esc(w.name)+'</div>'+
+    '<div class="w-role">'+esc(w.role)+'</div>'+
+    '<div class="badge" title="'+esc(ST_DESC[st]||'')+'">'+esc(ST_LABEL[st]||'UNKNOWN')+'</div>'+
+    '<div class="w-meta">'+esc(hb?relTime(hb.last_seen_at):'—')+'</div>'+
+    (act?'<div class="w-act" title="'+esc(act)+'">'+esc(act.slice(0,34))+'</div>':'')+
+    '<div class="desk-bar" aria-hidden="true"></div>'+
+  '</div>';
+}
+
+// Feed tag styles
+const TAG={task_completed:['#10b981','#031a10'],task_failed:['#ef4444','#1a0505'],
+           task_running:['#3b82f6','#050e1a'],approval_requested:['#f59e0b','#1a0f01'],
+           approval_granted:['#10b981','#031a10'],workflow_output:['#6366f1','#0b0a1a']};
+function feedHTML(items){
+  if(!items.length)return '<div class="no-data">No recent activity.<br>Workers may be idle or DB unreachable.</div>';
+  return items.slice(0,40).map(it=>{
+    const[fg,bg]=TAG[it.type||'']||['#64748b','#0d1117'];
+    const lbl=String(it.type||'event').replace(/_/g,' ');
+    const body=(it.summary||it.event_type||it.type||'system event').slice(0,80);
+    return '<div class="fi"><div class="fi-time">'+esc(relTime(it.at||it.created_at))+'</div>'+
+      '<div class="fi-body"><span class="fi-tag" style="background:'+bg+';color:'+fg+'">'+esc(lbl)+'</span>'+esc(body)+'</div></div>';
+  }).join('');
+}
+
+function renderQueue(rows){
+  const c={running:0,pending:0,completed:0,failed:0};
+  rows.forEach(r=>{
+    const s=String(r.status||'').toLowerCase();
+    if(s==='running'||s==='active')c.running++;
+    else if(s==='pending'||s==='queued')c.pending++;
+    else if(s==='completed'||s==='done')c.completed++;
+    else if(s==='failed'||s==='error')c.failed++;
+  });
+  const mx=Math.max(...Object.values(c),1);
+  const clr={running:'var(--blue)',pending:'var(--amber)',completed:'var(--green)',failed:'var(--red)'};
+  document.getElementById('q-summary').textContent=
+    c.pending+' pending · '+c.running+' running · '+c.completed+' done · '+c.failed+' failed';
+  return Object.entries(c).map(([k,v])=>{
+    const h=Math.max(3,Math.round(v/mx*32));
+    return '<div class="qbar-wrap"><div class="qbar" style="height:'+h+'px;background:'+clr[k]+'" title="'+v+' '+k+'" aria-label="'+v+' '+esc(k)+' jobs"></div><div class="qbar-lbl">'+v+'</div></div>';
+  }).join('');
+}
+
+// Clock
+function tick(){const el=document.getElementById('clock');if(el)el.textContent=new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+setInterval(tick,1000);tick();
+
+async function loadAll(){
+  document.getElementById('last-upd').textContent='Refreshing…';
+  try{
+    const[wfR,ovR,tlR]=await Promise.all([
+      apiFetch('/api/admin/ai-operations/workforce'),
+      apiFetch('/api/admin/ai-operations/overview').catch(()=>({})),
+      apiFetch('/api/admin/ai-operations/timeline').catch(()=>({data:{timeline:[]}})),
+    ]);
+    const wf=wfR.data||wfR, ov=ovR.data||ovR, tl=tlR.data||tlR;
+    const hbs=wf.worker_heartbeats||[];
+    const qrows=wf.queue_load||[];
+    const activity=wf.recent_activity||[];
+    const timeline=tl.timeline||[];
+    const cnt=wf.online_offline_summary||{};
+
+    // Metrics
+    const online=(cnt.running||0)+(cnt.active||0)+(cnt.online||0);
+    const working=(cnt.running||0)+(cnt.active||0);
+    const stale=cnt.stale||0;
+    const qPend=qrows.filter(r=>['pending','queued'].includes(String(r.status||'').toLowerCase())).length;
+    const approvals=(ov.approval_summary?.pending_count)||0;
+    document.getElementById('m-online').textContent=online;
+    document.getElementById('m-working').textContent=working;
+    document.getElementById('m-stale').textContent=stale;
+    document.getElementById('m-queue').textContent=qPend;
+    document.getElementById('m-approvals').textContent=approvals;
+
+    // Heartbeat label
+    document.getElementById('hb-count').textContent=
+      hbs.length?hbs.length+' live heartbeat'+(hbs.length!==1?'s':''):'No live heartbeat data';
+
+    // Worker stations
+    const fg=document.getElementById('floor-grid');
+    if(!hbs.length&&!qrows.length&&!activity.length){
+      fg.innerHTML='<div class="no-data" style="grid-column:1/-1">No live worker data found.<br>Workers offline or database unreachable.</div>'+
+        ROSTER.map(w=>stationHTML(w,null,0)).join('');
+    } else {
+      fg.innerHTML=ROSTER.map(w=>{
+        const hb=matchHb(w.id,hbs);
+        const jc=qrows.filter(r=>{
+          const m=r.metadata||{};
+          return String(m.worker||m.worker_id||'').toLowerCase().includes(w.id)&&
+                 ['pending','running','queued'].includes(String(r.status||'').toLowerCase());
+        }).length;
+        return stationHTML(w,hb,jc);
+      }).join('');
+    }
+
+    // Activity feed
+    const merged=[
+      ...activity.map(r=>({...r,at:r.created_at,type:['completed','approved','ready'].includes(String(r.status||'').toLowerCase())?'task_completed':r.status==='failed'?'task_failed':'workflow_output'})),
+      ...timeline.slice(0,30),
+    ].sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
+    document.getElementById('act-feed').innerHTML=feedHTML(merged);
+
+    // Queue bars
+    document.getElementById('q-bars').innerHTML=renderQueue(qrows);
+
+    document.getElementById('last-upd').textContent='Updated '+new Date().toLocaleTimeString()+' · Auto-refresh 30s';
+  }catch(e){
+    document.getElementById('last-upd').textContent='Error: '+esc(e.message);
+    document.getElementById('floor-grid').innerHTML=
+      '<div class="no-data" style="grid-column:1/-1">Failed to load: '+esc(e.message)+'<br>Check admin token and server status.</div>'+
+      ROSTER.map(w=>stationHTML(w,null,0)).join('');
+  }
+}
+setInterval(loadAll,30000);
+loadAll();
+</script>
+</body>
+</html>"""
+
+
+@app.route("/admin/workforce-operations")
+def admin_workforce_operations_page():
+    if not _admin_authorized(request):
+        return _unauthorized_response()
+    return _WORKFORCE_OPS_HTML
+
+
 # ─────────────────────────────────────────────
 # Bloomberg-style HTML terminal
 # ─────────────────────────────────────────────
