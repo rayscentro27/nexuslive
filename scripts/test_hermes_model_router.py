@@ -36,7 +36,7 @@ def main() -> int:
     ok &= _check("premium_reasoning requires >=64K", int(p.get("max_context", 0)) >= 64000, str(p))
 
     p2 = get_provider(task_type="cheap_summary", min_context=0)
-    ok &= _check("cheap_summary can use Ollama", p2.get("name") in {"netcup_ollama", "oracle_ollama", "groq"}, str(p2))
+    ok &= _check("cheap_summary can use Ollama", p2.get("name") in {"netcup_ollama", "oracle_ollama", "groq_api"}, str(p2))
 
     # Simulate explicit rejection path for tiny context requirement mismatch
     try:
