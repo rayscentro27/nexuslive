@@ -34,6 +34,7 @@ import { AppShell } from './components/AppShell';
 import { FloatingChat } from './components/FloatingChat';
 import { NotificationToasts } from './components/NotificationToasts';
 import { Zap, Lock, AlertCircle, Bell } from 'lucide-react';
+import InstallPrompt from './components/InstallPrompt';
 
 const DOCK_ITEMS = [
   { id: 'home',          emoji: '🏠', label: 'Home' },
@@ -488,6 +489,7 @@ export default function App() {
         {/* ── public + legacy SPA (tab-based) ───────────────────────────── */}
         <Route path="/*" element={<AppContent />} />
       </Routes>
+      <InstallPrompt />
       </NotificationProvider>
     </AuthProvider>
   );
