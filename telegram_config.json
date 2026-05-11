@@ -1,0 +1,12 @@
+{
+  "bot_token": "USE_ENV_VAR_TELEGRAM_BOT_TOKEN",
+  "chat_id": "USE_ENV_VAR_TELEGRAM_CHAT_ID",
+  "enabled": true,
+  "alert_level": "INFO",
+  "include_charts": true,
+  "include_metrics": true,
+  "nexus_api_url": "http://localhost:3000",
+  "hermes_url": "http://localhost:8642",
+  "supabase_url": "USE_ENV_VAR_SUPABASE_URL",
+  "supabase_key": "USE_ENV_VAR_SUPABASE_KEY"
+}

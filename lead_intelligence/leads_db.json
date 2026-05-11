@@ -1,0 +1,21 @@
+[
+  {
+    "id": "LEAD-202604241632458430",
+    "name": "rayscentro",
+    "email": "rayscentro@yahoo.com",
+    "phone": "",
+    "source": "nexuslive_signup",
+    "interest": "business funding",
+    "message": "Signed up on nexuslive.netlify.app on 2026-04-14",
+    "budget": null,
+    "created_at": "2026-04-24T16:32:45.843053",
+    "score": 15,
+    "tier": "low",
+    "intent": "low",
+    "reasons": [
+      "Source (nexuslive_signup): +5",
+      "Has email: +10"
+    ],
+    "is_high_value": false
+  }
+]

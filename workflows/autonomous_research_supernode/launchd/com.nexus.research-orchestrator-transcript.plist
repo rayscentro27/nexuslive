@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.nexus.research-orchestrator-transcript</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/raymonddavis/.nvm/versions/node/v24.14.0/bin/node</string>
+    <string>/Users/raymonddavis/nexus-ai/workflows/autonomous_research_supernode/research_orchestrator.js</string>
+    <string>--once</string>
+    <string>--transcript</string>
+    <string>--sources</string>
+    <string>sample_sources.json</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/raymonddavis/nexus-ai/workflows/autonomous_research_supernode</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StartInterval</key>
+  <integer>7200</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/raymonddavis/nexus-ai/logs/research-orchestrator-transcript.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/raymonddavis/nexus-ai/logs/research-orchestrator-transcript.error.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/raymonddavis</string>
+    <key>PATH</key>
+    <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/Users/raymonddavis/.nvm/versions/node/v24.14.0/bin</string>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+</dict>
+</plist>

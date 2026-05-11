@@ -1,0 +1,29 @@
+{
+  "content_id": "5be170644250e8eb",
+  "required_assets": [
+    {
+      "type": "background",
+      "description": "Clean branded background (1080x1920 for Reels/Shorts, 1920x1080 for YouTube)"
+    },
+    {
+      "type": "logo_overlay",
+      "description": "Brand logo in corner, 10% opacity"
+    },
+    {
+      "type": "captions",
+      "description": "Word-level captions burned in or as .srt sidecar"
+    },
+    {
+      "type": "hook_text_overlay",
+      "description": "Bold text overlay for first 3 seconds"
+    },
+    {
+      "type": "cta_endcard",
+      "description": "Follow / Subscribe end card 2s"
+    }
+  ],
+  "tooling_ready": true,
+  "missing_tools": [],
+  "manual_required": false,
+  "note": "ffmpeg available \u2014 wire up assembly in stage_assembly()."
+}

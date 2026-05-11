@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.nexus.grant-worker</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/raymonddavis/.nvm/versions/node/v24.14.0/bin/node</string>
+    <string>/Users/raymonddavis/nexus-ai/workflows/ai_workforce/grant_worker/grant_worker.js</string>
+    <string>--since</string>
+    <string>30</string>
+    <string>--min-score</string>
+    <string>40</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/raymonddavis/nexus-ai/workflows/ai_workforce</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StartInterval</key>
+  <integer>14400</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/raymonddavis/nexus-ai/logs/grant-worker.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/raymonddavis/nexus-ai/logs/grant-worker.error.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/raymonddavis</string>
+    <key>PATH</key>
+    <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/Users/raymonddavis/.nvm/versions/node/v24.14.0/bin</string>
+  </dict>
+
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+</dict>
+</plist>

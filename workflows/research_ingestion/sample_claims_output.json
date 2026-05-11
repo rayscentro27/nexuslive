@@ -1,0 +1,68 @@
+{
+  "source_name": "CreditWarrior",
+  "source_type": "youtube_channel",
+  "topic": "credit_repair",
+  "title": "5 Credit Repair Tactics That Actually Work in 2025",
+  "classification": {
+    "topic": "credit_repair",
+    "subthemes": ["dispute_letters", "authorized_user_tradelines"],
+    "confidence": 0.9
+  },
+  "extracted": {
+    "summary": "The video covers five actionable credit repair tactics including dispute letters, authorized user tradelines, and credit mix optimization. The host emphasizes starting with your credit report from AnnualCreditReport.com before taking any action.",
+    "claims": [
+      {
+        "claim_text": "Dispute letters sent directly to bureaus via certified mail have a higher removal rate than online disputes.",
+        "claim_type": "strategy",
+        "confidence": 0.85,
+        "topic": "credit_repair",
+        "subtheme": "dispute_letters"
+      },
+      {
+        "claim_text": "Becoming an authorized user on a primary cardholder's account with 2+ years of history can add 30-50 points within 60 days.",
+        "claim_type": "strategy",
+        "confidence": 0.80,
+        "topic": "credit_repair",
+        "subtheme": "authorized_user_tradelines"
+      },
+      {
+        "claim_text": "Credit utilization below 10% on each individual card maximizes FICO scoring impact.",
+        "claim_type": "framework",
+        "confidence": 0.90,
+        "topic": "credit_repair",
+        "subtheme": null
+      },
+      {
+        "claim_text": "Filing a CFPB complaint after a failed dispute often triggers bureau re-investigation within 15 business days.",
+        "claim_type": "workflow",
+        "confidence": 0.75,
+        "topic": "credit_repair",
+        "subtheme": "dispute_letters"
+      },
+      {
+        "claim_text": "Pay-for-delete agreements with collection agencies are no longer recognized by major bureaus under 2022 FCRA guidance.",
+        "claim_type": "warning",
+        "confidence": 0.70,
+        "topic": "credit_repair",
+        "subtheme": null
+      }
+    ],
+    "key_points": [
+      "Always pull reports from AnnualCreditReport.com before starting any dispute process.",
+      "FICO 8 weighs credit utilization at 30% of total score.",
+      "New hard inquiries drop score 5-10 points for 12 months."
+    ],
+    "action_items": [
+      "Pull all 3 bureau reports from AnnualCreditReport.com",
+      "Identify all derogatory marks older than 24 months for dispute priority",
+      "Draft a goodwill letter to creditors with isolated late payments"
+    ],
+    "risk_warnings": [
+      "Credit repair companies cannot legally charge upfront fees before services rendered.",
+      "Dispute factories that mass-dispute all items may trigger bureau fraud flags."
+    ],
+    "opportunity_notes": [
+      "Authorized user tradeline rental is a growing service business with $500-2000/month revenue potential per client."
+    ]
+  }
+}

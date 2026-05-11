@@ -1,0 +1,19 @@
+{
+  "forex": {
+    "min_samples_for_optimization": 10,
+    "sl_tp_analysis": true,
+    "threshold_analysis": true
+  },
+  "options": {
+    "min_samples_for_optimization": 5,
+    "structure_analysis": true
+  },
+  "confidence": {
+    "calibration_analysis": true,
+    "min_calibration_samples": 5
+  },
+  "output": {
+    "write_to_supabase": true,
+    "send_telegram": true
+  }
+}

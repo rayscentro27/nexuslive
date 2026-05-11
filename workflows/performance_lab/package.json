@@ -1,0 +1,11 @@
+{
+  "name": "nexus-performance-lab",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "scorecards": "node performance_runner.js --scorecards",
+    "rank": "node performance_runner.js --rank",
+    "ingest": "node performance_runner.js --ingest"
+  },
+  "dependencies": { "dotenv": "^16.4.5" }
+}

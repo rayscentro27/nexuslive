@@ -1,0 +1,58 @@
+**Strategies**
+- **Event-driven macro trading (geopolitical risk premium):**
+Focus is on how geopolitical events (war escalation, potential Strait of Hormuz disruption) reprice oil via expected supply shocks.
+- **Gap-and-hold context read:**
+They note oil is “trading around where it gapped up over the weekend,” implying a strategy lens of:
+- gap up on risk event
+- assess whether price **holds** gap levels vs fades
+- infer whether market is pricing persistent risk or temporary headline shock
+- **Relative expectation strategy:**
+Compare current price behavior vs what “should” happen under severe disruption scenarios. Their read: oil is elevated but still “muted,” suggesting market expects **contained** disruption rather than full supply outage.
+
+---
+
+**Indicators**
+- **No classic technical indicators** (no RSI, MACD, moving averages, etc.) are explicitly used.
+- Primary “indicators” in this discussion are:
+- **Spot price levels:** Brent around ~$83.5; US oil around ~$75
+- **Percent change context:** oil now ~15% above earlier level when conflict started
+- **Gap reference level:** weekend gap-up area as a key regime marker
+- **Fundamental trigger variable:** accessibility of regional energy supply (especially via Strait of Hormuz)
+
+---
+
+**Risk Management**
+- **Not explicitly defined** in the transcript (no stop-loss %, position sizing formula, or R:R targets given).
+- Implied risk framework:
+- Treat **geopolitical headlines** as volatility catalysts.
+- Avoid overpricing worst-case scenarios unless there is confirmed supply disruption.
+- Monitor binary risk node: **Hormuz closure/threat** as key escalation trigger.
+- Practical implementation (inferred, not stated):
+- Use smaller size around headline risk windows (weekends/conflict escalation).
+- Define invalidation around gap-fill or failure-to-hold post-event levels.
+
+---
+
+**Trade Setups**
+1. **Geopolitical escalation long setup (implied):**
+- **Condition:** credible threat to Hormuz / regional export flow.
+- **Entry logic:** long crude on confirmation of supply-access risk.
+- **Confirmation:** sustained trade above weekend gap zone, broad market repricing.
+2. **Contained-risk / muted-reaction setup (implied):**
+- **Condition:** conflict persists but supply channels remain open.
+- **Entry logic:** fade extreme panic pricing; expect stabilization near current ranges.
+- **Confirmation:** price stays around gap-up zone without follow-through breakout.
+3. **Regional demand sensitivity filter:**
+- Track dependence of major Asian importers (India, Pakistan, China, Japan, South Korea) as demand-side context for how severe supply disruptions could propagate.
+
+---
+
+**Psychology**
+- **Stay evidence-based, not narrative-driven:**
+They acknowledge scary headlines but emphasize what market pricing actually shows (“muted” reaction).
+- **Avoid reflexive overreaction:**
+Market may “brace for impact,” but price confirmation matters more than fear.
+- **Focus on the key variable:**
+Not conflict in general, but **energy accessibility/supply flow** is the actionable driver.
+- **Scenario thinking over certainty:**
+They frame multiple outcomes (threat vs closure vs status quo) rather than committing to one story too early.

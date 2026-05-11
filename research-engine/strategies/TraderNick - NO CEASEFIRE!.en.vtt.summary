@@ -1,0 +1,91 @@
+**Strategies**
+- **Macro-sentiment + technical context trading**
+- The speaker frames trades using a mix of macro factors and chart structure: gold strength, dollar strength, stock market rebound attempts, oil stability, and geopolitical headlines.
+- Core idea: assess whether price action is confirming or diverging from broader sentiment and macro conditions.
+- **Contrarian sentiment read**
+- Heavy bearish crowd sentiment is treated as potentially meaningful, especially when markets begin stabilizing or rebounding.
+- The put/call ratio is referenced as a way to gauge when positioning may be shifting toward bullishness.
+- **Trend filter approach**
+- The market is still viewed cautiously because price remains **below the 200-day moving average**.
+- That implies: rebounds may be tradable, but the larger trend has not yet fully turned bullish.
+- **Event-driven trading awareness**
+- Geopolitical developments, especially US-Iran / ceasefire-related news, are treated as catalysts that can strongly affect gold, risk assets, and sentiment.
+
+**Indicators**
+- **200-day moving average**
+- Used as a major trend filter.
+- If price is below it, the speaker suggests the broader market remains in a weaker or not-yet-confirmed recovery state.
+- **VIX**
+- Used to judge market fear/volatility conditions.
+- A decline from above 30 to around 25 is interpreted as volatility cooling, which may support stabilization or rebound conditions.
+- **Put/Call Ratio**
+- Used as a sentiment/positioning indicator.
+- A surge in call-side activity is interpreted as increased bullish sentiment or a shift away from extreme pessimism.
+- **Price levels in macro assets**
+- **Gold**: sharp recovery highlighted as important momentum/safety demand signal.
+- **Dollar near 99**: used as a macro strength gauge.
+- **Oil below 100**: viewed as a sign that inflationary/panic conditions are not spiraling further.
+- **Sentiment surveys**
+- AAII-style investor sentiment data is used to assess crowd psychology and potential contrarian opportunities.
+
+**Risk Management**
+- **Caution under major resistance/trend filters**
+- Even with rebounds, the speaker avoids declaring full bullish confirmation while price remains below the 200-day moving average.
+- Practical takeaway: reduce conviction or size when broader trend confirmation is missing.
+- **Respect volatility regime**
+- VIX is monitored to judge whether conditions are becoming safer for risk-taking.
+- High volatility implies more caution; cooling volatility may allow more confidence.
+- **Headline risk awareness**
+- Because the setup is tied partly to geopolitical developments, traders should account for sudden reversals from news flow.
+- This implies tighter risk controls around event-sensitive assets like gold and indices.
+- **No explicit sizing/stop formula given in the excerpt**
+- The transcript segment does **not** specify fixed stop-loss distances, % risk per trade, or target R-multiples.
+- Implied risk practice: trade smaller or stay cautious when technical confirmation is incomplete and macro headlines are driving moves.
+
+**Trade Setups**
+- **Rebound setup in risk assets**
+- Conditions:
+- Stock market showing signs of rebounding
+- VIX cooling off
+- Oil not breaking higher
+- Sentiment still pessimistic
+- Interpretation: a rebound can continue when fear eases but crowd positioning remains overly bearish.
+- **Contrarian bullish setup**
+- Conditions:
+- Broad sentiment is “very, very bearish”
+- Market begins stabilizing or rallying anyway
+- Put/call activity starts shifting bullish
+- Interpretation: overly negative sentiment may fuel upside as traders reposition.
+- **Gold momentum / safe-haven reaction setup**
+- Conditions:
+- Sharp move in gold tied to macro/geopolitical catalysts
+- Market uncertainty still elevated
+- Interpretation: gold strength may signal continued defensive demand or event-driven momentum.
+- **Trend-confirmation filter**
+- Condition:
+- If price remains below the 200-day MA, treat rallies as provisional rather than fully confirmed trend reversals.
+- Interpretation: enter more selectively until price reclaims major long-term trend levels.
+
+**Psychology**
+- **Stay skeptical during rebounds**
+- The speaker does not blindly trust a bounce just because price is moving higher.
+- Mindset: avoid emotional overreaction to short-term recovery moves.
+- **Use crowd sentiment as context, not gospel**
+- Extreme bearishness matters, but it should be weighed alongside actual price action and volatility.
+- Good trading psychology here is to separate what people feel from what the market is doing.
+- **Respect uncertainty**
+- The discussion emphasizes that markets are still in a fragile state despite improved short-term action.
+- Mindset: remain flexible, not dogmatic.
+- **Avoid narrative-only trading**
+- Geopolitical stories matter, but the speaker still checks technical markers like the 200-day MA and VIX.
+- Mental model: combine story + data + chart confirmation.
+
+**Bottom line**
+This transcript is less about a precise mechanical strategy and more about a **top-down discretionary framework**:
+- Watch **macro context**
+- Track **sentiment extremes**
+- Use **technical filters** like the 200-day MA
+- Monitor **volatility** via the VIX
+- Stay **cautious and flexible** until broader trend confirmation appears
+
+If you want, I can turn this into a tighter **trader-ready checklist** or a **JSON schema extraction** for transcript analysis.

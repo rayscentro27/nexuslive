@@ -1,0 +1,66 @@
+{
+  "date": "2026-03-11",
+  "daily_pnl": 0,
+  "open_positions": [
+    {
+      "symbol": "EUR_USD",
+      "side": "buy",
+      "strategy_id": "trend_follow",
+      "asset_type": "forex",
+      "approved_at": "2026-03-11T13:42:04.658Z"
+    },
+    {
+      "symbol": "EUR_USD",
+      "side": "buy",
+      "strategy_id": "trend_follow",
+      "asset_type": "forex",
+      "approved_at": "2026-03-11T13:43:16.581Z"
+    },
+    {
+      "symbol": "EUR_USD",
+      "side": "buy",
+      "strategy_id": "trend_follow",
+      "asset_type": "forex",
+      "approved_at": "2026-03-11T13:43:26.848Z"
+    },
+    {
+      "symbol": "GBP_USD",
+      "side": "buy",
+      "strategy_id": "trend_follow",
+      "asset_type": "forex",
+      "approved_at": "2026-03-11T13:46:03.412Z"
+    },
+    {
+      "symbol": "GBP_USD",
+      "side": "buy",
+      "strategy_id": "trend_follow",
+      "asset_type": "forex",
+      "approved_at": "2026-03-11T13:46:11.216Z"
+    },
+    {
+      "symbol": "AUD_USD",
+      "side": "buy",
+      "strategy_id": "trend_follow",
+      "asset_type": "forex",
+      "approved_at": "2026-03-11T13:50:39.821Z"
+    },
+    {
+      "symbol": "AUD_USD",
+      "side": "buy",
+      "strategy_id": "trend_follow",
+      "asset_type": "forex",
+      "approved_at": "2026-03-11T13:50:40.935Z"
+    },
+    {
+      "symbol": "USD_JPY",
+      "side": "buy",
+      "strategy_id": "trend_follow",
+      "asset_type": "forex",
+      "approved_at": "2026-03-11T14:38:29.125Z"
+    }
+  ],
+  "total_evaluated": 8,
+  "total_approved": 7,
+  "total_blocked": 0,
+  "total_review": 1
+}

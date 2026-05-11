@@ -1,0 +1,34 @@
+{
+  "name": "April Grant + Opportunity Sweep",
+  "owner": "ray@nexus",
+  "project_type": "opportunity_pipeline",
+  "objective": "Continuously surface the best monetizable business opportunities from recent Nexus research with minimal supervision.",
+  "deadline": null,
+  "priority": "high",
+  "autonomy_mode": "assisted",
+  "topics": [
+    "business_opportunities",
+    "crm_automation"
+  ],
+  "constraints": [
+    "No live trading",
+    "No client PII",
+    "Only draft outputs can bypass approval"
+  ],
+  "deliverables": [
+    "ranked_opportunities",
+    "operator_brief"
+  ],
+  "requested_roles": [
+    "research_worker",
+    "opportunity_worker"
+  ],
+  "payload": {
+    "since_days": 14,
+    "min_score": 45
+  },
+  "metadata": {
+    "request_channel": "manual_cli",
+    "project_source": "human_project_intake"
+  }
+}

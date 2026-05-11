@@ -1,0 +1,65 @@
+**Strategies**
+- **Core strategy: The Wheel (cash-secured puts → covered calls → repeat).**
+- Step 1: Sell a **cash-secured put** at a strike where you’re willing to buy.
+- Step 2a: If not assigned, keep premium and sell another put.
+- Step 2b: If assigned, buy shares at strike (effective cost reduced by premium).
+- Step 3: Sell **covered calls** above cost basis/purchase price.
+- Step 4a: If shares not called away, keep premium and repeat covered calls.
+- Step 4b: If called away, realize share profit + keep all premiums, then return to puts.
+- **Intended market regime:** Best framed for **sideways/slowly trending** underlying (“slow stocks,” “barely moved ETF”).
+- **Edge claimed in transcript:** Monetizing **time decay + volatility + patience** versus passive buy-and-hold.
+
+---
+
+**Indicators**
+- No classic chart indicators (RSI, MACD, MA, etc.) were explicitly mentioned.
+- Implied “indicators” used in decision-making:
+- **Price level selection** (“your price” for put strike).
+- **Volatility context** (higher option premiums improve wheel income).
+- **Time decay (theta)** as recurring source of premium capture.
+- Practical interpretation: This is more an **options-income framework** than a technical-indicator strategy.
+
+---
+
+**Risk Management**
+- **Capital structure implied:** Use **cash-secured puts** (fully funded assignment risk).
+- **Assignment risk accepted:** You must be willing to own the underlying at put strike.
+- **Strike discipline:** Covered calls are sold **above purchase price** to target profitable exits.
+- **Income buffer:** Premiums reduce net basis and partially cushion downside.
+- **Missing (important) controls not discussed in transcript:**
+- Position sizing limits (e.g., max % capital per ticker).
+- Downside defense in sharp selloffs (wheel can underperform in strong bear trends).
+- Early-assignment/dividend risk, liquidity/spread filters.
+- Explicit stop-loss or adjustment rules.
+- **Analyst note:** The “$5,800 vs $488” example is anecdotal and should be treated as **scenario-specific**, not guaranteed expectancy.
+
+---
+
+**Trade Setups**
+1. **Put-selling setup (entry into wheel)**
+- Condition: Want to own quality stock/ETF at lower price.
+- Action: Sell cash-secured put at desired entry strike.
+- Outcome paths:
+- No assignment → premium income, re-sell puts.
+- Assignment → acquire shares at target level.
+
+2. **Covered-call setup (income while holding shares)**
+- Condition: Shares assigned/owned.
+- Action: Sell covered call above cost basis.
+- Outcome paths:
+- Price below call strike at expiry → keep shares + premium, repeat.
+- Price above strike → shares called away at profit + premium retained.
+
+3. **Cycle reset**
+- After call-away, rotate back to cash-secured puts and continue wheel.
+
+---
+
+**Psychology**
+- **Patience-first mindset:** “Get paid to wait” rather than chasing entries.
+- **Rule-based repetition:** Follow the cycle mechanically instead of emotional switching.
+- **Acceptance of outcomes:** Be comfortable with both assignment and call-away (both are planned outcomes).
+- **Discipline over prediction:** Strategy relies on process consistency, not directional forecasting.
+- **Expectation management:** Focus on **consistent cash flow**, not maximizing upside in runaway bull moves.
+
+If you want, I can convert this into a **checklist playbook** (strike selection, DTE, delta targets, rolling rules, and max allocation limits) to make it executable.

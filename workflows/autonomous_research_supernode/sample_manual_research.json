@@ -1,0 +1,31 @@
+{
+  "manual_sources": [
+    {
+      "topic": "credit_repair",
+      "subtheme": "dispute_letters",
+      "title": "CFPB 2024 Dispute Letter Best Practices",
+      "content_text": "As of 2024, the CFPB recommends sending dispute letters via certified mail to all three bureaus simultaneously. Include your name, address, SSN last 4, the specific item in dispute, the reason it is inaccurate, and your requested resolution. Attach supporting documentation such as payment records or account statements. Bureaus must respond within 30 days under FCRA. Online disputes may be processed faster but give up some legal protections. The CFPB complaint portal can be used as an escalation tool if bureaus fail to investigate properly.",
+      "source_name": "Manual Research — CFPB Notes",
+      "source_type": "manual",
+      "source_url": null
+    },
+    {
+      "topic": "grant_research",
+      "subtheme": "small_business_grants",
+      "title": "Arizona Small Business Grant Programs Q1 2026",
+      "content_text": "Arizona Commerce Authority offers the Small Business Capital Access Program providing loans up to $250k with favorable terms for businesses under 100 employees. The AZSBDC network provides free consulting and helps with grant applications. The SBA SBIR program is open to Arizona tech companies with Phase I awards up to $275k and Phase II up to $1.8M. Local city programs in Phoenix and Tucson offer micro-grants from $5k to $25k for minority-owned businesses. Applications are typically open January-March each year. Eligibility requires 2+ years in operation, AZ registration, and annual revenue under $2M for most programs.",
+      "source_name": "Manual Research — AZ Grants",
+      "source_type": "manual",
+      "source_url": null
+    },
+    {
+      "topic": "business_opportunities",
+      "subtheme": "AI_automation_agency",
+      "title": "AI Automation Agency Business Model Overview",
+      "content_text": "AI automation agencies are a growing service business model where agencies build and maintain automated workflows for small and medium businesses using tools like Make.com, Zapier, GoHighLevel, and custom GPT integrations. Typical client retainers range from $1,500 to $5,000 per month for ongoing automation management. High-demand niches include real estate, healthcare, insurance, and legal. Core services include CRM automation, lead nurturing sequences, appointment setting bots, and reporting dashboards. Client acquisition typically happens via LinkedIn outreach and referral networks. Profit margins are 60-80% after tool costs. Barriers to entry are low but client trust and delivery speed are the main differentiators.",
+      "source_name": "Manual Research — AI Agency",
+      "source_type": "manual",
+      "source_url": null
+    }
+  ]
+}

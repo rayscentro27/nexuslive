@@ -1,0 +1,289 @@
+{
+  "sources": [
+    {
+      "type": "website",
+      "topic": "credit_repair",
+      "name": "CFPB Credit Report Disputes",
+      "url": "https://www.consumerfinance.gov/ask-cfpb/how-do-i-dispute-an-error-on-my-credit-report-en-314/"
+    },
+    {
+      "type": "website",
+      "topic": "credit_repair",
+      "name": "USA.gov Credit Report Errors",
+      "url": "https://www.usa.gov/credit-report-errors"
+    },
+    {
+      "type": "website",
+      "topic": "credit_repair",
+      "name": "Experian Dispute Center",
+      "url": "https://www.experian.com/help/dispute-credit.html"
+    },
+    {
+      "type": "website",
+      "topic": "credit_repair",
+      "name": "TransUnion Credit Disputes",
+      "url": "https://www.transunion.com/credit-disputes/dispute-your-credit"
+    },
+    {
+      "type": "website",
+      "topic": "credit_repair",
+      "name": "Equifax Credit Report Help",
+      "url": "https://www.equifax.com/personal/help/"
+    },
+    {
+      "type": "youtube_channel",
+      "lane": "transcript",
+      "topic": "credit_repair",
+      "name": "Credit Plug",
+      "url": "https://www.youtube.com/@creditplug"
+    },
+    {
+      "type": "youtube_channel",
+      "lane": "transcript",
+      "topic": "credit_repair",
+      "name": "Monica Main",
+      "url": "https://www.youtube.com/@MonicaMain",
+      "max_videos": 3
+    },
+    {
+      "type": "youtube_channel",
+      "topic": "credit_repair",
+      "name": "Darius Benders",
+      "url": "https://www.youtube.com/@Dariusbenders"
+    },
+    {
+      "type": "youtube_channel",
+      "topic": "credit_repair",
+      "name": "Fix Your Credit Faster",
+      "url": "https://www.youtube.com/@fixyourcreditfaster"
+    },
+    {
+      "type": "website",
+      "topic": "credit_repair",
+      "name": "Help Me Build Credit - 0% APR Business Credit Cards",
+      "url": "https://helpmebuildcredit.com/how-to-get-approved-for-over-100k-on-0-apr-business-credit-cards/"
+    },
+
+    {
+      "type": "website",
+      "topic": "grant_research",
+      "name": "Grants.gov",
+      "url": "https://www.grants.gov/"
+    },
+    {
+      "type": "website",
+      "topic": "grant_research",
+      "name": "Grants.gov Eligibility",
+      "url": "https://www.grants.gov/learn-grants/grant-eligibility"
+    },
+    {
+      "type": "website",
+      "topic": "grant_research",
+      "name": "SBA Funding Programs",
+      "url": "https://www.sba.gov/funding-programs"
+    },
+    {
+      "type": "website",
+      "topic": "grant_research",
+      "name": "SBA Grants",
+      "url": "https://www.sba.gov/funding-programs/grants"
+    },
+    {
+      "type": "website",
+      "topic": "grant_research",
+      "name": "Hello Alice Grants",
+      "url": "https://helloalice.com/funding/grants/"
+    },
+    {
+      "type": "website",
+      "topic": "grant_research",
+      "name": "SCORE",
+      "url": "https://www.score.org/"
+    },
+    {
+      "type": "website",
+      "topic": "grant_research",
+      "name": "Arizona Commerce Authority",
+      "url": "https://www.azcommerce.com/"
+    },
+    {
+      "type": "website",
+      "topic": "grant_research",
+      "name": "SBIR.gov",
+      "url": "https://www.sbir.gov/"
+    },
+    {
+      "type": "website",
+      "topic": "grant_research",
+      "name": "MBDA Grants and Loans",
+      "url": "https://www.mbda.gov/page/grants-and-loans"
+    },
+    {
+      "type": "website",
+      "topic": "grant_research",
+      "name": "CDFI Program",
+      "url": "https://www.cdfifund.gov/programs-training/programs/cdfi-program"
+    },
+    {
+      "type": "website",
+      "topic": "grant_research",
+      "name": "CDFI Fund FAQ",
+      "url": "https://www.cdfifund.gov/faq"
+    },
+    {
+      "type": "website",
+      "topic": "grant_research",
+      "name": "SBA Women's Business Centers",
+      "url": "https://www.sba.gov/local-assistance/resource-partners/womens-business-centers"
+    },
+    {
+      "type": "website",
+      "topic": "grant_research",
+      "name": "Grants.gov SBA Search",
+      "url": "https://www.grants.gov/search-grants.html?agencyCode=SBA"
+    },
+
+    {
+      "type": "youtube_channel",
+      "topic": "business_opportunities",
+      "name": "Alex Hormozi",
+      "url": "https://www.youtube.com/@AlexHormozi"
+    },
+    {
+      "type": "youtube_channel",
+      "topic": "business_opportunities",
+      "name": "Codie Sanchez",
+      "url": "https://www.youtube.com/@CodieSanchezCT"
+    },
+    {
+      "type": "youtube_channel",
+      "lane": "transcript",
+      "topic": "business_opportunities",
+      "name": "Tech Conversations",
+      "url": "https://www.youtube.com/@TechConversations",
+      "max_videos": 3
+    },
+    {
+      "type": "youtube_channel",
+      "lane": "transcript",
+      "topic": "business_opportunities",
+      "name": "JT Hustlez",
+      "url": "https://www.youtube.com/@JTHustlez",
+      "max_videos": 3
+    },
+    {
+      "type": "youtube_channel",
+      "lane": "transcript",
+      "topic": "business_opportunities",
+      "name": "Roberts Tech Toolbox",
+      "url": "https://www.youtube.com/@RobertsTechToolbox",
+      "max_videos": 3
+    },
+    {
+      "type": "youtube_channel",
+      "lane": "transcript",
+      "topic": "general_business_intelligence",
+      "name": "Stedman Waiters",
+      "url": "https://www.youtube.com/@StedmanWaiters",
+      "max_videos": 3
+    },
+    {
+      "type": "website",
+      "topic": "business_opportunities",
+      "name": "Starter Story",
+      "url": "https://www.starterstory.com/"
+    },
+    {
+      "type": "website",
+      "topic": "business_opportunities",
+      "name": "Indie Hackers",
+      "url": "https://www.indiehackers.com/"
+    },
+    {
+      "type": "website",
+      "topic": "business_opportunities",
+      "name": "MicroAcquire / Acquire",
+      "url": "https://acquire.com/"
+    },
+
+    {
+      "type": "website",
+      "topic": "crm_automation",
+      "name": "HubSpot Blog - CRM",
+      "url": "https://blog.hubspot.com/sales"
+    },
+    {
+      "type": "website",
+      "topic": "crm_automation",
+      "name": "Zapier Blog Automation",
+      "url": "https://zapier.com/blog/"
+    },
+    {
+      "type": "website",
+      "topic": "crm_automation",
+      "name": "Make Blog",
+      "url": "https://www.make.com/en/blog"
+    },
+
+    {
+      "type": "youtube_channel",
+      "topic": "trading",
+      "name": "Option Alpha",
+      "url": "https://www.youtube.com/c/OptionAlpha"
+    },
+    {
+      "type": "youtube_channel",
+      "topic": "trading",
+      "name": "SMB Capital",
+      "url": "https://www.youtube.com/@SMBCapital"
+    },
+    {
+      "type": "youtube_channel",
+      "topic": "trading",
+      "name": "Options With Ravish",
+      "url": "https://www.youtube.com/@OptionsWithRavish"
+    },
+    {
+      "type": "youtube_channel",
+      "topic": "trading",
+      "name": "Luuk Alleman",
+      "url": "https://www.youtube.com/@LuukAlleman"
+    },
+    {
+      "type": "youtube_channel",
+      "lane": "transcript",
+      "topic": "trading",
+      "name": "Scarface Trades",
+      "url": "https://www.youtube.com/@ScarfaceTrades",
+      "max_videos": 3
+    },
+    {
+      "type": "youtube_channel",
+      "lane": "transcript",
+      "topic": "trading",
+      "name": "Trade Tactics",
+      "url": "https://www.youtube.com/@tradetactics",
+      "max_videos": 3
+    },
+    {
+      "type": "youtube_channel",
+      "lane": "transcript",
+      "topic": "trading",
+      "name": "Alec Delpuech",
+      "url": "https://www.youtube.com/@alecdelpuech",
+      "max_videos": 3
+    },
+    {
+      "type": "website",
+      "topic": "trading",
+      "name": "OANDA Learn",
+      "url": "https://www.oanda.com/us-en/trade-tap-blog/"
+    },
+    {
+      "type": "website",
+      "topic": "trading",
+      "name": "CBOE Education",
+      "url": "https://www.cboe.com/optionsinstitute/"
+    }
+  ]
+}

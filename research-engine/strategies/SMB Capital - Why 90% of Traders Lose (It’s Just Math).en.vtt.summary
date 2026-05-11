@@ -1,0 +1,57 @@
+**Strategies**
+- **“Be the casino” / positive expectancy approach**: Build trades where the math favors you over many repetitions, rather than betting on single outcomes.
+- **Probability-first options trading**: Avoid low-probability long call gambling (example given: buying a 30-delta call and still losing despite a small directional move).
+- **Systematic edge model**:
+- Use a **time-tested win rate**
+- Keep **defined risk** and **defined reward**
+- Execute repeatedly across large sample sizes (e.g., 100 trades)
+- **Example framework in transcript**:
+- Win rate: **60%**
+- Avg win: **+15%**
+- Avg loss: **-7.5%**
+- R:R = **1:2** (risk $1 to make $2)
+- Still profitable even if win rate drops toward **50%** because reward > risk.
+
+---
+
+**Indicators**
+- **Option Delta (probability proxy)**:
+- A **30-delta call** is presented as roughly a **30% chance** of finishing ITM.
+- Key message: many retail traders ignore what delta implies about odds.
+- No traditional chart indicators (RSI/MACD/EMA, etc.) are discussed in the provided portion.
+
+---
+
+**Risk Management**
+- **Defined risk per trade** (loss is capped and planned in advance).
+- **Defined reward target** (profit objective pre-planned).
+- **Risk/Reward emphasis**:
+- Target **2:1 reward-to-risk** profile.
+- Example: lose 7.5% when wrong, make 15% when right.
+- **Expectancy math over streaks**:
+- Focus on aggregate P/L across many trades, not individual outcomes.
+- **Position sizing implication**:
+- Keep trade risk standardized enough to make expectancy math meaningful over 50–100+ trades.
+
+---
+
+**Trade Setups**
+- **Avoided setup** (explicitly criticized):
+- Buying OTM/low-delta calls hoping for a directional move without sufficient probability edge.
+- **Preferred setup characteristics**:
+1. Measured historical win rate
+2. Predefined stop/exit loss
+3. Predefined profit target
+4. Positive expectancy (win% × avg win > loss% × avg loss)
+- **Entry condition (conceptual)**:
+- Enter only when structure supports favorable expectancy, not when “it feels like it’ll move.”
+
+---
+
+**Psychology**
+- **Identity shift**: Stop thinking like a gambler; think like the house.
+- **Discipline over excitement**: Professionals don’t chase luck; they execute edge.
+- **Process orientation**: Judge performance by consistency with system and expectancy, not by whether the last trade won.
+- **Probabilistic mindset**: Accept that losses are normal; edge plays out over a series, not a single trade.
+
+If you want, I can turn this into a **one-page trading checklist** (pre-trade, in-trade, post-trade) based on this framework.

@@ -1,0 +1,158 @@
+{
+  "project": {
+    "id": "c1256169-7df3-5898-9ea0-47c10e68ced5",
+    "recommendation_id": "f8ca8423-05a2-59fc-94bb-3efd7a792c5e",
+    "domain": "business",
+    "project_type": "business_buildout",
+    "title": "How to Manage Time Like a Top 1% CEO",
+    "summary": "Turn missed follow-up into booked calls. For operators in the saas opportunities space who need faster growth and clearer systems, this offer fixes slow follow-up, missed leads, and messy conversion handoffs",
+    "status": "queued",
+    "metadata": {
+      "trace_id": "94599ce6-76e0-4f37-ae45-20092e6d7b00",
+      "recommendation": "review",
+      "profitability_path": "Profitability comes from packaging a repeatable service, keeping delivery lean, and upselling follow-on work",
+      "workflow_output_warning": "{\"code\":\"PGRST204\",\"details\":null,\"hint\":null,\"message\":\"Could not find the 'blockers' column of 'workflow_outputs' in the schema cache\"}"
+    },
+    "created_at": "2026-04-25T23:38:27.78719+00:00"
+  },
+  "recommendation": {
+    "id": "f8ca8423-05a2-59fc-94bb-3efd7a792c5e",
+    "title": "How to Manage Time Like a Top 1% CEO",
+    "summary": "Turn missed follow-up into booked calls. For operators in the saas opportunities space who need faster growth and clearer systems, this offer fixes slow follow-up, missed leads, and messy conversion handoffs",
+    "thesis": "A productized content-to-lead system that turns educational content into qualified inbound demand for operators in the saas opportunities space who need faster growth and clearer systems, packaged to win clients and s... It is most compelling for operators in the saas opportunities space who need faster growth and clearer systems and monetizes through productized service revenue from setup fees plus recurring retainers.",
+    "execution_plan": [
+      "Interview 5-10 prospects who match this ICP: Operators in the saas opportunities space who need faster growth and clearer systems",
+      "Package the offer as: A content-to-lead system that turns educational content into qualified inbound demand",
+      "Test a pricing structure such as: Start with a productized setup package, then add a monthly retainer for ongoing optimization and reporting",
+      "Launch with this first channel: Repurpose educational content into short-form clips, lead magnets, and direct outreach follow-up"
+    ],
+    "profitability_path": "Profitability comes from packaging a repeatable service, keeping delivery lean, and upselling follow-on work",
+    "backend_handoff": [
+      "Create landing page copy for this offer: A content-to-lead system that turns educational content into qualified inbound demand",
+      "Add proof sections from these points: Everyone gets the same amount of time every single day; The truth is, most of that advice, it's It's performing for the sake of discipline; And one of the questions I get more than almost anything else is the age-old, how do you do it all",
+      "Connect lead capture to support this channel: Repurpose educational content into short-form clips, lead magnets, and direct outreach follow-up"
+    ],
+    "metadata": {
+      "icp": "Operators in the saas opportunities space who need faster growth and clearer systems",
+      "niche": "saas_opportunities",
+      "offer": "A content-to-lead system that turns educational content into qualified inbound demand",
+      "source": "Codie Sanchez",
+      "headline": "Turn missed follow-up into booked calls",
+      "pain_points": [
+        "Too much manual work is being handled by the owner or a small team"
+      ],
+      "positioning": "A productized content-to-lead system that turns educational content into qualified inbound demand for operators in the saas opportunities space who need faster growth and clearer systems, packaged to win clients and s...",
+      "review_note": "Approved for business execution",
+      "reviewed_at": "2026-04-25T23:38:26.967481+00:00",
+      "strategy_id": null,
+      "subheadline": "For operators in the saas opportunities space who need faster growth and clearer systems, this offer fixes slow follow-up, missed leads, and messy conversion handoffs",
+      "proof_points": [
+        "Everyone gets the same amount of time every single day",
+        "The truth is, most of that advice, it's It's performing for the sake of discipline",
+        "And one of the questions I get more than almost anything else is the age-old, how do you do it all"
+      ],
+      "pricing_model": "Start with a productized setup package, then add a monthly retainer for ongoing optimization and reporting",
+      "revenue_model": "Productized service revenue from setup fees plus recurring retainers.",
+      "review_action": "approved",
+      "risk_decision": null,
+      "recent_replays": null,
+      "handoff_created": true,
+      "handoff_created_at": "2026-04-25T23:38:28.523890+00:00",
+      "original_source_id": 1217,
+      "acquisition_channel": "Repurpose educational content into short-form clips, lead magnets, and direct outreach follow-up",
+      "implementation_project_id": "c1256169-7df3-5898-9ea0-47c10e68ced5"
+    }
+  },
+  "sitemap": [
+    {
+      "slug": "/",
+      "title": "How to Manage Time Like a Top 1% CEO",
+      "goal": "Primary landing page and conversion CTA"
+    },
+    {
+      "slug": "/offer",
+      "title": "Saas Opportunities Offer",
+      "goal": "Explain the service or product clearly"
+    },
+    {
+      "slug": "/pricing",
+      "title": "Pricing",
+      "goal": "Package and pricing clarity"
+    },
+    {
+      "slug": "/process",
+      "title": "How It Works",
+      "goal": "Show process and reduce buyer friction"
+    },
+    {
+      "slug": "/contact",
+      "title": "Get Started",
+      "goal": "Capture leads and schedule next step"
+    }
+  ],
+  "content_plan": {
+    "headline": [
+      "Turn missed follow-up into booked calls"
+    ],
+    "subheadline": [
+      "For operators in the saas opportunities space who need faster growth and clearer systems, this offer fixes slow follow-up, missed leads, and messy conversion handoffs."
+    ],
+    "positioning": [
+      "A focused content-to-lead offer for operators in the saas opportunities space who need faster growth and clearer systems, designed to turn more demand into qualified calls."
+    ],
+    "core_thesis": [
+      "A productized content-to-lead system that turns educational content into qualified inbound demand for operators in the saas opportunities space who need faster growth and clearer systems, packaged to win clients and s... It is most compelling for operators in the saas opportunities space who need faster growth and clearer systems and monetizes through productized service revenue from setup fees plus recurring retainers."
+    ],
+    "profitability_path": [
+      "Profitability comes from packaging a repeatable service, keeping delivery lean, and upselling follow-on work"
+    ],
+    "ideal_customer_profile": [
+      "Operators in the saas opportunities space who need faster growth and clearer systems"
+    ],
+    "who_its_for": [
+      "This is built for operators in the saas opportunities space who need faster growth and clearer systems who want a simpler way to turn attention into qualified pipeline."
+    ],
+    "offer": [
+      "A content-to-lead system that turns educational content into qualified inbound demand"
+    ],
+    "pricing_model": [
+      "Start with a productized setup package, then add a monthly retainer for ongoing optimization and reporting"
+    ],
+    "pricing_blurb": [
+      "Start with a setup package and add a monthly optimization retainer once the funnel is converting."
+    ],
+    "acquisition_channel": [
+      "Repurpose educational content into short-form clips, lead magnets, and direct outreach follow-up"
+    ],
+    "proof_points": [
+      "Everyone gets the same amount of time every single day",
+      "The truth is, most of that advice, it's It's performing for the sake of discipline",
+      "And one of the questions I get more than almost anything else is the age-old, how do you do it all"
+    ],
+    "customer_pain_points": [
+      "Too much manual work is being handled by the owner or a small team"
+    ],
+    "revenue_model": [
+      "Productized service revenue from setup fees plus recurring retainers"
+    ],
+    "offer_outcomes": [
+      "Capture inbound leads the moment they arrive.",
+      "Automate follow-up so qualified prospects do not go cold.",
+      "Centralize pipeline visibility inside one simple CRM workflow.",
+      "Turn more demand into booked calls and sales conversations."
+    ],
+    "cta_label": [
+      "Book Your CRM Audit"
+    ],
+    "cta_support": [
+      "Use short-form content, lead magnets, and direct outreach to drive interest, then route responses into a simple audit, demo, or booking flow."
+    ],
+    "page_promises": [
+      "Primary landing page and conversion CTA",
+      "Explain the service or product clearly",
+      "Package and pricing clarity",
+      "Show process and reduce buyer friction",
+      "Capture leads and schedule next step"
+    ]
+  }
+}

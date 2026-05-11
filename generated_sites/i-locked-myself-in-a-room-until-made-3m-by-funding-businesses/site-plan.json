@@ -1,0 +1,166 @@
+{
+  "project": {
+    "id": "d83ec50a-5475-5b54-873a-1b434ef786d3",
+    "recommendation_id": "28cef144-f53d-5478-bd81-4e38ee06cd7a",
+    "domain": "business",
+    "project_type": "business_buildout",
+    "title": "I locked myself in a room until made $3m by funding businesses",
+    "summary": "Turn missed follow-up into booked calls. For founders with early traction who need a lean acquisition and crm stack before hiring a full sales team, this offer fixes slow follow-up, missed leads, and messy conversion handoffs",
+    "status": "completed",
+    "metadata": {
+      "trace_id": "0033784d-01d3-472a-8b6e-7e5ccc5094f6",
+      "completed_at": "2026-04-25T23:32:01.385336+00:00",
+      "recommendation": "review",
+      "site_bundle_path": "/Users/raymonddavis/nexus-ai/generated_sites/i-locked-myself-in-a-room-until-made-3m-by-funding-businesses",
+      "site_generated_at": "2026-04-25T23:31:58.737190+00:00",
+      "profitability_path": "Profitability improves when one implementation template can be reused across clients, reducing labor while preserving premium pricing",
+      "workflow_output_warning": "{\"code\":\"PGRST204\",\"details\":null,\"hint\":null,\"message\":\"Could not find the 'blockers' column of 'workflow_outputs' in the schema cache\"}"
+    },
+    "created_at": "2026-04-25T23:31:55.916406+00:00"
+  },
+  "recommendation": {
+    "id": "28cef144-f53d-5478-bd81-4e38ee06cd7a",
+    "title": "I locked myself in a room until made $3m by funding businesses",
+    "summary": "Turn missed follow-up into booked calls. For founders with early traction who need a lean acquisition and crm stack before hiring a full sales team, this offer fixes slow follow-up, missed leads, and messy conversion handoffs",
+    "thesis": "A productized done-for-you crm automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects for founders with early traction who need a lean acquisition and crm stack before hiring a f... It is most compelling for founders with early traction who need a lean acquisition and crm stack before hiring a full sales team and monetizes through productized service revenue from setup fees plus recurring retainers.",
+    "execution_plan": [
+      "Interview 5-10 prospects who match this ICP: Founders with early traction who need a lean acquisition and CRM stack before hiring a full sales team",
+      "Package the offer as: A done-for-you CRM automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects",
+      "Test a pricing structure such as: Start with a productized setup package, then add a monthly retainer for ongoing optimization and reporting",
+      "Launch with this first channel: Launch one paid acquisition channel with tight tracking, then retarget interested visitors into booked calls"
+    ],
+    "profitability_path": "Profitability improves when one implementation template can be reused across clients, reducing labor while preserving premium pricing",
+    "backend_handoff": [
+      "Create landing page copy for this offer: A done-for-you CRM automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects",
+      "Add proof sections from these points: A hundred and fifty thousand dollars a month, that's what my funding business generates and I'm going to walk you through exactly how I did it step by step [music] from the very first deal all the way to a hundred and...; I locked myself in, studied [music] everything about business funding, made a ton of mistakes, burned through bad leads, got ghosted by clients, and figured out the framework that took me from zero to six figures a mo...; [music] And in this video, I'm going to break down all three stages so you can skip the mistakes [music] I made and get there way faster",
+      "Connect lead capture to support this channel: Launch one paid acquisition channel with tight tracking, then retarget interested visitors into booked calls"
+    ],
+    "metadata": {
+      "icp": "Founders with early traction who need a lean acquisition and CRM stack before hiring a full sales team",
+      "niche": "lead_generation",
+      "offer": "A done-for-you CRM automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects",
+      "source": "Stedman Waiters",
+      "headline": "Turn missed follow-up into booked calls",
+      "pain_points": [
+        "Leads are arriving, but follow-up is slow or inconsistent",
+        "Prospects fall through the cracks because the CRM is underused or disorganized",
+        "Too much manual work is being handled by the owner or a small team"
+      ],
+      "positioning": "A productized done-for-you crm automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects for founders with early traction who need a lean acquisition and crm stack before hiring a f...",
+      "review_note": "Approved for business execution",
+      "reviewed_at": "2026-04-25T23:31:55.135985+00:00",
+      "strategy_id": null,
+      "subheadline": "For founders with early traction who need a lean acquisition and crm stack before hiring a full sales team, this offer fixes slow follow-up, missed leads, and messy conversion handoffs",
+      "proof_points": [
+        "A hundred and fifty thousand dollars a month, that's what my funding business generates and I'm going to walk you through exactly how I did it step by step [music] from the very first deal all the way to a hundred and...",
+        "I locked myself in, studied [music] everything about business funding, made a ton of mistakes, burned through bad leads, got ghosted by clients, and figured out the framework that took me from zero to six figures a mo...",
+        "[music] And in this video, I'm going to break down all three stages so you can skip the mistakes [music] I made and get there way faster",
+        "A hundred and fifty thousand dollars a month, that's what my funding business generates and I'm going to walk you through exactly how I did it step by step [music] from the very first deal all the way to a hundred and fi"
+      ],
+      "pricing_model": "Start with a productized setup package, then add a monthly retainer for ongoing optimization and reporting",
+      "revenue_model": "Productized service revenue from setup fees plus recurring retainers.",
+      "review_action": "approved",
+      "risk_decision": null,
+      "recent_replays": null,
+      "handoff_created": true,
+      "handoff_created_at": "2026-04-25T23:31:56.654320+00:00",
+      "original_source_id": 1221,
+      "acquisition_channel": "Launch one paid acquisition channel with tight tracking, then retarget interested visitors into booked calls",
+      "implementation_project_id": "d83ec50a-5475-5b54-873a-1b434ef786d3"
+    }
+  },
+  "sitemap": [
+    {
+      "slug": "/",
+      "title": "I locked myself in a room until made $3m by funding businesses",
+      "goal": "Primary landing page and conversion CTA"
+    },
+    {
+      "slug": "/offer",
+      "title": "Lead Generation Offer",
+      "goal": "Explain the service or product clearly"
+    },
+    {
+      "slug": "/pricing",
+      "title": "Pricing",
+      "goal": "Package and pricing clarity"
+    },
+    {
+      "slug": "/process",
+      "title": "How It Works",
+      "goal": "Show process and reduce buyer friction"
+    },
+    {
+      "slug": "/contact",
+      "title": "Get Started",
+      "goal": "Capture leads and schedule next step"
+    }
+  ],
+  "content_plan": {
+    "headline": [
+      "Turn missed follow-up into booked calls"
+    ],
+    "subheadline": [
+      "For founders with early traction who need a lean acquisition and crm stack before hiring a full sales team, this offer fixes slow follow-up, missed leads, and messy conversion handoffs."
+    ],
+    "positioning": [
+      "A focused CRM automation offer for founders with early traction who need a lean acquisition and crm stack before hiring a full sales team, designed to turn more demand into qualified calls."
+    ],
+    "core_thesis": [
+      "A productized done-for-you crm automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects for founders with early traction who need a lean acquisition and crm stack before hiring a f... It is most compelling for founders with early traction who need a lean acquisition and crm stack before hiring a full sales team and monetizes through productized service revenue from setup fees plus recurring retainers."
+    ],
+    "profitability_path": [
+      "Profitability improves when one implementation template can be reused across clients, reducing labor while preserving premium pricing"
+    ],
+    "ideal_customer_profile": [
+      "Founders with early traction who need a lean acquisition and CRM stack before hiring a full sales team"
+    ],
+    "who_its_for": [
+      "This is built for founders with early traction who need a lean acquisition and crm stack before hiring a full sales team who want a simpler way to turn attention into qualified pipeline."
+    ],
+    "offer": [
+      "A done-for-you CRM automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects"
+    ],
+    "pricing_model": [
+      "Start with a productized setup package, then add a monthly retainer for ongoing optimization and reporting"
+    ],
+    "pricing_blurb": [
+      "Start with a setup package and add a monthly optimization retainer once the funnel is converting."
+    ],
+    "acquisition_channel": [
+      "Launch one paid acquisition channel with tight tracking, then retarget interested visitors into booked calls"
+    ],
+    "proof_points": [
+      "A hundred and fifty thousand dollars a month, that's what my funding business generates and I'm going to walk you through exactly how I did it step by step [music] from the very first deal all the way to a hundred and",
+      "I locked myself in, studied [music] everything about business funding, made a ton of mistakes, burned through bad leads, got ghosted by clients, and figured out the framework that took me from zero to six figures a mo",
+      "[music] And in this video, I'm going to break down all three stages so you can skip the mistakes [music] I made and get there way faster"
+    ],
+    "customer_pain_points": [
+      "Leads are arriving, but follow-up is slow or inconsistent",
+      "Prospects fall through the cracks because the CRM is underused or disorganized",
+      "Too much manual work is being handled by the owner or a small team"
+    ],
+    "revenue_model": [
+      "Productized service revenue from setup fees plus recurring retainers"
+    ],
+    "offer_outcomes": [
+      "Capture inbound leads the moment they arrive.",
+      "Automate follow-up so qualified prospects do not go cold.",
+      "Centralize pipeline visibility inside one simple CRM workflow.",
+      "Turn more demand into booked calls and sales conversations."
+    ],
+    "cta_label": [
+      "Book Your CRM Audit"
+    ],
+    "cta_support": [
+      "Use launch one paid acquisition channel with tight tracking, then retarget interested visitors into booked calls to drive interest, then route responses into a simple audit, demo, or booking flow."
+    ],
+    "page_promises": [
+      "Primary landing page and conversion CTA",
+      "Explain the service or product clearly",
+      "Package and pricing clarity",
+      "Show process and reduce buyer friction",
+      "Capture leads and schedule next step"
+    ]
+  }
+}

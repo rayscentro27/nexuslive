@@ -1,0 +1,10 @@
+[
+  {
+    "proposal_id": "00000000-0000-0000-0000-000000000002",
+    "symbol": "SPY",
+    "asset_type": "options",
+    "strategy_id": "covered_call",
+    "ai_confidence": 0.78,
+    "trace_id": "sample-options-001"
+  }
+]

@@ -1,0 +1,76 @@
+{
+  "channels": [
+    {
+      "name": "No Nonsense Forex",
+      "url": "https://www.youtube.com/@NoNonsenseForex",
+      "category": "forex_strategy",
+      "max_videos": 1
+    },
+    {
+      "name": "SMB Capital",
+      "url": "https://www.youtube.com/@SMBcapital",
+      "category": "trading_education",
+      "max_videos": 1
+    },
+    {
+      "name": "TraderNick",
+      "url": "https://www.youtube.com/@TraderNick",
+      "category": "forex_strategy",
+      "max_videos": 1
+    },
+    {
+      "name": "Monica Main",
+      "url": "https://www.youtube.com/@MonicaMain",
+      "category": "trading_education",
+      "max_videos": 3
+    },
+    {
+      "name": "Credit Plug",
+      "url": "https://www.youtube.com/@creditplug",
+      "category": "other",
+      "max_videos": 3
+    },
+    {
+      "name": "Scarface Trades",
+      "url": "https://www.youtube.com/@ScarfaceTrades",
+      "category": "trading_education",
+      "max_videos": 3
+    },
+    {
+      "name": "JT Hustlez",
+      "url": "https://www.youtube.com/@JTHustlez",
+      "category": "other",
+      "max_videos": 3
+    },
+    {
+      "name": "Tech Conversations",
+      "url": "https://www.youtube.com/@TechConversations",
+      "category": "other",
+      "max_videos": 3
+    },
+    {
+      "name": "Trade Tactics",
+      "url": "https://www.youtube.com/@tradetactics",
+      "category": "technical_analysis",
+      "max_videos": 3
+    },
+    {
+      "name": "Alec Delpuech",
+      "url": "https://www.youtube.com/@alecdelpuech",
+      "category": "trading_education",
+      "max_videos": 3
+    },
+    {
+      "name": "Roberts Tech Toolbox",
+      "url": "https://www.youtube.com/@RobertsTechToolbox",
+      "category": "other",
+      "max_videos": 3
+    },
+    {
+      "name": "Stedman Waiters",
+      "url": "https://www.youtube.com/@StedmanWaiters",
+      "category": "other",
+      "max_videos": 3
+    }
+  ]
+}

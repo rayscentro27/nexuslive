@@ -1,0 +1,20 @@
+{
+  "name": "nexus-ai-workforce",
+  "version": "1.0.0",
+  "description": "Nexus AI Workforce — 10 AI employee roles",
+  "type": "module",
+  "scripts": {
+    "grant":       "node grant_worker/grant_worker.js",
+    "opportunity": "node opportunity_worker/opportunity_worker.js",
+    "credit":      "node credit_worker/credit_worker.js",
+    "crm":         "node crm_copilot_worker/crm_copilot_worker.js",
+    "ops":         "node ops_monitoring_worker/ops_monitoring_worker.js",
+    "dispatch":    "node workforce_dispatcher.js",
+    "autonomous-opportunity": "node autonomous_opportunity_engine/autonomous_opportunity_engine.js",
+    "project-orchestrator": "node project_orchestrator/autonomous_project_orchestrator.js",
+    "control-api": "node project_orchestrator/nexus_control_api.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  }
+}

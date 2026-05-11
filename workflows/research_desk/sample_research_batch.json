@@ -1,0 +1,20 @@
+[
+  {
+    "id": "sample-001",
+    "title": "Breakout Strategy Performance in Low-Volume Sessions",
+    "summary": "Analysis of breakout behavior across 200 forex sessions shows that breakout entries during low-volume periods (Asian session, pre-market) have a 38% lower follow-through rate than high-volume breakouts. Volume confirmation filters significantly reduce false breakout rate. Key finding: resistance break signals without volume > 1.5x average should be treated as suspect.",
+    "source_type": "internal_analysis"
+  },
+  {
+    "id": "sample-002",
+    "title": "IV Crush Post-Earnings: Options Premium Decay Patterns",
+    "summary": "Review of 45 earnings events shows consistent implied volatility crush averaging 42% within 24 hours post-announcement. Short vega structures entered 2 days before earnings and closed at open on earnings day capture 60-80% of the premium decay without holding directional overnight risk. Strangles and iron condors both show positive expectancy in this window.",
+    "source_type": "market_research"
+  },
+  {
+    "id": "sample-003",
+    "title": "Mean Reversion Signals and Regime Dependency",
+    "summary": "Backtesting mean reversion strategies across 18 months of data reveals strong regime dependency. In trending markets (ADX > 25), mean reversion signals produce negative expectancy (-0.3R average). In ranging markets (ADX < 20), the same signals produce +0.8R average expectancy. A regime filter applied at strategy entry increases win rate from 44% to 61%. Conclusion: mean reversion strategies require a volatility regime classifier to be viable.",
+    "source_type": "backtest_report"
+  }
+]

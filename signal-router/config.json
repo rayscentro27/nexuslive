@@ -1,0 +1,10 @@
+{
+  "hermes_url": "http://localhost:8642",
+  "auth_token": "3658055de4324bc84b0ec1cf4d85af003094cc971c68987d",
+  "host": "0.0.0.0",
+  "port": 8000,
+  "log_level": "INFO",
+  "allowed_symbols": ["EURUSD", "GBPUSD", "USDJPY", "BTCUSD", "ETHUSD"],
+  "max_signals_per_hour": 10,
+  "require_confirmation": false
+}

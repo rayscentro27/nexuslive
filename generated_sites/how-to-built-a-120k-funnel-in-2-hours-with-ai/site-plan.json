@@ -1,0 +1,167 @@
+{
+  "project": {
+    "id": "d0cd6910-8b66-50a7-9a3c-f29cff94529b",
+    "recommendation_id": "4cd93fa3-d146-592b-8010-1be0b5f0782d",
+    "domain": "business",
+    "project_type": "business_buildout",
+    "title": "How to Built a $120K Funnel in 2 Hours With AI",
+    "summary": "Turn missed follow-up into booked calls. For coaches, consultants, and creators selling high-value offers without a reliable follow-up system, this offer fixes slow follow-up, missed leads, and messy conversion handoffs.",
+    "status": "completed",
+    "metadata": {
+      "headline": "Turn missed follow-up into booked calls",
+      "trace_id": "9a7addc9-e411-424f-95e7-5e5a9cf4769d",
+      "positioning": "A focused CRM automation offer for coaches, consultants, and creators selling high-value offers without a reliable follow-up system, designed to turn more demand into qualified calls.",
+      "subheadline": "For coaches, consultants, and creators selling high-value offers without a reliable follow-up system, this offer fixes slow follow-up, missed leads, and messy conversion handoffs.",
+      "completed_at": "2026-04-25T15:00:47.907977+00:00",
+      "recommendation": "review",
+      "site_bundle_path": "/Users/raymonddavis/nexus-ai/generated_sites/how-to-built-a-120k-funnel-in-2-hours-with-ai",
+      "site_generated_at": "2026-04-25T14:03:53.855174+00:00",
+      "profitability_path": "Profitability comes from packaging a repeatable service, keeping delivery lean, and upselling follow-on work"
+    },
+    "created_at": "2026-04-25T13:47:41.123452+00:00"
+  },
+  "recommendation": {
+    "id": "4cd93fa3-d146-592b-8010-1be0b5f0782d",
+    "title": "How to Built a $120K Funnel in 2 Hours With AI",
+    "summary": "Turn missed follow-up into booked calls. For coaches, consultants, and creators selling high-value offers without a reliable follow-up system, this offer fixes slow follow-up, missed leads, and messy conversion handoffs",
+    "thesis": "A productized done-for-you crm automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects for coaches, consultants, and creators selling high-value offers without a reliable follow-u... It is most compelling for coaches, consultants, and creators selling high-value offers without a reliable follow-up system and monetizes through productized service revenue from setup fees plus recurring retainers.",
+    "execution_plan": [
+      "Interview 5-10 prospects who match this ICP: Coaches, consultants, and creators selling high-value offers without a reliable follow-up system",
+      "Package the offer as: A done-for-you CRM automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects",
+      "Test a pricing structure such as: Start with a productized setup package, then add a monthly retainer for ongoing optimization and reporting",
+      "Launch with this first channel: Repurpose educational content into short-form clips, lead magnets, and direct outreach follow-up"
+    ],
+    "profitability_path": "Profitability comes from packaging a repeatable service, keeping delivery lean, and upselling follow-on work",
+    "backend_handoff": [
+      "Create landing page copy for this offer: A done-for-you CRM automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects",
+      "Add proof sections from these points: A lot of people are the best at taxes, digital products, whatever it is, but you're the best kept secret; The one thing I learned early is like it's not the who has the best product or services, it's the who's the most seen; So, if the people don't know you, they can't flow you",
+      "Connect lead capture to support this channel: Repurpose educational content into short-form clips, lead magnets, and direct outreach follow-up"
+    ],
+    "metadata": {
+      "icp": "Coaches, consultants, and creators selling high-value offers without a reliable follow-up system",
+      "niche": "crm_automation",
+      "offer": "A done-for-you CRM automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects",
+      "source": "Darius Benders",
+      "headline": "Turn missed follow-up into booked calls",
+      "pain_points": [
+        "Leads are arriving, but follow-up is slow or inconsistent",
+        "Prospects fall through the cracks because the CRM is underused or disorganized",
+        "Too much manual work is being handled by the owner or a small team"
+      ],
+      "positioning": "A productized done-for-you crm automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects for coaches, consultants, and creators selling high-value offers without a reliable follow-u...",
+      "review_note": "Approved via operator CLI",
+      "reviewed_at": "2026-04-25T14:39:28.164467+00:00",
+      "strategy_id": null,
+      "subheadline": "For coaches, consultants, and creators selling high-value offers without a reliable follow-up system, this offer fixes slow follow-up, missed leads, and messy conversion handoffs",
+      "proof_points": [
+        "A lot of people are the best at taxes, digital products, whatever it is, but you're the best kept secret",
+        "The one thing I learned early is like it's not the who has the best product or services, it's the who's the most seen",
+        "So, if the people don't know you, they can't flow you"
+      ],
+      "pricing_model": "Start with a productized setup package, then add a monthly retainer for ongoing optimization and reporting",
+      "revenue_model": "Productized service revenue from setup fees plus recurring retainers.",
+      "review_action": "approved",
+      "risk_decision": null,
+      "recent_replays": null,
+      "handoff_created": true,
+      "handoff_created_at": "2026-04-25T13:48:47.895634+00:00",
+      "original_source_id": 1125,
+      "acquisition_channel": "Repurpose educational content into short-form clips, lead magnets, and direct outreach follow-up",
+      "implementation_project_id": "d0cd6910-8b66-50a7-9a3c-f29cff94529b"
+    }
+  },
+  "sitemap": [
+    {
+      "slug": "/",
+      "title": "How to Built a $120K Funnel in 2 Hours With AI",
+      "goal": "Primary landing page and conversion CTA"
+    },
+    {
+      "slug": "/offer",
+      "title": "Crm Automation Offer",
+      "goal": "Explain the service or product clearly"
+    },
+    {
+      "slug": "/pricing",
+      "title": "Pricing",
+      "goal": "Package and pricing clarity"
+    },
+    {
+      "slug": "/process",
+      "title": "How It Works",
+      "goal": "Show process and reduce buyer friction"
+    },
+    {
+      "slug": "/contact",
+      "title": "Get Started",
+      "goal": "Capture leads and schedule next step"
+    }
+  ],
+  "content_plan": {
+    "headline": [
+      "Turn missed follow-up into booked calls"
+    ],
+    "subheadline": [
+      "For coaches, consultants, and creators selling high-value offers without a reliable follow-up system, this offer fixes slow follow-up, missed leads, and messy conversion handoffs."
+    ],
+    "positioning": [
+      "A focused CRM automation offer for coaches, consultants, and creators selling high-value offers without a reliable follow-up system, designed to turn more demand into qualified calls."
+    ],
+    "core_thesis": [
+      "A productized done-for-you crm automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects for coaches, consultants, and creators selling high-value offers without a reliable follow-u... It is most compelling for coaches, consultants, and creators selling high-value offers without a reliable follow-up system and monetizes through productized service revenue from setup fees plus recurring retainers."
+    ],
+    "profitability_path": [
+      "Profitability comes from packaging a repeatable service, keeping delivery lean, and upselling follow-on work"
+    ],
+    "ideal_customer_profile": [
+      "Coaches, consultants, and creators selling high-value offers without a reliable follow-up system"
+    ],
+    "who_its_for": [
+      "This is built for coaches, consultants, and creators selling high-value offers without a reliable follow-up system who want a simpler way to turn attention into qualified pipeline."
+    ],
+    "offer": [
+      "A done-for-you CRM automation and lead follow-up system that captures, qualifies, and nurtures inbound prospects"
+    ],
+    "pricing_model": [
+      "Start with a productized setup package, then add a monthly retainer for ongoing optimization and reporting"
+    ],
+    "pricing_blurb": [
+      "Start with a setup package and add a monthly optimization retainer once the funnel is converting."
+    ],
+    "acquisition_channel": [
+      "Repurpose educational content into short-form clips, lead magnets, and direct outreach follow-up"
+    ],
+    "proof_points": [
+      "A lot of people are the best at taxes, digital products, whatever it is, but you're the best kept secret",
+      "The one thing I learned early is like it's not the who has the best product or services, it's the who's the most seen",
+      "So, if the people don't know you, they can't flow you"
+    ],
+    "customer_pain_points": [
+      "Leads are arriving, but follow-up is slow or inconsistent",
+      "Prospects fall through the cracks because the CRM is underused or disorganized",
+      "Too much manual work is being handled by the owner or a small team"
+    ],
+    "revenue_model": [
+      "Productized service revenue from setup fees plus recurring retainers"
+    ],
+    "offer_outcomes": [
+      "Capture inbound leads the moment they arrive.",
+      "Automate follow-up so qualified prospects do not go cold.",
+      "Centralize pipeline visibility inside one simple CRM workflow.",
+      "Turn more demand into booked calls and sales conversations."
+    ],
+    "cta_label": [
+      "Book Your CRM Audit"
+    ],
+    "cta_support": [
+      "Use short-form content, lead magnets, and direct outreach to drive interest, then route responses into a simple audit, demo, or booking flow."
+    ],
+    "page_promises": [
+      "Primary landing page and conversion CTA",
+      "Explain the service or product clearly",
+      "Package and pricing clarity",
+      "Show process and reduce buyer friction",
+      "Capture leads and schedule next step"
+    ]
+  }
+}
