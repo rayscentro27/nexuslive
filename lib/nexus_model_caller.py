@@ -29,6 +29,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
+import subprocess
 import time
 import urllib.request
 import urllib.error
@@ -110,6 +112,8 @@ def _dispatch(
     fmt  = provider["format"]
     name = provider["name"]
 
+    if fmt == "cli_subprocess":
+        return _call_cli_subprocess(provider, prompt, system, timeout)
     if fmt == "ollama_generate":
         return _call_ollama(provider, prompt, system, timeout)
     if fmt == "anthropic":
@@ -119,6 +123,51 @@ def _dispatch(
 
     return _fail(name, provider.get("model", "?"), provider.get("cost_tier", "?"),
                  f"Unknown format: {fmt}")
+
+
+# ── Claude CLI subprocess caller (auth-login, no HTTP) ───────────────────────
+
+def _call_cli_subprocess(
+    provider:   dict,
+    prompt:     str,
+    system:     str,
+    timeout:    int,
+) -> dict:
+    name  = provider["name"]
+    model = provider["model"]
+    tier  = provider.get("cost_tier", "included")
+
+    cli_bin = shutil.which("claude") or ""
+    if not cli_bin:
+        return _fail(name, model, tier, "claude CLI not found in PATH")
+
+    full_prompt = f"{system}\n\n{prompt}" if system else prompt
+
+    t0 = time.monotonic()
+    try:
+        proc = subprocess.run(
+            [cli_bin, "-p", full_prompt],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        duration = round(time.monotonic() - t0, 2)
+
+        if proc.returncode != 0:
+            err = (proc.stderr or "").strip()[:200]
+            return _fail(name, model, tier, f"CLI exit {proc.returncode}: {err}", duration=duration)
+
+        text = (proc.stdout or "").strip()
+        if not text:
+            return _fail(name, model, tier, "Empty response from claude CLI", duration=duration)
+
+        return _ok(name, model, tier, text, duration)
+
+    except subprocess.TimeoutExpired:
+        return _fail(name, model, tier, f"claude CLI timed out after {timeout}s",
+                     duration=round(time.monotonic() - t0, 2))
+    except Exception as e:
+        return _fail(name, model, tier, str(e), duration=round(time.monotonic() - t0, 2))
 
 
 # ── OpenAI-compatible caller (covers Hermes, OpenRouter, Groq, Nvidia, Gemini, OpenClaw, ChatGPT, Oracle Ollama) ──
