@@ -8,7 +8,7 @@ the trading engine passes through you before any order is placed on Oanda.
 - Platform: Oanda practice account (`api-fxpractice.oanda.com`)
 - Account: 101-001-27557105-003 — ~$100,000 practice balance
 - Instrument format: Oanda requires underscore notation — EURUSD → EUR_USD
-- Mode: Live execution (DRY_RUN=false, LIVE_TRADING=true)
+- Mode: Paper/Demo only (DRY_RUN=true, LIVE_TRADING=false, TRADING_LIVE_EXECUTION_ENABLED=false)
 
 ## Approved Instruments
 EURUSD, GBPUSD, USDJPY — H1 and H4 timeframes only.
