@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   UserPlus, Mail, Search, MoreVertical, CheckCircle2,
   Clock, AlertCircle, RefreshCw, Send, Unlock, Lock,
-  Loader2, X, Toggle
+  Loader2, X
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../AuthProvider';
@@ -25,10 +25,11 @@ interface InvitedUser {
 }
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  pending:   { label: 'Pending',   color: '#f59e0b', bg: '#fffbeb' },
-  sent:      { label: 'Sent',      color: '#3d5af1', bg: '#eef0fd' },
-  accepted:  { label: 'Accepted',  color: '#22c55e', bg: '#f0fdf4' },
-  expired:   { label: 'Expired',   color: '#ef4444', bg: '#fef2f2' },
+  pending:      { label: 'Pending',     color: '#f59e0b', bg: '#fffbeb' },
+  sent:         { label: 'Sent',        color: '#3d5af1', bg: '#eef0fd' },
+  accepted:     { label: 'Accepted',    color: '#22c55e', bg: '#f0fdf4' },
+  expired:      { label: 'Expired',     color: '#ef4444', bg: '#fef2f2' },
+  send_failed:  { label: 'Send Failed', color: '#dc2626', bg: '#fef2f2' },
 };
 
 const SUB_META: Record<string, { label: string; color: string }> = {
@@ -152,45 +153,60 @@ function AddInviteModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
 }
 
 function SendWelcomeModal({ invite, onClose, onSent }: { invite: InvitedUser; onClose: () => void; onSent: () => void }) {
+  const { user } = useAuth();
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-
-  const WELCOME_SUBJECT = `Welcome to Nexus — Your Free Full Access Is Ready`;
-  const WELCOME_BODY = `Hi ${invite.name},
-
-Welcome to Nexus.
-
-Nexus is a guided financial growth platform designed to help you improve your credit profile, build a fundable business foundation, discover funding opportunities, explore grants, and follow a clear step-by-step action plan.
-
-Your account currently includes free full access. You will not be charged a monthly subscription during this access period.
-
-Inside Nexus, you can:
-- Upload and review credit information
-- See credit improvement recommendations
-- Build your business foundation
-- Track funding readiness
-- Explore grant opportunities
-- Use messaging and support features
-- Follow your personalized Action Center
-
-When subscription billing becomes active, we will notify you before any changes are made to your access.
-
-Click below to create your account:
-${invite.signup_link ?? window.location.origin}
-
-Welcome to Nexus,
-The Nexus Team`;
+  const [sendError, setSendError] = useState('');
 
   const handleSend = async () => {
     setSending(true);
-    // Mark invite as sent in DB
-    await supabase.from('invited_users').update({
-      invite_status: 'sent',
-      invite_sent_at: new Date().toISOString(),
-    }).eq('id', invite.id);
+    setSendError('');
+    let delivered = false;
+    let deliveryError = '';
+
+    try {
+      // Get current user JWT to authenticate with the backend proxy
+      const { data: sessionData } = await supabase.auth.getSession();
+      const jwt = sessionData?.session?.access_token || '';
+
+      const res = await fetch('/.netlify/functions/admin-invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({
+          invite_id: invite.id,
+          email: invite.email,
+          name: invite.name,
+          membership_level: invite.subscription_status === 'waived' ? 'admin_test' : 'starter',
+          invited_by: user?.id || 'admin',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        delivered = true;
+      } else {
+        deliveryError = data?.error || `HTTP ${res.status}`;
+        console.error('admin-invite failed:', deliveryError, data);
+      }
+    } catch (err: any) {
+      deliveryError = err?.message || 'Network error';
+      console.error('admin-invite network error:', deliveryError);
+    }
+
+    // Backend already updates Supabase; frontend just reflects result
+    if (!delivered) {
+      setSendError(`Delivery failed: ${deliveryError}`);
+      // Still update local DB status so dashboard reflects the attempt
+      await supabase.from('invited_users').update({
+        invite_status: 'send_failed',
+      }).eq('id', invite.id);
+    }
+
     setSending(false);
     setSent(true);
-    setTimeout(() => { onSent(); onClose(); }, 1500);
+    setTimeout(() => { onSent(); onClose(); }, delivered ? 1000 : 2500);
   };
 
   return (
@@ -214,16 +230,21 @@ The Nexus Team`;
           </div>
           <div style={{ padding: '10px 14px', background: '#f7f8ff', borderRadius: 10, marginBottom: 12 }}>
             <p style={{ fontSize: 12, fontWeight: 700, color: '#8b8fa8', margin: '0 0 4px' }}>SUBJECT</p>
-            <p style={{ fontSize: 14, color: '#1a1c3a', margin: 0 }}>{WELCOME_SUBJECT}</p>
+            <p style={{ fontSize: 14, color: '#1a1c3a', margin: 0 }}>You've Been Invited to Join Nexus Beta</p>
           </div>
-          <div style={{ padding: '10px 14px', background: '#f7f8ff', borderRadius: 10, maxHeight: 200, overflowY: 'auto' }}>
-            <p style={{ fontSize: 12, fontWeight: 700, color: '#8b8fa8', margin: '0 0 4px' }}>BODY PREVIEW</p>
-            <pre style={{ fontSize: 12, color: '#1a1c3a', margin: 0, whiteSpace: 'pre-wrap', fontFamily: 'inherit', lineHeight: 1.6 }}>{WELCOME_BODY}</pre>
+          <div style={{ padding: '10px 14px', background: '#f7f8ff', borderRadius: 10 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#8b8fa8', margin: '0 0 4px' }}>DELIVERY</p>
+            <p style={{ fontSize: 13, color: '#1a1c3a', margin: 0 }}>
+              Sent via Nexus backend (Gmail SMTP). Signup link uses canonical production URL.
+              Waived subscription: <strong>yes</strong>. Status updates in this dashboard on send.
+            </p>
           </div>
         </div>
-        <p style={{ fontSize: 12, color: '#8b8fa8', marginBottom: 16 }}>
-          Note: Configure your email service (Resend/SendGrid) in Supabase Edge Functions to deliver this email. The invite status will be updated to "sent" immediately.
-        </p>
+        {sendError && (
+          <p style={{ fontSize: 12, color: '#ef4444', marginBottom: 12, padding: '8px 12px', background: '#fef2f2', borderRadius: 8 }}>
+            {sendError}
+          </p>
+        )}
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={onClose}
             style={{ flex: 1, padding: '11px 0', borderRadius: 10, border: '1.5px solid #e8e9f2', background: '#fff', fontSize: 14, fontWeight: 700, color: '#8b8fa8', cursor: 'pointer' }}>
