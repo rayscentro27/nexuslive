@@ -13,6 +13,7 @@ import {
 import { useAuth } from './AuthProvider';
 import { usePlan, PlanTier } from '../hooks/usePlan';
 import { cn } from '../lib/utils';
+import { MobileBottomNav } from './MobileBottomNav';
 
 const ROUTES: Array<{
   path: string;
@@ -169,7 +170,7 @@ export function AppShell() {
           <span className="text-sm font-black text-[#1a1c3a]">Nexus</span>
         </div>
 
-        <div className="flex-1 overflow-y-auto scrollbar-hide">
+        <div className="flex-1 overflow-y-auto scrollbar-hide pb-16 md:pb-0">
           <Outlet />
         </div>
 
@@ -179,6 +180,9 @@ export function AppShell() {
         >
           © 2026 Nexus · All rights reserved · Paper trading only
         </footer>
+
+        {/* Mobile persistent bottom navigation */}
+        <MobileBottomNav />
       </main>
     </div>
   );
