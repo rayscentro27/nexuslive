@@ -85,13 +85,13 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
             latest = done[-3:]
             bullets = "; ".join(str(x.get("task") or x) for x in latest)
             return InternalFirstReply(
-                text=f"Direct answer: latest completed work includes {bullets}.\nSource: internal operational memory.\nNext: ask 'show pending tasks' for the active queue.",
+                text=f"Latest completed work: {bullets}. Ask 'show pending tasks' for the active queue.",
                 confidence=confidence_default,
                 source="operational_memory.recent_completed",
                 matched_topic=topic,
             )
         return InternalFirstReply(
-            text="Direct answer: I do not have recent completed OpenCode/Codex tasks in internal memory yet.\nSource: internal operational memory.\nNext: run a fresh status snapshot to update activity.",
+            text="No recent OpenCode/Codex tasks in internal memory yet. Run a fresh status snapshot to update activity.",
             confidence=CONF_INTERNAL_PARTIAL,
             source="operational_memory",
             matched_topic=topic,
@@ -102,13 +102,13 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         if rows:
             bullets = "; ".join(str(r.get("summary") or "").strip()[:120] for r in rows if str(r.get("summary") or "").strip())
             return InternalFirstReply(
-                text=f"Direct answer: current funding blockers/signals: {bullets}.\nSource: funding intelligence from Knowledge Brain.\nNext: clear the top blocker, then rerun readiness check.",
+                text=f"Current funding blockers: {bullets}. Clear the top blocker, then rerun readiness check.",
                 confidence=confidence_default,
                 source="knowledge_brain.funding",
                 matched_topic=topic,
             )
         return InternalFirstReply(
-            text="Direct answer: no fresh funding blockers are recorded internally.\nSource: funding intelligence/Knowledge Brain.\nNext: run funding workflow review to refresh data.",
+            text="No fresh funding blockers recorded internally. Run a funding workflow review to refresh data.",
             confidence=CONF_INTERNAL_PARTIAL,
             source="knowledge_brain.funding",
             matched_topic=topic,
@@ -119,24 +119,26 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         pending = mem.get("pending_approval_refs") or []
         first = (recs[0].get("summary") if recs else "Review pending approvals and clear blockers.")
         focus = top_focus_summary()
+        pending_note = f" ({len(pending)} pending approval{'s' if len(pending) != 1 else ''} to clear first)" if pending else ""
         return InternalFirstReply(
-            text=f"Direct answer: start with '{first}'.\nInternal priorities:\n{focus}\nSource: internal recommendations + approvals ({len(pending)} pending).\nNext: close approvals first, then highest-impact workflow.",
+            text=f"Today I'd focus on: {first}{pending_note}.\n{focus}",
             confidence=confidence_default,
             source="operational_memory+knowledge_brain",
             matched_topic=topic,
         )
 
     if topic == "knowledge_email":
-        rows = recent_knowledge_email_intake(limit=5)
+        rows = recent_knowledge_email_intake(limit=50)
         if rows:
+            distinct_emails = len({r.get("source_email_id") for r in rows if r.get("source_email_id")})
             return InternalFirstReply(
-                text=f"Direct answer: {len(rows)} recent knowledge-intake email runs are recorded.\nSource: internal knowledge intake reports.\nNext: ask for full report by email if you want details.",
+                text=f"{len(rows)} proposed KB records from {distinct_emails} email(s) in intake queue. Ask for a full report by email if you want details.",
                 confidence=confidence_default,
                 source="knowledge_email_intake",
                 matched_topic=topic,
             )
         return InternalFirstReply(
-            text="Direct answer: no recent knowledge-intake email runs found.\nSource: internal knowledge intake records.\nNext: send a 'Knowledge Load' email to seed intake.",
+            text="No knowledge intake records found. Send a 'Knowledge Load' email to seed intake.",
             confidence=CONF_INTERNAL_PARTIAL,
             source="knowledge_email_intake",
             matched_topic=topic,
@@ -147,7 +149,7 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         score = ready.get("score")
         status = ready.get("status")
         return InternalFirstReply(
-            text=f"Direct answer: remote readiness is {status} ({score}).\nSource: internal demo/remote readiness checks.\nNext: verify pending approvals and today priorities before travel.",
+            text=f"Remote readiness: {status} ({score}). Verify pending approvals and today's priorities before leaving.",
             confidence=confidence_default,
             source="demo_readiness",
             matched_topic=topic,
@@ -158,9 +160,34 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         queue = load_dry_run_queue(str(queue_path))
         msg = summarize_intake_queue(queue)
         return InternalFirstReply(
-            text=f"Direct answer: {msg}\nSource: NotebookLM dry-run intake queue.",
+            text=msg,
             confidence=confidence_default if queue else CONF_INTERNAL_PARTIAL,
             source=str(queue_path),
+            matched_topic=topic,
+        )
+
+    if topic == "ai_providers":
+        # Read live status of known provider routes
+        openrouter_key = bool(os.getenv("OPENROUTER_API_KEY", "").strip())
+        openrouter_model = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat")
+        hermes_url = os.getenv("HERMES_GATEWAY_URL", "http://127.0.0.1:8642")
+        ollama_primary = os.getenv("HERMES_REASONING_MODEL", "qwen3:8b")
+        oracle_host = "161.153.40.41"
+        lines = [
+            "Internally, these are the known Nexus provider routes:",
+            f"• OpenRouter API ({openrouter_model}): {'configured ✓' if openrouter_key else 'key missing ✗'} — used for Telegram conversational replies",
+            f"• Hermes local Ollama ({ollama_primary}): {hermes_url} — tunnel required, currently unreachable if tunnel is down",
+            f"• Oracle VM Ollama (qwen2.5:14b): {oracle_host} — frequently unreachable (100% packet loss when down)",
+            "• Claude Code CLI: available locally for coding tasks",
+            "• OpenClaw: ChatGPT session routing — active when OPENCLAW_ENABLED=true",
+            "",
+            "Best current fallback: OpenRouter (deepseek-chat) for conversation, Claude Code CLI for code tasks.",
+            "To check live Ollama status, run /models or ask 'worker status'.",
+        ]
+        return InternalFirstReply(
+            text="\n".join(lines),
+            confidence=CONF_INTERNAL_CONFIRMED,
+            source="env_config + known_topology",
             matched_topic=topic,
         )
 
@@ -176,16 +203,15 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         if ready:
             return InternalFirstReply(
                 text=(
-                    "Direct answer: marketing artifacts are staged and pending execution review.\n"
-                    f"Ready docs: {', '.join(ready[:4])}.\n"
-                    "Next: run soft-launch checklist and approve first weekly content batch."
+                    f"Marketing artifacts staged: {', '.join(ready[:4])}. "
+                    "Run soft-launch checklist and approve first weekly content batch."
                 ),
                 confidence=confidence_default,
                 source="marketing/*.md",
                 matched_topic=topic,
             )
         return InternalFirstReply(
-            text="Direct answer: no marketing research artifacts were found in the current local set.\nNext: generate/update marketing docs before launch.",
+            text="No marketing research artifacts found. Generate or update marketing docs before launch.",
             confidence=CONF_INTERNAL_PARTIAL,
             source="marketing/",
             matched_topic=topic,

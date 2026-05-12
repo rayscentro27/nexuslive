@@ -6,6 +6,8 @@ import os
 import hashlib
 import time
 
+from lib.hermes_operational_telemetry import emit_metric
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -36,11 +38,14 @@ _CACHE: dict[str, tuple[float, Any]] = {}
 def _cache_get(key: str):
     row = _CACHE.get(key)
     if not row:
+        emit_metric("knowledge_cache_miss", payload={"domain": "knowledge", "cache_key": key[:80]})
         return None
     expires_at, value = row
     if time.time() >= expires_at:
         _CACHE.pop(key, None)
+        emit_metric("knowledge_cache_miss", payload={"domain": "knowledge", "cache_key": key[:80], "reason": "expired"})
         return None
+    emit_metric("knowledge_cache_hit", payload={"domain": "knowledge", "cache_key": key[:80]})
     return value
 
 
@@ -251,6 +256,7 @@ def _historical_success_weight(row: dict[str, Any]) -> float:
 
 
 def rank_knowledge_results(rows: list[dict[str, Any]], category: str = "operations") -> list[dict[str, Any]]:
+    started = time.time()
     if not _flag("KNOWLEDGE_SOURCE_RANKING_ENABLED", "true"):
         return rows
     ranked = []
@@ -262,6 +268,8 @@ def rank_knowledge_results(rows: list[dict[str, Any]], category: str = "operatio
         topic_w = _topic_match_weight(row, category)
         tenant_w = _tenant_context_weight(row)
         history_w = _historical_success_weight(row)
+        if history_w >= 1.0:
+            emit_metric("knowledge_prior_success_weight_used", payload={"domain": "knowledge", "category": category})
         outcome_w = _workflow_outcome_weight(row)
         stale_penalty = 0.75 if detect_stale_knowledge([row], days=10) else 1.0
         relevance_bonus = 1.0
@@ -280,6 +288,10 @@ def rank_knowledge_results(rows: list[dict[str, Any]], category: str = "operatio
             str((x.get("raw_source_reference") or {}).get("id") or ""),
         ),
         reverse=True,
+    )
+    emit_metric(
+        "knowledge_ranking_timing",
+        payload={"domain": "knowledge", "category": category, "duration_ms": int((time.time() - started) * 1000)},
     )
     return ranked
 
@@ -354,6 +366,7 @@ def audit_knowledge_sources() -> dict[str, Any]:
 
 
 def get_recent_knowledge(category: str = "operations", limit: int = 20, fetch_limit: int = 240) -> list[dict[str, Any]]:
+    started = time.time()
     if not _flag("KNOWLEDGE_RETRIEVAL_ENABLED", "true"):
         return []
     key = f"recent:{category}:{int(limit)}:{int(fetch_limit)}"
@@ -367,6 +380,10 @@ def get_recent_knowledge(category: str = "operations", limit: int = 20, fetch_li
     rows = _non_empty(_dedupe(rows))
     filtered = [r for r in rows if str(r.get("category") or "") == category]
     filtered.sort(key=lambda x: str(x.get("created_at") or ""), reverse=True)
+    emit_metric(
+        "knowledge_retrieval_timing",
+        payload={"domain": "knowledge", "category": category, "duration_ms": int((time.time() - started) * 1000)},
+    )
     return _cache_set(key, filtered[: max(1, int(limit))])
 
 
@@ -454,16 +471,31 @@ def knowledge_dashboard_snapshot() -> dict[str, Any]:
 
 def build_hermes_context_pack(category: str = "operations") -> dict[str, Any]:
     """Context pack for planning and recommendation generation."""
+    started = time.time()
     recent = get_recent_knowledge(category, limit=8)
     recs = get_recent_recommendations(limit=6)
     compact = [str(r.get("summary") or "").strip() for r in recs[:4] if str(r.get("summary") or "").strip()]
-    return {
+    out = {
         "recent_knowledge": recent,
         "recent_recommendations": recs,
         "funding_insights": get_funding_knowledge(limit=4),
         "credit_insights": get_credit_knowledge(limit=4),
         "compact_summary": compact,
     }
+    emit_metric(
+        "knowledge_compact_summary_timing",
+        payload={"domain": "knowledge", "category": category, "duration_ms": int((time.time() - started) * 1000)},
+    )
+    for row in recent[:8]:
+        emit_metric(
+            "knowledge_source_usage",
+            payload={
+                "domain": "knowledge",
+                "category": str(row.get("category") or category),
+                "source_type": str(row.get("source_type") or "unknown"),
+            },
+        )
+    return out
 
 
 def build_telegram_knowledge_report_context() -> dict[str, Any]:

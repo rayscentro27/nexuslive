@@ -55,11 +55,32 @@ def default_runtime_config() -> dict[str, Any]:
         "hermes_internal_first_keywords": {
             "opencode": ["opencode", "codex", "what did codex finish"],
             "funding": ["funding blocker", "funding blockers", "funding"],
-            "today": ["what should i work on today", "what should we work on today", "next best move", "what do you recommend we work on today"],
-            "knowledge_email": ["knowledge emails", "knowledge email", "what knowledge emails arrived"],
+            "today": [
+                "what should i work on today", "what should we work on today",
+                "next best move", "what do you recommend we work on today",
+                "what should i focus on today", "what to focus on today",
+                "focus today", "priorities today", "top priorities",
+            ],
+            "knowledge_email": [
+                "knowledge emails", "knowledge email", "what knowledge emails arrived",
+                "knowledge intake", "intake status", "knowledge intake status",
+                "summarize latest intake", "what knowledge arrived", "recent knowledge emails",
+                "knowledge load", "what did we ingest",
+            ],
             "marketing": ["what marketing research is pending", "marketing research", "marketing pending"],
             "travel": ["before travel", "travel", "remote ceo"],
-            "notebooklm": ["what notebooklm research is ready", "summarize notebooklm intake queue", "notebooklm research"],
+            "notebooklm": [
+                "what notebooklm research is ready", "summarize notebooklm intake queue", "notebooklm research",
+                "notebooklm queue", "notebooklm status", "what's in notebooklm",
+                "what is in notebooklm", "notebook research", "knowledge queue",
+            ],
+            "ai_providers": [
+                "what ai providers are available", "ai providers available", "which ai providers",
+                "model router status", "provider status", "provider routes",
+                "is claude available", "is openrouter available", "is openclaw available",
+                "is codex available", "did codex hit a rate limit", "what fallback provider",
+                "available models", "which models are available", "what models can you use",
+            ],
         },
         "hermes_project_aliases": {
             "opencode": ["dev-agent bridge", "mac mini operational sessions", "ai ops dashboard"],

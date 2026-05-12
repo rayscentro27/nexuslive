@@ -78,6 +78,8 @@ async function sbFetch(path, options = {}) {
 
 // ── Telegram ───────────────────────────────────────────────────────────────────
 async function telegram(text) {
+  console.warn("telegram_policy denied=true reason=memory_or_background_summary message_type=system_summary source=script");
+  return;
   if (!TG_TOKEN || !TG_CHAT) { console.log('[TELEGRAM]', text); return; }
   try {
     await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {

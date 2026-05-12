@@ -28,5 +28,6 @@ run_test "Agent Collaboration" "python3 scripts/test_agent_collaboration.py"
 run_test "Executive Reports" "python3 scripts/test_executive_reports.py"
 run_test "AI Ops Scorecard" "python3 scripts/test_ai_ops_scorecard.py"
 run_test "Email Reports" "python3 scripts/test_email_reports.py"
+run_test "Hermes Dev Agent Bridge" "python3 scripts/test_hermes_dev_agent_bridge.py"
 
 printf "\n✅ AI Ops smoke suite passed.\n"

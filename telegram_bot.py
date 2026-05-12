@@ -69,7 +69,15 @@ from lib import swarm_coordinator
 from lib.ops_monitor_agent import run_ops_monitor_summary
 from lib.controlled_agents import run_controlled_agent
 from lib.hermes_knowledge_brain import get_recent_recommendations, get_funding_knowledge, get_credit_knowledge, knowledge_dashboard_snapshot, build_telegram_knowledge_report_context
+from lib.hermes_operational_telemetry import emit_metric
+from lib.demo_readiness import run_demo_readiness_check
+from lib.trading_intelligence_lab import build_trading_intelligence_report
+from lib.opportunity_intelligence import build_opportunity_summary
+from lib.hermes_email_knowledge_intake import recent_knowledge_email_intake
+from lib.hermes_internal_first import try_internal_first
+from lib.hermes_runtime_config import format_telegram_reply
 from lib.telegram_router import TelegramRouter
+from lib import hermes_conversation_memory
 
 DIAGNOSTIC_PHRASES = {
     "status",
@@ -172,6 +180,39 @@ TASK_SELECTION_ALIASES = {
 }
 
 
+def _build_ops_context_snippet() -> str:
+    """Build a short operational context string to inject into the LLM system prompt."""
+    try:
+        from lib import hermes_ops_memory
+        from lib.notebooklm_ingest_adapter import load_dry_run_queue, summarize_intake_queue
+        from pathlib import Path
+
+        mem = hermes_ops_memory.load_memory(updated_by="context_snippet")
+        pending = mem.get("pending_approval_refs") or []
+        completed = mem.get("recent_completed") or []
+
+        nlm_path = Path(__file__).resolve().parent / "reports" / "knowledge_intake" / "notebooklm_intake_queue.json"
+        nlm_queue = load_dry_run_queue(str(nlm_path)) if nlm_path.exists() else []
+
+        openrouter_ok = bool(os.getenv("OPENROUTER_API_KEY", "").strip())
+        provider_note = f"OpenRouter {'available' if openrouter_ok else 'key missing'}"
+
+        parts = ["Current Nexus operational state:"]
+        if pending:
+            parts.append(f"- {len(pending)} pending approval(s) in queue")
+        if completed:
+            last = completed[-1]
+            task_name = str(last.get("task") or last) if isinstance(last, dict) else str(last)
+            parts.append(f"- Last completed: {task_name[:60]}")
+        if nlm_queue:
+            parts.append(f"- NotebookLM queue: {len(nlm_queue)} item(s) ready")
+        parts.append(f"- AI provider: {provider_note}")
+
+        return " ".join(parts) if len(parts) > 1 else ""
+    except Exception:
+        return ""
+
+
 def email_summaries_enabled() -> bool:
     return os.getenv("TELEGRAM_EMAIL_SUMMARIES_ENABLED", "false").lower() == "true"
 
@@ -200,7 +241,7 @@ class NexusTelegramBot:
         self.last_update_id = self.load_update_offset()
         self.max_response_chars = int(os.getenv("TELEGRAM_MAX_RESPONSE_CHARS", "1800"))
         self.max_inbound_chars = int(os.getenv("TELEGRAM_MAX_INBOUND_CHARS", "280"))
-        self.command_timeout_seconds = float(os.getenv("TELEGRAM_COMMAND_TIMEOUT_SECONDS", "12"))
+        self.command_timeout_seconds = float(os.getenv("TELEGRAM_COMMAND_TIMEOUT_SECONDS", "30"))
         self.cooldown_seconds = float(os.getenv("TELEGRAM_COMMAND_COOLDOWN_SECONDS", "3"))
         self.circuit_breaker_window_seconds = float(os.getenv("TELEGRAM_CIRCUIT_BREAKER_WINDOW_SECONDS", "60"))
         self.circuit_breaker_error_threshold = int(os.getenv("TELEGRAM_CIRCUIT_BREAKER_ERROR_THRESHOLD", "5"))
@@ -220,6 +261,7 @@ class NexusTelegramBot:
         self.task_lifecycle: dict[str, str] = {}
         self._last_reply_hash: str = ""
         self._last_reply_ts: float = 0.0
+        self._current_chat_id: str = ""
         self.ops_memory: dict[str, Any] = self._load_operational_memory()
         self.last_plan_items = list(self.ops_memory.get("latest_daily_plan", []))
         self.task_lifecycle = dict(self.ops_memory.get("task_lifecycle", {}))
@@ -418,6 +460,10 @@ class NexusTelegramBot:
                 return False, f"Command failed: {e}"
 
     def _fallback_response_for_command(self, command: str) -> str:
+        emit_metric(
+            "telegram_fallback_response",
+            payload={"domain": "telegram", "command": (command or "").strip().lower()},
+        )
         cmd = (command or "").strip().lower()
         if cmd in {"status", "health", "jobs", "workers", "queue", "approvals"}:
             return "I hit a timeout while checking that command. Please retry in a moment."
@@ -441,6 +487,7 @@ class NexusTelegramBot:
         now = time.time()
         if digest == self._last_reply_hash and (now - self._last_reply_ts) < 4.0:
             logger.info("telegram dedup reply_suppressed=true")
+            emit_metric("telegram_duplicate_reply_suppressed", payload={"domain": "telegram"})
             return True
         sent = self.send_message(text, parse_mode=parse_mode)
         if sent:
@@ -450,11 +497,31 @@ class NexusTelegramBot:
 
     def _conversational_reply(self, raw: str) -> str:
         """Natural-language Telegram reply path for conversational mode."""
+        chat_id = getattr(self, "_current_chat_id", "")
         normalized = (raw or "").strip().lower()
         if normalized in {
             "hi", "hello", "hey", "good morning", "good afternoon", "good evening", "yo",
         }:
+            hermes_conversation_memory.clear_session(chat_id)
             return "Good morning, Ray. I'm online and ready."
+
+        # Internal-first routing — bypass LLM for known Nexus topics
+        internal = try_internal_first(raw)
+        if internal is not None:
+            text = format_telegram_reply(internal.text)
+            hermes_conversation_memory.record_turn(chat_id, "user", raw)
+            hermes_conversation_memory.record_turn(chat_id, "assistant", internal.text)
+            return text
+
+        # Build message history for conversational continuity
+        history = hermes_conversation_memory.get_history(chat_id)
+        is_followup = hermes_conversation_memory.is_followup(raw, chat_id)
+        if is_followup:
+            logger.info("telegram conversation follow-up detected chat_id=%s history_turns=%d", chat_id, len(history))
+
+        # Build operational context snapshot to anchor identity
+        ops_context = _build_ops_context_snippet()
+
         try:
             base_url = (os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").rstrip("/")
             model = (os.getenv("OPENROUTER_MODEL") or "deepseek/deepseek-chat").strip()
@@ -462,27 +529,46 @@ class NexusTelegramBot:
             if not key:
                 raise RuntimeError("OPENROUTER_API_KEY missing")
             url = f"{base_url}/chat/completions"
-            headers = {"Content-Type": "application/json"}
-            headers["Authorization"] = f"Bearer {key}"
+            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
+            system_prompt = (
+                "You are Hermes, the AI Chief of Staff for Nexus — Raymond's private business intelligence and credit platform. "
+                "You have access to Nexus internal state: operational memory, knowledge queue, provider status, pending tasks. "
+                "You are NOT a generic assistant. You ONLY answer in the context of Nexus operations. "
+                "Rules: "
+                "(1) Short — 2-4 sentences max. No markdown headers. No bullet dumps. "
+                "(2) Operational first — check Nexus internal state before reasoning. "
+                "(3) AI providers are Nexus-internal only: OpenRouter, Ollama, Claude Code, OpenClaw. Never name public AI products unprompted. "
+                "(4) For 'what to focus on' — give 2-3 specific Nexus priorities, not general advice. "
+                "(5) Conversational tone — you are a chief of staff, not a report generator. "
+                "(6) Follow-up questions: use prior conversation context naturally. "
+                "(7) If you genuinely lack live data: say 'I don't have live data on that right now' and suggest a Nexus command to get it. "
+                f"{ops_context}"
+            )
+            messages = [{"role": "system", "content": system_prompt}]
+            if is_followup and history:
+                messages.extend(history[-6:])
+            else:
+                messages.extend(history[-3:])
+            messages.append({"role": "user", "content": raw})
             payload = {
                 "model": model,
-                "messages": [
-                    {
-                        "role": "system",
-                        "content": "You are Hermes. Reply naturally and briefly for Telegram chat.",
-                    },
-                    {"role": "user", "content": raw},
-                ],
-                "max_tokens": 400,
-                "temperature": 0.7,
+                "messages": messages,
+                "max_tokens": 300,
+                "temperature": 0.5,
             }
-            logger.info("telegram conversational model=openrouter/%s", model)
+            logger.info(
+                "telegram conversational model=openrouter/%s history_turns=%d followup=%s",
+                model, len(history), is_followup,
+            )
             resp = requests.post(url, headers=headers, json=payload, timeout=45)
             resp.raise_for_status()
             data = resp.json()
-            return str(((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+            reply = str(((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+            hermes_conversation_memory.record_turn(chat_id, "user", raw)
+            hermes_conversation_memory.record_turn(chat_id, "assistant", reply)
+            return format_telegram_reply(reply)
         except Exception:
-            return "I'm online, but my chat model is unavailable right now."
+            return "Hermes is online — conversational model unavailable right now. Try /status, /models, or ask a specific operational question."
 
     def send_message(self, message: str, parse_mode: str = "HTML") -> bool:
         """Send message to Telegram"""
@@ -1349,6 +1435,7 @@ class NexusTelegramBot:
     def parse_command(self, text: str) -> tuple[str, str]:
         raw = text.strip()
         normalized = raw.lower().strip()
+        normalized_key = normalized.rstrip(" ?!.")
         mapping = {
             "status": "status",
             "/status": "status",
@@ -1430,8 +1517,16 @@ class NexusTelegramBot:
             "why is this client high priority?": "client_priority_reason",
             "why is this strategy ranked highly?": "strategy_priority_reason",
             "show executive review snapshot": "executive_review_snapshot",
+            "run demo readiness check": "demo_readiness_check",
+            "demo ready": "demo_readiness_check",
+            "what funding blockers do we have": "funding_blockers",
+            "what trading strategies are launch focus": "launch_focus_strategies",
+            "what trading strategies are lanch focus": "launch_focus_strategies",
+            "what opportunities should we review": "opportunity_review",
+            "where are you getting your information from": "data_source_summary",
+            "are you using what is in supabase": "data_source_summary",
         }
-        return mapping.get(normalized, "unknown"), raw
+        return mapping.get(normalized, mapping.get(normalized_key, "unknown")), raw
 
     def _routed_health(self) -> str:
         try:
@@ -1544,6 +1639,78 @@ class NexusTelegramBot:
             return '\n'.join(lines)
         except Exception as e:
             return f"CEO report error: {e}"
+
+    def _cmd_demo_readiness_check(self) -> str:
+        try:
+            report = run_demo_readiness_check()
+            score = int(report.get("score") or 0)
+            status = str(report.get("status") or "unknown")
+            blockers = report.get("blockers") or []
+            if blockers:
+                return (
+                    f"✅ Demo readiness is {status} ({score}). "
+                    f"Top blocker: {str(blockers[0])[:90]}. "
+                    "I can send the full report by email."
+                )
+            return f"✅ Demo readiness is {status} ({score}) with no blockers detected. I can send the full report by email."
+        except Exception as e:
+            return f"Demo readiness check error: {e}"
+
+    def _cmd_launch_focus_strategies(self) -> str:
+        try:
+            report = build_trading_intelligence_report()
+            focus = report.get("launch_focus_strategies") or []
+            names = [str(s.get("strategy_name") or "").strip() for s in focus if str(s.get("strategy_name") or "").strip()]
+            if not names:
+                return "Launch-focus strategies are currently unavailable."
+            return "🚀 Launch-focus strategies: " + ", ".join(names[:3]) + "."
+        except Exception as e:
+            return f"Trading launch-focus error: {e}"
+
+    def _cmd_opportunity_review(self) -> str:
+        try:
+            summary = build_opportunity_summary()
+            grants = summary.get("grant_opportunity_summary") or []
+            business = summary.get("business_opportunity_summary") or []
+            titles = []
+            for row in (grants + business):
+                title = str(row.get("summary") or row.get("title") or "").strip()
+                if title:
+                    titles.append(title)
+                if len(titles) >= 3:
+                    break
+            action = str(summary.get("opportunity_next_action") or "Review the opportunity shortlist and blockers.")
+            if titles:
+                return f"Here are the top opportunities to review: {', '.join(titles)}. Next best action: {action}"
+            return f"The opportunity shortlist is sparse right now. Next best action: {action}"
+        except Exception as e:
+            return f"Opportunity review error: {e}"
+
+    def _cmd_funding_blockers_conversational(self) -> str:
+        core = str(self.handle_basic_command("funding_blockers") or "").strip()
+        if not core:
+            return "I couldn't pull funding blockers right now. I can retry or send a full report by email."
+        return f"Here’s what I’m seeing for funding blockers right now: {core}"
+
+    def _cmd_data_source_summary(self) -> str:
+        return (
+            "I use Nexus data paths first (Supabase-backed system events, workflow outputs, and operational memory) "
+            "when available, then fall back to safe summaries if a data path is unavailable."
+        )
+
+    def _cmd_knowledge_emails_summary(self) -> str:
+        try:
+            rows = recent_knowledge_email_intake(limit=5)
+            if not rows:
+                return "No recent knowledge email intake records found yet."
+            cats: dict[str, int] = {}
+            for r in rows:
+                c = str(r.get("category") or "general")
+                cats[c] = cats.get(c, 0) + 1
+            top = ", ".join([f"{k}:{v}" for k, v in sorted(cats.items(), key=lambda x: (-x[1], x[0]))[:3]])
+            return f"Recent knowledge email proposals: {len(rows)} records. Top categories: {top}."
+        except Exception as e:
+            return f"Knowledge email status unavailable right now: {e}"
 
     def _cmd_models(self) -> str:
         try:
@@ -2209,6 +2376,21 @@ class NexusTelegramBot:
                 updated_by="telegram_user_instruction",
             )
         continuity = {
+            "run demo readiness check": self._cmd_demo_readiness_check,
+            "demo ready?": self._cmd_demo_readiness_check,
+            "demo ready": self._cmd_demo_readiness_check,
+            "what funding blockers do we have": self._cmd_funding_blockers_conversational,
+            "what trading strategies are launch focus": self._cmd_launch_focus_strategies,
+            "what trading strategies are lanch focus": self._cmd_launch_focus_strategies,
+            "what opportunities should we review": self._cmd_opportunity_review,
+            "where are you getting your information from": self._cmd_data_source_summary,
+            "are you using what is in supabase": self._cmd_data_source_summary,
+            "run remote readiness check": self._cmd_demo_readiness_check,
+            "send remote ceo report": lambda: self._run_controlled_agent("report_writer"),
+            "what needs my approval?": self._cmd_approvals_summary,
+            "what knowledge emails came in?": self._cmd_knowledge_emails_summary,
+            "what marketing tasks are ready?": lambda: self.handle_basic_command("weekly_focus"),
+            "what should i do before travel?": self._cmd_demo_readiness_check,
             "start work session": lambda: self._start_work_session_summary(),
             "pause work session": lambda: self._pause_work_session_summary(),
             "resume work session": lambda: self._resume_work_session_summary(),
@@ -2338,6 +2520,11 @@ class NexusTelegramBot:
         , role_timeout)
         if not ok:
             logger.error("controlled_agent timeout_or_error role=%s detail=%s", role_id, payload)
+            emit_metric(
+                "telegram_timeout",
+                status="failed",
+                payload={"domain": "telegram", "command": f"controlled_agent:{role_id}"},
+            )
             return self.render_chat_response(
                 f"{role_id.replace('_', ' ').title()} timed out. I did not run autonomous actions. Please retry in a moment."
             )
@@ -2500,6 +2687,7 @@ class NexusTelegramBot:
         if not text:
             return
         command, _ = self.parse_command(text)
+        emit_metric("telegram_inbound", payload={"domain": "telegram", "command": command})
 
         if self._circuit_open():
             self._structured_log(
@@ -2522,13 +2710,23 @@ class NexusTelegramBot:
             )
             return
         self.chat_cooldowns[chat_id] = time.time() + self.cooldown_seconds
+        self._current_chat_id = chat_id
 
         ok, response = self.execute_with_timeout(lambda: self.handle_inbound_message(text))
         if ok:
             rendered = (response or "").strip()
             if not rendered:
                 rendered = self._fallback_response_for_command(command)
+            logger.info("telegram inbound=%r response_preview=%r", text[:120], rendered[:200])
             self._send_message_once(rendered)
+            emit_metric(
+                "telegram_reply_success",
+                payload={
+                    "domain": "telegram",
+                    "command": command,
+                    "duration_ms": int((time.time() - started) * 1000),
+                },
+            )
             self._structured_log(
                 update_id=update_id,
                 chat_id=chat_id,
@@ -2549,6 +2747,17 @@ class NexusTelegramBot:
             return
         self._record_error()
         logger.error("telegram inbound failure command=%s detail=%s", command, response)
+        if "timed out" in str(response or "").lower():
+            emit_metric(
+                "telegram_timeout",
+                status="failed",
+                payload={"domain": "telegram", "command": command, "duration_ms": int((time.time() - started) * 1000)},
+            )
+        emit_metric(
+            "telegram_failed_command",
+            status="failed",
+            payload={"domain": "telegram", "command": command, "duration_ms": int((time.time() - started) * 1000)},
+        )
         self._send_message_once(response or self._fallback_response_for_command(command))
         self._structured_log(
             update_id=update_id,

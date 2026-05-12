@@ -9,7 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from lib.hermes_gate import telegram_policy_allows_send
+from lib.hermes_gate import telegram_policy_allows_send, _contains_forbidden_content, _is_empty
 
 PASS = "✅ PASS"
 FAIL = "❌ FAIL"
@@ -98,6 +98,28 @@ for path in all_py_files:
         violations.append(rel)
 
 check("all non-test Telegram sends go through hermes_gate", not violations, ", ".join(sorted(violations)[:8]))
+
+
+print("\n[4] Forbidden content patterns blocked")
+forbidden_samples = [
+    "🏛️ Nexus Research — Weekly Digest",
+    "🏛️ Nexus Intelligence Brief for Raymond",
+    "🏛️ Nexus Research Run Complete",
+    "Key Findings: 3 strategies extracted this week",
+    "Sources: Bloomberg, Reuters, SEC filings",
+    "Research artifacts saved to /reports/knowledge_intake",
+    "Intelligence Brief: market overview attached",
+]
+allowed_samples = [
+    "✅ Research report saved. I kept the full summary out of Telegram.",
+    "Worker status: 3 running, 1 pending",
+    "Your funding readiness score is 72.",
+    "Approved. Task queued.",
+]
+for sample in forbidden_samples:
+    check(f'Forbidden content blocked: "{sample[:55]}"', _contains_forbidden_content(sample))
+for sample in allowed_samples:
+    check(f'Allowed content passes: "{sample[:55]}"', not _contains_forbidden_content(sample))
 
 
 print(f"\n{'=' * 52}")
