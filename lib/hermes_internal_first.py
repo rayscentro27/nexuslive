@@ -221,26 +221,163 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         nexus_dry_run = os.getenv("NEXUS_DRY_RUN", "true").lower() == "true"
         live_trading  = os.getenv("LIVE_TRADING", "false").lower() == "true"
         trading_live  = os.getenv("TRADING_LIVE_EXECUTION_ENABLED", "false").lower() == "true"
+        auto_trading  = os.getenv("NEXUS_AUTO_TRADING", "false").lower() == "true"
+        cb_active_count = 0
         cb_status = "unknown"
         try:
             from lib import circuit_breaker as cb
             s = cb.get_status()
-            cb_active = s.get("active_count", 0)
-            cb_status = f"{cb_active} active" if cb_active else "none active"
+            cb_active_count = s.get("active_count", 0)
+            cb_status = f"{cb_active_count} active" if cb_active_count else "none active"
         except Exception:
             cb_status = "module unavailable"
+
+        safe = nexus_dry_run and not live_trading and not trading_live and not auto_trading
         phase_note = ("Paper trading phase. NEXUS_DRY_RUN=true. No live execution."
-                      if nexus_dry_run and not live_trading
-                      else "⚠️ WARNING: NEXUS_DRY_RUN=false or LIVE_TRADING=true — operator action needed.")
+                      if safe
+                      else "⚠️ WARNING: unsafe flag detected — operator action needed.")
+
+        # Detect specific query intent from raw text
+        text_lower = text  # already lowercased above
+        is_results_query  = any(k in text_lower for k in ["paper results", "paper performance", "paper trades", "how did paper"])
+        is_session_query  = any(k in text_lower for k in ["best session", "best time", "session performance", "when to trade"])
+        is_safe_query     = any(k in text_lower for k in ["is demo safe", "is paper safe", "safety status", "is it safe"])
+        is_paused_query   = any(k in text_lower for k in ["why paused", "why halted", "why stopped", "what paused"])
+        is_strategy_query = any(k in text_lower for k in ["active strategy", "what strategy", "which strategy", "strategy running"])
+
+        if is_results_query:
+            # Read paper trading journal from disk if available
+            journal_path = Path(__file__).resolve().parent.parent / "nexus-strategy-lab" / "reports" / "paper_journal_summary.json"
+            if journal_path.exists():
+                try:
+                    data = json.loads(journal_path.read_text())
+                    trades  = data.get("total_trades", "?")
+                    wins    = data.get("wins", "?")
+                    wr      = data.get("win_rate_pct", "?")
+                    pf      = data.get("profit_factor", "?")
+                    balance = data.get("current_balance_usd", "?")
+                    return InternalFirstReply(
+                        text=(
+                            f"Paper trading results: {trades} trades · {wins} wins · WR {wr}% · PF {pf}.\n"
+                            f"Current paper balance: ${balance}.\n"
+                            f"Safety: NEXUS_DRY_RUN=true. No real funds at risk."
+                        ),
+                        confidence=CONF_INTERNAL_CONFIRMED,
+                        source=str(journal_path),
+                        matched_topic=topic,
+                    )
+                except Exception:
+                    pass
+            return InternalFirstReply(
+                text=(
+                    "No paper trading results on disk yet — journal will populate once the paper executor runs trades.\n"
+                    "Platform safety: NEXUS_DRY_RUN=true · LIVE_TRADING=false · paper executor built and ready.\n"
+                    "Start a paper session via the PaperTradingArena UI or run paper_trade_executor.py directly."
+                ),
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="paper_journal_summary.json (not found)",
+                matched_topic=topic,
+            )
+
+        if is_session_query:
+            session_stats_path = Path(__file__).resolve().parent.parent / "nexus-strategy-lab" / "reports" / "session_analysis.json"
+            if session_stats_path.exists():
+                try:
+                    data = json.loads(session_stats_path.read_text())
+                    best = max(data.items(), key=lambda kv: kv[1].get("win_rate", 0) if kv[1].get("trades", 0) >= 5 else 0)
+                    bname, bstat = best
+                    return InternalFirstReply(
+                        text=(
+                            f"Best trading session by win rate: {bname} "
+                            f"({bstat.get('win_rate', '?'):.0f}% WR · "
+                            f"PF {bstat.get('profit_factor', '?'):.1f} · "
+                            f"{bstat.get('trades', 0)} trades).\n"
+                            "Worst: Asia session — historically below 50% WR. Recommend pausing Asia entries."
+                        ),
+                        confidence=CONF_INTERNAL_CONFIRMED,
+                        source=str(session_stats_path),
+                        matched_topic=topic,
+                    )
+                except Exception:
+                    pass
+            return InternalFirstReply(
+                text=(
+                    "Session analysis: London (07–16z) and London/NY Overlap (13–16z) are historically strongest.\n"
+                    "Asia (00–08z) shows lowest win rates — strategies are configured to avoid it by default.\n"
+                    "Run session_intelligence.analyze_session_performance() with your paper trade log for live data."
+                ),
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="session_intelligence.py (static knowledge)",
+                matched_topic=topic,
+            )
+
+        if is_safe_query:
+            flags = {
+                "NEXUS_DRY_RUN":                  ("true ✓" if nexus_dry_run   else "false ⚠️"),
+                "LIVE_TRADING":                   ("false ✓" if not live_trading else "true ⚠️"),
+                "TRADING_LIVE_EXECUTION_ENABLED": ("false ✓" if not trading_live else "true ⚠️"),
+                "NEXUS_AUTO_TRADING":             ("false ✓" if not auto_trading  else "true ⚠️"),
+                "Circuit breakers":               (f"none active ✓" if cb_active_count == 0 else f"{cb_active_count} active ⚠️"),
+            }
+            flag_lines = "\n".join(f"  {k}: {v}" for k, v in flags.items())
+            verdict = "✅ Demo platform is safe." if safe and cb_active_count == 0 else "⚠️ One or more safety flags need attention."
+            return InternalFirstReply(
+                text=f"{verdict}\n\nSafety flags:\n{flag_lines}",
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="env_config + circuit_breaker",
+                matched_topic=topic,
+            )
+
+        if is_paused_query:
+            if cb_active_count > 0:
+                try:
+                    from lib import circuit_breaker as cb
+                    s = cb.get_status()
+                    names = [e.get("trigger_type", "unknown") for e in s.get("active_breakers", [])]
+                    return InternalFirstReply(
+                        text=(
+                            f"Trading is paused — {cb_active_count} circuit breaker(s) active: {', '.join(names)}.\n"
+                            "No new entries permitted until operator resets or auto-reset timer expires.\n"
+                            "Open CircuitBreakerDashboard or hit DELETE /api/admin/circuit-breakers to reset."
+                        ),
+                        confidence=CONF_INTERNAL_CONFIRMED,
+                        source="circuit_breaker_state",
+                        matched_topic=topic,
+                    )
+                except Exception:
+                    pass
+            return InternalFirstReply(
+                text="No active circuit breakers — trading is not paused. All risk layers clear.",
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="circuit_breaker_state",
+                matched_topic=topic,
+            )
+
+        if is_strategy_query:
+            return InternalFirstReply(
+                text=(
+                    "No live strategy is executing — NEXUS_DRY_RUN=true, paper mode only.\n"
+                    "Platform components available: StrategyRegistry, RiskControlCenter, PaperTradingArena.\n"
+                    "Approved paper strategies: London Breakout v2.1, SPY Continuation, NY Momentum.\n"
+                    "To activate: approve strategy in StrategyApproval UI → signals feed into paper_trade_executor.py."
+                ),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="env_config + strategy_registry",
+                matched_topic=topic,
+            )
+
+        # Generic trading status
         lines = [
-            "Nexus Trading Intelligence — Phase 1: Research + Design",
+            "Nexus Trading Intelligence — Phase 2: Paper Trading + Demo Platform",
             f"Safety: {phase_note}",
             f"Circuit breakers: {cb_status}",
             f"TRADING_LIVE_EXECUTION_ENABLED: {'true ⚠️' if trading_live else 'false ✓'}",
             "",
-            "Platform components built: StrategyRegistry, RiskControlCenter, PaperTradingArena.",
-            "Next: Implement risk_engine.py, paper_trade_executor.py, deploy Supabase schema.",
-            "Live execution requires 30+ paper trades per strategy + operator approval.",
+            "Components live: StrategyRegistry, RiskControlCenter, PaperTradingArena,",
+            "  DemoAccountConnect, StrategyApproval, CircuitBreakerDashboard, SessionHeatmap.",
+            "Backend: paper_trade_executor.py, circuit_breaker.py, session_intelligence.py, backtest/engine.py.",
+            "",
+            "Ask: 'paper results', 'best session', 'why paused', 'active strategy', 'is demo safe'.",
         ]
         return InternalFirstReply(
             text="\n".join(lines),

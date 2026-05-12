@@ -1,7 +1,38 @@
-# Paper Trading Engine Progress Report
-**Date:** 2026-05-12  
-**Phase:** D2 — Paper Trading Engine  
+# Paper Trading Engine Progress — Updated Report
+**Date:** 2026-05-12 | **Pass:** Trading Demo Platform (updated) | **Phase:** 2 — Paper Execution Live
 **Safety:** NEXUS_DRY_RUN=true | LIVE_TRADING=false | No real execution
+
+## Pass 3 Additions
+
+### paper_trade_executor.py (new in Pass 3)
+Full lifecycle paper trade executor:
+
+| Function | Purpose |
+|---|---|
+| `get_practice_price(symbol)` | OANDA practice API (read-only) with synthetic fallback |
+| `_check_circuit_breaker(strategy_id)` | Integrates lib.circuit_breaker.is_halted() |
+| `_check_risk_limits(...)` | 5-layer pre-check: position count, SL, TP, R:R, account risk % |
+| `open_paper_position(...)` | Full entry: CB check → risk check → live price → slippage → position |
+| `check_exit_conditions(...)` | SL/TP hit detection per position direction |
+| `close_paper_position(...)` | PnL calc (pips + USD), timestamps, status update |
+
+**Slippage model:** 0.5–1.5 pip random per trade (realistic for paper simulation).
+
+### SessionHeatmap.tsx (new in Pass 3)
+- 24-bar win rate visualization (clickable, shows tooltip with WR/trades/avg pips)
+- Session band overlays (Asia, London, NY Open, Overlap)
+- Per-session breakdown table with edge decay warning
+
+## Remaining for Phase 3
+- [ ] Wire paper_trade_executor to real Supabase journal writes
+- [ ] Session intelligence fed from actual closed positions
+- [ ] Backtesting results page (BacktestResult visualization)
+- [ ] Paper trade replay with historical OANDA tick data
+- [ ] Graduated approval for live execution (30+ paper trades + operator sign-off)
+
+---
+**Original report continues below:**
+
 
 ---
 
