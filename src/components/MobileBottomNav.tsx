@@ -4,15 +4,22 @@ import {
   Home, TrendingUp, CreditCard, MessageSquare, Zap,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { usePlan } from '../hooks/usePlan';
+import { usePlan, PlanTier } from '../hooks/usePlan';
 
-const NAV_ITEMS = [
+type NavItem = {
+  path: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  requiredPlan?: PlanTier;
+};
+
+const NAV_ITEMS: NavItem[] = [
   { path: '/app/dashboard', label: 'Home',    icon: Home },
-  { path: '/app/trading',   label: 'Trading', icon: TrendingUp, requiredPlan: 'pro' as const },
-  { path: '/app/funding',   label: 'Funding', icon: CreditCard, requiredPlan: 'pro' as const },
+  { path: '/app/trading',   label: 'Trading', icon: TrendingUp, requiredPlan: 'pro' },
+  { path: '/app/funding',   label: 'Funding', icon: CreditCard, requiredPlan: 'pro' },
   { path: '/app/messages',  label: 'Inbox',   icon: MessageSquare },
   { path: '/app/actions',   label: 'Actions', icon: Zap },
-] as const;
+];
 
 export function MobileBottomNav() {
   const navigate = useNavigate();

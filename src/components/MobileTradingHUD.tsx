@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Zap, TrendingUp, TrendingDown, Shield, Target,
   ChevronRight, Activity, AlertTriangle,
@@ -45,6 +46,15 @@ const MOCK_TRADES: HUDTrade[] = [
   { id: 't2', market: 'GBP/JPY', direction: 'short', pnlPips: -8, tpProgress: 12, session: 'London' },
 ];
 
+// ── gauge math ────────────────────────────────────────────────────────────────
+
+const GAUGE_R = 14;
+const GAUGE_CIRC = 2 * Math.PI * GAUGE_R; // ≈ 87.96
+
+function gaugeStroke(pct: number) {
+  return (Math.min(100, Math.max(0, pct)) / 100) * GAUGE_CIRC;
+}
+
 // ── sub-components ────────────────────────────────────────────────────────────
 
 function RiskPill({ label }: { label: HUDMetrics['riskLabel'] }) {
@@ -61,10 +71,38 @@ function RiskPill({ label }: { label: HUDMetrics['riskLabel'] }) {
   );
 }
 
-function MiniTradeCard({ trade }: { trade: HUDTrade }) {
+function AnimatedPnL({ value }: { value: number }) {
+  const [displayed, setDisplayed] = useState(0);
+  useEffect(() => {
+    let frame: number;
+    const start = performance.now();
+    const duration = 600;
+    const animate = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplayed(Math.round(eased * value));
+      if (t < 1) frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+  return (
+    <span className={cn('text-[10px] font-black tabular-nums', value >= 0 ? 'text-green-600' : 'text-red-500')}>
+      {value >= 0 ? '+' : ''}{displayed}p
+    </span>
+  );
+}
+
+function MiniTradeCard({ trade }: { key?: React.Key; trade: HUDTrade }) {
   const pos = trade.pnlPips >= 0;
   return (
-    <div className="flex items-center gap-3 py-2 px-3 bg-white rounded-xl border border-slate-100">
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={{ duration: 0.25 }}
+      className="flex items-center gap-3 py-2 px-3 bg-white rounded-xl border border-slate-100"
+    >
       <div className="flex items-center gap-1.5 flex-1 min-w-0">
         {trade.direction === 'long'
           ? <TrendingUp className="w-3.5 h-3.5 text-green-500 shrink-0" />
@@ -80,15 +118,44 @@ function MiniTradeCard({ trade }: { trade: HUDTrade }) {
       {/* TP progress mini bar */}
       <div className="flex items-center gap-1.5 shrink-0">
         <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-          <div
+          <motion.div
             className={cn('h-full rounded-full', pos ? 'bg-green-400' : 'bg-red-400')}
-            style={{ width: `${Math.abs(trade.tpProgress)}%` }}
+            initial={{ width: 0 }}
+            animate={{ width: `${Math.abs(trade.tpProgress)}%` }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
           />
         </div>
-        <span className={cn('font-black text-[11px] tabular-nums w-12 text-right', pos ? 'text-green-600' : 'text-red-500')}>
-          {pos ? '+' : ''}{trade.pnlPips}p
-        </span>
+        <AnimatedPnL value={trade.pnlPips} />
       </div>
+    </motion.div>
+  );
+}
+
+function RiskGauge({ riskUsedPct, riskLabel }: { riskUsedPct: number; riskLabel: HUDMetrics['riskLabel'] }) {
+  const stroke = gaugeStroke(riskUsedPct);
+  const color = riskUsedPct > 80 ? '#ef4444' : riskUsedPct > 60 ? '#f59e0b' : '#22c55e';
+
+  return (
+    <div className="shrink-0 text-center">
+      <div className="relative w-10 h-10">
+        <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
+          <circle cx="18" cy="18" r={GAUGE_R} fill="none" stroke="#f1f5f9" strokeWidth="3" />
+          <motion.circle
+            cx="18" cy="18" r={GAUGE_R} fill="none"
+            stroke={color}
+            strokeWidth="3"
+            strokeLinecap="round"
+            initial={{ strokeDashoffset: GAUGE_CIRC }}
+            animate={{ strokeDashoffset: GAUGE_CIRC - stroke }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            style={{ strokeDasharray: GAUGE_CIRC }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Shield className="w-3.5 h-3.5 text-[#3d5af1]" />
+        </div>
+      </div>
+      <RiskPill label={riskLabel} />
     </div>
   );
 }
@@ -102,63 +169,64 @@ export function MobileTradingHUD({ onExpand }: { onExpand?: () => void }) {
 
   if (metrics.circuitBreaker) {
     return (
-      <div className="mx-4 mb-3 p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="mx-4 mb-3 p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2"
+      >
         <AlertTriangle className="w-4 h-4 text-red-500 shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-black text-red-700">Circuit Breaker Active</p>
           <p className="text-[9px] text-red-500">No new entries. Operator reset required.</p>
         </div>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="mx-4 mb-3 space-y-2">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="mx-4 mb-3 space-y-2"
+    >
       {/* Top HUD bar */}
       <div
-        className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100"
+        className="flex items-center gap-3 p-3 rounded-xl bg-white border border-slate-100 cursor-pointer active:scale-[0.99] transition-transform"
         onClick={onExpand}
       >
         {/* Balance + today */}
         <div className="flex-1 min-w-0">
           <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Paper Balance</p>
           <div className="flex items-baseline gap-1.5 mt-0.5">
-            <span className="text-base font-black text-[#1a1c3a]">
+            <motion.span
+              className="text-base font-black text-[#1a1c3a]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.1 }}
+            >
               ${metrics.balance.toLocaleString()}
-            </span>
+            </motion.span>
             <span className={cn('text-[10px] font-black', todayPos ? 'text-green-600' : 'text-red-500')}>
               {todayPos ? '+' : ''}{metrics.todayPct.toFixed(2)}%
             </span>
           </div>
         </div>
 
-        {/* Risk gauge */}
-        <div className="shrink-0 text-center">
-          <div className="relative w-10 h-10">
-            <svg className="w-10 h-10 -rotate-90" viewBox="0 0 36 36">
-              <circle cx="18" cy="18" r="14" fill="none" stroke="#f1f5f9" strokeWidth="3" />
-              <circle
-                cx="18" cy="18" r="14" fill="none"
-                stroke={metrics.riskUsedPct > 80 ? '#ef4444' : metrics.riskUsedPct > 60 ? '#f59e0b' : '#22c55e'}
-                strokeWidth="3"
-                strokeDasharray={`${metrics.riskUsedPct * 0.879} 87.9`}
-                strokeLinecap="round"
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Shield className="w-3.5 h-3.5 text-[#3d5af1]" />
-            </div>
-          </div>
-          <RiskPill label={metrics.riskLabel} />
-        </div>
+        {/* Animated risk gauge */}
+        <RiskGauge riskUsedPct={metrics.riskUsedPct} riskLabel={metrics.riskLabel} />
 
         {/* Open trades count */}
         <div className="shrink-0 text-center">
           <div className="flex gap-0.5 mb-1">
             {Array.from({ length: metrics.maxTrades }).map((_, i) => (
-              <div
+              <motion.div
                 key={i}
                 className={cn('w-2.5 h-5 rounded-sm', i < metrics.openTrades ? 'bg-[#3d5af1]' : 'bg-slate-100')}
+                initial={{ scaleY: 0 }}
+                animate={{ scaleY: 1 }}
+                transition={{ delay: i * 0.08, duration: 0.3, ease: 'easeOut' }}
+                style={{ originY: 1 }}
               />
             ))}
           </div>
@@ -171,23 +239,34 @@ export function MobileTradingHUD({ onExpand }: { onExpand?: () => void }) {
       </div>
 
       {/* Live trades compact */}
-      {trades.length > 0 && (
-        <div className="space-y-1.5">
-          {trades.map(t => <MiniTradeCard key={t.id} trade={t} />)}
-        </div>
-      )}
-
-      {trades.length === 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-slate-100">
-          <Activity className="w-3.5 h-3.5 text-[#00d4ff] animate-pulse" />
-          <span className="text-[10px] text-slate-400 font-medium">
-            Scanning for signals · {metrics.riskLabel} risk environment
-          </span>
-        </div>
-      )}
+      <AnimatePresence mode="popLayout">
+        {trades.length > 0 && (
+          <div className="space-y-1.5">
+            {trades.map(t => <MiniTradeCard key={t.id} trade={t} />)}
+          </div>
+        )}
+        {trades.length === 0 && (
+          <motion.div
+            key="empty"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-center gap-2 px-3 py-2 bg-white rounded-xl border border-slate-100"
+          >
+            <Activity className="w-3.5 h-3.5 text-[#00d4ff] animate-pulse" />
+            <span className="text-[10px] text-slate-400 font-medium">
+              Scanning for signals · {metrics.riskLabel} risk environment
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Week stat pill */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-white rounded-xl border border-slate-100">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="flex items-center justify-between px-3 py-1.5 bg-white rounded-xl border border-slate-100"
+      >
         <span className="text-[9px] text-slate-400 font-medium">This week</span>
         <span className={cn('font-black text-[11px]', metrics.weekPct >= 0 ? 'text-green-600' : 'text-red-500')}>
           {metrics.weekPct >= 0 ? '+' : ''}{metrics.weekPct}%
@@ -197,7 +276,7 @@ export function MobileTradingHUD({ onExpand }: { onExpand?: () => void }) {
           <Zap className="w-2.5 h-2.5 text-[#00d4ff]" />
           PAPER MODE
         </span>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }
