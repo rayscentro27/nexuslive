@@ -1,8 +1,8 @@
 {
   "broker_type": "oanda",
-  "live_trading": true,
+  "live_trading": false,
   "signal_port": 5000,
-  "auto_trading": true,
+  "auto_trading": false,
   "max_trades_per_day": 5,
   "trading_pairs": ["EURUSD", "GBPUSD", "USDJPY"],
   "timeframes": ["H1", "H4"],
@@ -10,7 +10,10 @@
   "broker_config": {
     "api_url": "https://api-fxpractice.oanda.com",
     "account_id": "101-001-27557105-003",
-    "api_key": "ae77b6c0effc9c6836b8085bab9318fc-d05ce7457fa2fd95f7aa9788d3036764",
+    "api_key": "ROTATE_THIS_KEY",
     "leverage": 100
-  }
+  },
+  "_safety_note": "live_trading and auto_trading are intentionally false. Do not set to true without explicit operator review and a separate approval workflow.",
+  "NEXUS_DRY_RUN": true,
+  "TRADING_LIVE_EXECUTION_ENABLED": false
 }
