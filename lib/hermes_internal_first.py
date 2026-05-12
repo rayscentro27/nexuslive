@@ -217,4 +217,64 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
             matched_topic=topic,
         )
 
+    if topic == "trading":
+        nexus_dry_run = os.getenv("NEXUS_DRY_RUN", "true").lower() == "true"
+        live_trading  = os.getenv("LIVE_TRADING", "false").lower() == "true"
+        trading_live  = os.getenv("TRADING_LIVE_EXECUTION_ENABLED", "false").lower() == "true"
+        cb_status = "unknown"
+        try:
+            from lib import circuit_breaker as cb
+            s = cb.get_status()
+            cb_active = s.get("active_count", 0)
+            cb_status = f"{cb_active} active" if cb_active else "none active"
+        except Exception:
+            cb_status = "module unavailable"
+        phase_note = ("Paper trading phase. NEXUS_DRY_RUN=true. No live execution."
+                      if nexus_dry_run and not live_trading
+                      else "⚠️ WARNING: NEXUS_DRY_RUN=false or LIVE_TRADING=true — operator action needed.")
+        lines = [
+            "Nexus Trading Intelligence — Phase 1: Research + Design",
+            f"Safety: {phase_note}",
+            f"Circuit breakers: {cb_status}",
+            f"TRADING_LIVE_EXECUTION_ENABLED: {'true ⚠️' if trading_live else 'false ✓'}",
+            "",
+            "Platform components built: StrategyRegistry, RiskControlCenter, PaperTradingArena.",
+            "Next: Implement risk_engine.py, paper_trade_executor.py, deploy Supabase schema.",
+            "Live execution requires 30+ paper trades per strategy + operator approval.",
+        ]
+        return InternalFirstReply(
+            text="\n".join(lines),
+            confidence=CONF_INTERNAL_CONFIRMED,
+            source="env_config + circuit_breaker + ops_memory",
+            matched_topic=topic,
+        )
+
+    if topic == "circuit_breaker":
+        try:
+            from lib import circuit_breaker as cb
+            s = cb.get_status()
+            active = s.get("active_breakers", [])
+            if active:
+                names = [e.get("trigger_type", "unknown") for e in active]
+                return InternalFirstReply(
+                    text=f"⚠️ {len(active)} circuit breaker(s) active: {', '.join(names)}. "
+                         "No new entries permitted. Operator reset required.",
+                    confidence=CONF_INTERNAL_CONFIRMED,
+                    source="circuit_breaker_state",
+                    matched_topic=topic,
+                )
+            return InternalFirstReply(
+                text="Circuit breakers: none active. All 10 risk engine layers clear.",
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="circuit_breaker_state",
+                matched_topic=topic,
+            )
+        except Exception:
+            return InternalFirstReply(
+                text="Circuit breaker module unavailable. Check /api/admin/circuit-breakers for live status.",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="circuit_breaker_module",
+                matched_topic=topic,
+            )
+
     return None
