@@ -81,6 +81,17 @@ def default_runtime_config() -> dict[str, Any]:
                 "is codex available", "did codex hit a rate limit", "what fallback provider",
                 "available models", "which models are available", "what models can you use",
             ],
+            "trading": [
+                "trading status", "paper trading", "trading platform", "trading intelligence",
+                "strategy status", "what strategies are running", "paper trades",
+                "how is trading going", "trading update", "trading progress",
+                "trading phase", "live trading", "trading safety", "trading mode",
+            ],
+            "circuit_breaker": [
+                "circuit breaker", "circuit breakers", "circuit breaker status",
+                "is trading halted", "halt status", "any circuit breakers",
+                "trading halt", "kill switch",
+            ],
         },
         "hermes_project_aliases": {
             "opencode": ["dev-agent bridge", "mac mini operational sessions", "ai ops dashboard"],

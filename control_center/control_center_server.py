@@ -5666,6 +5666,112 @@ def api_trading_status():
     })
 
 
+@app.route("/api/admin/kill-switch", methods=["GET", "POST"])
+def api_kill_switch():
+    """
+    GET  — return current kill switch + safety flag state
+    POST — update safety flags (operator only, body: {action: "halt"|"resume"|"status"})
+    Requires X-Admin-Token auth.
+    """
+    token = request.headers.get("X-Admin-Token", "")
+    if token != os.getenv("CONTROL_CENTER_ADMIN_TOKEN", ""):
+        return jsonify({"error": "unauthorized"}), 401
+
+    if request.method == "GET":
+        return jsonify({
+            "nexus_dry_run":      os.getenv("NEXUS_DRY_RUN", "true"),
+            "live_trading":       os.getenv("LIVE_TRADING", "false"),
+            "auto_trading":       os.getenv("NEXUS_AUTO_TRADING", "false"),
+            "swarm_execution":    os.getenv("SWARM_EXECUTION_ENABLED", "false"),
+            "hermes_cli_exec":    os.getenv("HERMES_CLI_EXECUTION_ENABLED", "false"),
+            "trading_live_exec":  os.getenv("TRADING_LIVE_EXECUTION_ENABLED", "false"),
+            "kill_switch_status": "safe" if os.getenv("NEXUS_DRY_RUN", "true").lower() == "true" else "WARNING",
+        })
+
+    body   = request.get_json(silent=True) or {}
+    action = body.get("action", "status")
+    now    = datetime.utcnow().isoformat()
+
+    if action == "halt":
+        # Set all execution flags to safe mode
+        os.environ["NEXUS_DRY_RUN"]                    = "true"
+        os.environ["LIVE_TRADING"]                     = "false"
+        os.environ["NEXUS_AUTO_TRADING"]               = "false"
+        os.environ["SWARM_EXECUTION_ENABLED"]          = "false"
+        os.environ["HERMES_CLI_EXECUTION_ENABLED"]     = "false"
+        os.environ["TRADING_LIVE_EXECUTION_ENABLED"]   = "false"
+        logger.warning(f"[KILL SWITCH] HALT triggered at {now}")
+        return jsonify({
+            "ok": True, "action": "halt", "timestamp": now,
+            "message": "All execution halted. Dry-run mode enforced.",
+        })
+
+    if action == "resume":
+        # Only resume non-trading automation. Trading flags stay false.
+        logger.info(f"[KILL SWITCH] RESUME requested at {now}")
+        return jsonify({
+            "ok": True, "action": "resume", "timestamp": now,
+            "message": "Non-trading automation may resume. Trading flags unchanged.",
+            "warning": "LIVE_TRADING and TRADING_LIVE_EXECUTION_ENABLED remain false. "
+                       "Set them manually in .env after operator review.",
+        })
+
+    return jsonify({
+        "ok": True, "action": "status",
+        "nexus_dry_run":     os.getenv("NEXUS_DRY_RUN", "true"),
+        "live_trading":      os.getenv("LIVE_TRADING", "false"),
+        "auto_trading":      os.getenv("NEXUS_AUTO_TRADING", "false"),
+        "swarm_execution":   os.getenv("SWARM_EXECUTION_ENABLED", "false"),
+    })
+
+
+@app.route("/api/admin/circuit-breakers", methods=["GET", "POST", "DELETE"])
+def api_circuit_breakers():
+    """
+    GET    — return current circuit breaker status
+    POST   — fire a circuit breaker (body: {trigger_type, trigger_value, notes})
+    DELETE — reset a circuit breaker (body: {trigger_type, strategy_id, notes})
+    Requires X-Admin-Token auth.
+    """
+    token = request.headers.get("X-Admin-Token", "")
+    if token != os.getenv("CONTROL_CENTER_ADMIN_TOKEN", ""):
+        return jsonify({"error": "unauthorized"}), 401
+
+    try:
+        import sys
+        _nexus_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if _nexus_root not in sys.path:
+            sys.path.insert(0, _nexus_root)
+        from lib import circuit_breaker as cb
+    except ImportError as e:
+        return jsonify({"error": f"circuit_breaker module unavailable: {e}"}), 503
+
+    if request.method == "GET":
+        return jsonify(cb.get_status())
+
+    body = request.get_json(silent=True) or {}
+
+    if request.method == "POST":
+        trigger_type  = body.get("trigger_type", "operator_halt")
+        trigger_value = body.get("trigger_value")
+        strategy_id   = body.get("strategy_id")
+        notes         = body.get("notes", "")
+        event = cb.fire(trigger_type, trigger_value, strategy_id, notes)
+        logger.warning(f"[CIRCUIT BREAKER] Fired via API: {trigger_type}")
+        return jsonify({"ok": True, "event": event})
+
+    if request.method == "DELETE":
+        trigger_type = body.get("trigger_type")
+        strategy_id  = body.get("strategy_id")
+        notes        = body.get("notes", "")
+        if not trigger_type:
+            return jsonify({"error": "trigger_type required"}), 400
+        ok = cb.reset(trigger_type, strategy_id, resolved_by="operator", notes=notes)
+        return jsonify({"ok": ok, "trigger_type": trigger_type})
+
+    return jsonify({"error": "method not allowed"}), 405
+
+
 @app.route("/")
 def index():
     response = make_response(render_template_string(TERMINAL_HTML))
