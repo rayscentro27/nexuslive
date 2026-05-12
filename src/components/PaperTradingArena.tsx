@@ -315,9 +315,12 @@ export function PaperTradingArena() {
           <h2 className="text-lg font-black text-[#1a1c3a] flex items-center gap-2">
             <Zap className="w-5 h-5 text-[#00d4ff]" />
             Paper Trading Arena
+            <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-amber-50 text-amber-600 border border-amber-200 tracking-wider">
+              DEMO / SIMULATED
+            </span>
           </h2>
           <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-            Simulated · No real funds
+            Simulated · No real funds · Demo data only
           </p>
         </div>
         <div className="text-right">
