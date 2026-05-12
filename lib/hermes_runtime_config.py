@@ -86,6 +86,12 @@ def default_runtime_config() -> dict[str, Any]:
                 "strategy status", "what strategies are running", "paper trades",
                 "how is trading going", "trading update", "trading progress",
                 "trading phase", "live trading", "trading safety", "trading mode",
+                "paper results", "paper performance", "how did paper", "best session",
+                "best time to trade", "session performance", "when to trade",
+                "active strategy", "what strategy", "which strategy", "strategy running",
+                "is demo safe", "is paper safe", "safety status",
+                "why paused", "why halted", "why stopped", "what paused",
+                "why is trading paused", "why is trading halted", "is trading paused",
             ],
             "circuit_breaker": [
                 "circuit breaker", "circuit breakers", "circuit breaker status",
