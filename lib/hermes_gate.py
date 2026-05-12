@@ -26,6 +26,40 @@ from typing import Optional
 logger = logging.getLogger('HermesGate')
 
 
+_HARD_DENY_EVENT_TOKENS = {
+    'trading',
+    'signal',
+    'research',
+    'youtube',
+    'ingest',
+    'scheduled_summary',
+    'weekly_summary',
+    'daily_summary',
+    'worker_summary',
+    'model_error_report',
+    'research_brief',
+    'trading_alert',
+    'opportunity_brief',
+    'trading_summary',
+    'youtube_summary',
+    'ingestion_summary',
+    'automatic_status',
+    'cron_report',
+    'scheduler_report',
+    'retry_error_report',
+    'background_report',
+}
+
+_ALLOW_EVENT_TYPES = {
+    'direct_chat_reply',
+    'command_reply',
+    'approval_request',
+    'approval_result',
+    'user_requested_completion_notice',
+    'user_requested_email_report_confirmation',
+}
+
+
 def _auto_reports_enabled() -> bool:
     if os.getenv('TELEGRAM_MANUAL_ONLY', 'true').lower() in {'1', 'true', 'yes', 'on'}:
         return False
@@ -34,6 +68,7 @@ def _auto_reports_enabled() -> bool:
 
 def _telegram_enabled() -> bool:
     return os.getenv('TELEGRAM_ENABLED', 'true').lower() in {'1', 'true', 'yes', 'on'}
+
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 
@@ -60,6 +95,25 @@ _EMPTY_PATTERNS = [
     '0 email', '0 email(s)', 'done — 0', 'processed: 0',
     'no action required',
 ]
+
+# Content patterns that must never reach Telegram automatically.
+# These are auto-report artifacts that should only go to email/file.
+_FORBIDDEN_CONTENT_PATTERNS = [
+    '🏛️ nexus research',
+    '🏛️ nexus intelligence brief',
+    '🏛️ nexus research run complete',
+    'key findings:',
+    'sources:',
+    'research artifacts saved',
+    'intelligence brief',
+    'nexus research run complete',
+]
+
+
+def _contains_forbidden_content(text: str) -> bool:
+    """Return True if message contains auto-report patterns forbidden in Telegram."""
+    lowered = text.lower().strip()
+    return any(p in lowered for p in _FORBIDDEN_CONTENT_PATTERNS)
 
 # ── Supabase helpers ───────────────────────────────────────────────────────────
 
@@ -188,9 +242,55 @@ def _telegram_send(text: str, bot_token: str, chat_id: str, parse_mode: str = 'H
     try:
         with urllib.request.urlopen(req, timeout=10) as _:
             return True
+    except urllib.error.HTTPError as e:
+        try:
+            details = e.read().decode('utf-8', errors='ignore').lower()
+        except Exception:
+            details = ''
+        if e.code == 400 and "can't parse entities" in details:
+            fallback = json.dumps({
+                'chat_id': chat_id,
+                'text': text[:4096],
+            }).encode()
+            retry_req = urllib.request.Request(url, data=fallback, headers={'Content-Type': 'application/json'})
+            try:
+                with urllib.request.urlopen(retry_req, timeout=10) as _:
+                    logger.warning('Telegram HTML parse failed; resent message without parse_mode')
+                    return True
+            except Exception as retry_err:
+                logger.warning(f'Telegram fallback send failed: {retry_err}')
+                return False
+        logger.warning(f'Telegram send failed: HTTP {e.code}')
+        return False
     except Exception as e:
         logger.warning(f"Telegram send failed: {e}")
         return False
+
+
+def telegram_policy_allows_send(
+    *,
+    event_type: str,
+    source: str = 'unknown',
+    user_requested: bool = False,
+    is_command: bool = False,
+    is_approval: bool = False,
+    is_completion: bool = False,
+) -> tuple[bool, str]:
+    event_lower = (event_type or '').strip().lower()
+
+    if not event_lower:
+        return False, 'missing_event_type'
+
+    if any(token in event_lower for token in _HARD_DENY_EVENT_TOKENS):
+        return False, 'scheduled_or_background_summary'
+
+    if source in {'scheduler', 'worker', 'background', 'cron'}:
+        return False, 'scheduled_or_background_summary'
+
+    if event_lower in _ALLOW_EVENT_TYPES:
+        return True, 'allowed_explicit_type'
+
+    return False, 'not_allowlisted'
 
 
 # ── Public API ─────────────────────────────────────────────────────────────────
@@ -226,12 +326,22 @@ def send(
         return False
 
     if not force:
+        allowed, reason = telegram_policy_allows_send(event_type=event_type, source='gate')
+        if not allowed:
+            logger.info(f"telegram_policy denied=true message_type={event_type} source=gate reason={reason}")
+            return False
+
         # Conversational mode: suppress all automated non-critical outbound reports.
         if not _auto_reports_enabled() and severity != 'critical':
             logger.info("Telegram auto-report suppressed; conversational mode still enabled")
             return False
 
-        # 1. Empty signal check
+        # 1a. Forbidden content check — auto-report artifacts never go to Telegram
+        if _contains_forbidden_content(text):
+            logger.info(f"Gate suppressed [{event_type}]: forbidden_content_pattern — save to email/file instead")
+            return False
+
+        # 1b. Empty signal check
         if _is_empty(text):
             logger.info(f"Gate suppressed [{event_type}]: no actionable content")
             return False
@@ -311,6 +421,23 @@ def send_direct_response(
 
     if not token or not chat:
         logger.debug("send_direct_response: no bot token/chat_id configured")
+        return False
+
+    allowed, reason = telegram_policy_allows_send(
+        event_type=event_type,
+        source='direct',
+        user_requested=True,
+        is_command=event_type == 'command_reply',
+        is_approval='approval' in event_type,
+        is_completion='completion' in event_type,
+    )
+    if not allowed:
+        logger.info(f"telegram_policy denied=true message_type={event_type} source=direct reason={reason}")
+        return False
+
+    # Belt-and-suspenders: never send forbidden auto-report content even in direct replies
+    if _contains_forbidden_content(text):
+        logger.info(f"send_direct_response suppressed [{event_type}]: forbidden_content_pattern")
         return False
 
     # 60-second dedup window — prevents exact-duplicate double-sends only

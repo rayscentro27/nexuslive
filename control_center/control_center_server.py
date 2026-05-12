@@ -643,6 +643,104 @@ def api_send_tester_email(user_id: str):
     })
 
 
+@app.route("/api/admin/tester-invites/send", methods=["POST"])
+def api_send_tester_invite():
+    """
+    Send a beta invite email to a pre-signup invitee via the backend email system.
+
+    Accepts: { invite_id, email, name, membership_level?, note? }
+    Auth: X-Admin-Token header
+    Email: sent via NEXUS_EMAIL/NEXUS_EMAIL_PASSWORD (Gmail SMTP)
+    Invite link: uses NEXUS_APP_URL env var (canonical production URL)
+    Logs: updates invited_users row in Supabase with delivery result
+    """
+    from flask import request as flask_request
+    from scripts.prelaunch_utils import build_tester_email, default_test_mode, supabase_request, utc_now_iso
+
+    if not _admin_authorized(flask_request):
+        return _unauthorized_response()
+
+    body = flask_request.get_json(silent=True) or {}
+    invite_id = (body.get("invite_id") or "").strip()
+    email = (body.get("email") or "").strip().lower()
+    name = (body.get("name") or "").strip()
+    membership_level = (body.get("membership_level") or "admin_test").strip()
+    note = (body.get("note") or "").strip()
+    invited_by = (body.get("invited_by") or "ray").strip()
+
+    if not email:
+        return jsonify({"ok": False, "error": "email is required"}), 400
+    if "@" not in email:
+        return jsonify({"ok": False, "error": "invalid email address"}), 400
+
+    # Build canonical invite link from server-side env (never from client window.origin)
+    app_url = (os.getenv("NEXUS_APP_URL") or os.getenv("NEXUS_WEBSITE_URL") or "https://nexus.goclearonline.com").rstrip("/")
+    from urllib.parse import quote
+    signup_link = f"{app_url}/?invited=true&email={quote(email)}"
+
+    preview = build_tester_email(
+        name=name or email,
+        login_link=signup_link,
+        membership_level=membership_level,
+        note=note,
+    )
+
+    delivery_status = "preview"
+    delivery_error = ""
+
+    if default_test_mode():
+        delivery_status = "preview_only"
+    else:
+        try:
+            _send_tester_email_live(email, preview["subject"], preview["body"])
+            delivery_status = "sent"
+        except Exception as exc:
+            delivery_status = "send_failed"
+            delivery_error = str(exc)
+            logger.error("tester-invites/send: delivery failed for %s: %s", email, exc)
+
+    now = utc_now_iso()
+    patch_body: dict = {
+        "invite_status": delivery_status,
+        "invite_sent_at": now if delivery_status == "sent" else None,
+        "signup_link": signup_link,
+    }
+
+    if invite_id:
+        supabase_request(
+            f"invited_users?id=eq.{invite_id}",
+            method="PATCH",
+            body=patch_body,
+            prefer="return=representation",
+        )
+    else:
+        supabase_request(
+            f"invited_users?email=eq.{email}",
+            method="PATCH",
+            body=patch_body,
+            prefer="return=representation",
+        )
+
+    logger.info(
+        "tester-invites/send email=%s status=%s invite_id=%s invited_by=%s",
+        email, delivery_status, invite_id or "by_email", invited_by,
+    )
+
+    return jsonify({
+        "ok": delivery_status == "sent" or delivery_status == "preview_only",
+        "invite_id": invite_id,
+        "email": email,
+        "delivery_status": delivery_status,
+        "sent_at": now if delivery_status == "sent" else None,
+        "signup_link": signup_link,
+        "provider": "smtp_gmail",
+        "invited_by": invited_by,
+        "waived_subscription": True,
+        "error": delivery_error or None,
+        "test_mode": default_test_mode(),
+    })
+
+
 @app.route("/api/referral-link")
 def api_referral_link():
     from flask import request as flask_request

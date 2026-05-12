@@ -1,0 +1,984 @@
+{
+  "subject": "Nexus Weekly CEO Report - 2026-05-09T21:40:32.164040+00:00",
+  "report": {
+    "report_type": "weekly_ceo_report",
+    "timestamp": "2026-05-09T21:40:32.163956+00:00",
+    "operational_memory": {
+      "active_work_session": null,
+      "recent_recommendations": [],
+      "recent_completed": [],
+      "recent_failed": [],
+      "pending_approval_refs": [
+        {
+          "id": "5365eb16-168b-4a98-8ce1-fc347a2bd038",
+          "status": "pending",
+          "action_type": "chief_of_staff_recommendation",
+          "created_at": "2026-05-06T21:06:23.165117+00:00"
+        },
+        {
+          "id": "ecb25a0e-1433-494a-b78f-690118c5824c",
+          "status": "pending",
+          "action_type": "chief_of_staff_recommendation",
+          "created_at": "2026-05-06T21:06:24.095423+00:00"
+        },
+        {
+          "id": "d2ea06c6-0564-4f25-b4b5-4887bd7a7823",
+          "status": "pending",
+          "action_type": "chief_of_staff_recommendation",
+          "created_at": "2026-05-06T21:06:24.634077+00:00"
+        },
+        {
+          "id": "c365de73-a2d9-4e9f-a5d1-ae207e4a9b72",
+          "status": "pending",
+          "action_type": "chief_of_staff_recommendation",
+          "created_at": "2026-05-06T21:06:25.173436+00:00"
+        },
+        {
+          "id": "1cb52d9c-6aa1-4f92-a81b-235fa4839ee1",
+          "status": "pending",
+          "action_type": "chief_of_staff_recommendation",
+          "created_at": "2026-05-06T21:06:25.701071+00:00"
+        },
+        {
+          "id": "5354d462-48de-4261-91dd-3821391ffa1d",
+          "status": "pending",
+          "action_type": "chief_of_staff_recommendation",
+          "created_at": "2026-05-06T21:06:26.22287+00:00"
+        }
+      ]
+    },
+    "knowledge": {
+      "category_counts": {},
+      "stale_warnings": [],
+      "recent_funding_insights": [],
+      "recent_credit_insights": []
+    },
+    "workforce": {
+      "latest_agent_runs": {},
+      "recent_failures": [],
+      "recent_telegram_activity": {},
+      "worker_status_summary": {},
+      "job_queue_status_summary": {}
+    },
+    "system_health": {
+      "worker_status_summary": {},
+      "job_queue_status_summary": {}
+    },
+    "recent_failures": [
+      {
+        "task": "none",
+        "reason": "No recent failures recorded."
+      }
+    ],
+    "telegram_activity": {},
+    "operational_telemetry": {
+      "telegram_reliability": {
+        "date": "2026-05-09",
+        "inbound_count": 0,
+        "reply_success_count": 0,
+        "timeout_count": 0,
+        "fallback_count": 0,
+        "duplicate_prevented_count": 0,
+        "failed_command_count": 0,
+        "avg_response_latency_ms": 0,
+        "per_command": {}
+      },
+      "knowledge_metrics": {
+        "cache_hit": 0,
+        "cache_miss": 0,
+        "retrieval_latency_ms_avg": 0,
+        "ranking_latency_ms_avg": 0,
+        "compact_summary_latency_ms_avg": 0,
+        "source_usage": {},
+        "category_usage": {},
+        "prior_success_weight_used": 0,
+        "cache_hit_ratio": 0.0,
+        "debug_trace": []
+      },
+      "worker_reliability": {
+        "success_count": 0,
+        "failure_count": 0,
+        "rejected_count": 0,
+        "unsupported_route_attempts": 0,
+        "stale_worker_heartbeats": 0,
+        "worker_role_activity": {},
+        "repeated_timeout_pattern": false,
+        "degraded_worker_warnings": [],
+        "escalation_recommendation": "No escalation required."
+      }
+    },
+    "operational_intelligence": {
+      "executive_summary": "ok",
+      "risk_level": "low"
+    },
+    "funding_intelligence": {
+      "enabled": true,
+      "next_best_funding_action": "collect docs"
+    },
+    "trading_intelligence_lab": {
+      "enabled": true,
+      "trading_paper_only": true
+    },
+    "opportunity_intelligence": {
+      "enabled": true,
+      "opportunity_next_action": "review opportunities"
+    },
+    "executive_strategy_summary": {
+      "next_domain_focus": {
+        "domain": "operations"
+      }
+    },
+    "dev_agent_bridge": {
+      "generated_at": "2026-05-09T21:40:19.274997+00:00",
+      "bridge_enabled": true,
+      "execution_enabled": false,
+      "dry_run_mode": true,
+      "approval_required": true,
+      "agents": [
+        {
+          "name": "gemini",
+          "installed": true,
+          "path": "/Users/raymonddavis/.nvm/versions/node/v20.20.2/bin/gemini",
+          "version": "0.41.1",
+          "provider": "google",
+          "safe_for_execution": false,
+          "detection_error": null
+        },
+        {
+          "name": "opencode",
+          "installed": true,
+          "path": "/Users/raymonddavis/.nvm/versions/node/v20.20.2/bin/opencode",
+          "version": "1.14.41",
+          "provider": "opencode-ai",
+          "safe_for_execution": false,
+          "detection_error": null
+        },
+        {
+          "name": "claude",
+          "installed": true,
+          "path": "/Users/raymonddavis/.local/bin/claude",
+          "version": "2.1.137",
+          "provider": "anthropic",
+          "safe_for_execution": false,
+          "detection_error": null
+        },
+        {
+          "name": "codex",
+          "installed": false,
+          "path": null,
+          "version": null,
+          "provider": "openai",
+          "safe_for_execution": false,
+          "detection_error": null
+        }
+      ],
+      "installed_count": 3,
+      "missing_count": 1,
+      "installed_names": [
+        "gemini",
+        "opencode",
+        "claude"
+      ],
+      "missing_names": [
+        "codex"
+      ],
+      "safe_for_execution": false
+    },
+    "demo_readiness": {
+      "timestamp": "2026-05-09T21:40:19.275419+00:00",
+      "status": "ready",
+      "score": 100,
+      "checks": [
+        {
+          "name": "telegram_conversational",
+          "ok": true,
+          "detail": "TELEGRAM_CONVERSATIONAL_MODE"
+        },
+        {
+          "name": "telegram_manual_only",
+          "ok": true,
+          "detail": "TELEGRAM_MANUAL_ONLY"
+        },
+        {
+          "name": "telegram_auto_reports_disabled",
+          "ok": true,
+          "detail": "TELEGRAM_AUTO_REPORTS_ENABLED=false"
+        },
+        {
+          "name": "telegram_full_reports_disabled",
+          "ok": true,
+          "detail": "TELEGRAM_FULL_REPORTS_ENABLED=false"
+        },
+        {
+          "name": "swarm_execution_disabled",
+          "ok": true,
+          "detail": "SWARM_EXECUTION_ENABLED=false"
+        },
+        {
+          "name": "swarm_dry_run",
+          "ok": true,
+          "detail": "HERMES_SWARM_DRY_RUN=true"
+        },
+        {
+          "name": "cli_execution_disabled",
+          "ok": true,
+          "detail": "HERMES_CLI_EXECUTION_ENABLED=false"
+        },
+        {
+          "name": "cli_dry_run",
+          "ok": true,
+          "detail": "HERMES_CLI_DRY_RUN=true"
+        },
+        {
+          "name": "cli_approval_required",
+          "ok": true,
+          "detail": "HERMES_CLI_APPROVAL_REQUIRED=true"
+        },
+        {
+          "name": "trading_live_disabled",
+          "ok": true,
+          "detail": "TRADING_LIVE_EXECUTION_ENABLED=false"
+        },
+        {
+          "name": "trading_paper_only",
+          "ok": true,
+          "detail": "TRADING_PAPER_ONLY=true"
+        },
+        {
+          "name": "email_reports_enabled",
+          "ok": true,
+          "detail": "EMAIL_REPORTS_ENABLED=true"
+        }
+      ],
+      "blockers": [],
+      "recommended_fixes": [],
+      "next_action": "Run phone checklist and send executive report.",
+      "dev_agent_bridge": {
+        "generated_at": "2026-05-09T21:40:24.487251+00:00",
+        "bridge_enabled": true,
+        "execution_enabled": false,
+        "dry_run_mode": true,
+        "approval_required": true,
+        "agents": [
+          {
+            "name": "gemini",
+            "installed": true,
+            "path": "/Users/raymonddavis/.nvm/versions/node/v20.20.2/bin/gemini",
+            "version": "0.41.1",
+            "provider": "google",
+            "safe_for_execution": false,
+            "detection_error": null
+          },
+          {
+            "name": "opencode",
+            "installed": true,
+            "path": "/Users/raymonddavis/.nvm/versions/node/v20.20.2/bin/opencode",
+            "version": "1.14.41",
+            "provider": "opencode-ai",
+            "safe_for_execution": false,
+            "detection_error": null
+          },
+          {
+            "name": "claude",
+            "installed": true,
+            "path": "/Users/raymonddavis/.local/bin/claude",
+            "version": "2.1.137",
+            "provider": "anthropic",
+            "safe_for_execution": false,
+            "detection_error": null
+          },
+          {
+            "name": "codex",
+            "installed": false,
+            "path": null,
+            "version": null,
+            "provider": "openai",
+            "safe_for_execution": false,
+            "detection_error": null
+          }
+        ],
+        "installed_count": 3,
+        "missing_count": 1,
+        "installed_names": [
+          "gemini",
+          "opencode",
+          "claude"
+        ],
+        "missing_names": [
+          "codex"
+        ],
+        "safe_for_execution": false
+      },
+      "funding_intelligence": {
+        "timestamp": "2026-05-09T21:40:29.017850+00:00",
+        "enabled": true,
+        "review_only": true,
+        "actions_require_approval": true,
+        "funding_readiness_summary": {
+          "top_recommendations": [
+            {
+              "source_type": "workflow_outputs",
+              "category": "funding",
+              "created_at": "2026-04-28T20:29:14.535825+00:00",
+              "updated_at": "2026-04-28T20:29:14.535825+00:00",
+              "confidence_score": 0.8,
+              "relevance_tags": [
+                "funding",
+                "workflow_outputs"
+              ],
+              "tenant_scope": "global",
+              "context_text": "**hook**\n**your business structure could be holding you back from funding success!**\n\nscript:\n\"are you excited to apply for funding, but unsure if your business is ready? one crucial step often overlo ceo_routed_draft   ",
+              "prior_success_score": 0.0,
+              "workflow_id": "6f0db9db-ac13-48b0-9152-acf3b3c757ed",
+              "summary": "**Hook**\n**Your Business Structure Could Be Holding You Back From Funding Success!**\n\nScript:\n\"Are you excited to apply for funding, but unsure if your business is ready? One crucial step often overlo",
+              "raw_source_reference": {
+                "id": "6f0db9db-ac13-48b0-9152-acf3b3c757ed",
+                "status": "pending_review",
+                "event_type": null,
+                "workflow_type": "ceo_routed_draft"
+              },
+              "ranking_score": 0.6339
+            }
+          ],
+          "confidence": "medium"
+        },
+        "credit_readiness_summary": {
+          "top_recommendations": [],
+          "confidence": "low"
+        },
+        "business_setup_readiness_summary": {
+          "top_recommendations": [],
+          "confidence": "low"
+        },
+        "grant_readiness_summary": {
+          "top_recommendations": [],
+          "confidence": "low"
+        },
+        "missing_data": [
+          "business profile details",
+          "credit profile",
+          "bank statements",
+          "entity setup docs"
+        ],
+        "funding_blockers": [
+          "Missing key readiness documents.",
+          "Credit readiness requires consistency checks."
+        ],
+        "next_best_funding_action": "Compile missing readiness items and review the top ranked funding recommendation.",
+        "capital_ladder_recommendation": [
+          {
+            "stage": 1,
+            "name": "credit stabilization",
+            "goal": "improve profile consistency"
+          },
+          {
+            "stage": 2,
+            "name": "starter capital",
+            "goal": "secure small revolving lines"
+          },
+          {
+            "stage": 3,
+            "name": "growth capital",
+            "goal": "expand limits with stronger docs"
+          }
+        ],
+        "source_aware_context": {
+          "funding": {},
+          "credit": {}
+        }
+      },
+      "trading_intelligence": {
+        "timestamp": "2026-05-09T21:40:29.017925+00:00",
+        "enabled": true,
+        "trading_live_execution_enabled": false,
+        "trading_paper_only": true,
+        "trading_coach_educational_only": true,
+        "strategy_templates": [
+          {
+            "stop_loss_rules": "fixed invalidation plus volatility guard",
+            "take_profit_rules": "partial at 1R, runner into trend continuation",
+            "risk_per_trade_percent": 0.5,
+            "max_daily_loss_percent": 2.0,
+            "risk_reward_target": "2.0R",
+            "confidence_score": 0.55,
+            "stability_score": 0.6,
+            "difficulty_level": "intermediate",
+            "market_condition_fit": "trending or structured breakout",
+            "hermes_coach_notes": "Educational paper-trading setup. Validate session context and risk limits before sim entry.",
+            "visual_config": {
+              "card_theme": "signal",
+              "accent": "teal",
+              "badge": "paper"
+            },
+            "educational_disclaimer": "Educational demo scenario only. Not financial advice. No guaranteed outcomes.",
+            "strategy_name": "London Breakout",
+            "market_type": "forex",
+            "symbol_or_pair": "GBPUSD",
+            "timeframe": "M15",
+            "best_session": "London",
+            "indicators": [
+              "session range",
+              "ATR"
+            ],
+            "entry_rules": [
+              "break of London range",
+              "volume confirmation"
+            ],
+            "exit_rules": [
+              "close below breakout base"
+            ]
+          },
+          {
+            "stop_loss_rules": "fixed invalidation plus volatility guard",
+            "take_profit_rules": "partial at 1R, runner into trend continuation",
+            "risk_per_trade_percent": 0.5,
+            "max_daily_loss_percent": 2.0,
+            "risk_reward_target": "2.0R",
+            "confidence_score": 0.55,
+            "stability_score": 0.6,
+            "difficulty_level": "intermediate",
+            "market_condition_fit": "trending or structured breakout",
+            "hermes_coach_notes": "Educational paper-trading setup. Validate session context and risk limits before sim entry.",
+            "visual_config": {
+              "card_theme": "signal",
+              "accent": "teal",
+              "badge": "paper"
+            },
+            "educational_disclaimer": "Educational demo scenario only. Not financial advice. No guaranteed outcomes.",
+            "strategy_name": "SPY Trend Continuation",
+            "market_type": "options",
+            "symbol_or_pair": "SPY",
+            "timeframe": "M30",
+            "best_session": "New York",
+            "indicators": [
+              "VWAP",
+              "EMA 20/50"
+            ],
+            "entry_rules": [
+              "pullback to trend support",
+              "trend resumes"
+            ],
+            "exit_rules": [
+              "trend structure break"
+            ]
+          },
+          {
+            "stop_loss_rules": "fixed invalidation plus volatility guard",
+            "take_profit_rules": "partial at 1R, runner into trend continuation",
+            "risk_per_trade_percent": 0.5,
+            "max_daily_loss_percent": 2.0,
+            "risk_reward_target": "2.0R",
+            "confidence_score": 0.55,
+            "stability_score": 0.6,
+            "difficulty_level": "intermediate",
+            "market_condition_fit": "trending or structured breakout",
+            "hermes_coach_notes": "Educational paper-trading setup. Validate session context and risk limits before sim entry.",
+            "visual_config": {
+              "card_theme": "signal",
+              "accent": "teal",
+              "badge": "paper"
+            },
+            "educational_disclaimer": "Educational demo scenario only. Not financial advice. No guaranteed outcomes.",
+            "strategy_name": "BTC/ETH Trend Structure",
+            "market_type": "crypto",
+            "symbol_or_pair": "BTCUSD",
+            "timeframe": "H1",
+            "best_session": "US overlap",
+            "indicators": [
+              "market structure",
+              "RSI"
+            ],
+            "entry_rules": [
+              "higher low confirmation",
+              "momentum recovery"
+            ],
+            "exit_rules": [
+              "lower-low breakdown"
+            ]
+          },
+          {
+            "stop_loss_rules": "fixed invalidation plus volatility guard",
+            "take_profit_rules": "partial at 1R, runner into trend continuation",
+            "risk_per_trade_percent": 0.5,
+            "max_daily_loss_percent": 2.0,
+            "risk_reward_target": "2.0R",
+            "confidence_score": 0.55,
+            "stability_score": 0.6,
+            "difficulty_level": "intermediate",
+            "market_condition_fit": "trending or structured breakout",
+            "hermes_coach_notes": "Educational paper-trading setup. Validate session context and risk limits before sim entry.",
+            "visual_config": {
+              "card_theme": "signal",
+              "accent": "teal",
+              "badge": "paper"
+            },
+            "educational_disclaimer": "Educational demo scenario only. Not financial advice. No guaranteed outcomes.",
+            "strategy_name": "Trend Pullback",
+            "market_type": "forex",
+            "symbol_or_pair": "EURUSD",
+            "timeframe": "M30",
+            "best_session": "London/NY overlap",
+            "indicators": [
+              "EMA",
+              "ADX"
+            ],
+            "entry_rules": [
+              "pullback to moving average",
+              "trend resumption candle"
+            ],
+            "exit_rules": [
+              "trend invalidation"
+            ]
+          },
+          {
+            "stop_loss_rules": "fixed invalidation plus volatility guard",
+            "take_profit_rules": "partial at 1R, runner into trend continuation",
+            "risk_per_trade_percent": 0.5,
+            "max_daily_loss_percent": 2.0,
+            "risk_reward_target": "2.0R",
+            "confidence_score": 0.55,
+            "stability_score": 0.6,
+            "difficulty_level": "intermediate",
+            "market_condition_fit": "trending or structured breakout",
+            "hermes_coach_notes": "Educational paper-trading setup. Validate session context and risk limits before sim entry.",
+            "visual_config": {
+              "card_theme": "signal",
+              "accent": "teal",
+              "badge": "paper"
+            },
+            "educational_disclaimer": "Educational demo scenario only. Not financial advice. No guaranteed outcomes.",
+            "strategy_name": "Liquidity Sweep Reversal",
+            "market_type": "forex",
+            "symbol_or_pair": "USDJPY",
+            "timeframe": "M15",
+            "best_session": "London",
+            "indicators": [
+              "liquidity highs/lows",
+              "orderflow proxy"
+            ],
+            "entry_rules": [
+              "sweep then reclaim",
+              "confirmation close"
+            ],
+            "exit_rules": [
+              "retest failure"
+            ]
+          },
+          {
+            "stop_loss_rules": "fixed invalidation plus volatility guard",
+            "take_profit_rules": "partial at 1R, runner into trend continuation",
+            "risk_per_trade_percent": 0.5,
+            "max_daily_loss_percent": 2.0,
+            "risk_reward_target": "2.0R",
+            "confidence_score": 0.55,
+            "stability_score": 0.6,
+            "difficulty_level": "intermediate",
+            "market_condition_fit": "trending or structured breakout",
+            "hermes_coach_notes": "Educational paper-trading setup. Validate session context and risk limits before sim entry.",
+            "visual_config": {
+              "card_theme": "signal",
+              "accent": "teal",
+              "badge": "paper"
+            },
+            "educational_disclaimer": "Educational demo scenario only. Not financial advice. No guaranteed outcomes.",
+            "strategy_name": "Iron Condor Income",
+            "market_type": "options",
+            "symbol_or_pair": "SPY",
+            "timeframe": "D1",
+            "best_session": "New York",
+            "indicators": [
+              "IV rank",
+              "range width"
+            ],
+            "entry_rules": [
+              "high IV environment",
+              "balanced range"
+            ],
+            "exit_rules": [
+              "range expansion warning"
+            ]
+          },
+          {
+            "stop_loss_rules": "fixed invalidation plus volatility guard",
+            "take_profit_rules": "partial at 1R, runner into trend continuation",
+            "risk_per_trade_percent": 0.5,
+            "max_daily_loss_percent": 2.0,
+            "risk_reward_target": "2.0R",
+            "confidence_score": 0.55,
+            "stability_score": 0.6,
+            "difficulty_level": "intermediate",
+            "market_condition_fit": "trending or structured breakout",
+            "hermes_coach_notes": "Educational paper-trading setup. Validate session context and risk limits before sim entry.",
+            "visual_config": {
+              "card_theme": "signal",
+              "accent": "teal",
+              "badge": "paper"
+            },
+            "educational_disclaimer": "Educational demo scenario only. Not financial advice. No guaranteed outcomes.",
+            "strategy_name": "Earnings Volatility Watchlist",
+            "market_type": "options",
+            "symbol_or_pair": "QQQ",
+            "timeframe": "D1",
+            "best_session": "New York",
+            "indicators": [
+              "implied vol",
+              "event calendar"
+            ],
+            "entry_rules": [
+              "pre-event volatility setup"
+            ],
+            "exit_rules": [
+              "post-event crush"
+            ]
+          },
+          {
+            "stop_loss_rules": "fixed invalidation plus volatility guard",
+            "take_profit_rules": "partial at 1R, runner into trend continuation",
+            "risk_per_trade_percent": 0.5,
+            "max_daily_loss_percent": 2.0,
+            "risk_reward_target": "2.0R",
+            "confidence_score": 0.55,
+            "stability_score": 0.6,
+            "difficulty_level": "intermediate",
+            "market_condition_fit": "trending or structured breakout",
+            "hermes_coach_notes": "Educational paper-trading setup. Validate session context and risk limits before sim entry.",
+            "visual_config": {
+              "card_theme": "signal",
+              "accent": "teal",
+              "badge": "paper"
+            },
+            "educational_disclaimer": "Educational demo scenario only. Not financial advice. No guaranteed outcomes.",
+            "strategy_name": "Momentum Breakout",
+            "market_type": "crypto",
+            "symbol_or_pair": "ETHUSD",
+            "timeframe": "M30",
+            "best_session": "US overlap",
+            "indicators": [
+              "range expansion",
+              "volume"
+            ],
+            "entry_rules": [
+              "breakout with volume"
+            ],
+            "exit_rules": [
+              "failed follow-through"
+            ]
+          },
+          {
+            "stop_loss_rules": "fixed invalidation plus volatility guard",
+            "take_profit_rules": "partial at 1R, runner into trend continuation",
+            "risk_per_trade_percent": 0.5,
+            "max_daily_loss_percent": 2.0,
+            "risk_reward_target": "2.0R",
+            "confidence_score": 0.55,
+            "stability_score": 0.6,
+            "difficulty_level": "intermediate",
+            "market_condition_fit": "trending or structured breakout",
+            "hermes_coach_notes": "Educational paper-trading setup. Validate session context and risk limits before sim entry.",
+            "visual_config": {
+              "card_theme": "signal",
+              "accent": "teal",
+              "badge": "paper"
+            },
+            "educational_disclaimer": "Educational demo scenario only. Not financial advice. No guaranteed outcomes.",
+            "strategy_name": "Funding Rate Reversal",
+            "market_type": "crypto",
+            "symbol_or_pair": "BTCUSD",
+            "timeframe": "H4",
+            "best_session": "24h",
+            "indicators": [
+              "funding rate",
+              "open interest"
+            ],
+            "entry_rules": [
+              "extreme funding divergence"
+            ],
+            "exit_rules": [
+              "normalization complete"
+            ]
+          }
+        ],
+        "launch_focus_strategies": [
+          {
+            "stop_loss_rules": "fixed invalidation plus volatility guard",
+            "take_profit_rules": "partial at 1R, runner into trend continuation",
+            "risk_per_trade_percent": 0.5,
+            "max_daily_loss_percent": 2.0,
+            "risk_reward_target": "2.0R",
+            "confidence_score": 0.55,
+            "stability_score": 0.6,
+            "difficulty_level": "intermediate",
+            "market_condition_fit": "trending or structured breakout",
+            "hermes_coach_notes": "Educational paper-trading setup. Validate session context and risk limits before sim entry.",
+            "visual_config": {
+              "card_theme": "signal",
+              "accent": "teal",
+              "badge": "paper"
+            },
+            "educational_disclaimer": "Educational demo scenario only. Not financial advice. No guaranteed outcomes.",
+            "strategy_name": "London Breakout",
+            "market_type": "forex",
+            "symbol_or_pair": "GBPUSD",
+            "timeframe": "M15",
+            "best_session": "London",
+            "indicators": [
+              "session range",
+              "ATR"
+            ],
+            "entry_rules": [
+              "break of London range",
+              "volume confirmation"
+            ],
+            "exit_rules": [
+              "close below breakout base"
+            ]
+          },
+          {
+            "stop_loss_rules": "fixed invalidation plus volatility guard",
+            "take_profit_rules": "partial at 1R, runner into trend continuation",
+            "risk_per_trade_percent": 0.5,
+            "max_daily_loss_percent": 2.0,
+            "risk_reward_target": "2.0R",
+            "confidence_score": 0.55,
+            "stability_score": 0.6,
+            "difficulty_level": "intermediate",
+            "market_condition_fit": "trending or structured breakout",
+            "hermes_coach_notes": "Educational paper-trading setup. Validate session context and risk limits before sim entry.",
+            "visual_config": {
+              "card_theme": "signal",
+              "accent": "teal",
+              "badge": "paper"
+            },
+            "educational_disclaimer": "Educational demo scenario only. Not financial advice. No guaranteed outcomes.",
+            "strategy_name": "SPY Trend Continuation",
+            "market_type": "options",
+            "symbol_or_pair": "SPY",
+            "timeframe": "M30",
+            "best_session": "New York",
+            "indicators": [
+              "VWAP",
+              "EMA 20/50"
+            ],
+            "entry_rules": [
+              "pullback to trend support",
+              "trend resumes"
+            ],
+            "exit_rules": [
+              "trend structure break"
+            ]
+          },
+          {
+            "stop_loss_rules": "fixed invalidation plus volatility guard",
+            "take_profit_rules": "partial at 1R, runner into trend continuation",
+            "risk_per_trade_percent": 0.5,
+            "max_daily_loss_percent": 2.0,
+            "risk_reward_target": "2.0R",
+            "confidence_score": 0.55,
+            "stability_score": 0.6,
+            "difficulty_level": "intermediate",
+            "market_condition_fit": "trending or structured breakout",
+            "hermes_coach_notes": "Educational paper-trading setup. Validate session context and risk limits before sim entry.",
+            "visual_config": {
+              "card_theme": "signal",
+              "accent": "teal",
+              "badge": "paper"
+            },
+            "educational_disclaimer": "Educational demo scenario only. Not financial advice. No guaranteed outcomes.",
+            "strategy_name": "BTC/ETH Trend Structure",
+            "market_type": "crypto",
+            "symbol_or_pair": "BTCUSD",
+            "timeframe": "H1",
+            "best_session": "US overlap",
+            "indicators": [
+              "market structure",
+              "RSI"
+            ],
+            "entry_rules": [
+              "higher low confirmation",
+              "momentum recovery"
+            ],
+            "exit_rules": [
+              "lower-low breakdown"
+            ]
+          }
+        ],
+        "active_strategy_tests": [],
+        "top_strategy_candidates": [
+          "London Breakout",
+          "SPY Trend Continuation",
+          "BTC/ETH Trend Structure"
+        ],
+        "strategy_health": {
+          "status": "monitoring",
+          "risk_score": "moderate"
+        },
+        "demo_results": {
+          "paper_trade_count": 0,
+          "win_rate": 0.0,
+          "average_rr": 0.0,
+          "profit_factor": 0.0,
+          "max_drawdown": 0.0,
+          "demo_account_growth": 0.0,
+          "weekly_result": 0.0,
+          "monthly_result": 0.0,
+          "consistency_score": 0.0,
+          "last_tested_at": "2026-05-09T21:40:29.017940+00:00"
+        },
+        "coach_prompt_template": "Provide an educational paper-trading setup, risk-managed scenario, and demo validation checklist."
+      },
+      "opportunity_intelligence": {
+        "timestamp": "2026-05-09T21:40:32.163865+00:00",
+        "enabled": true,
+        "review_only": true,
+        "actions_require_approval": true,
+        "grant_opportunity_summary": [],
+        "business_opportunity_summary": [],
+        "opportunity_fit_score": "medium",
+        "effort_vs_reward_summary": "Prioritize medium-effort/high-fit opportunities first.",
+        "urgency_expiration_awareness": "Monitor upcoming deadlines and first-window eligibility.",
+        "application_readiness_blockers": [
+          "No fresh grant intelligence signals detected.",
+          "Business opportunity qualification data is sparse."
+        ],
+        "opportunity_next_action": "Review top opportunity candidates and collect missing application prerequisites.",
+        "categories": [
+          "grants",
+          "government contracts",
+          "business opportunities",
+          "online income opportunities",
+          "local opportunities",
+          "partnerships",
+          "vendor/client opportunities"
+        ],
+        "source_aware_context": {}
+      },
+      "marketing_plan_inputs_needed": {
+        "target_audience_assumptions": [
+          "Founders needing funding readiness",
+          "Operators wanting AI-assisted execution visibility"
+        ],
+        "core_offer": "Nexus as an operational intelligence and execution-coordination layer.",
+        "demo_story": "From operator message to safe prioritized action with transparent guardrails.",
+        "main_benefits": [
+          "Faster prioritization",
+          "Safer AI operations",
+          "Unified intelligence rollups"
+        ],
+        "proof_points_needed": [
+          "test pass evidence",
+          "dashboard snapshots",
+          "email report output",
+          "safety flag confirmation"
+        ],
+        "recommended_content_angles": [
+          "AI COO workflow",
+          "Funding readiness clarity",
+          "Educational trading lab"
+        ],
+        "next_marketing_build_prompt_outline": "Build a 7-day content plan using demo readiness proof points and safety-first positioning."
+      }
+    },
+    "delta_summary": {
+      "today": "2026-05-09",
+      "yesterday": "2026-05-08",
+      "queue_growth_delta": 2,
+      "telegram_reliability_trend": {
+        "today": {
+          "date": "2026-05-09",
+          "inbound_count": 0,
+          "reply_success_count": 0,
+          "timeout_count": 0,
+          "fallback_count": 0,
+          "duplicate_prevented_count": 0,
+          "failed_command_count": 0,
+          "avg_response_latency_ms": 0,
+          "per_command": {}
+        },
+        "yesterday": {
+          "date": "2026-05-08",
+          "inbound_count": 0,
+          "reply_success_count": 0,
+          "timeout_count": 0,
+          "fallback_count": 0,
+          "duplicate_prevented_count": 0,
+          "failed_command_count": 0,
+          "avg_response_latency_ms": 0,
+          "per_command": {}
+        }
+      },
+      "worker_degradation_trend": {
+        "today": {
+          "success_count": 0,
+          "failure_count": 0,
+          "rejected_count": 0,
+          "unsupported_route_attempts": 0,
+          "stale_worker_heartbeats": 0,
+          "worker_role_activity": {},
+          "repeated_timeout_pattern": false,
+          "degraded_worker_warnings": [],
+          "escalation_recommendation": "No escalation required."
+        },
+        "yesterday": {
+          "success_count": 0,
+          "failure_count": 0,
+          "rejected_count": 0,
+          "unsupported_route_attempts": 0,
+          "stale_worker_heartbeats": 0,
+          "worker_role_activity": {},
+          "repeated_timeout_pattern": false,
+          "degraded_worker_warnings": [],
+          "escalation_recommendation": "No escalation required."
+        }
+      },
+      "most_active_workflows": [
+        {
+          "workflow_type": "ceo_routed_draft",
+          "count": 1
+        }
+      ],
+      "failure_trends": [],
+      "recommended_focus_areas": [
+        "Maintain current reliability posture and monitor trend continuity."
+      ]
+    },
+    "next_recommended_actions": [
+      "Review pending approvals and clear blockers.",
+      "Investigate any failed tasks and assign owner follow-up.",
+      "Prioritize top ranked funding and credit recommendations."
+    ],
+    "collaboration_preview": {
+      "can_execute": false,
+      "execution_mode": "preview_only"
+    },
+    "funding_credit_summary": {
+      "funding": [],
+      "credit": []
+    },
+    "marketing_plan_inputs_needed": {
+      "target_audience_assumptions": [
+        "Founders needing funding readiness",
+        "Operators wanting AI-assisted execution visibility"
+      ],
+      "core_offer": "Nexus as an operational intelligence and execution-coordination layer.",
+      "demo_story": "From operator message to safe prioritized action with transparent guardrails.",
+      "main_benefits": [
+        "Faster prioritization",
+        "Safer AI operations",
+        "Unified intelligence rollups"
+      ],
+      "proof_points_needed": [
+        "test pass evidence",
+        "dashboard snapshots",
+        "email report output",
+        "safety flag confirmation"
+      ],
+      "recommended_content_angles": [
+        "AI COO workflow",
+        "Funding readiness clarity",
+        "Educational trading lab"
+      ],
+      "next_marketing_build_prompt_outline": "Build a 7-day content plan using demo readiness proof points and safety-first positioning."
+    },
+    "weekly_focus": "Consolidate operational wins, blockers, and ranked knowledge signals."
+  }
+}

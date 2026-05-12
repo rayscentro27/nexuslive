@@ -86,6 +86,19 @@ def telegram_conversational_mode() -> bool:
     return _env_truthy("TELEGRAM_CONVERSATIONAL_MODE", "true")
 
 
+def telegram_primary_bot() -> str:
+    return (os.getenv("TELEGRAM_PRIMARY_BOT", "thechosenone") or "thechosenone").strip().lower()
+
+
+def telegram_manual_mode() -> bool:
+    mode = (os.getenv("TELEGRAM_MODE", "manual") or "manual").strip().lower()
+    return mode == "manual"
+
+
+def secondary_bots_disabled() -> bool:
+    return telegram_primary_bot() == "thechosenone" and telegram_manual_mode()
+
+
 def allow_shared_token() -> bool:
     return _env_truthy("TELEGRAM_ALLOW_SHARED_TOKEN", "false")
 
