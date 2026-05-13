@@ -76,6 +76,7 @@ from lib.opportunity_intelligence import build_opportunity_summary
 from lib.hermes_email_knowledge_intake import recent_knowledge_email_intake
 from lib.hermes_internal_first import try_internal_first
 from lib.hermes_runtime_config import format_telegram_reply
+from lib.hermes_supabase_first import nexus_knowledge_reply
 from lib.telegram_router import TelegramRouter
 from lib import hermes_conversation_memory
 
@@ -505,13 +506,22 @@ class NexusTelegramBot:
             hermes_conversation_memory.clear_session(chat_id)
             return "Good morning, Ray. I'm online and ready."
 
-        # Internal-first routing — bypass LLM for known Nexus topics
+        # Internal-first routing — bypass LLM for known Nexus ops topics
         internal = try_internal_first(raw)
         if internal is not None:
             text = format_telegram_reply(internal.text)
             hermes_conversation_memory.record_turn(chat_id, "user", raw)
             hermes_conversation_memory.record_turn(chat_id, "assistant", internal.text)
             return text
+
+        # Supabase-first knowledge routing — search approved knowledge, research tickets, domain tables
+        # Intercepts Nexus-relevant questions before they reach the generic LLM
+        supabase_reply = nexus_knowledge_reply(raw)
+        if supabase_reply is not None:
+            hermes_conversation_memory.record_turn(chat_id, "user", raw)
+            hermes_conversation_memory.record_turn(chat_id, "assistant", supabase_reply)
+            logger.info("telegram route=supabase_first reply_len=%d", len(supabase_reply))
+            return format_telegram_reply(supabase_reply)
 
         # Build message history for conversational continuity
         history = hermes_conversation_memory.get_history(chat_id)
@@ -541,7 +551,7 @@ class NexusTelegramBot:
                 "(4) For 'what to focus on' — give 2-3 specific Nexus priorities, not general advice. "
                 "(5) Conversational tone — you are a chief of staff, not a report generator. "
                 "(6) Follow-up questions: use prior conversation context naturally. "
-                "(7) If you genuinely lack live data: say 'I don't have live data on that right now' and suggest a Nexus command to get it. "
+                "(7) For Nexus-specific knowledge (grants, funding, trading strategies, opportunities): the Supabase-first router has already been checked. If the question reaches you, answer from Nexus operational context only — do NOT say 'I don't have live data' or 'Run Nexus search'. If you cannot answer from Nexus context, say 'I can submit that to the research team' and nothing else. "
                 f"{ops_context}"
             )
             messages = [{"role": "system", "content": system_prompt}]
