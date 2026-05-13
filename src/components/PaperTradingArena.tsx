@@ -1,10 +1,36 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { useAuth } from './AuthProvider';
+import { supabase } from '../lib/supabase';
 import {
   Zap, TrendingUp, TrendingDown, Target, Shield,
   CheckCircle2, XCircle, Clock, BarChart3, Calendar,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+
+// ── DB row types ──────────────────────────────────────────────────────────────
+
+interface PaperRun {
+  id: string;
+  symbol: string | null;
+  strategy_id: string | null;
+  strategy_type: string | null;
+  status: 'running' | 'finished' | 'error';
+  started_at: string;
+  finished_at: string | null;
+}
+
+interface ReplayResult {
+  id: string;
+  symbol: string | null;
+  strategy_id: string | null;
+  replay_outcome: string;
+  pnl_r: number | null;
+  pnl_pct: number | null;
+  hit_take_profit: boolean | null;
+  hit_stop_loss: boolean | null;
+  created_at: string;
+}
 
 // ── types ─────────────────────────────────────────────────────────────────────
 
@@ -41,94 +67,84 @@ interface ArenaStats {
   profitFactor: number;
 }
 
-// ── mock data ─────────────────────────────────────────────────────────────────
+// ── constants ─────────────────────────────────────────────────────────────────
 
-const MOCK_STATS: ArenaStats = {
-  balance: 10847,
-  startBalance: 10000,
-  todayPnlUsd: 347,
-  todayPnlPct: 0.32,
-  weekTrades: 12,
-  weekWins: 8,
-  weekPnlUsd: 847,
-  weekPnlPct: 4.2,
-  profitFactor: 2.1,
-};
+const DEMO_START = 10000;
+const R_VALUE = 100; // 1R = $100 for demo sizing
 
-const MOCK_TRADES: PaperTrade[] = [
-  {
-    id: 't1',
-    strategyId: 'london-breakout-v21',
-    strategyName: 'London Breakout',
-    market: 'EUR/USD',
+// ── DB → display mappers ──────────────────────────────────────────────────────
+
+function mapRun(r: PaperRun): PaperTrade {
+  return {
+    id: r.id,
+    strategyId: r.strategy_id ?? 'unknown',
+    strategyName: (r.strategy_id ?? 'Session').replace(/_/g, ' '),
+    market: r.symbol ?? 'Pending',
     direction: 'long',
-    entryPrice: 1.08420,
-    stopLoss: 1.08200,
-    takeProfit: 1.08860,
-    sizeLots: 0.1,
-    pnlPips: 28,
-    openedAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
+    entryPrice: 0,
+    stopLoss: 0,
+    takeProfit: 0,
+    sizeLots: 0.01,
+    openedAt: r.started_at,
     status: 'open',
-    session: 'London',
-    aiConfidence: 72,
-  },
-  {
-    id: 't2',
-    strategyId: 'spy-continuation',
-    strategyName: 'SPY Continuation',
-    market: 'GBP/JPY',
-    direction: 'short',
-    entryPrice: 183.50,
-    stopLoss: 183.80,
-    takeProfit: 182.90,
-    sizeLots: 0.05,
-    pnlPips: -8,
-    openedAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
-    status: 'open',
-    session: 'London',
-    aiConfidence: 61,
-  },
-  {
-    id: 't3',
-    strategyId: 'london-breakout-v21',
-    strategyName: 'London Breakout',
-    market: 'GBP/USD',
-    direction: 'short',
-    entryPrice: 1.2720,
-    stopLoss: 1.2740,
-    takeProfit: 1.2680,
-    exitPrice: 1.2688,
-    sizeLots: 0.1,
-    pnlPips: 32,
-    pnlUsd: 320,
-    openedAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-    closedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    status: 'tp_hit',
-    exitReason: 'tp',
-    session: 'London',
-    aiConfidence: 68,
-  },
-  {
-    id: 't4',
-    strategyId: 'ny-momentum',
-    strategyName: 'NY Momentum',
-    market: 'USD/JPY',
+    session: 'Replay',
+    aiConfidence: 50,
+  };
+}
+
+function mapResult(r: ReplayResult): PaperTrade {
+  const pnlR = r.pnl_r ?? 0;
+  return {
+    id: r.id,
+    strategyId: r.strategy_id ?? 'unknown',
+    strategyName: (r.strategy_id ?? 'Strategy').replace(/_/g, ' '),
+    market: r.symbol ?? 'Unknown',
     direction: 'long',
-    entryPrice: 151.20,
-    stopLoss: 151.05,
-    takeProfit: 151.50,
-    exitPrice: 151.05,
-    sizeLots: 0.05,
-    pnlPips: -15,
-    pnlUsd: -75,
-    openedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-    closedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    status: 'stopped',
-    exitReason: 'sl',
-    session: 'Asia',
-    aiConfidence: 44,
-  },
-];
+    entryPrice: 0,
+    stopLoss: 0,
+    takeProfit: 0,
+    sizeLots: 0.01,
+    pnlPips: Math.round(pnlR * 20),
+    pnlUsd: Math.round(pnlR * R_VALUE),
+    openedAt: r.created_at,
+    closedAt: r.created_at,
+    status: r.hit_take_profit ? 'tp_hit' : r.hit_stop_loss ? 'stopped' : 'closed',
+    exitReason: r.hit_take_profit ? 'tp' : r.hit_stop_loss ? 'sl' : undefined,
+    session: 'Replay',
+    aiConfidence: 50,
+  };
+}
+
+function computeStats(results: ReplayResult[]): ArenaStats {
+  if (results.length === 0) {
+    return {
+      balance: DEMO_START, startBalance: DEMO_START,
+      todayPnlUsd: 0, todayPnlPct: 0,
+      weekTrades: 0, weekWins: 0, weekPnlUsd: 0, weekPnlPct: 0,
+      profitFactor: 0,
+    };
+  }
+  const wins = results.filter(r => r.hit_take_profit);
+  const losses = results.filter(r => r.hit_stop_loss);
+  const totalR = results.reduce((s, r) => s + (r.pnl_r ?? 0), 0);
+  const balance = DEMO_START + totalR * R_VALUE;
+  const today = new Date().toISOString().slice(0, 10);
+  const todayResults = results.filter(r => r.created_at.slice(0, 10) === today);
+  const todayR = todayResults.reduce((s, r) => s + (r.pnl_r ?? 0), 0);
+  const winR = wins.reduce((s, r) => s + (r.pnl_r ?? 0), 0);
+  const lossR = Math.abs(losses.reduce((s, r) => s + (r.pnl_r ?? 0), 0));
+  return {
+    balance: Math.round(balance),
+    startBalance: DEMO_START,
+    todayPnlUsd: Math.round(todayR * R_VALUE),
+    todayPnlPct: parseFloat((todayR * R_VALUE / DEMO_START * 100).toFixed(2)),
+    weekTrades: results.length,
+    weekWins: wins.length,
+    weekPnlUsd: Math.round(totalR * R_VALUE),
+    weekPnlPct: parseFloat(((balance - DEMO_START) / DEMO_START * 100).toFixed(2)),
+    profitFactor: lossR > 0 ? parseFloat((winR / lossR).toFixed(2)) : winR > 0 ? 99 : 0,
+  };
+}
 
 // ── sub-components ────────────────────────────────────────────────────────────
 
@@ -302,16 +318,37 @@ function WeeklyStats({ stats }: { stats: ArenaStats }) {
 // ── main export ───────────────────────────────────────────────────────────────
 
 export function PaperTradingArena() {
+  const { user } = useAuth();
   const { emit } = useAnalytics();
   const [tab, setTab] = useState<'live' | 'journal' | 'stats'>('live');
-  const stats = MOCK_STATS;
+  const [loading, setLoading] = useState(true);
+  const [runs, setRuns] = useState<PaperRun[]>([]);
+  const [results, setResults] = useState<ReplayResult[]>([]);
 
   useEffect(() => {
     emit('page_view', { event_name: 'paper_trading_arena_viewed', feature: 'trading', page: '/trading' });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const openTrades = MOCK_TRADES.filter(t => t.status === 'open');
-  const closedTrades = MOCK_TRADES.filter(t => t.status !== 'open');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [{ data: runData }, { data: resultData }] = await Promise.all([
+      supabase.from('paper_trade_runs').select('id,symbol,strategy_id,strategy_type,status,started_at,finished_at')
+        .order('started_at', { ascending: false }).limit(50),
+      supabase.from('replay_results').select('id,symbol,strategy_id,replay_outcome,pnl_r,pnl_pct,hit_take_profit,hit_stop_loss,created_at')
+        .order('created_at', { ascending: false }).limit(100),
+    ]);
+    setRuns((runData ?? []) as PaperRun[]);
+    setResults((resultData ?? []) as ReplayResult[]);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const openTrades = runs.filter(r => r.status === 'running').map(mapRun);
+  const closedTrades = results.map(mapResult);
+  const stats = computeStats(results);
   const totalPct = ((stats.balance - stats.startBalance) / stats.startBalance) * 100;
+  void user; // user context available for future RLS-gated queries
 
   return (
     <div className="p-6 space-y-4">
