@@ -17,14 +17,20 @@ import {
   getProfile, getTasks, getActivity, getCreditReport,
   UserProfile, Task, ActivityItem, CreditReport
 } from '../lib/db';
+import { useAnalytics } from '../hooks/useAnalytics';
 
 export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user } = useAuth();
+  const { emit } = useAnalytics();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [credit, setCredit] = useState<CreditReport | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) emit('page_view', { event_name: 'dashboard_viewed', feature: 'dashboard', page: '/dashboard' });
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!user) return;

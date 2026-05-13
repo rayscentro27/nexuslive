@@ -3,6 +3,7 @@ import { MessageSquare, X, Send, Loader2, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthProvider';
 import { isFeatureEnabled } from '../lib/featureFlags';
+import { useAnalytics } from '../hooks/useAnalytics';
 
 interface ChatMsg {
   id: string;
@@ -32,6 +33,7 @@ interface FloatingChatProps {
 
 export function FloatingChat({ activeTab }: FloatingChatProps) {
   const { user, profile } = useAuth();
+  const { emit } = useAnalytics();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
@@ -107,6 +109,7 @@ export function FloatingChat({ activeTab }: FloatingChatProps) {
     if (!text.trim() || sending) return;
     setSending(true);
     setInput('');
+    emit('hermes_interaction', { event_name: 'chat_message_sent', feature: 'chat', page: activeTab, metadata: { msg_length: text.trim().length } });
 
     const convId = conversationId ?? await initConversation();
     if (!convId) { setSending(false); return; }

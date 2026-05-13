@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useAnalytics } from '../hooks/useAnalytics';
 import {
   Zap, TrendingUp, TrendingDown, Target, Shield,
   CheckCircle2, XCircle, Clock, BarChart3, Calendar,
@@ -301,8 +302,13 @@ function WeeklyStats({ stats }: { stats: ArenaStats }) {
 // ── main export ───────────────────────────────────────────────────────────────
 
 export function PaperTradingArena() {
+  const { emit } = useAnalytics();
   const [tab, setTab] = useState<'live' | 'journal' | 'stats'>('live');
   const stats = MOCK_STATS;
+
+  useEffect(() => {
+    emit('page_view', { event_name: 'paper_trading_arena_viewed', feature: 'trading', page: '/trading' });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const openTrades = MOCK_TRADES.filter(t => t.status === 'open');
   const closedTrades = MOCK_TRADES.filter(t => t.status !== 'open');
   const totalPct = ((stats.balance - stats.startBalance) / stats.startBalance) * 100;
