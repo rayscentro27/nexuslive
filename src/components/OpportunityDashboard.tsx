@@ -304,9 +304,9 @@ export function OpportunityDashboard({ onNavigate, limit = 7 }: Props) {
           {categories.map(cat => (
             <button key={cat} onClick={() => setCategoryFilter(cat)} style={{
               padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              background: filter === cat ? '#3d5af1' : '#f3f4f6',
-              color: filter === cat ? '#fff' : '#6b7280',
-              border: filter === cat ? '1px solid #3d5af1' : '1px solid #e5e7eb',
+              background: categoryFilter === cat ? '#3d5af1' : '#f3f4f6',
+              color: categoryFilter === cat ? '#fff' : '#6b7280',
+              border: categoryFilter === cat ? '1px solid #3d5af1' : '1px solid #e5e7eb',
             }}>
               {cat === 'all' ? 'All' : cat.charAt(0).toUpperCase() + cat.slice(1)}
             </button>

@@ -8,7 +8,7 @@ import { motion } from 'motion/react';
 import { supabase } from '../../lib/supabase';
 import { RefreshCw, Activity, Shield } from 'lucide-react';
 import { DepartmentZone } from './DepartmentZone';
-import { buildWorkforceState, type DepartmentStatus } from './workforce_state_adapter';
+import { buildWorkforceState, type DepartmentStatus, type ResearchTicket } from './workforce_state_adapter';
 
 interface ProviderHealth {
   provider_name: string;
@@ -36,9 +36,10 @@ export function WorkforceOffice() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState(new Date().toISOString());
   const [oppsCount, setOppsCount] = useState(0);
+  const [openTickets, setOpenTickets] = useState(0);
 
   const load = useCallback(async () => {
-    const [phRes, evRes, oppsRes] = await Promise.all([
+    const [phRes, evRes, oppsRes, ticketRes] = await Promise.all([
       supabase
         .from('provider_health')
         .select('provider_name,status,avg_latency_ms,last_checked_at')
@@ -51,14 +52,21 @@ export function WorkforceOffice() {
       supabase
         .from('user_opportunities')
         .select('id', { count: 'exact', head: true }),
+      supabase
+        .from('research_requests')
+        .select('id,department,status,priority,topic,created_at,completed_at')
+        .in('status', ['submitted','queued','researching','needs_review'])
+        .limit(50),
     ]);
 
     const providers = (phRes.data || []) as ProviderHealth[];
     const events = (evRes.data || []) as AnalyticsEvent[];
     const count = oppsRes.count || 0;
+    const tickets = (ticketRes.data || []) as ResearchTicket[];
 
     setOppsCount(count);
-    setDepartments(buildWorkforceState(providers, events, count));
+    setOpenTickets(tickets.length);
+    setDepartments(buildWorkforceState(providers, events, count, tickets));
     setLastRefresh(new Date().toISOString());
     setLoading(false);
     setRefreshing(false);
@@ -114,6 +122,7 @@ export function WorkforceOffice() {
             { label: 'Active', value: activeWorkers, color: '#22c55e', bg: '#f0fdf4' },
             { label: 'Needs Attention', value: warnWorkers, color: warnWorkers > 0 ? '#f59e0b' : '#9ca3af', bg: warnWorkers > 0 ? '#fffbeb' : '#f9fafb' },
             { label: 'Opportunities', value: oppsCount, color: '#7c3aed', bg: '#f5f3ff' },
+            { label: 'Open Tickets', value: openTickets, color: openTickets > 0 ? '#d97706' : '#9ca3af', bg: openTickets > 0 ? '#fffbeb' : '#f9fafb' },
           ].map(s => (
             <div key={s.label} style={{
               flex: '1 1 80px', padding: '10px 12px', borderRadius: 12,
