@@ -16,6 +16,8 @@ load_dotenv()
 
 from lib.telegram_role_config import get_chat_config, get_ops_config, get_reports_config, hermes_chat_enabled
 from lib.model_router import get_provider, ModelRoutingError
+from lib import hermes_gate
+from lib.hermes_conversation_memory import record_turn, get_history, clear_session, session_summary
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,7 +53,7 @@ If the user sends casual conversation (e.g., 'good evening'), reply naturally fi
 Do not invent data. If system state is unknown, say so and suggest the exact check command.
 
 Nexus context:
-- Trading engine: live OANDA forex trades, auto-trading enabled
+- Trading engine: paper/demo only (DRY_RUN=true, LIVE_TRADING=false). No real funds.
 - Research pipeline: YouTube/web research -> signals -> strategy candidates
 - Credit/funding: helping users become fundable (B2B SaaS)
 - Workers: orchestrator, research worker, monitoring, coordination, grant worker, strategy lab
@@ -78,7 +80,6 @@ DEPLOY_TARGETS = {
     },
 }
 
-conversation_history = []
 _ROUTER_ERROR_WINDOW_SECONDS = int(os.getenv("HERMES_ROUTER_ERROR_WINDOW_SECONDS", "300"))
 _ROUTER_ERROR_MAX_ALERTS = int(os.getenv("HERMES_ROUTER_ERROR_MAX_ALERTS", "1"))
 _ROUTER_COOLDOWN_SECONDS = int(os.getenv("HERMES_ROUTER_COOLDOWN_SECONDS", "300"))
@@ -146,23 +147,24 @@ def tg_post(method, payload):
 
 
 def send_message(chat_id, text):
-    tg_post('sendMessage', {
-        'chat_id': chat_id,
-        'text': text,
-        'parse_mode': 'Markdown'
-    })
+    hermes_gate.send_direct_response(
+        text,
+        event_type='direct_chat_reply',
+        bot_token=BOT_TOKEN,
+        chat_id=str(chat_id),
+        parse_mode='Markdown',
+    )
 
 
 def send_typing(chat_id):
     tg_post('sendChatAction', {'chat_id': chat_id, 'action': 'typing'})
 
 
-def ask_groq(user_message, append_user: bool = True):
+def ask_groq(user_message, chat_id: str = "", append_user: bool = True):
     if append_user:
-        conversation_history.append({'role': 'user', 'content': user_message})
+        record_turn(chat_id, "user", user_message)
 
-    # Keep last 20 messages to avoid token limits
-    history = conversation_history[-20:]
+    history = get_history(chat_id)[-20:]
 
     headers = {
         'Authorization': f'Bearer {GROQ_API_KEY}',
@@ -178,13 +180,13 @@ def ask_groq(user_message, append_user: bool = True):
     r = requests.post(f'{GROQ_BASE_URL}/chat/completions', headers=headers, json=payload, timeout=30)
     r.raise_for_status()
     reply = r.json()['choices'][0]['message']['content']
-    conversation_history.append({'role': 'assistant', 'content': reply})
+    record_turn(chat_id, "assistant", reply)
     return reply
 
 
-def ask_via_router(user_message):
+def ask_via_router(user_message, chat_id: str = ""):
     """Route Hermes chat through the model router; fall back to Groq path on failure."""
-    conversation_history.append({'role': 'user', 'content': user_message})
+    record_turn(chat_id, "user", user_message)
     task_type, required_ctx = _task_for_chat(user_message)
     try:
         provider = get_provider(task_type=task_type, model_source='auto', min_context=required_ctx)
@@ -207,14 +209,14 @@ def ask_via_router(user_message):
 
     provider_ctx = int(provider.get('max_context') or required_ctx)
     budget = max(1200, min(provider_ctx // 2, 24000))
-    history = _trim_history_for_context(conversation_history, budget)
+    history = _trim_history_for_context(get_history(chat_id), budget)
 
     if provider.get('format') != 'openai':
-        return ask_groq(user_message, append_user=False)
+        return ask_groq(user_message, chat_id=chat_id, append_user=False)
 
     url = provider.get('url', '').rstrip('/')
     if not url:
-        return ask_groq(user_message, append_user=False)
+        return ask_groq(user_message, chat_id=chat_id, append_user=False)
     if not url.endswith('/chat/completions'):
         url = f"{url}/chat/completions"
 
@@ -238,7 +240,7 @@ def ask_via_router(user_message):
             r = requests.post(url, headers=headers, json=payload, timeout=45)
             r.raise_for_status()
             reply = r.json()['choices'][0]['message']['content']
-            conversation_history.append({'role': 'assistant', 'content': reply})
+            record_turn(chat_id, "assistant", reply)
             return reply
         except ValueError as e:
             log.error("Non-retriable model config/value error: %s", e)
@@ -254,20 +256,20 @@ def ask_via_router(user_message):
         msg = str(last_err or "").lower()
         if any(k in msg for k in ('context', 'token', 'length', 'maximum')):
             log.warning('Context too large for provider=%s; retrying with compact history', provider.get('name'))
-            compact_history = _trim_history_for_context(conversation_history, 2000)
+            compact_history = _trim_history_for_context(get_history(chat_id), 2000)
             payload['messages'] = [{'role': 'system', 'content': SYSTEM_PROMPT}] + compact_history
             try:
                 r = requests.post(url, headers=headers, json=payload, timeout=35)
                 r.raise_for_status()
                 reply = r.json()['choices'][0]['message']['content']
-                conversation_history.append({'role': 'assistant', 'content': reply})
+                record_turn(chat_id, "assistant", reply)
                 return reply
             except Exception as compact_err:
                 log.warning('Compact retry failed (%s): %s', provider.get('name'), compact_err)
 
         log.warning(f'Router model call failed ({provider.get("name")}): {last_err}; falling back to Groq')
         try:
-            return ask_groq(user_message, append_user=False)
+            return ask_groq(user_message, chat_id=chat_id, append_user=False)
         except Exception:
             return (
                 "I can still help, but model capacity is tight right now. "
@@ -359,12 +361,13 @@ def handle_message(msg):
         return
 
     if cmd == '/clear':
-        conversation_history.clear()
+        clear_session(chat_id)
         send_message(chat_id, '🧹 Conversation history cleared.')
         return
 
     if cmd == '/status':
-        send_message(chat_id, f'✅ *Hermes Claude Bot*\nModel: `{GROQ_MODEL}`\nMessages in context: {len(conversation_history)}\nDeploy targets: {", ".join(DEPLOY_TARGETS.keys())}')
+        sess = session_summary(chat_id)
+        send_message(chat_id, f'✅ *Hermes Claude Bot*\nModel: `{GROQ_MODEL}`\nMessages in context: {sess["total_turns"]}\nIdle: {sess["idle_seconds"]}s\nDeploy targets: {", ".join(DEPLOY_TARGETS.keys())}')
         return
 
     if cmd == '/deploy':
@@ -378,7 +381,7 @@ def handle_message(msg):
     send_typing(chat_id)
 
     try:
-        reply = ask_via_router(text)
+        reply = ask_via_router(text, chat_id=chat_id)
         log.info(f'Assistant: {reply[:80]}...')
         send_message(chat_id, reply)
     except Exception as e:

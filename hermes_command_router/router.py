@@ -510,6 +510,155 @@ def _run_ceo_report() -> tuple[str, list[str], str]:
         return "unknown", [f"Briefing fetch failed: {e}"], "Check CEO worker."
 
 
+def _run_business_opportunities() -> tuple[str, list[str], str]:
+    """Query top business opportunities from Supabase."""
+    try:
+        import json, urllib.request
+        _env_path = os.path.join(ROOT, '.env')
+        if os.path.exists(_env_path):
+            with open(_env_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        k, _, v = line.partition('=')
+                        os.environ.setdefault(k.strip(), v.strip())
+
+        url = os.getenv('SUPABASE_URL', '')
+        key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY', '')
+        req = urllib.request.Request(
+            f"{url}/rest/v1/business_opportunities"
+            "?select=title,opportunity_type,score,urgency,monetization_hint"
+            "&status=eq.active&order=score.desc&limit=5",
+            headers={'apikey': key, 'Authorization': f'Bearer {key}'},
+        )
+        with urllib.request.urlopen(req, timeout=8) as r:
+            rows = json.loads(r.read())
+
+        if not rows:
+            return "unknown", ["No active business opportunities found"], "Run the business opportunities seed."
+
+        evidence = [
+            f"#{i+1} [{r.get('score',0)}/10] {r.get('title','?')} — {r.get('monetization_hint','')[:60]}"
+            for i, r in enumerate(rows)
+        ]
+        return "healthy", evidence, f"Top opportunity: {rows[0].get('title','?')} (score {rows[0].get('score',0)}/10). View full list at https://goclearonline.cc"
+    except Exception as e:
+        return "unknown", [f"Business opportunities query failed: {e}"], "Check Supabase connectivity."
+
+
+def _run_app_url() -> tuple[str, list[str], str]:
+    """Return canonical app URL."""
+    evidence = [
+        "Platform URL: https://goclearonline.cc",
+        "Admin dashboard: https://goclearonline.cc/admin",
+        "Deploy target: Netlify (auto-deploy from nexuslive main branch)",
+    ]
+    return "healthy", evidence, "Access Nexus at https://goclearonline.cc"
+
+
+def _run_onboarding_status() -> tuple[str, list[str], str]:
+    """Check onboarding completion rates."""
+    try:
+        import json, urllib.request
+        _env_path = os.path.join(ROOT, '.env')
+        if os.path.exists(_env_path):
+            with open(_env_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        k, _, v = line.partition('=')
+                        os.environ.setdefault(k.strip(), v.strip())
+
+        url = os.getenv('SUPABASE_URL', '')
+        key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY', '')
+
+        req = urllib.request.Request(
+            f"{url}/rest/v1/profiles?select=onboarding_complete,onboarding_step&limit=500",
+            headers={'apikey': key, 'Authorization': f'Bearer {key}'},
+        )
+        with urllib.request.urlopen(req, timeout=8) as r:
+            rows = json.loads(r.read())
+
+        total = len(rows)
+        complete = sum(1 for r in rows if r.get('onboarding_complete'))
+        pct = (complete / total * 100) if total else 0
+
+        evidence = [
+            f"Total profiles: {total}",
+            f"Onboarding complete: {complete} ({pct:.0f}%)",
+            f"Onboarding incomplete: {total - complete}",
+        ]
+        status = "healthy" if pct >= 60 else "warning"
+        rec = f"{pct:.0f}% completion. " + ("Good retention." if pct >= 60 else "Focus on reducing friction in onboarding steps.")
+        return status, evidence, rec
+    except Exception as e:
+        return "unknown", [f"Onboarding query failed: {e}"], "Check profiles table in Supabase."
+
+
+def _run_platform_analytics() -> tuple[str, list[str], str]:
+    """Pull basic platform analytics from Supabase."""
+    try:
+        import json, urllib.request
+        from datetime import datetime, timezone, timedelta
+        _env_path = os.path.join(ROOT, '.env')
+        if os.path.exists(_env_path):
+            with open(_env_path) as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        k, _, v = line.partition('=')
+                        os.environ.setdefault(k.strip(), v.strip())
+
+        url = os.getenv('SUPABASE_URL', '')
+        key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY', '')
+        cutoff_7d = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+
+        evidence = []
+
+        # Total users
+        try:
+            req = urllib.request.Request(
+                f"{url}/rest/v1/profiles?select=id&limit=1000",
+                headers={'apikey': key, 'Authorization': f'Bearer {key}'},
+            )
+            with urllib.request.urlopen(req, timeout=6) as r:
+                users = json.loads(r.read())
+            evidence.append(f"Total users: {len(users)}")
+        except Exception:
+            evidence.append("Total users: unavailable")
+
+        # Invites sent
+        try:
+            req = urllib.request.Request(
+                f"{url}/rest/v1/invite_codes?select=id,used_at&limit=500",
+                headers={'apikey': key, 'Authorization': f'Bearer {key}'},
+            )
+            with urllib.request.urlopen(req, timeout=6) as r:
+                invites = json.loads(r.read())
+            used = sum(1 for i in invites if i.get('used_at'))
+            evidence.append(f"Invites sent: {len(invites)}, used: {used} ({100*used//len(invites) if invites else 0}%)")
+        except Exception:
+            evidence.append("Invites: unavailable")
+
+        # Knowledge items
+        try:
+            req = urllib.request.Request(
+                f"{url}/rest/v1/knowledge_items?select=id,status&limit=500",
+                headers={'apikey': key, 'Authorization': f'Bearer {key}'},
+            )
+            with urllib.request.urlopen(req, timeout=6) as r:
+                ki = json.loads(r.read())
+            approved = sum(1 for k in ki if k.get('status') == 'approved')
+            evidence.append(f"Knowledge items: {len(ki)} total, {approved} approved")
+        except Exception:
+            evidence.append("Knowledge items: unavailable")
+
+        status = "healthy" if evidence else "unknown"
+        return status, evidence, "Platform analytics pulled from live DB."
+    except Exception as e:
+        return "unknown", [f"Analytics query failed: {e}"], "Check Supabase connectivity."
+
+
 # ── Routing table ──────────────────────────────────────────────────────────────
 
 _INTENT_HANDLERS = {
@@ -521,6 +670,10 @@ _INTENT_HANDLERS = {
     "pilot_readiness":           _run_pilot_readiness,
     "next_best_move":            _run_next_best_move,
     "communication_health":      _run_communication_health,
+    "business_opportunities":    _run_business_opportunities,
+    "app_url":                   _run_app_url,
+    "onboarding_status":         _run_onboarding_status,
+    "platform_analytics":        _run_platform_analytics,
 }
 
 _SCRIPT_ROUTES = {
@@ -540,6 +693,46 @@ def run_command(raw_text: str, source: str = "cli", sender: str = "raymond") -> 
     cmd    = normalize(raw_text, source=source, sender=sender)
     intent = cmd["intent"]
     mc     = model_class_for(intent)
+
+    # ── Dev Agent Bridge intents ──────────────────────────────────────────────
+    if intent in ("list_dev_agents", "dev_agent_status", "recommend_dev_agent", "prepare_dev_handoff"):
+        try:
+            from lib.hermes_dev_agent_bridge import (
+                build_telegram_dev_agent_response,
+                get_cli_agent_status,
+                recommend_dev_agent_for_task,
+            )
+            tg_response = build_telegram_dev_agent_response(intent, raw_text)
+            status_data = get_cli_agent_status()
+            installed = status_data.get("installed_names", [])
+            missing = status_data.get("missing_names", [])
+            evidence = [
+                f"Installed: {', '.join(installed) or 'none'}",
+                f"Missing: {', '.join(missing) or 'none'}",
+                f"Execution enabled: {status_data.get('execution_enabled', False)}",
+                f"Dry-run mode: {status_data.get('dry_run_mode', True)}",
+            ]
+            if intent == "recommend_dev_agent":
+                rec = recommend_dev_agent_for_task(raw_text)
+                primary = rec.get("primary_recommendation", {})
+                evidence.append(f"Recommended: {primary.get('display_name', '?')} — {primary.get('reason', '')}")
+            return build_report(
+                status="healthy",
+                what_happened=tg_response,
+                evidence=evidence,
+                recommendation="See AI Ops dashboard → Dev Agents panel for full details.",
+                action_needed="none",
+                command=raw_text,
+            )
+        except Exception as e:
+            return build_report(
+                status="warning",
+                what_happened="Dev Agent Bridge check failed.",
+                evidence=[str(e)],
+                recommendation="Check lib/hermes_dev_agent_bridge.py is installed.",
+                action_needed="investigate",
+                command=raw_text,
+            )
 
     # ── Codex CLI: generate task brief, do not attempt code ourselves ──────────
     if mc == "codex_cli":

@@ -47,6 +47,24 @@ def normalize(
 _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
     # (keywords, intent, priority, requires_approval)
 
+    # ── Dev Agent Bridge (must appear BEFORE generic keyword catches) ───────────
+    (["list dev agents", "which coding agents", "coding agents available",
+      "what agents", "dev agents", "available agents", "agent bridge",
+      "run dev agent status"],                                "list_dev_agents",           "low",    False),
+
+    (["ask gemini", "prepare a prompt for gemini",
+      "use gemini", "gemini review", "gemini analyze",
+      "ask opencode", "prepare a prompt for opencode",
+      "use opencode", "opencode implement",
+      "ask claude cli", "prepare a prompt for claude",
+      "claude cli review",
+      "ask codex", "prepare a prompt for codex",
+      "use codex", "codex patch"],                            "prepare_dev_handoff",       "medium", True),
+
+    (["recommend agent", "which agent should", "what agent should",
+      "best agent for", "which cli agent", "suggest agent",
+      "which coding agent"],                                  "recommend_dev_agent",       "low",    False),
+
     # ── Special phrases (must be before generic keyword catches) ────────────────
     (["are we ready", "ready for pilot", "10-user pilot", "10 user pilot",
       "pilot ready", "pilot launch", "ready to launch", "ready for launch"],
@@ -74,6 +92,21 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
     (["refactor", "fix", "build", "implement", "code", "write"],   "code_task",                 "high",   True),
     (["deploy", "push", "release", "rm ", "delete ", "drop "],     "code_task",                 "critical", True),
     (["summary", "summarize", "activity"],                         "summarize_recent_activity", "medium", False),
+
+    # ── Nexus intelligence intents ───────────────────────────────────────────────
+    (["business opportunity", "business opportunities", "what opportunities",
+      "show opportunities", "best opportunity", "top opportunity",
+      "side hustle", "ai content agency", "credit repair consulting",
+      "funding broker", "opportunities ready"],                     "business_opportunities",    "medium", False),
+    (["app url", "website url", "what is the url", "what's the url",
+      "app link", "platform url", "nexus url", "goclear",
+      "what is the app", "where is the app", "how do i access"],   "app_url",                   "low",    False),
+    (["onboarding", "getting started", "setup steps", "new user",
+      "how to start", "first steps"],                              "onboarding_status",         "medium", False),
+    (["user intelligence", "user score", "engagement score",
+      "user profile", "user readiness", "who are my users"],       "user_intelligence_status",  "medium", False),
+    (["platform analytics", "usage stats",
+      "how many users", "user count", "active users"],             "platform_analytics",        "medium", False),
 ]
 
 
