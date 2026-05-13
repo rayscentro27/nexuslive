@@ -573,7 +573,7 @@ def _run_onboarding_status() -> tuple[str, list[str], str]:
         key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY', '')
 
         req = urllib.request.Request(
-            f"{url}/rest/v1/profiles?select=onboarding_complete,onboarding_step&limit=500",
+            f"{url}/rest/v1/user_profiles?select=onboarding_complete&limit=500",
             headers={'apikey': key, 'Authorization': f'Bearer {key}'},
         )
         with urllib.request.urlopen(req, timeout=8) as r:
@@ -618,7 +618,7 @@ def _run_platform_analytics() -> tuple[str, list[str], str]:
         # Total users
         try:
             req = urllib.request.Request(
-                f"{url}/rest/v1/profiles?select=id&limit=1000",
+                f"{url}/rest/v1/user_profiles?select=id&limit=1000",
                 headers={'apikey': key, 'Authorization': f'Bearer {key}'},
             )
             with urllib.request.urlopen(req, timeout=6) as r:
