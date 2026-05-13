@@ -88,6 +88,11 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
     (["credit", "score", "fico"],                                  "credit_workflow_status",    "medium", False),
     (["grant", "grants"],                                          "grant_research_status",     "low",    False),
     (["research", "youtube", "signal"],                            "research_task",             "low",    False),
+    # ── CEO digest / anomaly — must come before generic "ceo" keyword ────────
+    (["ceo digest", "ceo report", "ceo brief", "executive digest",
+      "daily digest", "show me the digest", "platform digest",
+      "anomaly", "anomalies", "what's broken", "what is broken",
+      "health report", "platform health"],                         "ceo_digest",                "high",   False),
     (["ceo", "daily report", "weekly report", "brief"],            "summarize_recent_activity", "high",   False),
     (["refactor", "fix", "build", "implement", "code", "write"],   "code_task",                 "high",   True),
     (["deploy", "push", "release", "rm ", "delete ", "drop "],     "code_task",                 "critical", True),
