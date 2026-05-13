@@ -37,6 +37,9 @@ if os.path.exists(_env_path):
 SUPABASE_URL = os.getenv('SUPABASE_URL', '')
 SUPABASE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY', '')
 DRY_RUN = os.getenv('NEXUS_DRY_RUN', 'true').lower() == 'true'
+# Scoped write flag for provider health — low-risk, no automation path.
+WRITES_ENABLED = os.getenv('PROVIDER_HEALTH_WRITES_ENABLED', 'false').lower() == 'true'
+PERSIST = WRITES_ENABLED
 
 GROQ_API_KEY       = os.getenv('GROQ_API_KEY', '')
 OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
@@ -57,7 +60,7 @@ def _sb_headers() -> dict:
 
 
 def _sb_upsert(table: str, row: dict, on_conflict: str = 'provider_name') -> bool:
-    url = f"{SUPABASE_URL}/rest/v1/{table}"
+    url = f"{SUPABASE_URL}/rest/v1/{table}?on_conflict={on_conflict}"
     data = json.dumps(row).encode()
     req = urllib.request.Request(url, data=data, headers=_sb_headers(), method='POST')
     try:
@@ -198,23 +201,24 @@ def run_poll() -> dict:
         row = {
             'provider_name': name,
             'status': status,
-            'latency_ms': latency,
+            'avg_latency_ms': latency or None,
             'last_checked_at': now,
-            'error_detail': error,
+            'last_healthy_at': now if status == 'online' else None,
+            'notes': error or None,
             'updated_at': now,
         }
 
-        if DRY_RUN:
-            logger.info("[DRY_RUN] would upsert provider_health: %s → %s", name, status)
-        else:
+        if PERSIST:
             _sb_upsert('provider_health', row, on_conflict='provider_name')
+        else:
+            logger.info("[LOG_ONLY] provider_health: %s → %s (set PROVIDER_HEALTH_WRITES_ENABLED=true to persist)", name, status)
 
     online  = sum(1 for r in results.values() if r['status'] == 'online')
     offline = sum(1 for r in results.values() if r['status'] == 'offline')
     degraded = sum(1 for r in results.values() if r['status'] == 'degraded')
 
     summary = {
-        'mode':     'dry_run' if DRY_RUN else 'live',
+        'mode':     'live (writes enabled)' if PERSIST else 'log_only (set PROVIDER_HEALTH_WRITES_ENABLED=true to persist)',
         'polled':   len(results),
         'online':   online,
         'offline':  offline,
