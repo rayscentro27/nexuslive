@@ -661,6 +661,16 @@ def _run_platform_analytics() -> tuple[str, list[str], str]:
 
 # ── Routing table ──────────────────────────────────────────────────────────────
 
+def _run_ceo_digest() -> tuple[str, list[str], str]:
+    """Generate live CEO grouped digest with anomaly detection."""
+    try:
+        from lib.ceo_grouped_digest import format_grouped_digest
+        digest = format_grouped_digest()
+        return digest, [], "Review and action the priority items above."
+    except Exception as e:
+        return f"CEO digest error: {e}", [], "Check lib/ceo_grouped_digest.py"
+
+
 _INTENT_HANDLERS = {
     "health_check":              _run_monitoring_check,
     "worker_status":             _run_worker_check,
@@ -674,6 +684,8 @@ _INTENT_HANDLERS = {
     "app_url":                   _run_app_url,
     "onboarding_status":         _run_onboarding_status,
     "platform_analytics":        _run_platform_analytics,
+    "ceo_digest":                _run_ceo_digest,
+    "user_intelligence_status":  _run_platform_analytics,
 }
 
 _SCRIPT_ROUTES = {
