@@ -3,6 +3,7 @@ import { Cpu, Play, Pause, RotateCcw, Save, UserPlus, Search, Bot, Loader2, Acti
 import { cn } from '../../lib/utils';
 import { getBotProfiles, BotProfile } from '../../lib/db';
 import { supabase } from '../../lib/supabase';
+import { WorkforceOffice } from './WorkforceOffice';
 
 interface AgentRun {
   id: string;
@@ -27,7 +28,7 @@ interface AgentEvent {
   created_at: string;
 }
 
-const PANEL_TABS = ['Agents', 'Activity', 'Events'] as const;
+const PANEL_TABS = ['Office', 'Agents', 'Activity', 'Events'] as const;
 type PanelTab = typeof PANEL_TABS[number];
 
 function statusBadge(status: string) {
@@ -49,7 +50,7 @@ export function AdminAIWorkforce() {
   const [bots,       setBots]      = useState<BotProfile[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading,    setLoading]   = useState(true);
-  const [activeTab,  setActiveTab] = useState<PanelTab>('Agents');
+  const [activeTab,  setActiveTab] = useState<PanelTab>('Office');
   const [runs,       setRuns]      = useState<AgentRun[]>([]);
   const [events,     setEvents]    = useState<AgentEvent[]>([]);
   const [runsLoading, setRunsLoading] = useState(false);
@@ -182,6 +183,8 @@ export function AdminAIWorkforce() {
         <div className="flex items-center justify-center py-24">
           <Loader2 className="w-6 h-6 text-slate-300 animate-spin" />
         </div>
+      ) : activeTab === 'Office' ? (
+        <WorkforceOffice />
       ) : activeTab === 'Agents' ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Bot List */}
