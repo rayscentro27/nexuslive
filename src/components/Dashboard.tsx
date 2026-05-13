@@ -111,100 +111,84 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
   }
 
   return (
-    <div style={{ padding: '16px 20px', background: '#eaebf6' }}>
+    <div style={{ padding: '12px 16px', background: '#eaebf6' }}>
       {/* Page header */}
-      <div style={{ marginBottom: 16 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1a1c3a', marginBottom: 3 }}>
+      <div style={{ marginBottom: 12 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a1c3a', marginBottom: 2 }}>
           Welcome back, {userName} 👋
         </h1>
-        <p style={{ fontSize: 15, color: '#8b8fa8' }}>
-          Here's where your funding journey stands today.
+        <p style={{ fontSize: 13, color: '#8b8fa8' }}>
+          Your funding journey — {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </p>
       </div>
 
       {/* Two-column layout */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'flex-start' }}>
 
         {/* ── LEFT MAIN COLUMN ── */}
-        <div style={{ flex: '1 1 300px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ flex: '1 1 300px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
           {/* 1. Upload Credit Report hero card */}
           <div
             className="glass-card"
             style={{
-              padding: '18px 20px',
+              padding: '14px 16px',
               background: 'linear-gradient(135deg, #dbeafe 0%, #ede9fe 100%)',
               border: '1px solid #e8e9f2',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 28, marginBottom: 6 }}>🚀</div>
-                <h2 style={{ fontSize: 20, fontWeight: 700, color: '#1a1c3a', marginBottom: 5 }}>
-                  {credit ? 'Credit Report Uploaded' : 'Upload Your Credit Report'}
-                </h2>
-                <p style={{ fontSize: 14, color: '#8b8fa8', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span style={{ fontSize: 20 }}>🚀</span>
+                  <h2 style={{ fontSize: 16, fontWeight: 700, color: '#1a1c3a', margin: 0 }}>
+                    {credit ? 'Credit Report Uploaded' : 'Upload Your Credit Report'}
+                  </h2>
+                </div>
+                <p style={{ fontSize: 12, color: '#8b8fa8', marginBottom: credit ? 0 : 10 }}>
                   {credit
-                    ? 'Your credit report has been analyzed. Review your funding range below.'
-                    : 'Get your personalized funding range and AI-powered credit analysis in minutes.'}
+                    ? 'Analyzed — review your funding range below.'
+                    : 'Get your personalized funding range in 2 minutes.'}
                 </p>
                 {!credit && (
                   <button
                     onClick={() => onNavigate?.('credit')}
                     className="nexus-button-primary"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px', fontSize: 14, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer' }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer' }}
                   >
-                    Upload Report <ArrowRight size={15} />
+                    Upload Report <ArrowRight size={13} />
                   </button>
                 )}
               </div>
-              {credit && (
-                <div style={{ textAlign: 'right' }}>
-                  <CheckCircle2 size={32} color="#22c55e" />
-                </div>
-              )}
+              {credit && <CheckCircle2 size={28} color="#22c55e" style={{ flexShrink: 0 }} />}
             </div>
-            {!credit && (
-              <div style={{ marginTop: 12, display: 'flex', gap: 16, fontSize: 13, color: '#8b8fa8' }}>
-                <span>⏱ Takes 2 minutes</span>
-                <span>🔒 Secure</span>
-                <span>📱 Phone or computer</span>
-              </div>
-            )}
           </div>
 
           {/* 2. Funding Journey card */}
-          <div className="glass-card" style={{ padding: 18 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <h3 style={{ fontSize: 17, fontWeight: 700, color: '#1a1c3a' }}>Funding Journey</h3>
-              <span style={{ fontSize: 15, color: '#3d5af1', fontWeight: 600 }}>{readinessScore}% Ready</span>
+          <div className="glass-card" style={{ padding: '14px 16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a1c3a', margin: 0 }}>Funding Journey</h3>
+              <span style={{ fontSize: 14, color: '#3d5af1', fontWeight: 700 }}>{readinessScore}% Ready</span>
             </div>
-
-            {/* Progress bar */}
-            <div style={{ height: 7, background: '#e8e9f2', borderRadius: 10, overflow: 'hidden', marginBottom: 14 }}>
-              <div style={{ width: `${readinessScore}%`, height: '100%', background: '#3d5af1', borderRadius: 10 }} />
+            <div style={{ height: 5, background: '#e8e9f2', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
+              <div style={{ width: `${readinessScore}%`, height: '100%', background: '#3d5af1', borderRadius: 10, transition: 'width 0.6s ease' }} />
             </div>
-
-            {/* Journey step boxes */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
               {journeySteps.map((step, i) => (
-                <div
-                  key={i}
-                  style={{
-                    padding: '12px 10px',
-                    borderRadius: 10,
-                    background: step.done ? '#eef0fd' : '#f7f8ff',
-                    border: `1px solid ${step.done ? '#3d5af1' : '#e8e9f2'}`,
-                    textAlign: 'center',
-                  }}
-                >
-                  <div style={{ marginBottom: 6 }}>
+                <div key={i} style={{
+                  padding: '8px 6px',
+                  borderRadius: 8,
+                  background: step.done ? '#eef0fd' : '#f7f8ff',
+                  border: `1px solid ${step.done ? '#3d5af1' : '#e8e9f2'}`,
+                  textAlign: 'center',
+                }}>
+                  <div style={{ marginBottom: 3 }}>
                     {step.done
-                      ? <CheckCircle2 size={20} color="#3d5af1" style={{ margin: '0 auto' }} />
-                      : <span style={{ fontSize: 20 }}>{step.icon}</span>
+                      ? <CheckCircle2 size={16} color="#3d5af1" style={{ margin: '0 auto' }} />
+                      : <span style={{ fontSize: 16 }}>{step.icon}</span>
                     }
                   </div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: step.done ? '#3d5af1' : '#8b8fa8', lineHeight: 1.3 }}>
+                  <p style={{ fontSize: 11, fontWeight: 600, color: step.done ? '#3d5af1' : '#8b8fa8', lineHeight: 1.3, margin: 0 }}>
                     {step.label}
                   </p>
                 </div>
@@ -294,41 +278,37 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
           </div>
 
           {/* 4. Recent Activity card */}
-          <div className="glass-card" style={{ padding: 18 }}>
-            <h3 style={{ fontSize: 17, fontWeight: 700, color: '#1a1c3a', marginBottom: 12 }}>Recent Activity</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="glass-card" style={{ padding: '12px 16px' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1a1c3a', marginBottom: 8 }}>Recent Activity</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {activity.length > 0
-                ? activity.map((item) => (
-                    <div key={item.id} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 8, background: '#eef0fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Zap size={17} color="#3d5af1" />
+                ? activity.slice(0, 4).map((item) => (
+                    <div key={item.id} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 7, background: '#eef0fd', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Zap size={13} color="#3d5af1" />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <p style={{ fontSize: 14, fontWeight: 600, color: '#1a1c3a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {item.actor}
-                          </p>
-                          <span style={{ fontSize: 12, color: '#8b8fa8', flexShrink: 0, marginLeft: 8 }}>
-                            {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                        <p style={{ fontSize: 13, color: '#8b8fa8', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <p style={{ fontSize: 12, fontWeight: 600, color: '#1a1c3a', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.actor}
+                        </p>
+                        <p style={{ fontSize: 11, color: '#8b8fa8', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {item.action}
                         </p>
                       </div>
+                      <span style={{ fontSize: 10, color: '#8b8fa8', flexShrink: 0 }}>
+                        {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
                     </div>
                   ))
                 : (
-                    <div style={{ textAlign: 'center', padding: '12px 0' }}>
-                      <p style={{ fontSize: 13, color: '#8b8fa8', margin: 0 }}>No activity yet — complete a task to get started.</p>
-                    </div>
+                    <p style={{ fontSize: 12, color: '#8b8fa8', margin: 0, padding: '4px 0' }}>No activity yet — complete a task to get started.</p>
                   )}
             </div>
           </div>
         </div>
 
         {/* ── RIGHT SIDEBAR ── */}
-        <div style={{ flex: '1 1 240px', maxWidth: 280, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ flex: '1 1 240px', maxWidth: 280, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
           {/* Next Best Action (primary task) */}
           {primaryTask ? (
@@ -370,33 +350,33 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
           )}
 
           {/* Readiness Score Breakdown */}
-          <div className="glass-card" style={{ padding: 18 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#1a1c3a', marginBottom: 14 }}>Readiness Breakdown</h3>
+          <div className="glass-card" style={{ padding: '14px 16px' }}>
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: '#1a1c3a', marginBottom: 10 }}>Readiness Breakdown</h3>
             {[
               { label: 'Credit', score: creditScore ? Math.min(100, Math.round(((creditScore - 300) / 550) * 100)) : 0, color: '#3d5af1', tab: 'credit' },
               { label: 'Business', score: profile?.current_funding_level ? (profile.current_funding_level - 1) * 30 : 0, color: '#6366f1', tab: 'business-setup' },
               { label: 'Funding', score: readinessScore, color: '#22c55e', tab: 'funding' },
               { label: 'Grants', score: readinessScore > 50 ? 45 : 20, color: '#f59e0b', tab: 'grants' },
             ].map(item => (
-              <div key={item.label} style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                  <button onClick={() => onNavigate?.(item.tab)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#1a1c3a', padding: 0 }}>
+              <div key={item.label} style={{ marginBottom: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                  <button onClick={() => onNavigate?.(item.tab)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, color: '#1a1c3a', padding: 0 }}>
                     {item.label}
                   </button>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: item.color }}>{item.score}%</span>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: item.color }}>{item.score}%</span>
                 </div>
-                <div style={{ height: 5, background: '#e8e9f2', borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ height: 4, background: '#e8e9f2', borderRadius: 10, overflow: 'hidden' }}>
                   <div style={{ width: `${item.score}%`, height: '100%', background: item.color, borderRadius: 10, transition: 'width 0.5s ease' }} />
                 </div>
               </div>
             ))}
             <button onClick={() => onNavigate?.('action-center')} style={{
-              width: '100%', marginTop: 4, padding: '9px 0', borderRadius: 10,
+              width: '100%', marginTop: 6, padding: '7px 0', borderRadius: 8,
               border: '1.5px solid #e8e9f2', background: '#fff',
-              fontSize: 13, fontWeight: 700, color: '#3d5af1', cursor: 'pointer',
+              fontSize: 12, fontWeight: 700, color: '#3d5af1', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
-              Improve Scores <ArrowRight size={13} />
+              Improve Scores <ArrowRight size={12} />
             </button>
           </div>
 
