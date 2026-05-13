@@ -19,12 +19,14 @@ import logging
 from typing import Any
 from dataclasses import dataclass, field
 
-from .env_loader import get_env
+from .env_loader import load_nexus_env
+
+load_nexus_env()
 
 logger = logging.getLogger(__name__)
 
-SUPABASE_URL = get_env("SUPABASE_URL")
-SUPABASE_SERVICE_KEY = get_env("SUPABASE_SERVICE_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
 # Minimum confidence to answer without escalating (0-100)
 CONFIDENCE_THRESHOLD = int(os.getenv("KNOWLEDGE_CONFIDENCE_THRESHOLD", "60"))
@@ -92,8 +94,10 @@ def _get(table: str, params: dict) -> list[dict]:
 # ── Layer 1: approved internal knowledge ──────────────────────────────────────
 
 def _search_knowledge_items(query: str, domain: str | None = None) -> list[dict]:
+    # Only approved records raise AI employee confidence
     params: dict = {
         "select": "id,domain,title,content,source_type,quality_score,quality_label,freshness_status",
+        "status": "eq.approved",
         "or":     f"(title.ilike.*{query}*,content.ilike.*{query}*)",
         "order":  "quality_score.desc",
         "limit":  "5",
@@ -106,25 +110,28 @@ def _search_knowledge_items(query: str, domain: str | None = None) -> list[dict]
 # ── Layer 2: domain-specific tables ───────────────────────────────────────────
 
 def _search_grants_catalog(query: str) -> list[dict]:
+    # grants_catalog columns: id, title, description, grantor, category, amount_min, amount_max, eligibility
     return _get("grants_catalog", {
-        "select": "id,grant_name,grant_type,funding_amount,eligibility_summary,application_url",
-        "or":     f"(grant_name.ilike.*{query}*,eligibility_summary.ilike.*{query}*)",
+        "select": "id,title,description,grantor,category,amount_min,amount_max,eligibility",
+        "or":     f"(title.ilike.*{query}*,description.ilike.*{query}*,eligibility.ilike.*{query}*)",
         "limit":  "5",
     })
 
 
 def _search_strategies_catalog(query: str) -> list[dict]:
+    # strategies_catalog columns: id, strategy_id, name, asset_class, timeframe, risk_level, ai_confidence
     return _get("strategies_catalog", {
-        "select": "id,strategy_name,description,risk_level,recommended_for",
-        "or":     f"(strategy_name.ilike.*{query}*,description.ilike.*{query}*)",
+        "select": "id,name,asset_class,timeframe,risk_level,ai_confidence,edge_health",
+        "or":     f"(name.ilike.*{query}*,asset_class.ilike.*{query}*)",
         "limit":  "5",
     })
 
 
 def _search_business_opportunities(query: str) -> list[dict]:
+    # business_opportunities columns: id, title, description, type, niche, evidence_summary
     return _get("business_opportunities", {
-        "select": "id,opportunity_name,category,description,feasibility_notes",
-        "or":     f"(opportunity_name.ilike.*{query}*,description.ilike.*{query}*)",
+        "select": "id,title,description,type,niche,evidence_summary,confidence,score",
+        "or":     f"(title.ilike.*{query}*,description.ilike.*{query}*,niche.ilike.*{query}*)",
         "limit":  "5",
     })
 
@@ -155,10 +162,11 @@ def _search_prior_research(query: str) -> list[dict]:
 # ── Layer 4: transcript / ops context ─────────────────────────────────────────
 
 def _search_transcript_queue(query: str) -> list[dict]:
+    # transcript_queue columns: id, title, source_url, source_type, cleaned_content, extraction_notes, quality_label, status
     return _get("transcript_queue", {
-        "select": "id,source_label,content_summary,extracted_insights,status",
+        "select": "id,title,source_type,cleaned_content,extraction_notes,quality_label",
         "status": "eq.processed",
-        "or":     f"(content_summary.ilike.*{query}*,extracted_insights.ilike.*{query}*)",
+        "or":     f"(title.ilike.*{query}*,cleaned_content.ilike.*{query}*)",
         "limit":  "3",
     })
 
@@ -167,7 +175,7 @@ def _search_transcript_queue(query: str) -> list[dict]:
 
 def _get_provider_health() -> list[dict]:
     return _get("provider_health", {
-        "select": "provider_name,status,latency_ms,last_checked_at",
+        "select": "provider_name,status,avg_latency_ms,last_checked_at",
         "order":  "last_checked_at.desc",
         "limit":  "10",
     })
