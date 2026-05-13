@@ -51,6 +51,7 @@ _KNOWLEDGE_TRIGGERS: list[str] = [
     # Opportunity/grant queries
     "validated opportunit", "validated grant", "nexus opportunit",
     "ingested knowledge", "new knowledge was ingested", "trading videos", "transcript sources", "nitrotrades email", "nitrotrades",
+    "pending review", "pending knowledge", "ingestion status", "highest quality sources", "trending internally",
 ]
 
 # Topics that map to AI employee roles
@@ -228,6 +229,27 @@ def summarize_recent_ingestions(domain: str | None = None, limit: int = 10) -> s
     return "Recent ingested transcript sources:\n" + "\n".join(lines)
 
 
+def summarize_ingestion_operations(limit: int = 40) -> str:
+    from .knowledge_ingestion_ops import build_ingestion_snapshot
+
+    t_rows = _supabase_get("transcript_queue", {
+        "select": "source_url,source_type,status,created_at",
+        "order": "created_at.desc",
+        "limit": str(limit),
+    })
+    k_rows = _supabase_get("knowledge_items", {
+        "select": "source_url,status,created_at",
+        "order": "created_at.desc",
+        "limit": str(limit),
+    })
+    snap = build_ingestion_snapshot(t_rows, k_rows)
+    return (
+        "Ingestion operations snapshot:\n"
+        f"• queue={snap.get('transcript_queue_total', 0)} | proposed={snap.get('proposed_count', 0)} | approved={snap.get('approved_count', 0)} | rejected={snap.get('rejected_count', 0)}\n"
+        f"• transcripts ready={snap.get('transcript_available_count', 0)} | failures={snap.get('ingestion_failure_count', 0)}"
+    )
+
+
 def summarize_transcript_topics(domain: str = "trading", limit: int = 20) -> str:
     rows = _supabase_get("transcript_queue", {
         "select": "title,cleaned_content,source_url,status,metadata",
@@ -333,7 +355,7 @@ def _handle_retrieval_query(text: str) -> str | None:
         return "No completed grant research yet. Ask me to find grants for a specific type of business and I'll submit it for research."
 
     # "What new knowledge was recently approved?"
-    if any(k in t for k in ["recently approved", "new knowledge", "what knowledge", "approved knowledge"]) and "ingested" not in t:
+    if any(k in t for k in ["recently approved", "new knowledge", "what knowledge", "approved knowledge"]) and "ingested" not in t and "pending" not in t and "review" not in t:
         rows = _supabase_get("knowledge_items", {
             "select": "domain,title,quality_score,approved_at",
             "status": "eq.approved",
@@ -423,6 +445,52 @@ def _handle_retrieval_query(text: str) -> str | None:
                 [f"• {r.get('title','source')} ({r.get('status','pending')})" for r in rows]
             )
         return "No pending transcript sources right now."
+
+    if any(k in t for k in ["pending review", "pending knowledge", "knowledge is pending review"]):
+        rows = _supabase_get("knowledge_items", {
+            "select": "title,domain,status,quality_score",
+            "status": "eq.proposed",
+            "order": "created_at.desc",
+            "limit": "8",
+        })
+        if rows:
+            return "Knowledge pending review:\n" + "\n".join(
+                [f"• [{r.get('domain','general')}] {r.get('title','item')} (score: {r.get('quality_score',0)})" for r in rows]
+            )
+        return "No proposed knowledge rows are pending review right now."
+
+    if any(k in t for k in ["trending internally", "trending concepts", "concepts are trending"]):
+        return summarize_transcript_topics("trading", limit=25)
+
+    if any(k in t for k in ["highest quality", "highest-quality", "best sources"]):
+        rows = _supabase_get("knowledge_items", {
+            "select": "title,domain,quality_score,source_url,status",
+            "status": "in.(approved,proposed)",
+            "order": "quality_score.desc",
+            "limit": "6",
+        })
+        if rows:
+            return "Highest quality internal sources:\n" + "\n".join(
+                [f"• {r.get('title','source')} ({r.get('domain','general')}, score {r.get('quality_score',0)})" for r in rows]
+            )
+        return "No quality-ranked sources found yet."
+
+    if any(k in t for k in ["opportunity research is nexus validating", "opportunity research nexus validating", "validating opportunities"]):
+        rows = _supabase_get("research_requests", {
+            "select": "topic,status,department,priority",
+            "department": "eq.business_opportunities",
+            "status": "in.(submitted,queued,researching,needs_review)",
+            "order": "updated_at.desc",
+            "limit": "6",
+        })
+        if rows:
+            return "Opportunity research Nexus is validating:\n" + "\n".join(
+                [f"• {r.get('topic','topic')} ({r.get('status','unknown')}, {r.get('priority','normal')})" for r in rows]
+            )
+        return "No active opportunity validation tickets found."
+
+    if "ingestion operations" in t or "ingestion status" in t:
+        return summarize_ingestion_operations(limit=50)
 
     if "nitrotrades" in t and any(k in t for k in ["process", "processed", "email"]):
         rows = _supabase_get("transcript_queue", {

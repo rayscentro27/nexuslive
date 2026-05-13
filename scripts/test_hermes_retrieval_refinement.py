@@ -49,6 +49,8 @@ def main() -> int:
         ok &= check("nitrotrades recognition", "nitrotrades" in r2.lower() or "processed" in r2.lower())
         r3 = hs.nexus_knowledge_reply("What does Nexus know about ICT silver bullet concepts?") or ""
         ok &= check("partial synthesis mode", "partial" in r3.lower() or "under review" in r3.lower())
+        r4 = hs.nexus_knowledge_reply("What knowledge is pending review?") or ""
+        ok &= check("pending review retrieval", "pending" in r4.lower() or "proposed" in r4.lower())
     finally:
         hs._supabase_get = orig_hs_get
 
