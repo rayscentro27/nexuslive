@@ -18,6 +18,8 @@ import {
   UserProfile, Task, ActivityItem, CreditReport
 } from '../lib/db';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { ProgressionSystem } from './ProgressionSystem';
+import { LiveActivityFeed } from './LiveActivityFeed';
 
 export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user } = useAuth();
@@ -121,10 +123,10 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
       </div>
 
       {/* Two-column layout */}
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
 
         {/* ── LEFT MAIN COLUMN ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ flex: '1 1 300px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {/* 1. Upload Credit Report hero card */}
           <div
@@ -325,8 +327,8 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
           </div>
         </div>
 
-        {/* ── RIGHT SIDEBAR (260px) ── */}
-        <div style={{ width: 260, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* ── RIGHT SIDEBAR ── */}
+        <div style={{ flex: '1 1 240px', maxWidth: 280, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {/* Next Best Action (primary task) */}
           {primaryTask ? (
@@ -397,6 +399,12 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
               Improve Scores <ArrowRight size={13} />
             </button>
           </div>
+
+          {/* Progression System */}
+          <ProgressionSystem score={readinessScore} onNavigate={onNavigate} />
+
+          {/* AI Workforce + Live Activity */}
+          <LiveActivityFeed />
 
           {/* Pending Tasks card */}
           <div className="glass-card" style={{ padding: 18 }}>
