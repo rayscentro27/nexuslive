@@ -19,6 +19,7 @@ import { cn } from '../lib/utils';
 import { BotAvatar } from './BotAvatar';
 import { GrantResearchRequest } from './GrantResearchRequest';
 import { supabase } from '../lib/supabase';
+import { useAnalytics } from '../hooks/useAnalytics';
 
 interface CatalogGrant {
   id: string;
@@ -52,6 +53,7 @@ const STATIC_GRANTS: CatalogGrant[] = [
 ];
 
 export function GrantsFinder() {
+  const { emit } = useAnalytics();
   const [activeSection,   setActiveSection]   = useState<'grants' | 'research'>('grants');
   const [catalogGrants,   setCatalogGrants]   = useState<CatalogGrant[]>([]);
   const [loading,         setLoading]         = useState(true);
@@ -189,6 +191,7 @@ export function GrantsFinder() {
                         href={grant.official_url}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => emit('grant_viewed', { event_name: 'grant_apply_clicked', feature: 'grants', metadata: { grant_id: grant.id, grant_title: grant.title, category: grant.category } })}
                         className="px-4 py-1.5 text-[10px] font-black rounded-lg bg-[#5B7CFA] text-white shadow-blue-500/10 hover:bg-[#4A6BEB] transition-all flex items-center gap-1"
                       >
                         Apply <ExternalLink className="w-2.5 h-2.5" />
