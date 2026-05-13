@@ -140,7 +140,7 @@ def _section_provider_health(providers: list) -> str:
         name   = (p.get('provider_name') or p.get('name') or 'unknown').ljust(12)
         status = p.get('status') or 'unknown'
         icon   = {'online': '🟢', 'offline': '🔴', 'degraded': '🟡'}.get(status, '⚪')
-        latency = p.get('latency_ms')
+        latency = p.get('avg_latency_ms') or p.get('latency_ms')
         lat_str = f"{latency}ms" if latency else "—"
         lines.append(f"  {icon} {name}  status={status}  latency={lat_str}")
     return "\n".join(lines)
@@ -204,16 +204,20 @@ def _section_next_actions(intelligence: list, anomaly_summary: dict) -> str:
 
 def _section_safety_check() -> str:
     lines = ["🔒 SAFETY STATE", "─" * 32]
-    dry_run = DRY_RUN
-    lines.append(f"  NEXUS_DRY_RUN={str(dry_run).lower()}")
-    lines.append(f"  LIVE_TRADING=false")
+    ui_writes  = os.getenv('USER_INTELLIGENCE_WRITES_ENABLED', 'false').lower() == 'true'
+    ph_writes  = os.getenv('PROVIDER_HEALTH_WRITES_ENABLED', 'false').lower() == 'true'
+    an_writes  = os.getenv('ANOMALY_WRITES_ENABLED', 'false').lower() == 'true'
+    live_trade = os.getenv('LIVE_TRADING', 'false').lower() == 'true'
+    lines.append(f"  NEXUS_DRY_RUN={str(DRY_RUN).lower()}  (global safety — always true)")
+    lines.append(f"  LIVE_TRADING={str(live_trade).lower()}")
     lines.append(f"  TRADING_LIVE_EXECUTION_ENABLED=false")
     lines.append(f"  NEXUS_AUTO_TRADING=false")
     lines.append(f"  Auto social posting: disabled")
-    if dry_run:
-        lines.append("  ⚠️  DRY_RUN active — user_intelligence writes suppressed")
-    else:
-        lines.append("  ✅ Live mode — user_intelligence writes enabled")
+    lines.append("")
+    lines.append("  Worker persistence (controlled activation):")
+    lines.append(f"  {'✅' if ui_writes else '⬜'} USER_INTELLIGENCE_WRITES_ENABLED={str(ui_writes).lower()}")
+    lines.append(f"  {'✅' if ph_writes else '⬜'} PROVIDER_HEALTH_WRITES_ENABLED={str(ph_writes).lower()}")
+    lines.append(f"  {'✅' if an_writes else '⬜'} ANOMALY_WRITES_ENABLED={str(an_writes).lower()}")
     return "\n".join(lines)
 
 

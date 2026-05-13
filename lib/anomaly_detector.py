@@ -35,6 +35,9 @@ if os.path.exists(_env_path):
 SUPABASE_URL = os.getenv('SUPABASE_URL', '')
 SUPABASE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY', '')
 DRY_RUN = os.getenv('NEXUS_DRY_RUN', 'true').lower() == 'true'
+# Scoped write flag — anomaly detection is always safe to run; persistence is low-risk.
+WRITES_ENABLED = os.getenv('ANOMALY_WRITES_ENABLED', 'false').lower() == 'true'
+PERSIST = WRITES_ENABLED
 
 # ── Anomaly thresholds ────────────────────────────────────────────────────────
 
@@ -284,7 +287,7 @@ def detect_stale_intelligence(intelligence_rows: list, profiles: list) -> Option
         category='stale_intelligence',
         severity='medium',
         title=f'{total_stale} user intelligence record(s) stale or missing',
-        detail='. '.join(detail_parts) + '. Set NEXUS_DRY_RUN=false and run user_intelligence_worker.',
+        detail='. '.join(detail_parts) + '. Set USER_INTELLIGENCE_WRITES_ENABLED=true and run user_intelligence_worker.',
         affected_count=total_stale,
         affected_ids=[uid[:8] for uid in list(unscored)[:10]],
     )
@@ -375,7 +378,7 @@ def run_detection() -> dict:
     severity_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
     anomalies.sort(key=lambda x: severity_order.get(x.severity, 9))
 
-    mode = 'dry_run' if DRY_RUN else 'live'
+    mode = 'live (anomaly writes enabled)' if PERSIST else 'log_only (set ANOMALY_WRITES_ENABLED=true to persist)'
     summary = {
         'mode': mode,
         'detected_at': datetime.now(timezone.utc).isoformat(),
@@ -388,6 +391,10 @@ def run_detection() -> dict:
 
     for a in anomalies:
         logger.warning("[%s] %s — %s: %s", a.severity.upper(), a.category, a.title, a.detail[:80])
+
+    if PERSIST and anomalies:
+        # Future: upsert anomalies into an operational_anomalies table when built
+        logger.info("PERSIST mode: %d anomalies would be written to DB (table TBD)", len(anomalies))
 
     if not anomalies:
         logger.info("No anomalies detected.")

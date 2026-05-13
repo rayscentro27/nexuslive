@@ -39,6 +39,13 @@ SUPABASE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY
 
 SCORING_VERSION = 'v1'
 DRY_RUN = os.getenv('NEXUS_DRY_RUN', 'true').lower() == 'true'
+# Worker-level persistence flag. NEXUS_DRY_RUN=true remains the global safety flag
+# for dangerous operations (trading, social, autonomous execution). This flag grants
+# scoped write permission for low-risk analytics persistence only.
+WRITES_ENABLED = os.getenv('USER_INTELLIGENCE_WRITES_ENABLED', 'false').lower() == 'true'
+# Effective persistence: worker flag is authoritative. Global DRY_RUN never overrides
+# safe analytics writes — it only blocks dangerous execution paths.
+PERSIST = WRITES_ENABLED
 
 
 # ── Supabase helpers ──────────────────────────────────────────────────────────
@@ -67,12 +74,11 @@ def _sb_get(path: str) -> list:
 
 
 def _sb_upsert(table: str, row: dict, on_conflict: str = 'user_id') -> Optional[dict]:
-    url = f"{SUPABASE_URL}/rest/v1/{table}"
+    url = f"{SUPABASE_URL}/rest/v1/{table}?on_conflict={on_conflict}"
     headers = _headers()
-    headers['Prefer'] = f'return=representation,resolution=merge-duplicates'
+    headers['Prefer'] = 'return=representation,resolution=merge-duplicates'
     data = json.dumps(row).encode()
     req = urllib.request.Request(url, data=data, headers=headers, method='POST')
-    req.add_header('Prefer', f'return=representation,resolution=merge-duplicates')
     try:
         with urllib.request.urlopen(req, timeout=15) as r:
             rows = json.loads(r.read())
@@ -354,30 +360,32 @@ def run_scoring(limit: int = 100) -> dict:
             health_counts[row.get('operational_health', 'unknown')] = \
                 health_counts.get(row.get('operational_health', 'unknown'), 0) + 1
 
-            if DRY_RUN:
-                logger.info(
-                    "[DRY_RUN] user=%s score=%d health=%s next=%s",
-                    user_id[:8],
-                    row['user_intelligence_score'],
-                    row['operational_health'],
-                    row['next_best_action'][:50],
-                )
-            else:
+            if PERSIST:
                 result = _sb_upsert('user_intelligence', row)
                 if result:
                     scored += 1
                     logger.info("Scored user=%s → %d (%s)", user_id[:8], row['user_intelligence_score'], row['operational_health'])
                 else:
                     errors += 1
+            else:
+                mode_label = 'DRY_RUN (writes not enabled)' if not WRITES_ENABLED else 'DRY_RUN'
+                logger.info(
+                    "[%s] user=%s score=%d health=%s next=%s",
+                    mode_label,
+                    user_id[:8],
+                    row['user_intelligence_score'],
+                    row['operational_health'],
+                    row['next_best_action'][:50],
+                )
         except Exception as e:
             logger.error("Failed to score user=%s: %s", (user_id or '?')[:8], e)
             errors += 1
 
-    if DRY_RUN:
+    if not PERSIST:
         scored = len(profiles)
 
     summary = {
-        'mode':         'dry_run' if DRY_RUN else 'live',
+        'mode':         'live (writes enabled)' if PERSIST else ('dry_run (set USER_INTELLIGENCE_WRITES_ENABLED=true to activate)'),
         'total_profiles': len(profiles),
         'scored':       scored,
         'errors':       errors,
