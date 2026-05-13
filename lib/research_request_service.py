@@ -254,7 +254,11 @@ def handle_employee_query(
     result = route_query(role=role, query=query, context=context)
 
     ticket = None
-    if result.escalation_needed:
+    supportive_sources = {"transcript_queue", "knowledge_items", "research_requests(completed)", "user_opportunities", "strategies_catalog"}
+    has_supportive_context = any(src in supportive_sources for src in (result.sources or []))
+    should_escalate = result.escalation_needed and not has_supportive_context
+
+    if should_escalate:
         ticket = create_research_ticket(
             role=role,
             query=query,
@@ -270,6 +274,6 @@ def handle_employee_query(
         "confidence":         result.confidence,
         "status":             result.status,
         "risk_notes":         result.risk_notes,
-        "escalation_needed":  result.escalation_needed,
+        "escalation_needed":  should_escalate,
         "ticket":             ticket,
     }

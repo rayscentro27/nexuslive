@@ -389,6 +389,14 @@ def _clean_text(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip())
 
 
+def _channel_name_from_url(url: str) -> str:
+    u = (url or "").strip().lower()
+    m = re.search(r"youtube\.com/@([a-z0-9_.-]+)", u)
+    if m:
+        return m.group(1)
+    return ""
+
+
 def _extract_video_id(url: str) -> str:
     u = (url or "").strip()
     m = re.search(r"[?&]v=([A-Za-z0-9_-]{11})", u)
@@ -512,6 +520,8 @@ def ingest_email_to_transcript_queue(
                 "priority": subject_meta.get("priority") or parsed.priority,
                 "department": subject_meta.get("department"),
                 "sender": parsed.sender_email,
+                "channel_name": _channel_name_from_url(src) or _channel_name_from_url(" ".join(source_urls)),
+                "searchable_tags": [domain, source_type, "youtube" if _youtube(src) else "website"],
             },
         }
         transcript_rows.append(t_payload)

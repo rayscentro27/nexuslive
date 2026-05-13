@@ -29,7 +29,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
 # Minimum confidence to answer without escalating (0-100)
-CONFIDENCE_THRESHOLD = int(os.getenv("KNOWLEDGE_CONFIDENCE_THRESHOLD", "60"))
+CONFIDENCE_THRESHOLD = int(os.getenv("KNOWLEDGE_CONFIDENCE_THRESHOLD", "50"))
 
 ROLE_DOMAIN_MAP: dict[str, list[str]] = {
     "hermes":                ["knowledge_items", "strategies_catalog", "user_opportunities", "provider_health"],
@@ -162,13 +162,27 @@ def _search_prior_research(query: str) -> list[dict]:
 # ── Layer 4: transcript / ops context ─────────────────────────────────────────
 
 def _search_transcript_queue(query: str) -> list[dict]:
-    # transcript_queue columns: id, title, source_url, source_type, cleaned_content, extraction_notes, quality_label, status
+    # transcript_queue columns: id, title, source_url, source_type, cleaned_content, extraction_notes, quality_label, status, domain, metadata
     return _get("transcript_queue", {
-        "select": "id,title,source_type,cleaned_content,extraction_notes,quality_label",
-        "status": "eq.processed",
-        "or":     f"(title.ilike.*{query}*,cleaned_content.ilike.*{query}*)",
-        "limit":  "3",
+        "select": "id,title,source_url,source_type,cleaned_content,extraction_notes,quality_label,status,domain,metadata,created_at",
+        "status": "in.(ready,needs_review,needs_transcript,processed)",
+        "or":     f"(title.ilike.*{query}*,cleaned_content.ilike.*{query}*,source_url.ilike.*{query}*)",
+        "order":  "created_at.desc",
+        "limit":  "8",
     })
+
+
+def _search_pending_research(query: str, department: str | None = None) -> list[dict]:
+    params: dict[str, str] = {
+        "select": "id,topic,status,priority,department,updated_at",
+        "status": "in.(submitted,queued,researching,needs_review)",
+        "or": f"(topic.ilike.*{query}*,original_question.ilike.*{query}*)",
+        "order": "updated_at.desc",
+        "limit": "5",
+    }
+    if department:
+        params["department"] = f"eq.{department}"
+    return _get("research_requests", params)
 
 
 # ── Layer 5: live ops context ─────────────────────────────────────────────────
@@ -192,22 +206,24 @@ def _get_recent_analytics(query: str) -> list[dict]:
 
 # ── Confidence scoring ─────────────────────────────────────────────────────────
 
-def _score_confidence(knowledge: list, domain: list, prior: list, transcripts: list) -> int:
+def _score_confidence(knowledge: list, domain: list, prior: list, transcripts: list, pending: list) -> int:
     score = 0
     if knowledge:
         best_quality = max((r.get("quality_score") or 0 for r in knowledge), default=0)
-        score += min(50, int(best_quality * 0.5))
+        score += min(58, int(best_quality * 0.58))
         # Freshness bonus
         for r in knowledge:
             if r.get("freshness_status") == "fresh":
                 score += 10
                 break
     if domain:
-        score += min(20, len(domain) * 7)
+        score += min(22, len(domain) * 7)
     if prior:
-        score += min(15, len(prior) * 7)
+        score += min(18, len(prior) * 8)
     if transcripts:
-        score += 5
+        score += min(24, 10 + len(transcripts) * 3)
+    if pending:
+        score += min(8, len(pending) * 2)
     return min(100, score)
 
 
@@ -283,20 +299,27 @@ def route_query(
         sources.append("transcript_queue")
         all_records.extend(transcript_hits)
 
-    # Layer 5 — live ops (role-gated)
+    # Layer 5 — pending research context (supportive, non-escalation by default)
+    pending_hits: list[dict] = _search_pending_research(query, ROLE_DEPARTMENT_MAP.get(role))
+    if pending_hits:
+        sources.append("research_requests(pending)")
+        all_records.extend(pending_hits)
+
+    # Layer 6 — live ops (role-gated)
     if "provider_health" in domains:
         ph = _get_provider_health()
         if ph:
             sources.append("provider_health")
 
-    confidence = _score_confidence(knowledge_hits, domain_hits, prior_hits, transcript_hits)
+    confidence = _score_confidence(knowledge_hits, domain_hits, prior_hits, transcript_hits, pending_hits)
 
-    escalation_needed = confidence < CONFIDENCE_THRESHOLD
+    meaningful_internal = bool(knowledge_hits or domain_hits or prior_hits or transcript_hits)
+    escalation_needed = (confidence < CONFIDENCE_THRESHOLD) and not meaningful_internal
     status = "found" if confidence >= CONFIDENCE_THRESHOLD else ("partial" if all_records else "not_found")
 
     # Build summary from best records
     summary_parts: list[str] = []
-    for rec in (knowledge_hits + domain_hits)[:3]:
+    for rec in (knowledge_hits + domain_hits)[:4]:
         snippet = (
             rec.get("content") or
             rec.get("educational_summary") or
@@ -309,6 +332,16 @@ def route_query(
             summary_parts.append(f"[{title}] {snippet[:300]}")
 
     summary = "\n\n".join(summary_parts) if summary_parts else ""
+
+    if transcript_hits:
+        transcript_titles = [r.get("title") or r.get("source_url") or "source" for r in transcript_hits[:4]]
+        transcript_line = "Transcript signals: " + "; ".join(transcript_titles)
+        summary = f"{summary}\n\n{transcript_line}".strip()
+
+    if pending_hits:
+        pending_topics = [f"{r.get('topic','topic')} ({r.get('status','pending')})" for r in pending_hits[:3]]
+        pending_line = "Research still under review: " + "; ".join(pending_topics)
+        summary = f"{summary}\n\n{pending_line}".strip()
 
     # Risk notes from knowledge records
     risk_parts: list[str] = []
@@ -330,7 +363,7 @@ def route_query(
             "I can submit it to the research team and notify you when the analysis is complete."
         )
     else:
-        suggested_response = summary or "I found limited information on that topic. Escalating for deeper research."
+        suggested_response = summary or "Nexus has limited internal context on this topic, but enough to continue without creating a new ticket yet."
 
     return KnowledgeResult(
         status=status,

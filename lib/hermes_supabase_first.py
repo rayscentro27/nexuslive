@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections import Counter
 
 from .env_loader import load_nexus_env
 
@@ -212,6 +213,76 @@ def _supabase_get(table: str, params: dict) -> list[dict]:
         return []
 
 
+def summarize_recent_ingestions(domain: str | None = None, limit: int = 10) -> str:
+    params = {
+        "select": "title,source_url,status,domain,created_at,metadata",
+        "order": "created_at.desc",
+        "limit": str(limit),
+    }
+    if domain:
+        params["domain"] = f"eq.{domain}"
+    rows = _supabase_get("transcript_queue", params)
+    if not rows:
+        return "No recent transcript ingestions found."
+    lines = [f"• {r.get('title') or r.get('source_url') or 'source'} ({r.get('status','unknown')})" for r in rows[:limit]]
+    return "Recent ingested transcript sources:\n" + "\n".join(lines)
+
+
+def summarize_transcript_topics(domain: str = "trading", limit: int = 20) -> str:
+    rows = _supabase_get("transcript_queue", {
+        "select": "title,cleaned_content,source_url,status,metadata",
+        "domain": f"eq.{domain}",
+        "order": "created_at.desc",
+        "limit": str(limit),
+    })
+    if not rows:
+        return "No transcript themes available yet."
+    lexicon = {
+        "session timing": ["session", "london", "new york", "timing", "overlap"],
+        "entries": ["entry", "entries", "trigger", "setup"],
+        "risk management": ["risk", "stop", "drawdown", "position size", "rr"],
+        "momentum": ["momentum", "continuation", "breakout"],
+    }
+    counts = Counter()
+    for r in rows:
+        text = f"{r.get('title','')} {r.get('cleaned_content','')}".lower()
+        for theme, keys in lexicon.items():
+            if any(k in text for k in keys):
+                counts[theme] += 1
+    if not counts:
+        return "Transcript themes are still sparse; source ingestion is present but thematic extraction is limited."
+    ordered = [f"• {k} ({v} source{'s' if v != 1 else ''})" for k, v in counts.most_common(4)]
+    return "Transcript themes detected:\n" + "\n".join(ordered)
+
+
+def summarize_pending_trading_research(limit: int = 5) -> str:
+    rows = _supabase_get("research_requests", {
+        "select": "topic,status,priority,updated_at",
+        "department": "eq.trading_intelligence",
+        "status": "in.(submitted,queued,researching,needs_review,completed)",
+        "order": "updated_at.desc",
+        "limit": str(limit),
+    })
+    if not rows:
+        return "No trading research tickets found."
+    lines = [f"• {r.get('topic','topic')} ({r.get('status','unknown')}, {r.get('priority','normal')})" for r in rows]
+    return "Trading research pipeline:\n" + "\n".join(lines)
+
+
+def summarize_recent_approved_knowledge(domain: str = "trading", limit: int = 5) -> str:
+    rows = _supabase_get("knowledge_items", {
+        "select": "title,domain,quality_score,approved_at,status",
+        "domain": f"eq.{domain}",
+        "status": "eq.approved",
+        "order": "approved_at.desc",
+        "limit": str(limit),
+    })
+    if not rows:
+        return "No approved knowledge found yet for this domain."
+    lines = [f"• {r.get('title','')} (score {r.get('quality_score',0)})" for r in rows]
+    return "Approved knowledge:\n" + "\n".join(lines)
+
+
 def _handle_retrieval_query(text: str) -> str | None:
     """
     Handle pure-retrieval queries that should return existing data without creating tickets.
@@ -287,19 +358,22 @@ def _handle_retrieval_query(text: str) -> str | None:
         return "No newly ingested proposed knowledge found yet."
 
     # "What trading research is available internally?"
-    if "trading videos" in t and any(k in t for k in ["ready", "review"]):
+    if "trading videos" in t and any(k in t for k in ["ready", "review", "recently ingested", "ingested"]):
         rows = _supabase_get("transcript_queue", {
-            "select": "title,source_url,status,domain,created_at",
+            "select": "title,source_url,status,domain,created_at,metadata",
             "domain": "eq.trading",
-            "status": "in.(ready,needs_review)",
+            "status": "in.(ready,needs_review,needs_transcript,processed)",
             "order": "created_at.desc",
             "limit": "10",
         })
         if rows:
-            return "Trading videos ready for review:\n" + "\n".join(
+            return "Trading video ingestion status:\n" + "\n".join(
                 [f"• {r.get('title','source')} ({r.get('status','unknown')})" for r in rows]
             )
-        return "No trading video transcripts are ready for review yet."
+        return "No trading video transcript rows found yet."
+
+    if "what trading videos were recently ingested" in t:
+        return summarize_recent_ingestions(domain="trading", limit=10)
 
     if "trading" in t and any(k in t for k in ["research", "available", "internal", "what"]) and "videos" not in t:
         rows = _supabase_get("strategies_catalog", {
@@ -321,9 +395,21 @@ def _handle_retrieval_query(text: str) -> str | None:
         if tickets:
             t_items = [f"• {r['topic']} ({r['status']})" for r in tickets]
             lines.append("Trading research tickets:\n" + "\n".join(t_items))
+        lines.append(summarize_transcript_topics("trading", limit=20))
+        lines.append(summarize_recent_approved_knowledge("trading", limit=5))
         if lines:
             return "\n\n".join(lines)
         return "No trading strategies or research tickets in the system yet. Strategies populate as paper trading runs accumulate data."
+
+    if "ict silver bullet" in t and any(k in t for k in ["what does nexus know", "concept", "know about", "what nexus"]):
+        parts = [
+            "Nexus has partial internal intelligence on ICT silver bullet concepts.",
+            summarize_transcript_topics("trading", limit=20),
+            summarize_pending_trading_research(limit=5),
+            summarize_recent_approved_knowledge("trading", limit=5),
+            "Some related research remains under review before becoming approved Nexus guidance.",
+        ]
+        return "\n\n".join(parts)
 
     if "transcript sources" in t and "pending" in t:
         rows = _supabase_get("transcript_queue", {
@@ -340,7 +426,7 @@ def _handle_retrieval_query(text: str) -> str | None:
 
     if "nitrotrades" in t and any(k in t for k in ["process", "processed", "email"]):
         rows = _supabase_get("transcript_queue", {
-            "select": "title,source_url,status,created_at",
+            "select": "title,source_url,status,created_at,metadata",
             "or": "(title.ilike.*nitrotrades*,source_url.ilike.*nitrotrades*)",
             "order": "created_at.desc",
             "limit": "10",
