@@ -11,6 +11,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthProvider';
 import { getBusinessEntity, upsertBusinessEntity, BusinessEntity } from '../lib/db';
+import { useAnalytics } from '../hooks/useAnalytics';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -586,6 +587,7 @@ type BizTab = 'foundation' | 'llc' | 'credit' | 'vendors';
 
 export function BusinessFoundation() {
   const { user } = useAuth();
+  const { emit } = useAnalytics();
   const [activeTab, setActiveTab] = useState<BizTab>('foundation');
   const [entity, setEntity] = useState<BusinessEntity | null>(null);
   const [loading, setLoading] = useState(true);
@@ -596,7 +598,8 @@ export function BusinessFoundation() {
       setEntity(data);
       setLoading(false);
     });
-  }, [user]);
+    emit('page_view', { event_name: 'business_foundation_viewed', feature: 'funding', page: '/business' });
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveEntity = async (updates: Partial<BusinessEntity>) => {
     if (!user) return;

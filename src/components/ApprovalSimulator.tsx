@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TrendingUp, AlertCircle, CheckCircle2, ArrowRight, Loader2, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthProvider';
+import { useAnalytics } from '../hooks/useAnalytics';
 import { getCreditReport } from '../lib/db';
 
 interface LenderRule {
@@ -50,6 +51,7 @@ function OddsGauge({ value }: { value: number }) {
 
 export function ApprovalSimulator({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user } = useAuth();
+  const { emit } = useAnalytics();
   const [lenders, setLenders] = useState<LenderRule[]>([]);
   const [results, setResults] = useState<SimResult[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,6 +133,7 @@ export function ApprovalSimulator({ onNavigate }: { onNavigate?: (tab: string) =
       }));
       await supabase.from('approval_simulations').insert(rows);
     }
+    emit('credit_checked', { event_name: 'approval_simulation_run', feature: 'credit', metadata: { lender_count: simResults.length, top_odds: simResults[0]?.approval_odds } });
   };
 
   if (loading) {

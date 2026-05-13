@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Shield, TrendingUp, AlertCircle, FileText, Upload, Download, ArrowRight, CheckCircle2, Clock, Loader2, Zap, Star } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from './AuthProvider';
+import { useAnalytics } from '../hooks/useAnalytics';
 import { getCreditReport, getDisputes, CreditReport, CreditDispute } from '../lib/db';
 import { CreditBoostEngine } from './CreditBoostEngine';
 import { ApprovalSimulator } from './ApprovalSimulator';
@@ -41,6 +42,7 @@ type CreditTab = 'analysis' | 'boost' | 'simulator';
 
 export function CreditAnalysis({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user } = useAuth();
+  const { emit } = useAnalytics();
   const [report, setReport] = useState<CreditReport | null>(null);
   const [disputes, setDisputes] = useState<CreditDispute[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,7 +80,8 @@ export function CreditAnalysis({ onNavigate }: { onNavigate?: (tab: string) => v
       setDisputes(d);
       setLoading(false);
     });
-  }, [user]);
+    emit('page_view', { event_name: 'credit_analysis_viewed', feature: 'credit', page: '/credit' });
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fallback values when no report exists
   const score = report?.score ?? 0;

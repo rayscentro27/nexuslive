@@ -7,6 +7,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthProvider';
 import { getCreditReport, getBusinessEntity } from '../lib/db';
+import { useAnalytics } from '../hooks/useAnalytics';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -214,6 +215,7 @@ const FACTORS: Factor[] = [
 
 export function FundingReadiness({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user } = useAuth();
+  const { emit } = useAnalytics();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [recalculating, setRecalculating] = useState(false);
@@ -232,6 +234,9 @@ export function FundingReadiness({ onNavigate }: { onNavigate?: (tab: string) =>
   }, [user]);
 
   useEffect(() => { loadSnapshot(); }, [loadSnapshot]);
+  useEffect(() => {
+    if (user) emit('page_view', { event_name: 'funding_readiness_viewed', feature: 'funding', page: '/funding' });
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const recalculate = async () => {
     if (!user) return;
