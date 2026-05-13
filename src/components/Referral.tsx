@@ -7,6 +7,7 @@ import { cn } from '../lib/utils';
 import { BotAvatar } from './BotAvatar';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthProvider';
+import { useAnalytics } from '../hooks/useAnalytics';
 
 interface Referral {
   id: string;
@@ -40,6 +41,7 @@ function statusMeta(status: string) {
 
 export function Referral() {
   const { user } = useAuth();
+  const { emit } = useAnalytics();
   const [referrals,    setReferrals]    = useState<Referral[]>([]);
   const [earnings,     setEarnings]     = useState<Earning[]>([]);
   const [commissions,  setCommissions]  = useState<Commission[]>([]);
@@ -70,6 +72,7 @@ export function Referral() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+    emit('invite_sent', { event_name: 'referral_link_copied', feature: 'referral', metadata: { referral_code: referralCode } });
   };
 
   // Computed totals — fall back to display zeros if no DB data yet

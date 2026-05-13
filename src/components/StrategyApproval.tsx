@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAnalytics } from '../hooks/useAnalytics';
 import {
   Shield, CheckCircle2, Clock, AlertTriangle, Zap,
   TrendingUp, Target, Play, Pause, X, ChevronDown, ChevronUp,
@@ -307,6 +308,7 @@ export function StrategyApproval({
 }: {
   onApproved?: (record: StrategyApprovalRecord) => void;
 }) {
+  const { emit } = useAnalytics();
   const [step, setStep] = useState<'select' | 'configure' | 'confirm' | 'done'>('select');
   const [selectedId, setSelectedId] = useState<string>('london_breakout');
   const [risk, setRisk] = useState<RiskProfile>(DEFAULT_RISK);
@@ -330,6 +332,7 @@ export function StrategyApproval({
     setApprovalRecord(record);
     setStep('done');
     onApproved?.(record);
+    emit('strategy_approved', { event_name: 'strategy_approved', feature: 'trading', metadata: { strategy_id: record.strategyId, strategy_name: record.strategyName } });
   }
 
   if (step === 'done' && approvalRecord) {

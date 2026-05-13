@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAnalytics } from '../hooks/useAnalytics';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -6,6 +7,7 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function InstallPrompt() {
+  const { emit } = useAnalytics();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
 
@@ -24,6 +26,7 @@ export default function InstallPrompt() {
     if (!deferredPrompt) return;
     await deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') emit('app_installed', { event_name: 'pwa_installed', feature: 'dashboard' });
     if (outcome === 'dismissed') sessionStorage.setItem('pwa-install-dismissed', '1');
     setVisible(false);
     setDeferredPrompt(null);
