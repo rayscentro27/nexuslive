@@ -20,13 +20,15 @@ import urllib.request
 import urllib.parse
 from datetime import datetime, timezone
 
-from .env_loader import get_env
+from .env_loader import load_nexus_env
 from .ai_employee_knowledge_router import ROLE_DEPARTMENT_MAP, KnowledgeResult
+
+load_nexus_env()
 
 logger = logging.getLogger(__name__)
 
-SUPABASE_URL = get_env("SUPABASE_URL")
-SUPABASE_SERVICE_KEY = get_env("SUPABASE_SERVICE_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
 WRITES_ENABLED = os.getenv("RESEARCH_REQUEST_WRITES_ENABLED", "false").lower() == "true"
 
