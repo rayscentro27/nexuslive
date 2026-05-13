@@ -14,9 +14,9 @@ interface Level {
 const LEVELS: Level[] = [
   { level: 1, name: 'Starter',      emoji: '🌱', minScore: 0,   color: '#6b7280', bgColor: '#f3f4f6', perks: ['Dashboard access', 'Credit upload'] },
   { level: 2, name: 'Builder',      emoji: '🔨', minScore: 25,  color: '#2563eb', bgColor: '#dbeafe', perks: ['Funding roadmap', 'Action center'] },
-  { level: 3, name: 'Funded',       emoji: '💰', minScore: 50,  color: '#7c3aed', bgColor: '#ede9fe', perks: ['Grant finder', 'Approval simulator'] },
-  { level: 4, name: 'Strategist',   emoji: '🧠', minScore: 70,  color: '#0d9488', bgColor: '#ccfbf1', perks: ['Trading lab', 'AI strategy builder'] },
-  { level: 5, name: 'Operator',     emoji: '🚀', minScore: 90,  color: '#d97706', bgColor: '#fef3c7', perks: ['Full automation', 'Priority access'] },
+  { level: 3, name: 'Strategist',   emoji: '🧠', minScore: 50,  color: '#7c3aed', bgColor: '#ede9fe', perks: ['Opportunity intelligence', 'Grant finder'] },
+  { level: 4, name: 'Operator',     emoji: '⚙️', minScore: 70,  color: '#0d9488', bgColor: '#ccfbf1', perks: ['Trading lab', 'AI strategy builder'] },
+  { level: 5, name: 'Nexus Elite',  emoji: '🚀', minScore: 90,  color: '#d97706', bgColor: '#fef3c7', perks: ['Priority AI workforce', 'Full automation'] },
 ];
 
 function computeLevel(score: number): { current: Level; next: Level | null; progress: number } {

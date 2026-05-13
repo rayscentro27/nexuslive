@@ -35,12 +35,14 @@ import { FloatingChat } from './components/FloatingChat';
 import { NotificationToasts } from './components/NotificationToasts';
 import { Zap, Lock, AlertCircle, Bell } from 'lucide-react';
 import InstallPrompt from './components/InstallPrompt';
+import { OpportunityDashboard } from './components/OpportunityDashboard';
 
 const DOCK_ITEMS = [
   { id: 'home',          emoji: '🏠', label: 'Home' },
   { id: 'action-center', emoji: '⚡', label: 'Actions', badge: '2' },
   { id: 'credit',        emoji: '🛡️', label: 'Credit' },
   { id: 'funding',       emoji: '💰', label: 'Funding' },
+  { id: 'opportunities',  emoji: '🔭', label: 'Opps' },
   { id: 'grants',        emoji: '🏆', label: 'Grants' },
   { id: 'trading',       emoji: '📈', label: 'Trading' },
   { id: 'messages',      emoji: '💬', label: 'Messages' },
@@ -344,6 +346,11 @@ function AppContent() {
           {activeTab === 'bots' && (
             <PlanGate requiredPlan="elite" featureName="AI Workforce" onUpgrade={() => setShowUpgradeModal(true)}>
               <Bots onInteract={() => setActiveTab('messages')} />
+            </PlanGate>
+          )}
+          {activeTab === 'opportunities' && (
+            <PlanGate requiredPlan="pro" featureName="Opportunity Intelligence" onUpgrade={() => setShowUpgradeModal(true)}>
+              <OpportunityDashboard onNavigate={setActiveTab} />
             </PlanGate>
           )}
         </div>
