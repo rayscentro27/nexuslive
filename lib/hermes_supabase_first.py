@@ -49,6 +49,7 @@ _KNOWLEDGE_TRIGGERS: list[str] = [
     "business credit",
     # Opportunity/grant queries
     "validated opportunit", "validated grant", "nexus opportunit",
+    "ingested knowledge", "new knowledge was ingested", "trading videos", "transcript sources", "nitrotrades email", "nitrotrades",
 ]
 
 # Topics that map to AI employee roles
@@ -261,7 +262,7 @@ def _handle_retrieval_query(text: str) -> str | None:
         return "No completed grant research yet. Ask me to find grants for a specific type of business and I'll submit it for research."
 
     # "What new knowledge was recently approved?"
-    if any(k in t for k in ["recently approved", "new knowledge", "what knowledge", "approved knowledge"]):
+    if any(k in t for k in ["recently approved", "new knowledge", "what knowledge", "approved knowledge"]) and "ingested" not in t:
         rows = _supabase_get("knowledge_items", {
             "select": "domain,title,quality_score,approved_at",
             "status": "eq.approved",
@@ -273,8 +274,34 @@ def _handle_retrieval_query(text: str) -> str | None:
             return "Recently approved Nexus knowledge:\n" + "\n".join(items)
         return "No approved knowledge records yet. Review the 5 proposed records in the Admin → Tickets board to activate the knowledge base."
 
+    if "new knowledge" in t and "ingested" in t:
+        rows = _supabase_get("knowledge_items", {
+            "select": "title,domain,status,created_at,source_url",
+            "status": "eq.proposed",
+            "order": "created_at.desc",
+            "limit": "8",
+        })
+        if rows:
+            items = [f"• [{r.get('domain','general')}] {r.get('title','')}" for r in rows]
+            return "Newest ingested knowledge (proposed):\n" + "\n".join(items)
+        return "No newly ingested proposed knowledge found yet."
+
     # "What trading research is available internally?"
-    if "trading" in t and any(k in t for k in ["research", "available", "internal", "what"]):
+    if "trading videos" in t and any(k in t for k in ["ready", "review"]):
+        rows = _supabase_get("transcript_queue", {
+            "select": "title,source_url,status,domain,created_at",
+            "domain": "eq.trading",
+            "status": "in.(ready,needs_review)",
+            "order": "created_at.desc",
+            "limit": "10",
+        })
+        if rows:
+            return "Trading videos ready for review:\n" + "\n".join(
+                [f"• {r.get('title','source')} ({r.get('status','unknown')})" for r in rows]
+            )
+        return "No trading video transcripts are ready for review yet."
+
+    if "trading" in t and any(k in t for k in ["research", "available", "internal", "what"]) and "videos" not in t:
         rows = _supabase_get("strategies_catalog", {
             "select": "name,asset_class,risk_level,ai_confidence,edge_health",
             "is_active": "eq.true",
@@ -297,6 +324,44 @@ def _handle_retrieval_query(text: str) -> str | None:
         if lines:
             return "\n\n".join(lines)
         return "No trading strategies or research tickets in the system yet. Strategies populate as paper trading runs accumulate data."
+
+    if "transcript sources" in t and "pending" in t:
+        rows = _supabase_get("transcript_queue", {
+            "select": "title,source_url,status,created_at",
+            "status": "in.(needs_transcript,failed,pending)",
+            "order": "created_at.desc",
+            "limit": "10",
+        })
+        if rows:
+            return "Transcript sources pending:\n" + "\n".join(
+                [f"• {r.get('title','source')} ({r.get('status','pending')})" for r in rows]
+            )
+        return "No pending transcript sources right now."
+
+    if "nitrotrades" in t and any(k in t for k in ["process", "processed", "email"]):
+        rows = _supabase_get("transcript_queue", {
+            "select": "title,source_url,status,created_at",
+            "or": "(title.ilike.*nitrotrades*,source_url.ilike.*nitrotrades*)",
+            "order": "created_at.desc",
+            "limit": "10",
+        })
+        if rows:
+            return "Nexus processed NitroTrades sources:\n" + "\n".join(
+                [f"• {r.get('source_url','')} ({r.get('status','unknown')})" for r in rows]
+            )
+        try:
+            import json
+            from pathlib import Path
+
+            state_file = Path(__file__).resolve().parent.parent / ".email_pipeline_state.json"
+            if state_file.exists():
+                state = json.loads(state_file.read_text())
+                ids = state.get("processed_message_ids") or []
+                if ids:
+                    return "Nexus processed knowledge emails recently, but no NitroTrades-tagged transcript row is present yet."
+        except Exception:
+            pass
+        return "No NitroTrades ingestion rows found yet in transcript_queue."
 
     return None
 

@@ -9,6 +9,8 @@ import json
 import os
 import re
 from html import unescape
+import urllib.parse
+import urllib.request
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,6 +74,73 @@ def _extract_sender_email(sender: str) -> str:
 def _youtube(url: str) -> bool:
     u = (url or "").lower()
     return "youtube.com/" in u or "youtu.be/" in u
+
+
+def _youtube_channel(url: str) -> bool:
+    u = (url or "").lower()
+    return "youtube.com/@" in u or "/channel/" in u or "/c/" in u
+
+
+def classify_mobile_subject(subject: str) -> dict[str, str]:
+    s = (subject or "").strip().lower()
+    compact = re.sub(r"\s+", " ", s)
+    mapping = {
+        "trading youtube strategy": {
+            "domain": "trading",
+            "source_type": "youtube",
+            "priority": "high",
+            "department": "trading_intelligence",
+        },
+        "businessopps website ai automation": {
+            "domain": "business",
+            "source_type": "website",
+            "priority": "medium",
+            "department": "business_opportunities",
+        },
+        "grants website arizona business grants": {
+            "domain": "grants",
+            "source_type": "website",
+            "priority": "medium",
+            "department": "grants_research",
+        },
+        "funding youtube business credit": {
+            "domain": "funding",
+            "source_type": "youtube",
+            "priority": "high",
+            "department": "funding_intelligence",
+        },
+        "credit youtube tradelines": {
+            "domain": "credit",
+            "source_type": "youtube",
+            "priority": "high",
+            "department": "credit_research",
+        },
+        "marketing website funnel": {
+            "domain": "marketing",
+            "source_type": "website",
+            "priority": "medium",
+            "department": "marketing_intelligence",
+        },
+    }
+    if compact in mapping:
+        return mapping[compact]
+    inferred_source = "youtube" if "youtube" in compact else ("website" if "website" in compact else "mixed")
+    inferred_domain = _detect_category(subject, subject)
+    dept_map = {
+        "trading": "trading_intelligence",
+        "funding": "funding_intelligence",
+        "grants": "grants_research",
+        "credit": "credit_research",
+        "marketing": "marketing_intelligence",
+        "business_setup": "business_opportunities",
+        "opportunities": "business_opportunities",
+    }
+    return {
+        "domain": inferred_domain,
+        "source_type": inferred_source,
+        "priority": "high" if "urgent" in compact else "medium",
+        "department": dept_map.get(inferred_domain, "operations"),
+    }
 
 
 def _detect_category(subject: str, body: str) -> str:
@@ -236,6 +305,260 @@ def parse_gmail_hydrated_message(message: dict[str, Any]) -> ParsedKnowledgeEmai
 def _dedup_key(url: str, category: str, source_email_id: str) -> str:
     base = f"{url}|{category}|{source_email_id}".encode()
     return hashlib.sha256(base).hexdigest()[:24]
+
+
+def _load_env_if_needed() -> None:
+    env_path = ROOT / ".env"
+    if not env_path.exists():
+        return
+    for raw in env_path.read_text().splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def _supabase_headers() -> dict[str, str]:
+    _load_env_if_needed()
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY") or ""
+    if not key:
+        raise RuntimeError("Supabase service key not configured")
+    return {
+        "apikey": key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type": "application/json",
+    }
+
+
+def _supabase_base() -> str:
+    _load_env_if_needed()
+    url = (os.getenv("SUPABASE_URL") or "").rstrip("/")
+    if not url:
+        raise RuntimeError("SUPABASE_URL not configured")
+    return f"{url}/rest/v1"
+
+
+def _supabase_get(path: str, params: dict[str, str] | None = None) -> list[dict[str, Any]]:
+    url = f"{_supabase_base()}/{path}"
+    if params:
+        url = f"{url}?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(url, headers=_supabase_headers(), method="GET")
+    with urllib.request.urlopen(req, timeout=25) as resp:
+        body = resp.read().decode()
+    return json.loads(body) if body else []
+
+
+def _supabase_post(path: str, payload: list[dict[str, Any]] | dict[str, Any]) -> list[dict[str, Any]]:
+    req = urllib.request.Request(
+        f"{_supabase_base()}/{path}",
+        headers={**_supabase_headers(), "Prefer": "return=representation"},
+        method="POST",
+        data=json.dumps(payload).encode("utf-8"),
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            body = resp.read().decode()
+    except Exception as exc:
+        detail = ""
+        if hasattr(exc, "read"):
+            try:
+                detail = exc.read().decode("utf-8", "replace")
+            except Exception:
+                detail = ""
+        raise RuntimeError(f"supabase_post {path} failed: {exc} {detail}".strip()) from exc
+    return json.loads(body) if body else []
+
+
+def _youtube_channel_videos(channel_url: str, max_videos: int = 10) -> list[str]:
+    req = urllib.request.Request(channel_url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=25) as resp:
+        html = resp.read().decode("utf-8", "replace")
+    ids = re.findall(r'"videoId":"([A-Za-z0-9_-]{11})"', html)
+    out: list[str] = []
+    for vid in ids:
+        u = f"https://www.youtube.com/watch?v={vid}"
+        if u not in out:
+            out.append(u)
+        if len(out) >= max(1, min(max_videos, 10)):
+            break
+    return out
+
+
+def _clean_text(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip())
+
+
+def _extract_video_id(url: str) -> str:
+    u = (url or "").strip()
+    m = re.search(r"[?&]v=([A-Za-z0-9_-]{11})", u)
+    if m:
+        return m.group(1)
+    m2 = re.search(r"youtu\.be/([A-Za-z0-9_-]{11})", u)
+    return m2.group(1) if m2 else ""
+
+
+def _youtube_transcript(video_url: str) -> tuple[str, str]:
+    vid = _extract_video_id(video_url)
+    if not vid:
+        return "", "missing_video_id"
+    timedtext = f"https://www.youtube.com/api/timedtext?lang=en&v={vid}"
+    try:
+        req = urllib.request.Request(timedtext, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            xml = resp.read().decode("utf-8", "replace")
+    except Exception:
+        return "", "timedtext_request_failed"
+    lines = re.findall(r">([^<]+)<", xml)
+    transcript = _clean_text(unescape(" ".join(lines)))
+    if not transcript:
+        return "", "transcript_unavailable"
+    return transcript, "ok"
+
+
+def _title_from_source(url: str, fallback: str = "source") -> str:
+    u = (url or "").strip()
+    if "youtube.com/watch" in u or "youtu.be/" in u:
+        return f"YouTube video research: {u}"
+    if _youtube_channel(u):
+        return f"YouTube channel research: {u}"
+    return f"Website research: {fallback}"
+
+
+def _quality_score(summary: str, transcript: str) -> int:
+    base = 45
+    if len(summary) > 140:
+        base += 15
+    if len(transcript) > 800:
+        base += 20
+    if any(k in summary.lower() for k in ["risk", "entry", "timing", "drawdown", "setup"]):
+        base += 10
+    return max(40, min(base, 92))
+
+
+def _status_from_transcript(t: str, reason: str) -> str:
+    if t:
+        return "ready"
+    if reason == "transcript_unavailable":
+        return "needs_transcript"
+    return "failed"
+
+
+def ingest_email_to_transcript_queue(
+    parsed: ParsedKnowledgeEmail,
+    *,
+    apply: bool = False,
+    max_channel_videos: int = 10,
+) -> dict[str, Any]:
+    subject_meta = classify_mobile_subject(parsed.subject)
+    domain = subject_meta.get("domain") or parsed.requested_category or "general"
+    source_urls = list(parsed.urls)
+    expanded_urls: list[str] = []
+    for u in source_urls:
+        if _youtube_channel(u):
+            expanded_urls.append(u)
+            try:
+                expanded_urls.extend(_youtube_channel_videos(u, max_videos=max_channel_videos))
+            except Exception:
+                pass
+        else:
+            expanded_urls.append(u)
+    expanded_urls = list(dict.fromkeys(expanded_urls))
+
+    existing_urls = set()
+    if apply and expanded_urls:
+        for u in expanded_urls:
+            checks = _supabase_get("transcript_queue", {
+                "select": "source_url",
+                "source_url": f"eq.{u}",
+                "limit": "1",
+            })
+            if checks:
+                existing_urls.add(u)
+
+    transcript_rows: list[dict[str, Any]] = []
+    knowledge_rows: list[dict[str, Any]] = []
+    inserted_transcript = 0
+    inserted_knowledge = 0
+    duplicates = 0
+
+    for src in expanded_urls:
+        if src in existing_urls:
+            duplicates += 1
+            continue
+        if _youtube(src):
+            transcript, reason = _youtube_transcript(src)
+            source_type = "youtube"
+        else:
+            transcript = ""
+            reason = "website_capture_pending"
+            source_type = "website"
+
+        status = _status_from_transcript(transcript, reason)
+        notes = f"email_id={parsed.email_message_id}; sender={parsed.sender_email}; reason={reason}"
+        t_payload = {
+            "title": _title_from_source(src, parsed.subject),
+            "source_url": src,
+            "source_type": source_type,
+            "raw_content": transcript or "",
+            "cleaned_content": transcript,
+            "extraction_notes": notes,
+            "quality_label": "high" if len(transcript) > 1500 else ("medium" if transcript else "low"),
+            "status": status,
+            "domain": domain,
+            "metadata": {
+                "source_email_id": parsed.email_message_id,
+                "subject": parsed.subject,
+                "priority": subject_meta.get("priority") or parsed.priority,
+                "department": subject_meta.get("department"),
+                "sender": parsed.sender_email,
+            },
+        }
+        transcript_rows.append(t_payload)
+
+        summary = _clean_text((transcript[:700] if transcript else f"Transcript pending for source: {src}"))
+        k_payload = {
+            "domain": domain,
+            "title": f"[Proposed] {_title_from_source(src, parsed.subject)}",
+            "content": summary,
+            "source_url": src,
+            "source_type": source_type,
+            "status": "proposed",
+            "quality_score": _quality_score(summary, transcript),
+            "freshness_status": "fresh",
+            "metadata": {
+                "source_email_id": parsed.email_message_id,
+                "review_required": True,
+                "transcript_status": status,
+            },
+        }
+        knowledge_rows.append(k_payload)
+
+    errors: list[str] = []
+    if apply:
+        try:
+            if transcript_rows:
+                inserted_transcript = len(_supabase_post("transcript_queue", transcript_rows))
+            if knowledge_rows:
+                inserted_knowledge = len(_supabase_post("knowledge_items", knowledge_rows))
+        except Exception as exc:
+            errors.append(str(exc))
+
+    return {
+        "ok": not errors,
+        "apply": apply,
+        "domain": domain,
+        "source_urls_found": len(source_urls),
+        "expanded_urls": len(expanded_urls),
+        "duplicates_skipped": duplicates,
+        "transcript_rows_prepared": len(transcript_rows),
+        "knowledge_rows_prepared": len(knowledge_rows),
+        "transcript_rows_inserted": inserted_transcript,
+        "knowledge_rows_inserted": inserted_knowledge,
+        "errors": errors,
+        "message_id": parsed.email_message_id,
+        "subject": parsed.subject,
+    }
 
 
 def build_proposed_records(parsed: ParsedKnowledgeEmail, *, dry_run: bool = True) -> list[dict[str, Any]]:

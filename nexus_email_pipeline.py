@@ -33,6 +33,11 @@ from pathlib import Path
 from typing import Any
 
 from lib.research_email_commands import execute_email_command, help_text as research_email_help_text
+from lib.hermes_email_knowledge_intake import (
+    classify_mobile_subject,
+    ingest_email_to_transcript_queue,
+    parse_knowledge_email,
+)
 
 # Load .env manually so no dotenv package required
 _env_file = Path(__file__).parent / ".env"
@@ -469,11 +474,7 @@ def groq_enhance(raw_recommendation):
         },
     )
     try:
-        import ssl as _ssl
-        _ctx = _ssl.create_default_context()
-        _ctx.check_hostname = False
-        _ctx.verify_mode = _ssl.CERT_NONE
-        with urllib.request.urlopen(req, timeout=30, context=_ctx) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read())
             return data["choices"][0]["message"]["content"]
     except Exception as e:
@@ -701,6 +702,31 @@ def process_research_email_command(msg):
     send_reply(reply_to, subject, result_body)
 
 
+def process_knowledge_ingestion(msg):
+    parsed = parse_knowledge_email(
+        sender=msg.get("sender", ""),
+        subject=msg.get("subject", ""),
+        body=msg.get("body", ""),
+        message_id=msg.get("message_id", ""),
+    )
+    result = ingest_email_to_transcript_queue(parsed, apply=True)
+    if not result.get("ok"):
+        raise RuntimeError(", ".join(result.get("errors") or ["unknown_ingestion_error"]))
+
+    send_reply(
+        msg["reply_to"],
+        msg["subject"],
+        (
+            "Nexus ingestion complete.\n\n"
+            f"Domain: {result.get('domain')}\n"
+            f"Expanded sources: {result.get('expanded_urls')}\n"
+            f"Transcript rows inserted: {result.get('transcript_rows_inserted')}\n"
+            f"Knowledge rows inserted: {result.get('knowledge_rows_inserted')}\n"
+            f"Duplicates skipped: {result.get('duplicates_skipped')}"
+        ),
+    )
+
+
 # ── Mode detection ────────────────────────────────────────────────────────────
 
 _HERMES_SUBJECT_TAGS = ["[hermes]", "hermes,", "hermes:"]
@@ -716,6 +742,7 @@ _HERMES_BODY_TRIGGERS = [
 def detect_mode(subject, body):
     s = subject.lower().strip()
     b = (body or "").lower()
+    subject_meta = classify_mobile_subject(subject)
 
     if "[research email]" in s or s == "research email" or s.startswith("re: [research email]"):
         return "research_email"
@@ -725,6 +752,8 @@ def detect_mode(subject, body):
         return "tasks"
     if "[nexus]" in s or "[research]" in s:
         return "research" if YT_RE.search(body) else None
+    if subject_meta.get("source_type") in {"youtube", "website", "mixed"} and ("http://" in b or "https://" in b):
+        return "knowledge_ingestion"
 
     # Hermes command: explicit subject tag or body contains known command phrases
     if any(tag in s for tag in _HERMES_SUBJECT_TAGS):
@@ -771,6 +800,8 @@ def poll_once():
                 process_hermes_command(msg)
             elif mode == "research_email":
                 process_research_email_command(msg)
+            elif mode == "knowledge_ingestion":
+                process_knowledge_ingestion(msg)
 
             # Mark as read only after successful processing.
             mark_email_read(msg["uid"])
