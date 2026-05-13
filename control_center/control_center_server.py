@@ -1688,6 +1688,20 @@ def api_admin_ai_ops_status():
     except Exception:
         intelligence_visibility = {}
 
+    transcript_rows = _safe_select(
+        "transcript_queue?select=source_url,source_type,status,created_at&order=created_at.desc&limit=120"
+    )
+    knowledge_rows = _safe_select(
+        "knowledge_items?select=source_url,status,created_at&order=created_at.desc&limit=160"
+    )
+    ingestion_operations = {}
+    try:
+        from lib.knowledge_ingestion_ops import build_ingestion_snapshot
+
+        ingestion_operations = build_ingestion_snapshot(transcript_rows, knowledge_rows)
+    except Exception:
+        ingestion_operations = {}
+
     data = {
             "model_config": {
                 "active_default_provider": provider_default,
@@ -1709,6 +1723,7 @@ def api_admin_ai_ops_status():
                 "recent_retry_error_events": retry_rows,
                 "recent_model_usage_events": usage_rows,
             },
+            "ingestion_operations": ingestion_operations,
             "knowledge_visibility": knowledge_visibility,
             "intelligence_visibility": intelligence_visibility,
         }
@@ -4653,8 +4668,9 @@ contributing_signals=${esc(JSON.stringify(review.contributing_signals || []))}</
 function renderAiOpsConfig(d) {
   const mc = d.model_config || {};
   const tg = d.telegram_mode || {};
+  const ingest = d.ingestion_operations || {};
   const modelBadge = `${mc.active_default_provider || 'unknown'}:${mc.active_default_model || 'unknown'}`;
-  return `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+  let html = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
     <span class="panel-badge badge-green">Telegram: Conversational</span>
     <span class="panel-badge badge-blue">Reports: Email Only</span>
     <span class="panel-badge badge-amber">Swarm: Dry Run Only</span>
@@ -4670,6 +4686,20 @@ function renderAiOpsConfig(d) {
     <tr><td style="color:var(--dim)">reports_destination</td><td>email</td></tr>
     <tr><td style="color:var(--dim)">safety</td><td class="amber">Swarm disabled | Approvals required | No auto-execution</td></tr>
   </tbody></table>`;
+  if (Object.keys(ingest).length) {
+    const latest = (ingest.latest_sources || []).slice(0, 3).map(s => `<div class="feed-text" style="font-size:10px">• ${esc(String(s).slice(0, 72))}</div>`).join('');
+    html += `<div style="color:var(--dim);font-size:10px;margin:10px 0 6px;letter-spacing:1px">INGESTION OPERATIONS</div>
+      <div class="metric-grid" style="margin-bottom:8px">
+        <div class="metric"><div class="val blue">${esc(String(ingest.transcript_queue_total || 0))}</div><div class="lbl">QUEUE</div></div>
+        <div class="metric"><div class="val amber">${esc(String(ingest.proposed_count || 0))}</div><div class="lbl">PROPOSED</div></div>
+        <div class="metric"><div class="val green">${esc(String(ingest.approved_count || 0))}</div><div class="lbl">APPROVED</div></div>
+        <div class="metric"><div class="val red">${esc(String(ingest.rejected_count || 0))}</div><div class="lbl">REJECTED</div></div>
+        <div class="metric"><div class="val green">${esc(String(ingest.transcript_available_count || 0))}</div><div class="lbl">TRANSCRIPTS</div></div>
+        <div class="metric"><div class="val ${(ingest.ingestion_failure_count || 0) > 0 ? 'red' : 'green'}">${esc(String(ingest.ingestion_failure_count || 0))}</div><div class="lbl">FAILURES</div></div>
+      </div>
+      ${latest ? `<div style="color:var(--dim);font-size:10px;margin-bottom:4px">LATEST SOURCES</div>${latest}` : ''}`;
+  }
+  return html;
 }
 
 function renderAiOpsSession(d) {

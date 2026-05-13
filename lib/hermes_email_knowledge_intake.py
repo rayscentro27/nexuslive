@@ -12,6 +12,15 @@ from html import unescape
 import urllib.parse
 import urllib.request
 
+from .knowledge_ingestion_ops import (
+    build_searchable_tags,
+    normalize_category,
+    owner_for_category,
+    quality_score,
+    source_metadata,
+    transcript_state,
+)
+
 
 ROOT = Path(__file__).resolve().parent.parent
 REPORT_DIR = ROOT / "reports" / "knowledge_intake"
@@ -434,22 +443,11 @@ def _title_from_source(url: str, fallback: str = "source") -> str:
 
 
 def _quality_score(summary: str, transcript: str) -> int:
-    base = 45
-    if len(summary) > 140:
-        base += 15
-    if len(transcript) > 800:
-        base += 20
-    if any(k in summary.lower() for k in ["risk", "entry", "timing", "drawdown", "setup"]):
-        base += 10
-    return max(40, min(base, 92))
+    return quality_score(summary, transcript, "youtube" if "youtube" in summary.lower() else "website")
 
 
 def _status_from_transcript(t: str, reason: str) -> str:
-    if t:
-        return "ready"
-    if reason == "transcript_unavailable":
-        return "needs_transcript"
-    return "failed"
+    return transcript_state(t, reason)
 
 
 def ingest_email_to_transcript_queue(
@@ -459,9 +457,10 @@ def ingest_email_to_transcript_queue(
     max_channel_videos: int = 10,
 ) -> dict[str, Any]:
     subject_meta = classify_mobile_subject(parsed.subject)
-    domain = subject_meta.get("domain") or parsed.requested_category or "general"
+    domain = normalize_category(subject_meta.get("domain") or parsed.requested_category or "general")
     source_urls = list(parsed.urls)
     expanded_urls: list[str] = []
+    max_channel_videos = max(1, min(int(max_channel_videos or 10), 10))
     for u in source_urls:
         if _youtube_channel(u):
             expanded_urls.append(u)
@@ -471,7 +470,7 @@ def ingest_email_to_transcript_queue(
                 pass
         else:
             expanded_urls.append(u)
-    expanded_urls = list(dict.fromkeys(expanded_urls))
+    expanded_urls = list(dict.fromkeys(expanded_urls))[: max(1, min(len(expanded_urls), 10))]
 
     existing_urls = set()
     if apply and expanded_urls:
@@ -491,11 +490,16 @@ def ingest_email_to_transcript_queue(
     duplicates = 0
 
     for src in expanded_urls:
+        src_meta = source_metadata(src)
+        normalized_src = src_meta["source_url"]
+        if normalized_src in existing_urls:
+            duplicates += 1
+            continue
         if src in existing_urls:
             duplicates += 1
             continue
-        if _youtube(src):
-            transcript, reason = _youtube_transcript(src)
+        if _youtube(normalized_src):
+            transcript, reason = _youtube_transcript(normalized_src)
             source_type = "youtube"
         else:
             transcript = ""
@@ -504,10 +508,11 @@ def ingest_email_to_transcript_queue(
 
         status = _status_from_transcript(transcript, reason)
         notes = f"email_id={parsed.email_message_id}; sender={parsed.sender_email}; reason={reason}"
+        tags = build_searchable_tags(domain, source_type, transcript, parsed.subject)
         t_payload = {
-            "title": _title_from_source(src, parsed.subject),
-            "source_url": src,
-            "source_type": source_type,
+            "title": _title_from_source(normalized_src, parsed.subject),
+            "source_url": normalized_src,
+            "source_type": src_meta["source_type"],
             "raw_content": transcript or "",
             "cleaned_content": transcript,
             "extraction_notes": notes,
@@ -518,28 +523,38 @@ def ingest_email_to_transcript_queue(
                 "source_email_id": parsed.email_message_id,
                 "subject": parsed.subject,
                 "priority": subject_meta.get("priority") or parsed.priority,
-                "department": subject_meta.get("department"),
+                "department": owner_for_category(domain),
                 "sender": parsed.sender_email,
-                "channel_name": _channel_name_from_url(src) or _channel_name_from_url(" ".join(source_urls)),
-                "searchable_tags": [domain, source_type, "youtube" if _youtube(src) else "website"],
+                "channel_name": src_meta["channel_name"] or _channel_name_from_url(" ".join(source_urls)),
+                "website_name": src_meta["website_name"],
+                "domain": src_meta["domain"],
+                "ingestion_category": domain,
+                "transcript_state": status,
+                "searchable_tags": tags,
             },
         }
         transcript_rows.append(t_payload)
 
-        summary = _clean_text((transcript[:700] if transcript else f"Transcript pending for source: {src}"))
+        summary = _clean_text((transcript[:700] if transcript else f"Transcript pending for source: {normalized_src}"))
         k_payload = {
             "domain": domain,
-            "title": f"[Proposed] {_title_from_source(src, parsed.subject)}",
+            "title": f"[Proposed] {_title_from_source(normalized_src, parsed.subject)}",
             "content": summary,
-            "source_url": src,
+            "source_url": normalized_src,
             "source_type": source_type,
             "status": "proposed",
-            "quality_score": _quality_score(summary, transcript),
+            "quality_score": quality_score(summary, transcript, source_type),
             "freshness_status": "fresh",
             "metadata": {
                 "source_email_id": parsed.email_message_id,
                 "review_required": True,
                 "transcript_status": status,
+                "channel_name": src_meta["channel_name"],
+                "website_name": src_meta["website_name"],
+                "domain": src_meta["domain"],
+                "ingestion_category": domain,
+                "searchable_tags": tags,
+                "suggested_owner": owner_for_category(domain),
             },
         }
         knowledge_rows.append(k_payload)
