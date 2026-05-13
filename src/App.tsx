@@ -90,7 +90,7 @@ function DockButton({ item, isActive, onClick }: { item: { emoji: string; label:
 function BottomDock({ activeTab, setActiveTab }: { activeTab: string; setActiveTab: (t: string) => void }) {
   return (
     <div style={{
-      position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+      position: 'fixed', bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)',
       zIndex: 200,
       background: 'rgba(210,225,245,0.88)',
       backdropFilter: 'blur(32px)',
