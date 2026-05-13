@@ -42,6 +42,23 @@ export interface AnalyticsEvent {
   created_at: string;
 }
 
+export interface ResearchTicket {
+  id: string;
+  department: string;
+  status: string;
+  priority: string;
+  topic: string;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface ResearchTicketSummary {
+  total: number;
+  open: number;
+  overdue: number;          // open for > 24h
+  byDepartment: Record<string, number>;
+}
+
 function providerToState(status: string): WorkerState {
   if (status === 'online') return 'active';
   if (status === 'degraded') return 'warning';
@@ -53,11 +70,41 @@ function minutesAgo(ts: string | null): number {
   return Math.floor((Date.now() - new Date(ts).getTime()) / 60_000);
 }
 
+export function summarizeTickets(tickets: ResearchTicket[]): ResearchTicketSummary {
+  const open = tickets.filter(t =>
+    ['submitted', 'queued', 'researching', 'needs_review'].includes(t.status)
+  );
+  const now = Date.now();
+  const overdue = open.filter(t => (now - new Date(t.created_at).getTime()) > 24 * 60 * 60 * 1000);
+  const byDepartment: Record<string, number> = {};
+  for (const t of tickets) {
+    byDepartment[t.department] = (byDepartment[t.department] ?? 0) + 1;
+  }
+  return { total: tickets.length, open: open.length, overdue: overdue.length, byDepartment };
+}
+
+function ticketStateForDept(dept: string, summary: ResearchTicketSummary): WorkerState {
+  const count = summary.byDepartment[dept] ?? 0;
+  if (count === 0) return 'idle';
+  const overdueOpen = summary.overdue > 0 && (summary.byDepartment[dept] ?? 0) > 0;
+  if (overdueOpen) return 'warning';
+  return 'researching';
+}
+
+function ticketStatusLine(dept: string, summary: ResearchTicketSummary): string {
+  const count = summary.byDepartment[dept] ?? 0;
+  if (count === 0) return 'No open tickets';
+  if (summary.overdue > 0) return `${count} ticket${count > 1 ? 's' : ''} · ⚠️ overdue`;
+  return `${count} ticket${count > 1 ? 's' : ''} in progress`;
+}
+
 export function buildWorkforceState(
   providers: ProviderHealth[],
   recentEvents: AnalyticsEvent[],
   oppsCount: number,
+  tickets: ResearchTicket[] = [],
 ): DepartmentStatus[] {
+  const ticketSummary = summarizeTickets(tickets);
   const providerMap = Object.fromEntries(providers.map(p => [p.provider_name, p]));
 
   const recentFeatures = new Set(
@@ -136,6 +183,14 @@ export function buildWorkforceState(
           statusLine: recentFeatures.has('funding') ? 'Funding events detected' : 'Standby',
           department: 'funding',
         },
+        {
+          id: 'funding_research_tickets',
+          label: 'Research Queue',
+          emoji: '📋',
+          state: ticketStateForDept('funding_intelligence', ticketSummary),
+          statusLine: ticketStatusLine('funding_intelligence', ticketSummary),
+          department: 'funding',
+        },
       ],
     },
     {
@@ -160,6 +215,14 @@ export function buildWorkforceState(
           statusLine: oppsCount > 0 ? 'Validating catalog' : 'No data yet',
           department: 'opportunities',
         },
+        {
+          id: 'opp_research_tickets',
+          label: 'Research Queue',
+          emoji: '📋',
+          state: ticketStateForDept('business_opportunities', ticketSummary),
+          statusLine: ticketStatusLine('business_opportunities', ticketSummary),
+          department: 'opportunities',
+        },
       ],
     },
     {
@@ -172,8 +235,16 @@ export function buildWorkforceState(
           id: 'grant_worker',
           label: 'Grant Finder',
           emoji: '🏆',
-          state: recentFeatures.has('grants') ? 'researching' : 'idle',
-          statusLine: recentFeatures.has('grants') ? 'Grant searches active' : 'Standby',
+          state: recentFeatures.has('grants') ? 'researching' : ticketStateForDept('grants_research', ticketSummary),
+          statusLine: recentFeatures.has('grants') ? 'Grant searches active' : ticketStatusLine('grants_research', ticketSummary),
+          department: 'grants',
+        },
+        {
+          id: 'grant_research_tickets',
+          label: 'Research Queue',
+          emoji: '📋',
+          state: ticketStateForDept('grants_research', ticketSummary),
+          statusLine: ticketStatusLine('grants_research', ticketSummary),
           department: 'grants',
         },
       ],
