@@ -1,11 +1,11 @@
 /**
  * WorkforceOffice — Admin animated AI workforce visualization.
- * Shows departments, workers, live research tickets, and ingestion activity.
+ * Shows departments, workers, live research tickets, ingestion activity, and live ops feed.
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../../lib/supabase';
-import { RefreshCw, Activity, Shield, Brain, Inbox, Clock } from 'lucide-react';
+import { RefreshCw, Activity, Shield, Brain, Inbox, Clock, Radio } from 'lucide-react';
 import { DepartmentZone } from './DepartmentZone';
 import { buildWorkforceState, type DepartmentStatus, type ResearchTicket } from './workforce_state_adapter';
 
@@ -26,7 +26,26 @@ interface IngestEvent {
   id: string;
   title: string;
   domain: string;
+  status?: string;
   created_at: string;
+}
+
+interface KnowledgeEvent {
+  id: string;
+  title: string;
+  status: string;
+  quality_score: number | null;
+  created_at: string;
+}
+
+interface OpsEvent {
+  id: string;
+  label: string;
+  sublabel: string;
+  icon: string;
+  color: string;
+  ts: string;
+  type: 'research' | 'knowledge' | 'ingestion' | 'activity';
 }
 
 function timeAgo(ts: string): string {
@@ -70,6 +89,89 @@ const STATUS_COLOR: Record<string, string> = {
   submitted: '#6b7280',
 };
 
+function IngestRow({ item, idx, color, icon }: { item: IngestEvent; idx: number; color: string; icon: string }) {
+  const label = item.title || item.domain || 'Source';
+  const shortLabel = label.length > 50 ? label.slice(0, 50) + '…' : label;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: idx * 0.04 }}
+      style={{
+        padding: '8px 12px', borderRadius: 9,
+        background: '#f9fafb', border: `1px solid ${color}20`,
+        display: 'flex', alignItems: 'center', gap: 9,
+      }}
+    >
+      <span style={{ fontSize: 14 }}>{icon}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, color: '#1a1c3a', margin: 0,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {shortLabel}
+        </p>
+        <p style={{ fontSize: 9, color: '#6b7280', margin: 0 }}>{item.domain}</p>
+      </div>
+      <span style={{ fontSize: 9, color: '#9ca3af', flexShrink: 0 }}>{timeAgo(item.created_at)}</span>
+    </motion.div>
+  );
+}
+
+function buildOpsEvents(
+  tickets: ResearchTicket[],
+  knowledge: KnowledgeEvent[],
+  ingest: IngestEvent[],
+  events: AnalyticsEvent[],
+): OpsEvent[] {
+  const out: OpsEvent[] = [];
+  const STATUS_ICON: Record<string, string> = {
+    researching: '🔬', needs_review: '👁️', submitted: '📋', queued: '⏳',
+  };
+  for (const t of tickets.slice(0, 8)) {
+    out.push({
+      id: `t-${t.id}`, type: 'research',
+      label: t.topic.length > 48 ? t.topic.slice(0, 48) + '…' : t.topic,
+      sublabel: `Research · ${t.status.replace(/_/g, ' ')}`,
+      icon: STATUS_ICON[t.status] || '📋',
+      color: t.status === 'researching' ? '#7c3aed' : t.status === 'needs_review' ? '#f59e0b' : '#3d5af1',
+      ts: t.created_at,
+    });
+  }
+  for (const k of knowledge.slice(0, 6)) {
+    const isApproved = k.status === 'approved';
+    out.push({
+      id: `k-${k.id}`, type: 'knowledge',
+      label: k.title.length > 48 ? k.title.slice(0, 48) + '…' : k.title,
+      sublabel: `Knowledge · ${k.status}${k.quality_score ? ` · q=${k.quality_score}` : ''}`,
+      icon: isApproved ? '✅' : k.status === 'proposed' ? '⏳' : '📚',
+      color: isApproved ? '#16a34a' : '#6b7280',
+      ts: k.created_at,
+    });
+  }
+  for (const i of ingest.slice(0, 5)) {
+    const statusIcon = i.status === 'ready' ? '📥' : i.status === 'needs_transcript' ? '⌛' : '📄';
+    out.push({
+      id: `i-${i.id}`, type: 'ingestion',
+      label: (i.title || i.domain || 'Source').slice(0, 48),
+      sublabel: `Ingestion · ${i.status || 'queued'} · ${i.domain}`,
+      icon: statusIcon,
+      color: '#0d9488',
+      ts: i.created_at,
+    });
+  }
+  for (const e of events.slice(0, 4)) {
+    if (!e.event_name && !e.feature) continue;
+    out.push({
+      id: `e-${e.created_at}`, type: 'activity',
+      label: e.event_name || e.feature || 'User event',
+      sublabel: `Activity · ${e.feature || 'platform'}`,
+      icon: '📊',
+      color: '#6366f1',
+      ts: e.created_at,
+    });
+  }
+  return out.sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime()).slice(0, 18);
+}
+
 export function WorkforceOffice() {
   const [departments, setDepartments] = useState<DepartmentStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -79,10 +181,11 @@ export function WorkforceOffice() {
   const [openTickets, setOpenTickets] = useState(0);
   const [tickets, setAllTickets] = useState<ResearchTicket[]>([]);
   const [ingestFeed, setIngestFeed] = useState<IngestEvent[]>([]);
-  const [activePanel, setActivePanel] = useState<'workforce' | 'research' | 'ingestion'>('workforce');
+  const [opsEvents, setOpsEvents] = useState<OpsEvent[]>([]);
+  const [activePanel, setActivePanel] = useState<'workforce' | 'research' | 'ingestion' | 'liveops'>('workforce');
 
   const load = useCallback(async () => {
-    const [phRes, evRes, oppsRes, ticketRes, transcriptRes] = await Promise.all([
+    const [phRes, evRes, oppsRes, ticketRes, transcriptRes, knowledgeRes] = await Promise.all([
       supabase
         .from('provider_health')
         .select('provider_name,status,avg_latency_ms,last_checked_at')
@@ -103,9 +206,15 @@ export function WorkforceOffice() {
         .limit(50),
       supabase
         .from('transcript_queue')
-        .select('id,title,domain,created_at')
+        .select('id,title,domain,status,created_at')
         .order('created_at', { ascending: false })
-        .limit(8),
+        .limit(12),
+      supabase
+        .from('knowledge_items')
+        .select('id,title,status,quality_score,created_at')
+        .in('status', ['approved', 'proposed'])
+        .order('created_at', { ascending: false })
+        .limit(10),
     ]);
 
     const providers = (phRes.data || []) as ProviderHealth[];
@@ -113,11 +222,13 @@ export function WorkforceOffice() {
     const count = oppsRes.count || 0;
     const tkts = (ticketRes.data || []) as ResearchTicket[];
     const ingest = (transcriptRes.data || []) as IngestEvent[];
+    const knowledge = (knowledgeRes.data || []) as KnowledgeEvent[];
 
     setOppsCount(count);
     setOpenTickets(tkts.length);
     setAllTickets(tkts);
     setIngestFeed(ingest);
+    setOpsEvents(buildOpsEvents(tkts, knowledge, ingest, events));
     setDepartments(buildWorkforceState(providers, events, count, tkts));
     setLastRefresh(new Date().toISOString());
     setLoading(false);
@@ -142,6 +253,7 @@ export function WorkforceOffice() {
     { id: 'workforce' as const, label: 'Workforce', icon: Brain, count: activeWorkers },
     { id: 'research' as const, label: 'Research', icon: Clock, count: openTickets },
     { id: 'ingestion' as const, label: 'Ingestion', icon: Inbox, count: ingestFeed.length },
+    { id: 'liveops' as const, label: 'Live Ops', icon: Radio, count: opsEvents.length },
   ];
 
   return (
@@ -313,38 +425,91 @@ export function WorkforceOffice() {
               </div>
             )}
           </motion.div>
-        ) : (
+        ) : activePanel === 'ingestion' ? (
           <motion.div key="ingestion" initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
             {ingestFeed.length === 0 ? (
               <div style={{ padding: '20px', textAlign: 'center' }}>
                 <p style={{ fontSize: 13, color: '#8b8fa8' }}>No ingested sources yet.</p>
                 <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-                  Run notebooklm_ingest_adapter or hermes_email_knowledge_intake.
+                  Run playlist_ingest_worker or hermes_email_knowledge_intake.
                 </p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {ingestFeed.map((item, idx) => (
+                {(() => {
+                  const ready = ingestFeed.filter(i => i.status === 'ready');
+                  const pending = ingestFeed.filter(i => i.status !== 'ready');
+                  return (
+                    <>
+                      {ready.length > 0 && (
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 2 }}>
+                          ✅ Ready ({ready.length})
+                        </div>
+                      )}
+                      {ready.map((item, idx) => (
+                        <IngestRow key={item.id} item={item} idx={idx} color="#16a34a" icon="📥" />
+                      ))}
+                      {pending.length > 0 && (
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: ready.length > 0 ? 8 : 0, marginBottom: 2 }}>
+                          ⌛ Awaiting Transcript ({pending.length})
+                        </div>
+                      )}
+                      {pending.slice(0, 6).map((item, idx) => (
+                        <IngestRow key={item.id} item={item} idx={idx} color="#f59e0b" icon="⌛" />
+                      ))}
+                      {pending.length > 6 && (
+                        <p style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', margin: '4px 0 0' }}>
+                          +{pending.length - 6} more awaiting transcript
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+          </motion.div>
+        ) : (
+          <motion.div key="liveops" initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <motion.div
+                animate={{ opacity: [1, 0.3, 1] }}
+                transition={{ duration: 1.8, repeat: Infinity }}
+                style={{ width: 7, height: 7, borderRadius: '50%', background: '#3d5af1' }}
+              />
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#3d5af1' }}>LIVE OPS FEED</span>
+              <span style={{ fontSize: 10, color: '#9ca3af', marginLeft: 'auto' }}>{opsEvents.length} events</span>
+            </div>
+            {opsEvents.length === 0 ? (
+              <div style={{ padding: '20px', textAlign: 'center' }}>
+                <p style={{ fontSize: 13, color: '#8b8fa8' }}>No operational events yet.</p>
+                <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Events appear as research, ingestion, and knowledge activity flows in.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {opsEvents.map((ev, idx) => (
                   <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.04 }}
+                    key={ev.id}
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.03 }}
                     style={{
-                      padding: '9px 12px', borderRadius: 10,
-                      background: '#f9fafb', border: '1px solid #e5e7eb',
-                      display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '8px 10px', borderRadius: 9,
+                      background: `${ev.color}08`,
+                      border: `1px solid ${ev.color}20`,
+                      display: 'flex', alignItems: 'center', gap: 9,
                     }}
                   >
-                    <span style={{ fontSize: 16 }}>📥</span>
+                    <span style={{ fontSize: 14, flexShrink: 0 }}>{ev.icon}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: '#1a1c3a', margin: 0,
+                      <p style={{ fontSize: 11, fontWeight: 700, color: '#1a1c3a', margin: 0,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {item.title || 'Untitled source'}
+                        {ev.label}
                       </p>
-                      <p style={{ fontSize: 10, color: '#6b7280', margin: 0 }}>{item.domain}</p>
+                      <p style={{ fontSize: 9, color: '#6b7280', margin: 0 }}>{ev.sublabel}</p>
                     </div>
-                    <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0 }}>{timeAgo(item.created_at)}</span>
+                    <span style={{ fontSize: 9, color: '#9ca3af', flexShrink: 0, textAlign: 'right' }}>
+                      {timeAgo(ev.ts)}
+                    </span>
                   </motion.div>
                 ))}
               </div>

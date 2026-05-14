@@ -111,7 +111,7 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
   }
 
   return (
-    <div style={{ padding: '12px 16px', background: '#eaebf6', minHeight: '100%' }}>
+    <div style={{ padding: '10px 12px', background: '#eaebf6', minHeight: '100%' }}>
       {/* Page header — compact, elegant */}
       <motion.div
         initial={{ opacity: 0, y: -6 }}
@@ -147,7 +147,7 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-start' }}>
 
         {/* ── LEFT MAIN COLUMN ── */}
-        <div style={{ flex: '1 1 280px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ flex: '1 1 260px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
           {/* 1. Upload Credit Report hero card */}
           <motion.div
@@ -357,7 +357,7 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
         </div>
 
         {/* ── MIDDLE INTELLIGENCE COLUMN ── */}
-        <div style={{ flex: '1 1 220px', maxWidth: 260, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ flex: '1 1 200px', maxWidth: 300, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <NexusIntelligencePanel onNavigate={onNavigate} />
 
           {/* Quick stats strip */}
@@ -382,7 +382,7 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
         </div>
 
         {/* ── RIGHT SIDEBAR ── */}
-        <div style={{ flex: '1 1 220px', maxWidth: 260, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ flex: '1 1 200px', maxWidth: 300, display: 'flex', flexDirection: 'column', gap: 10 }}>
 
           {/* Next Best Action (primary task) */}
           {primaryTask ? (
