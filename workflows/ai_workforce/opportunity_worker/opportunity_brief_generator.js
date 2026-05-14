@@ -2,6 +2,7 @@
 // Generates a human-readable opportunity brief and Telegram alert.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { shouldSendTelegramNotification } from "../../lib/telegram_notification_policy.js";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
@@ -110,6 +111,11 @@ function escMd(s) {
  * @returns {Promise<void>}
  */
 export async function sendOpportunityBriefAlert(brief) {
+  const policy = shouldSendTelegramNotification("opportunity_summary");
+  if (!policy.ok) {
+    console.log(`[opp-brief] Policy denied: ${policy.reason}`);
+    return;
+  }
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     console.warn("[opp-brief] Telegram not configured — skipping alert.");
     return;
