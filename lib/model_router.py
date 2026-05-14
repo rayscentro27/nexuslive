@@ -129,7 +129,7 @@ _H_KEY  = os.getenv("HERMES_GATEWAY_KEY", "") or os.getenv("HERMES_GATEWAY_TOKEN
 _OC_URL  = os.getenv("OPENCLAW_URL",        "http://localhost:18789")
 _OC_KEY  = os.getenv("OPENCLAW_AUTH_TOKEN", "") or os.getenv("OPENCLAW_API_KEY", "")
 _OC_MDL  = os.getenv("OPENCLAW_MODEL",      "nousresearch/hermes-4-70b")
-_OC_ON   = os.getenv("OPENCLAW_ENABLED",    "true").lower() not in ("false", "0", "no")
+_OC_ON   = os.getenv("OPENCLAW_ENABLED",    "false").lower() not in ("false", "0", "no")
 
 # Claude auth-login via claude CLI (NOT the Anthropic API)
 _CA_BIN  = shutil.which("claude") or ""   # path to claude CLI binary

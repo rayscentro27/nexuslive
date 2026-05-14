@@ -11,6 +11,8 @@ ALLOWED_EVENT_TYPES = {
 }
 
 BLOCKED_EVENT_TYPES = {
+    "opportunity_summary",
+    "grant_summary",
     "research_summary",
     "ingestion_summary",
     "queue_summary",
@@ -18,8 +20,11 @@ BLOCKED_EVENT_TYPES = {
     "worker_summary",
     "ticket_summary",
     "provider_summary",
+    "topic_brief",
+    "run_summary",
     "auto_digest",
     "full_report",
+    "opportunities_detected",
 }
 
 

@@ -10,6 +10,8 @@ const ALLOWED = new Set([
 ]);
 
 const BLOCKED = new Set([
+  "opportunity_summary",
+  "grant_summary",
   "research_summary",
   "ingestion_summary",
   "queue_summary",
@@ -17,8 +19,11 @@ const BLOCKED = new Set([
   "worker_summary",
   "ticket_summary",
   "provider_summary",
+  "topic_brief",
+  "run_summary",
   "auto_digest",
   "full_report",
+  "opportunities_detected",
 ]);
 
 export function shouldSendTelegramNotification(eventType, opts = {}) {

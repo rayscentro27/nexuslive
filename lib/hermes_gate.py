@@ -48,15 +48,19 @@ _HARD_DENY_EVENT_TOKENS = {
     'scheduler_report',
     'retry_error_report',
     'background_report',
+    'opportunity',
+    'grant',
+    'topic_brief',
+    'run_summary',
+    'queue_summary',
+    'auto_digest',
 }
 
 _ALLOW_EVENT_TYPES = {
-    'direct_chat_reply',
-    'command_reply',
-    'approval_request',
-    'approval_result',
-    'user_requested_completion_notice',
-    'user_requested_email_report_confirmation',
+    'conversational_reply',
+    'critical_alert',
+    'explicit_operator_requested_digest',
+    'coding_agent_completion_ack',
 }
 
 
@@ -277,6 +281,15 @@ def telegram_policy_allows_send(
     is_completion: bool = False,
 ) -> tuple[bool, str]:
     event_lower = (event_type or '').strip().lower()
+    alias_map = {
+        'direct_chat_reply': 'conversational_reply',
+        'command_reply': 'conversational_reply',
+        'approval_request': 'conversational_reply',
+        'approval_result': 'conversational_reply',
+        'user_requested_completion_notice': 'coding_agent_completion_ack',
+        'user_requested_email_report_confirmation': 'explicit_operator_requested_digest',
+    }
+    event_lower = alias_map.get(event_lower, event_lower)
 
     if not event_lower:
         return False, 'missing_event_type'
@@ -286,6 +299,18 @@ def telegram_policy_allows_send(
 
     if source in {'scheduler', 'worker', 'background', 'cron'}:
         return False, 'scheduled_or_background_summary'
+
+    if event_lower == 'critical_alert':
+        return True, 'allowed_critical'
+
+    if event_lower == 'explicit_operator_requested_digest' and user_requested:
+        return True, 'allowed_operator_digest'
+
+    if event_lower == 'coding_agent_completion_ack' and user_requested:
+        return True, 'allowed_coding_ack'
+
+    if event_lower == 'conversational_reply':
+        return True, 'allowed_conversational'
 
     if event_lower in _ALLOW_EVENT_TYPES:
         return True, 'allowed_explicit_type'
