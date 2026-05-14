@@ -22,6 +22,7 @@ import os
 from collections import Counter
 
 from .env_loader import load_nexus_env
+from .nexus_semantic_concepts import expand_query, detect_hype, get_related_concepts
 
 load_nexus_env()
 
@@ -539,10 +540,29 @@ def nexus_knowledge_reply(text: str, user_id: str | None = None) -> str | None:
         logger.info("hermes_supabase_first: retrieval match text=%s...", text[:60])
         return retrieval
 
+    # Hype/scam detection — never route these through research tickets
+    if detect_hype(text):
+        return ("That question touches on content that Nexus flags as potentially misleading "
+                "or hype-driven. Nexus only works with vetted, evidence-based intelligence. "
+                "I can submit a research request to validate the claim if you'd like.")
+
     # Normalize: extract core research topic (strip preamble)
     core_query = _normalize_query(text)
     role = _detect_role(text)
-    logger.info("hermes_supabase_first: role=%s core_query=%s...", role, core_query[:60])
+
+    # Expand query with semantic synonyms (improves knowledge search recall)
+    domain_for_expansion = {
+        "trading_analyst": "trading",
+        "grant_researcher": "grants",
+        "funding_strategist": "funding",
+        "business_opportunity": "business",
+        "credit_coach": "credit",
+    }.get(role, "")
+    expanded_terms = expand_query(core_query, domain=domain_for_expansion)
+    related_concepts = get_related_concepts(core_query, domain=domain_for_expansion)
+
+    logger.info("hermes_supabase_first: role=%s core=%s expanded=%d related=%s",
+                role, core_query[:50], len(expanded_terms), related_concepts[:3])
 
     try:
         from .research_request_service import handle_employee_query
@@ -550,7 +570,7 @@ def nexus_knowledge_reply(text: str, user_id: str | None = None) -> str | None:
             role=role,
             query=core_query,           # use normalized topic for dedup + knowledge search
             original_question=text,     # preserve full original for ticket record
-            context={"user_id": user_id},
+            context={"user_id": user_id, "expanded_terms": expanded_terms[:6], "related_concepts": related_concepts},
         )
     except Exception as exc:
         logger.error("hermes_supabase_first router error: %s", exc)

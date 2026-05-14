@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 
 from .env_loader import load_nexus_env
 from .ai_employee_knowledge_router import route_query, ROLE_DEPARTMENT_MAP
+from .nexus_semantic_concepts import detect_hype, source_trust_score, get_related_concepts
 
 load_nexus_env()
 
@@ -276,17 +277,38 @@ def _propose_knowledge(ticket: dict, synthesis: dict) -> str | None:
     domain = DEPT_TO_KNOWLEDGE_DOMAIN.get(dept, "platform")
     topic = ticket.get("topic", "")
 
+    # Quality scoring: base 40 + bonuses for length, model synthesis, related concepts
+    base_score = 40
+    if len(summary) >= 500:
+        base_score += 10  # substantive content
+    if synthesis.get("model_used") not in ("fallback_internal", "unknown"):
+        base_score += 10  # model-synthesized
+    if ticket.get("confidence_gap", 100) < 60:
+        base_score += 5   # moderate confidence gap means more internal knowledge available
+    related = get_related_concepts(topic, domain=domain)
+    if len(related) >= 2:
+        base_score += 5   # well-connected topic in our concept graph
+
+    # Hype/scam penalty
+    if detect_hype(summary) or detect_hype(topic):
+        base_score = max(10, base_score - 30)
+        review_note_prefix = "⚠️ HYPE_FLAGS_DETECTED — review carefully. "
+    else:
+        review_note_prefix = ""
+
+    quality_score = min(base_score, 65)  # cap at 65 — admin sets to 70+ to activate
+
     payload = {
         "domain":          domain,
         "title":           f"[Proposed] {topic[:200]}",
         "content":         summary,
         "source_type":     "research_ticket",
-        "quality_score":   40,
+        "quality_score":   quality_score,
         "quality_label":   "proposed",
         "freshness_status":"fresh",
         "stale_after_days": 90,
         "status":          "proposed",
-        "review_notes":    f"Auto-generated from research_request {ticket['id']}. Requires admin review before activation.",
+        "review_notes":    f"{review_note_prefix}Auto-generated from research_request {ticket['id']}. Related: {', '.join(related[:3])}. Requires admin review before activation.",
         "dry_run":         False,
         "metadata": {
             "research_ticket_id": ticket["id"],
@@ -294,6 +316,8 @@ def _propose_knowledge(ticket: dict, synthesis: dict) -> str | None:
             "model_used":         synthesis.get("model_used", "unknown"),
             "confidence_gap":     ticket.get("confidence_gap"),
             "recommended_action": synthesis.get("recommended_action", ""),
+            "related_concepts":   related[:5],
+            "hype_detected":      detect_hype(summary) or detect_hype(topic),
         },
     }
 
