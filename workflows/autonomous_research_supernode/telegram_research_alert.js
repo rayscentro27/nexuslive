@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { shouldSendTelegram } from "../lib/telegram_spam_guard.js";
 
 // ── SAFETY GUARD ──────────────────────────────────────────────────────────────
 // RESEARCH ONLY. No trading, no broker connections.
@@ -7,14 +8,29 @@ import "dotenv/config";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
+// Respect the TELEGRAM_RESEARCH_ALERTS_ENABLED gate (default off for safety).
+// Set TELEGRAM_RESEARCH_ALERTS_ENABLED=true in .env to re-enable research alerts.
+const RESEARCH_ALERTS_ENABLED =
+  process.env.TELEGRAM_RESEARCH_ALERTS_ENABLED === "true";
+
 /**
  * Send a Telegram message via the Bot API.
  * @param {string} text - message text (Markdown)
  * @returns {Promise<boolean>} true if sent successfully
  */
 async function sendTelegramMessage(text) {
+  if (!RESEARCH_ALERTS_ENABLED) {
+    console.log("[telegram-research-alert] TELEGRAM_RESEARCH_ALERTS_ENABLED=false — suppressed.");
+    return false;
+  }
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     console.warn("[telegram-research-alert] Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID — skipping.");
+    return false;
+  }
+
+  const gate = shouldSendTelegram("research_supernode_alert", text);
+  if (!gate.ok) {
+    console.log(`[telegram-research-alert] Suppressed: ${gate.reason}`);
     return false;
   }
 
@@ -75,6 +91,10 @@ const TOPIC_EMOJIS = {
  * @returns {Promise<boolean>}
  */
 export async function sendResearchAlert(brief, nextActions = []) {
+  const perSourceEnabled = process.env.TELEGRAM_RESEARCH_PER_SOURCE_ALERTS === "true";
+  if (!perSourceEnabled) {
+    return false;
+  }
   const laneLabel = LANE_LABELS[brief.lane] ?? brief.lane;
   const topicEmoji = TOPIC_EMOJIS[brief.topic] ?? "🔬";
   const confPct = ((brief.confidence ?? 0) * 100).toFixed(0);

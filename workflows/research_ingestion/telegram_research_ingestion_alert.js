@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { shouldSendTelegram } from "../lib/telegram_spam_guard.js";
 
 // ── SAFETY GUARD ──────────────────────────────────────────────────────────────
 // RESEARCH ONLY. No trading, no broker connections. Notification only.
@@ -13,6 +14,10 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
  * @param {Array<{transcript, classification, extracted}>} results
  */
 export async function sendIngestionAlert(results) {
+  if ((process.env.TELEGRAM_RESEARCH_ALERTS_ENABLED || "false") !== "true") {
+    console.log("[telegram-ingestion] TELEGRAM_RESEARCH_ALERTS_ENABLED=false — suppressed.");
+    return;
+  }
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     console.warn("[telegram-ingestion] Missing credentials — skipping alert.");
     return;
@@ -53,6 +58,11 @@ export async function sendIngestionAlert(results) {
   lines.push(`Domains: ${topics}`);
 
   const text = lines.join("\n").slice(0, 1000);
+  const gate = shouldSendTelegram("research_ingestion_summary", text);
+  if (!gate.ok) {
+    console.log(`[telegram-ingestion] Suppressed: ${gate.reason}`);
+    return;
+  }
 
   try {
     const res = await fetch(

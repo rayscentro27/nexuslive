@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { shouldSendTelegram } from "../lib/telegram_spam_guard.js";
 
 // ── SAFETY GUARD ──────────────────────────────────────────────────────────────
 // RESEARCH ONLY. No trading, no broker connections.
@@ -7,14 +8,29 @@ import "dotenv/config";
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
+// Respect the TELEGRAM_RESEARCH_ALERTS_ENABLED gate (default off for safety).
+// Set TELEGRAM_RESEARCH_ALERTS_ENABLED=true in .env to re-enable intelligence briefs.
+const RESEARCH_ALERTS_ENABLED =
+  process.env.TELEGRAM_RESEARCH_ALERTS_ENABLED === "true";
+
 /**
  * Send a Telegram message via the Bot API.
  * @param {string} text
  * @returns {Promise<boolean>}
  */
 async function sendTelegramMessage(text) {
+  if (!RESEARCH_ALERTS_ENABLED) {
+    console.log("[telegram-brief-alert] TELEGRAM_RESEARCH_ALERTS_ENABLED=false — suppressed.");
+    return false;
+  }
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     console.warn("[telegram-brief-alert] Missing credentials — skipping.");
+    return false;
+  }
+
+  const gate = shouldSendTelegram("research_supernode_brief", text);
+  if (!gate.ok) {
+    console.log(`[telegram-brief-alert] Suppressed: ${gate.reason}`);
     return false;
   }
 

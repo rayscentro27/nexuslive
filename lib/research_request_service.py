@@ -18,7 +18,7 @@ import logging
 import hashlib
 import urllib.request
 import urllib.parse
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from .env_loader import load_nexus_env
 from .ai_employee_knowledge_router import ROLE_DEPARTMENT_MAP, KnowledgeResult
@@ -31,6 +31,8 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 
 WRITES_ENABLED = os.getenv("RESEARCH_REQUEST_WRITES_ENABLED", "false").lower() == "true"
+RECENT_QUERY_COOLDOWN_MINUTES = int(os.getenv("RESEARCH_QUERY_COOLDOWN_MINUTES", "30") or "30")
+MAX_RESEARCH_NOTIFICATIONS_PER_HOUR = int(os.getenv("MAX_RESEARCH_NOTIFICATIONS_PER_HOUR", "6") or "6")
 
 # Hours estimates by department
 DEPT_COMPLETION_HOURS: dict[str, int] = {
@@ -120,6 +122,33 @@ def _find_open_ticket(topic: str, department: str, user_id: str | None) -> dict 
         return None
 
 
+def _find_recent_ticket_by_normalized_query(query: str, department: str, user_id: str | None) -> dict | None:
+    if not SUPABASE_URL:
+        return None
+    cutoff_iso = (datetime.now(timezone.utc) - timedelta(minutes=max(1, RECENT_QUERY_COOLDOWN_MINUTES))).isoformat()
+    params: dict = {
+        "select": "id,status,created_at,normalized_query",
+        "department": f"eq.{department}",
+        "normalized_query": f"eq.{query[:500]}",
+        "status": "in.(submitted,queued,researching,needs_review)",
+        "created_at": f"gte.{cutoff_iso}",
+        "order": "created_at.desc",
+        "limit": "1",
+    }
+    if user_id:
+        params["user_id"] = f"eq.{user_id}"
+    qs = urllib.parse.urlencode(params)
+    url = f"{SUPABASE_URL}/rest/v1/research_requests?{qs}"
+    req = urllib.request.Request(url, headers=_headers())
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            rows = json.loads(resp.read())
+            return rows[0] if rows else None
+    except Exception as exc:
+        logger.warning("research_request_service recent dedup check failed: %s", exc)
+        return None
+
+
 def _priority_from_gap(confidence: int) -> str:
     gap = 100 - confidence
     if gap >= 80:
@@ -175,7 +204,7 @@ def create_research_ticket(
         }
 
     # Deduplication
-    existing = _find_open_ticket(query, department, user_id)
+    existing = _find_recent_ticket_by_normalized_query(query, department, user_id) or _find_open_ticket(query, department, user_id)
     if existing:
         logger.info("research ticket already open: %s", existing.get("id"))
         return {

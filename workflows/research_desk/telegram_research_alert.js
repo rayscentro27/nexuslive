@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { shouldSendTelegram } from "../lib/telegram_spam_guard.js";
 
 // ── SAFETY GUARD ──────────────────────────────────────────────────────────────
 // This module is RESEARCH ONLY. Sends research desk alerts to Telegram.
@@ -9,12 +10,21 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 async function sendTelegramMessage(text) {
+  if ((process.env.TELEGRAM_RESEARCH_ALERTS_ENABLED || "false") !== "true") {
+    console.log("[telegram] TELEGRAM_RESEARCH_ALERTS_ENABLED=false — suppressed.");
+    return;
+  }
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     console.warn("[telegram] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set. Skipping.");
     return;
   }
 
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const gate = shouldSendTelegram("research_desk_summary", text);
+  if (!gate.ok) {
+    console.log(`[telegram] Suppressed: ${gate.reason}`);
+    return;
+  }
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
