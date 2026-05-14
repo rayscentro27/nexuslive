@@ -94,6 +94,44 @@ _ROLE_KEYWORDS: dict[str, list[str]] = {
 }
 
 
+# Patterns that are purely operational Hermes self-queries — handled by _handle_retrieval_query()
+# and NEVER eligible for research ticket creation.
+_OPERATIONAL_ONLY_PATTERNS: list[str] = [
+    "what new knowledge was recently approved",
+    "what grant opportunities has nexus researched",
+    "what trading research is available internally",
+    "what opportunities are nexus validated",
+    "what should i focus on today",
+    "what to focus on today",
+    "focus on today",
+    "did nexus process the latest playlist",
+    "ingestion status",
+    "ingestion operations",
+]
+
+# Content strings that indicate an empty/null knowledge auto-generated result
+# (produced by research_processing_worker when no real content was found).
+# These are NEVER returned to the user as vetted knowledge.
+_EMPTY_KNOWLEDGE_MARKERS: tuple[str, ...] = (
+    "No vetted Nexus knowledge found for:",
+    "no vetted nexus knowledge found",
+)
+
+
+def _is_operational_only(text: str) -> bool:
+    """Returns True if this query should only be handled by retrieval, never by ticket creation."""
+    t = text.lower()
+    return any(p in t for p in _OPERATIONAL_ONLY_PATTERNS)
+
+
+def _content_is_empty(text: str | None) -> bool:
+    """Returns True if content is an auto-generated empty-result marker, not real knowledge."""
+    if not text:
+        return True
+    tl = text.lower().strip()
+    return any(m.lower() in tl for m in _EMPTY_KNOWLEDGE_MARKERS)
+
+
 def _should_intercept(text: str) -> bool:
     t = text.lower()
     return any(trigger in t for trigger in _KNOWLEDGE_TRIGGERS)
@@ -416,7 +454,6 @@ def _handle_retrieval_query(text: str) -> str | None:
         rows = _supabase_get("transcript_queue", {
             "select": "title,source_url,status,domain,created_at,metadata",
             "domain": "eq.trading",
-            "status": "in.(ready,needs_review,needs_transcript,processed)",
             "order": "created_at.desc",
             "limit": "10",
         })
@@ -579,21 +616,37 @@ def _handle_retrieval_query(text: str) -> str | None:
 
     # "Did Nexus process the latest playlist?" / "playlist ingestion status?"
     if any(k in t for k in ["playlist", "latest playlist", "playlist ingestion"]):
+        # playlist_id is stored in metadata JSON; filter via title/metadata markers
         rows = _supabase_get("transcript_queue", {
-            "select": "title,source_url,status,channel_name,domain,created_at,playlist_id",
-            "playlist_id": "not.is.null",
+            "select": "title,source_url,status,domain,created_at,metadata",
             "order": "created_at.desc",
-            "limit": "8",
+            "limit": "30",
         })
-        if rows:
+        # Filter in Python: rows with playlist marker in metadata or title
+        playlist_rows = [
+            r for r in rows
+            if (r.get("metadata") or {}).get("playlist_id")
+            or "playlist" in (r.get("title") or "").lower()
+        ]
+        if playlist_rows:
             by_status: dict[str, list] = {}
-            for r in rows:
+            for r in playlist_rows:
                 s = r.get("status", "unknown")
                 by_status.setdefault(s, []).append(r.get("title") or r.get("source_url") or "item")
-            parts = [f"Nexus has {len(rows)} playlist item(s) in the ingestion queue."]
+            parts = [f"Nexus has {len(playlist_rows)} playlist item(s) in the ingestion queue."]
             for s, items in by_status.items():
                 parts.append(f"{s.replace('_',' ').title()} ({len(items)}): {', '.join(items[:3])}")
             return "\n".join(parts)
+        # Show overall queue summary as context
+        total = len(rows)
+        if total:
+            ready = sum(1 for r in rows if r.get("status") == "ready")
+            pending = sum(1 for r in rows if r.get("status") == "needs_transcript")
+            return (
+                f"No playlist-tagged items in the queue yet — {total} video source(s) total "
+                f"({ready} ready, {pending} awaiting transcript). "
+                "Run playlist_ingest_worker.py with PLAYLIST_INGEST_WRITES_ENABLED=true to add playlist items."
+            )
         return (
             "No playlist items found in the queue yet. "
             "Run playlist_ingest_worker.py with PLAYLIST_INGEST_WRITES_ENABLED=true to populate. "
@@ -647,6 +700,13 @@ def nexus_knowledge_reply(text: str, user_id: str | None = None) -> str | None:
         logger.info("hermes_supabase_first: retrieval match text=%s...", text[:60])
         return retrieval
 
+    # Operational self-queries must never fall through to ticket creation.
+    # If _handle_retrieval_query returned None for these, it means no data exists —
+    # return None so the LLM handles it, not the ticket system.
+    if _is_operational_only(text):
+        logger.info("hermes_supabase_first: operational-only query — no ticket. text=%s...", text[:60])
+        return None
+
     # Hype/scam detection — never route these through research tickets
     if detect_hype(text):
         return ("That question touches on content that Nexus flags as potentially misleading "
@@ -687,9 +747,17 @@ def nexus_knowledge_reply(text: str, user_id: str | None = None) -> str | None:
     confidence = result.get("confidence", 0)
     ticket = result.get("ticket")
 
-    # High confidence — answer from internal knowledge
-    if status == "found" and confidence >= 60:
-        return _format_found(result, role)
+    # Answer from internal knowledge when found.
+    # Threshold: 50 — "found" status already confirms a knowledge match exists;
+    # the confidence score reflects source depth, not whether we should answer.
+    # Guard: suppress empty auto-generated markers that slipped through approval.
+    if status == "found" and confidence >= 50:
+        summary = result.get("summary") or result.get("suggested_response") or ""
+        if _content_is_empty(summary):
+            logger.warning("hermes_supabase_first: suppressed empty-content knowledge match for query=%s", text[:60])
+            status = "not_found"
+        else:
+            return _format_found(result, role)
 
     # Ticket was created or deduplicated
     if ticket:

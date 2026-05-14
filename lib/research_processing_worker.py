@@ -272,6 +272,12 @@ def _propose_knowledge(ticket: dict, synthesis: dict) -> str | None:
     if not summary or len(summary) < 50:
         return None
 
+    # Never propose a knowledge item whose content is the empty-result fallback marker.
+    # This string means the synthesis had no real content — it is not reusable knowledge.
+    if "No vetted Nexus knowledge found for:" in summary:
+        logger.info("_propose_knowledge: suppressed empty-content proposal for ticket %s", ticket["id"])
+        return None
+
     dept = ticket.get("department", "operations")
     domain = DEPT_TO_KNOWLEDGE_DOMAIN.get(dept, "platform")
     topic = ticket.get("topic", "")
