@@ -5,6 +5,7 @@ import { getBotProfiles, BotProfile } from '../../lib/db';
 import { supabase } from '../../lib/supabase';
 import { WorkforceOffice } from './WorkforceOffice';
 import { ResearchTicketBoard } from './ResearchTicketBoard';
+import { IngestionStatusPanel } from './IngestionStatusPanel';
 
 interface AgentRun {
   id: string;
@@ -29,7 +30,7 @@ interface AgentEvent {
   created_at: string;
 }
 
-const PANEL_TABS = ['Office', 'Tickets', 'Agents', 'Activity', 'Events'] as const;
+const PANEL_TABS = ['Office', 'Tickets', 'Ingestion', 'Agents', 'Activity', 'Events'] as const;
 type PanelTab = typeof PANEL_TABS[number];
 
 function statusBadge(status: string) {
@@ -188,6 +189,8 @@ export function AdminAIWorkforce() {
         <WorkforceOffice />
       ) : activeTab === 'Tickets' ? (
         <ResearchTicketBoard />
+      ) : activeTab === 'Ingestion' ? (
+        <IngestionStatusPanel />
       ) : activeTab === 'Agents' ? (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Bot List */}
