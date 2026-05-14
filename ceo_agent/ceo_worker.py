@@ -94,6 +94,70 @@ def _send_telegram(briefing: dict) -> None:
         logger.warning(f"HermesGate send failed: {e}")
 
 
+def _build_html_brief(briefing: dict) -> str:
+    """Build a premium HTML executive briefing for email."""
+    now_str = datetime.now(timezone.utc).strftime("%B %d, %Y — %H:%M UTC")
+    headline = briefing.get("headline", "Nexus Operational Update")
+    blockers = briefing.get("blockers") or []
+    updates  = briefing.get("top_updates") or []
+    actions  = briefing.get("recommended_actions") or []
+    safety   = briefing.get("safety_status") or {}
+
+    def section(title: str, rows: list[str], color: str = "#3d5af1") -> str:
+        if not rows:
+            return ""
+        items = "".join(f"<li style='margin:6px 0;color:#374151;'>{r}</li>" for r in rows)
+        return f"""
+        <div style="margin-bottom:24px;">
+          <h3 style="margin:0 0 10px;font-size:14px;font-weight:700;color:{color};text-transform:uppercase;letter-spacing:0.05em;">{title}</h3>
+          <ul style="margin:0;padding-left:18px;font-size:14px;line-height:1.6;">{items}</ul>
+        </div>"""
+
+    blocker_rows = [b.get("description", "") for b in blockers if b.get("description")]
+    update_rows  = [
+        f"<strong>{u.get('agent','')}</strong>: {u.get('text','')}"
+        + (f" <span style='color:#6b7280;font-size:12px;'>[{u['client_id'][:8]}]</span>" if u.get("client_id") else "")
+        for u in updates
+    ]
+    action_rows  = [a.get("action", "") for a in actions if a.get("action")]
+    safety_rows  = [f"{k}: {v}" for k, v in safety.items()] if safety else [
+        "NEXUS_DRY_RUN=true", "LIVE_TRADING=false", "Knowledge approval gate active",
+    ]
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f8f9fc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <div style="max-width:600px;margin:32px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1a1c3a 0%,#3d5af1 100%);padding:28px 32px;">
+      <p style="margin:0 0 4px;font-size:11px;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.1em;">Nexus Intelligence Platform</p>
+      <h1 style="margin:0 0 6px;font-size:22px;font-weight:800;color:#fff;line-height:1.2;">{headline}</h1>
+      <p style="margin:0;font-size:12px;color:rgba(255,255,255,0.5);">{now_str}</p>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:28px 32px;">
+
+      {section("Blockers", blocker_rows, "#dc2626") if blocker_rows else ""}
+      {section("Operational Updates", update_rows, "#3d5af1") if update_rows else ""}
+      {section("Recommended Actions", action_rows, "#7c3aed") if action_rows else ""}
+      {section("Safety Status", safety_rows, "#16a34a")}
+
+      {"<p style='margin:0;padding-top:8px;font-size:13px;color:#9ca3af;'>No blockers · All clear</p>" if not blocker_rows and not update_rows else ""}
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:16px 32px;background:#f8f9fc;border-top:1px solid #e5e7eb;">
+      <p style="margin:0;font-size:11px;color:#9ca3af;">Nexus Executive Brief — generated automatically. Reply to Hermes on Telegram for real-time updates.</p>
+    </div>
+  </div>
+</body>
+</html>"""
+    return html
+
+
 def _send_email(briefing: dict) -> None:
     if not EMAIL_ENABLED:
         return
@@ -104,9 +168,9 @@ def _send_email(briefing: dict) -> None:
         updates  = briefing.get('top_updates') or []
         actions  = briefing.get('recommended_actions') or []
 
+        # Plain text fallback
         lines = [
             "Nexus Executive Brief",
-            "",
             f"Generated: {datetime.now(timezone.utc).isoformat()}",
             f"Headline: {briefing.get('headline', '')}",
             "",
@@ -115,22 +179,20 @@ def _send_email(briefing: dict) -> None:
             lines.append("Blockers:")
             for b in blockers:
                 lines.append(f"- {b.get('description', '')}")
-            lines.append("")
         if updates:
             lines.append("Top Updates:")
             for u in updates:
                 cid = f" [{u['client_id'][:8]}]" if u.get('client_id') else ''
                 lines.append(f"- {u['agent']}{cid}: {u['text']}")
-            lines.append("")
         if actions:
             lines.append("Recommended Actions:")
             for a in actions:
                 lines.append(f"- {a.get('action', '')}")
-            lines.append("")
 
         send_operator_email(
             subject="Nexus Executive Brief",
             body="\n".join(lines),
+            html_body=_build_html_brief(briefing),
         )
     except Exception as e:
         logger.warning(f"CEO email: {e}")

@@ -53,6 +53,10 @@ _KNOWLEDGE_TRIGGERS: list[str] = [
     "validated opportunit", "validated grant", "nexus opportunit",
     "ingested knowledge", "new knowledge was ingested", "trading videos", "transcript sources", "nitrotrades email", "nitrotrades",
     "pending review", "pending knowledge", "ingestion status", "highest quality sources", "trending internally",
+    # New conversational triggers
+    "playlist", "latest playlist", "playlist ingestion",
+    "nexus validating", "validating opportunities",
+    "what should i focus", "focus on today", "what to focus",
 ]
 
 # Topics that map to AI employee roles
@@ -119,10 +123,18 @@ _DEPT_LABELS = {
 def _format_found(result: dict, role: str) -> str:
     summary = (result.get("summary") or result.get("suggested_response") or "").strip()
     sources = result.get("sources") or []
-    src_str = ", ".join(sources[:3]) if sources else "internal knowledge"
+    src_str = ", ".join(sources[:3]) if sources else "internal knowledge base"
     risk = result.get("risk_notes") or ""
 
-    lines = [f"Nexus has this in approved knowledge (source: {src_str})."]
+    opener = {
+        "trading_analyst": "Nexus has vetted intel on this from",
+        "grant_researcher": "Good — Nexus has approved grant research from",
+        "funding_strategist": "Nexus has this covered — sourced from",
+        "business_opportunity": "Nexus has validated intelligence on this from",
+        "credit_coach": "Here's what Nexus knows about this from",
+    }.get(role, "Nexus has this in approved knowledge from")
+
+    lines = [f"{opener} {src_str}."]
     if summary:
         lines.append(summary[:400])
     if risk:
@@ -136,30 +148,31 @@ def _format_partial(result: dict, role: str) -> str:
     src_str = ", ".join(sources[:3]) if sources else "internal data"
     confidence = result.get("confidence", 0)
 
-    lines = [f"Nexus has partial internal data on this ({src_str}, confidence: {confidence}%)."]
+    lines = [f"Nexus has partial intelligence on this — {src_str}, confidence {confidence}%."]
     if summary:
         lines.append(summary[:300])
-    lines.append("If you need a deeper analysis, I can submit this for research review.")
+    lines.append("Want me to submit this for a deeper research pass? It'd come back as vetted knowledge.")
     return "\n\n".join(lines)
 
 
 def _format_ticket_created(ticket: dict, query: str) -> str:
     dept = _DEPT_LABELS.get(ticket.get("department", ""), ticket.get("department", "the research team"))
     priority = ticket.get("priority", "normal")
+    urgent = priority in ("urgent", "high")
     return (
-        f"I submitted this to {dept} for research (priority: {priority}). "
-        f"You'll see it in the Tickets tab under Admin → AI Team. "
-        f"Once the research team reviews and approves it, it becomes reusable Nexus knowledge. "
-        f"I'll send a notification when it's ready."
+        f"On it — I submitted that to {dept} for research"
+        f"{' (flagged urgent)' if urgent else ''}. "
+        f"You can track it in the Tickets tab under Admin → AI Team. "
+        f"Once the team reviews and approves it, it becomes reusable Nexus knowledge I can answer from directly."
     )
 
 
 def _format_ticket_duplicate(ticket: dict, query: str) -> str:
     dept = _DEPT_LABELS.get(ticket.get("department", ""), "the research team")
     return (
-        f"That research request is already in the queue for {dept}. "
-        f"Current status: researching. "
-        f"I'll notify you when it moves to review."
+        f"That one's already in the pipeline for {dept} — "
+        f"I won't create a duplicate. "
+        f"I'll flag you when it moves to review."
     )
 
 
@@ -225,9 +238,27 @@ def summarize_recent_ingestions(domain: str | None = None, limit: int = 10) -> s
         params["domain"] = f"eq.{domain}"
     rows = _supabase_get("transcript_queue", params)
     if not rows:
-        return "No recent transcript ingestions found."
-    lines = [f"• {r.get('title') or r.get('source_url') or 'source'} ({r.get('status','unknown')})" for r in rows[:limit]]
-    return "Recent ingested transcript sources:\n" + "\n".join(lines)
+        label = f"{domain} " if domain else ""
+        return f"No {label}transcript ingestions in the queue yet."
+    processed = [r for r in rows if r.get("status") == "processed"]
+    pending = [r for r in rows if r.get("status") in ("needs_transcript", "pending")]
+    summary = f"Nexus has {len(rows)} recent source{'s' if len(rows) != 1 else ''} in the ingestion queue"
+    if domain:
+        summary += f" ({domain})"
+    summary += "."
+    lines = [summary]
+    if processed:
+        lines.append(f"Processed ({len(processed)}): " + " · ".join(
+            r.get("title") or r.get("source_url") or "source" for r in processed[:4]
+        ))
+    if pending:
+        lines.append(f"Awaiting transcript ({len(pending)}): " + " · ".join(
+            r.get("title") or r.get("source_url") or "source" for r in pending[:3]
+        ))
+    if not processed and not pending:
+        other = [f"{r.get('title') or r.get('source_url') or 'source'} ({r.get('status','')})" for r in rows[:4]]
+        lines.append("\n".join(f"• {s}" for s in other))
+    return "\n".join(lines)
 
 
 def summarize_ingestion_operations(limit: int = 40) -> str:
@@ -460,6 +491,49 @@ def _handle_retrieval_query(text: str) -> str | None:
             )
         return "No proposed knowledge rows are pending review right now."
 
+    # "What should I focus on today?" / "What to focus on?"
+    if any(k in t for k in ["what should i focus", "focus on today", "what to focus"]):
+        priorities = []
+        proposed = _supabase_get("knowledge_items", {
+            "select": "id,title,domain,quality_score",
+            "status": "eq.proposed",
+            "order": "quality_score.desc",
+            "limit": "3",
+        })
+        if proposed:
+            priorities.append(
+                f"Review {len(proposed)} proposed knowledge record(s) — approve the best ones to activate Nexus retrieval. "
+                f"Top candidate: {proposed[0].get('title','')[:60]} (q={proposed[0].get('quality_score',0)})."
+            )
+        pending_tickets = _supabase_get("research_requests", {
+            "select": "topic,department,status",
+            "status": "eq.needs_review",
+            "order": "updated_at.desc",
+            "limit": "3",
+        })
+        if pending_tickets:
+            priorities.append(
+                f"{len(pending_tickets)} research ticket(s) waiting for your review — "
+                + ", ".join(r.get("topic", "")[:40] for r in pending_tickets[:2])
+                + "."
+            )
+        t_queue = _supabase_get("transcript_queue", {
+            "select": "id",
+            "status": "eq.needs_transcript",
+            "limit": "5",
+        })
+        if t_queue:
+            priorities.append(f"{len(t_queue)} transcript source(s) awaiting processing.")
+        if not priorities:
+            return (
+                "Operationally, Nexus looks stable — no open approvals or pending reviews. "
+                "Good time to ingest a new playlist, send a tester invite, or review the demo flow."
+            )
+        parts = ["Here's where your attention matters most right now:"]
+        for i, p in enumerate(priorities, 1):
+            parts.append(f"{i}. {p}")
+        return "\n".join(parts)
+
     if any(k in t for k in ["trending internally", "trending concepts", "concepts are trending"]):
         return summarize_transcript_topics("trading", limit=25)
 
@@ -471,12 +545,17 @@ def _handle_retrieval_query(text: str) -> str | None:
             "limit": "6",
         })
         if rows:
-            return "Highest quality internal sources:\n" + "\n".join(
-                [f"• {r.get('title','source')} ({r.get('domain','general')}, score {r.get('quality_score',0)})" for r in rows]
-            )
-        return "No quality-ranked sources found yet."
+            approved = [r for r in rows if r.get("status") == "approved"]
+            lines = [f"Top {len(rows)} sources by quality score:"]
+            for r in rows:
+                tag = "✅" if r.get("status") == "approved" else "⏳"
+                lines.append(f"{tag} {r.get('title','source')} ({r.get('domain','general')}, q={r.get('quality_score',0)})")
+            if not approved:
+                lines.append("None are approved yet — approve high-score records to activate retrieval.")
+            return "\n".join(lines)
+        return "No quality-ranked sources yet — the knowledge base is still being seeded."
 
-    if any(k in t for k in ["opportunity research is nexus validating", "opportunity research nexus validating", "validating opportunities"]):
+    if any(k in t for k in ["opportunity research is nexus validating", "opportunity research nexus validating", "validating opportunities", "nexus validating"]):
         rows = _supabase_get("research_requests", {
             "select": "topic,status,department,priority",
             "department": "eq.business_opportunities",
@@ -485,13 +564,41 @@ def _handle_retrieval_query(text: str) -> str | None:
             "limit": "6",
         })
         if rows:
-            return "Opportunity research Nexus is validating:\n" + "\n".join(
-                [f"• {r.get('topic','topic')} ({r.get('status','unknown')}, {r.get('priority','normal')})" for r in rows]
-            )
-        return "No active opportunity validation tickets found."
+            active = [r for r in rows if r.get("status") in ("researching", "needs_review")]
+            parts = [f"Nexus has {len(rows)} opportunity ticket(s) in the pipeline:"]
+            for r in rows:
+                icon = "🔬" if r.get("status") == "researching" else "👁️" if r.get("status") == "needs_review" else "📋"
+                parts.append(f"{icon} {r.get('topic','topic')} — {r.get('status','unknown')}")
+            if active:
+                parts.append(f"{len(active)} actively being researched right now.")
+            return "\n".join(parts)
+        return "No active opportunity validation tickets. Ask me to research a specific opportunity and I'll open a ticket."
 
     if "ingestion operations" in t or "ingestion status" in t:
         return summarize_ingestion_operations(limit=50)
+
+    # "Did Nexus process the latest playlist?" / "playlist ingestion status?"
+    if any(k in t for k in ["playlist", "latest playlist", "playlist ingestion"]):
+        rows = _supabase_get("transcript_queue", {
+            "select": "title,source_url,status,channel_name,domain,created_at,playlist_id",
+            "playlist_id": "not.is.null",
+            "order": "created_at.desc",
+            "limit": "8",
+        })
+        if rows:
+            by_status: dict[str, list] = {}
+            for r in rows:
+                s = r.get("status", "unknown")
+                by_status.setdefault(s, []).append(r.get("title") or r.get("source_url") or "item")
+            parts = [f"Nexus has {len(rows)} playlist item(s) in the ingestion queue."]
+            for s, items in by_status.items():
+                parts.append(f"{s.replace('_',' ').title()} ({len(items)}): {', '.join(items[:3])}")
+            return "\n".join(parts)
+        return (
+            "No playlist items found in the queue yet. "
+            "Run playlist_ingest_worker.py with PLAYLIST_INGEST_WRITES_ENABLED=true to populate. "
+            "The playlist registry has 4 curated playlists ready: ICT Silver Bullet, Grants Research, Business Credit, AI Automation."
+        )
 
     if "nitrotrades" in t and any(k in t for k in ["process", "processed", "email"]):
         rows = _supabase_get("transcript_queue", {
