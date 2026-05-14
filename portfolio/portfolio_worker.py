@@ -12,7 +12,6 @@ Run: python3 -m portfolio.portfolio_worker
 import os
 import json
 import logging
-import urllib.request
 from datetime import datetime, timezone
 
 logger = logging.getLogger('PortfolioWorker')
@@ -30,17 +29,13 @@ def _load_env() -> None:
 
 
 def _send_telegram(message: str) -> None:
-    token   = os.getenv('TELEGRAM_BOT_TOKEN', '')
-    chat_id = os.getenv('TELEGRAM_CHAT_ID', '')
-    if not token or not chat_id:
+    from lib.telegram_notification_policy import should_send_telegram_notification
+    from lib.hermes_gate import send as gate_send
+
+    allowed, _ = should_send_telegram_notification("worker_summary")
+    if not allowed:
         return
-    try:
-        url  = f"https://api.telegram.org/bot{token}/sendMessage"
-        body = json.dumps({'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'}).encode()
-        req  = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json'})
-        urllib.request.urlopen(req, timeout=10)
-    except Exception as e:
-        logger.warning(f"Telegram send failed: {e}")
+    gate_send(message, event_type="worker_summary", severity="summary")
 
 
 def run_portfolio_cycle() -> dict:

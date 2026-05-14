@@ -393,8 +393,6 @@ def run_review_cycle(batch_size: int = BATCH_SIZE) -> dict:
 
 def send_review_digest(reviews: list[dict]):
     """Send a Telegram summary of recent reviews."""
-    if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
-        return
     if not reviews:
         return
 
@@ -421,13 +419,13 @@ def send_review_digest(reviews: list[dict]):
         lines.append(f"\n⚠️ *Action required:* {note}")
 
     try:
-        import requests
-        requests.post(
-            f'https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage',
-            json={'chat_id': settings.TELEGRAM_CHAT_ID,
-                  'text': '\n'.join(lines), 'parse_mode': 'Markdown'},
-            timeout=10,
-        )
+        from lib.telegram_notification_policy import should_send_telegram_notification
+        from lib.hermes_gate import send as gate_send
+
+        allowed, _ = should_send_telegram_notification('run_summary')
+        if not allowed:
+            return
+        gate_send('\n'.join(lines), event_type='run_summary', severity='summary')
     except Exception:
         pass
 

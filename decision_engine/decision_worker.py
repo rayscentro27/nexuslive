@@ -57,23 +57,15 @@ def main() -> None:
     # Alert if decisions are piling up waiting for approval
     if len(pending) >= 5:
         try:
-            import json, urllib.request
-            token   = os.getenv('TELEGRAM_BOT_TOKEN', '')
-            chat_id = os.getenv('TELEGRAM_CHAT_ID', '')
-            if token and chat_id:
-                lines = [f"• {d['decision_type']}: {d['action'][:60]}" for d in pending[:5]]
-                msg   = (
-                    f"<b>Nexus Decisions Awaiting Approval</b>\n"
-                    f"{len(pending)} pending decision(s):\n"
-                    + '\n'.join(lines)
-                    + "\n\nUse <code>approve_decision(id)</code> to release."
-                )
-                body = json.dumps({'chat_id': chat_id, 'text': msg, 'parse_mode': 'HTML'}).encode()
-                req  = urllib.request.Request(
-                    f"https://api.telegram.org/bot{token}/sendMessage",
-                    data=body, headers={'Content-Type': 'application/json'},
-                )
-                urllib.request.urlopen(req, timeout=10)
+            from lib.hermes_gate import send as gate_send
+            lines = [f"• {d['decision_type']}: {d['action'][:60]}" for d in pending[:5]]
+            msg = (
+                f"<b>Nexus Decisions Awaiting Approval</b>\n"
+                f"{len(pending)} pending decision(s):\n"
+                + '\n'.join(lines)
+                + "\n\nUse <code>approve_decision(id)</code> to release."
+            )
+            gate_send(msg, event_type='critical_alert', severity='critical')
         except Exception as e:
             logger.warning(f"Telegram alert failed: {e}")
 

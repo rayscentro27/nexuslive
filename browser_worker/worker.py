@@ -45,9 +45,6 @@ logging.basicConfig(
 logger = logging.getLogger("BrowserWorker")
 
 POLL_INTERVAL = 30  # seconds between queue checks
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
-
 SCRIPTED_TASKS = {
     "oracle_check":    "browser_worker.tasks.oracle_check",
     "stripe_check":    "browser_worker.tasks.stripe_check",
@@ -57,23 +54,9 @@ SCRIPTED_TASKS = {
 
 
 def _send_telegram(text: str):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        return
-    import urllib.request
-    data = json.dumps({
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": text,
-        "parse_mode": "HTML",
-    }).encode()
-    req = urllib.request.Request(
-        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
-        data=data, headers={"Content-Type": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=8):
-            pass
-    except Exception as e:
-        logger.warning(f"Telegram failed: {e}")
+    from lib.hermes_gate import send as gate_send
+
+    gate_send(text, event_type="critical_alert", severity="critical")
 
 
 async def run_task(task: dict) -> dict:
@@ -152,7 +135,8 @@ async def process_task(task: dict):
         f"Requested by: {requested_by}\n\n"
         f"{summary[:800]}"
     )
-    _send_telegram(msg)
+    if result.get("status") == "error":
+        _send_telegram(msg)
     logger.info(f"Task {task_id} done — {result.get('status','?')}")
 
 
@@ -160,7 +144,7 @@ async def worker_loop():
     from browser_worker.task_queue import claim_next_task
 
     logger.info("🌐 Browser Worker started — polling every %ds", POLL_INTERVAL)
-    _send_telegram("🌐 <b>Browser Worker started</b>\nReady to execute tasks.")
+    logger.info("Telegram startup notice suppressed by policy")
 
     while True:
         try:

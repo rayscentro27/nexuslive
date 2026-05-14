@@ -214,17 +214,9 @@ def handle_support_request(event_payload: dict) -> dict:
         add_message(thread_id, 'agent', response)
         # Notify human via Telegram
         try:
-            import urllib.request as _ur
-            token   = os.getenv('TELEGRAM_BOT_TOKEN', '')
-            chat_id = os.getenv('TELEGRAM_CHAT_ID', '')
-            if token and chat_id:
-                alert = f"🚨 Support Escalation\nClient: {client_id or lead_id}\nMessage: {message[:200]}"
-                body  = json.dumps({'chat_id': chat_id, 'text': alert}).encode()
-                req   = _ur.Request(
-                    f"https://api.telegram.org/bot{token}/sendMessage",
-                    data=body, headers={'Content-Type': 'application/json'}
-                )
-                _ur.urlopen(req, timeout=10)
+            from lib.hermes_gate import send as gate_send
+            alert = f"🚨 Support Escalation\nClient: {client_id or lead_id}\nMessage: {message[:200]}"
+            gate_send(alert, event_type='critical_alert', severity='critical')
         except Exception:
             pass
     else:

@@ -173,18 +173,8 @@ def _send_response(
     except Exception as e:
         logger.warning(f"Output service unavailable, falling back to direct Telegram: {e}")
         try:
-            import urllib.request
-            token   = os.getenv('TELEGRAM_BOT_TOKEN', '')
-            chat_id = os.getenv('TELEGRAM_CHAT_ID', '')
-            if not token or not chat_id:
-                return
-            body = json.dumps({'chat_id': chat_id, 'text': response_text}).encode()
-            req  = urllib.request.Request(
-                f"https://api.telegram.org/bot{token}/sendMessage",
-                data=body,
-                headers={'Content-Type': 'application/json'},
-            )
-            urllib.request.urlopen(req, timeout=10)
+            from lib.hermes_gate import send_direct_response
+            send_direct_response(response_text, event_type='conversational_reply', parse_mode='HTML')
         except Exception as te:
             logger.error(f"Telegram fallback failed: {te}")
 

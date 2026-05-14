@@ -39,23 +39,12 @@ ALERT_THRESHOLD    = float(os.getenv('HEALTH_ALERT_THRESHOLD', '50'))
 
 def _send_telegram(msg: str) -> None:
     from lib.telegram_notification_policy import should_send_telegram_notification
+    from lib.hermes_gate import send as gate_send
 
     allowed, _ = should_send_telegram_notification("worker_summary")
     if not allowed:
         return
-    try:
-        import urllib.request, urllib.parse, json
-        token   = os.getenv('TELEGRAM_BOT_TOKEN', '')
-        chat_id = os.getenv('TELEGRAM_CHAT_ID', '')
-        if not token or not chat_id:
-            return
-        url  = f"https://api.telegram.org/bot{token}/sendMessage"
-        body = json.dumps({'chat_id': chat_id, 'text': msg, 'parse_mode': 'HTML'}).encode()
-        req  = urllib.request.Request(url, data=body,
-                                      headers={'Content-Type': 'application/json'})
-        urllib.request.urlopen(req, timeout=10)
-    except Exception as e:
-        logger.warning(f"Telegram send failed: {e}")
+    gate_send(msg, event_type='critical_alert', severity='critical')
 
 
 def main() -> None:

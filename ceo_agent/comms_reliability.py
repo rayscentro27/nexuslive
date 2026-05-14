@@ -87,24 +87,25 @@ def _update_log(log_id: str, status: str, retry_count: int = 0,
 
 # ─── Telegram ─────────────────────────────────────────────────────────────────
 
-def _raw_telegram_send(text: str, chat_id: str = '', parse_mode: str = 'HTML') -> bool:
-    cid = chat_id or TELEGRAM_CHAT_ID
-    token = TELEGRAM_BOT_TOKEN
-    if not token or not cid:
+def _raw_telegram_send(text: str, event_type: str = 'critical_alert', user_requested: bool = False) -> bool:
+    from lib.telegram_notification_policy import should_send_telegram_notification
+    from lib.hermes_gate import send as gate_send
+
+    allowed, _ = should_send_telegram_notification(
+        event_type,
+        user_requested=user_requested,
+        conversational=(event_type == 'conversational_reply'),
+        critical=(event_type == 'critical_alert'),
+    )
+    if not allowed:
         return False
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
-    body = json.dumps({'chat_id': cid, 'text': text[:4096], 'parse_mode': parse_mode}).encode()
-    req = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json'})
-    try:
-        with urllib.request.urlopen(req, timeout=10) as _:
-            return True
-    except Exception as e:
-        logger.warning(f"Telegram raw send: {e}")
-        return False
+    severity = 'critical' if event_type == 'critical_alert' else 'default'
+    return bool(gate_send(text, event_type=event_type, severity=severity))
 
 
 def send_telegram(text: str, subject: str = '', chat_id: str = '',
-                  idempotency_key: str = '') -> bool:
+                  idempotency_key: str = '', event_type: str = 'critical_alert',
+                  user_requested: bool = False) -> bool:
     """Send Telegram message with idempotency and logging."""
     recipient = chat_id or TELEGRAM_CHAT_ID
     idem_key = idempotency_key or _make_idempotency_key('telegram', recipient, subject, text)
@@ -113,7 +114,7 @@ def send_telegram(text: str, subject: str = '', chat_id: str = '',
         logger.debug(f"Telegram message already sent: {idem_key}")
         return True
 
-    success = _raw_telegram_send(text, chat_id=recipient)
+    success = _raw_telegram_send(text, event_type=event_type, user_requested=user_requested)
     status = 'sent' if success else 'failed'
     _log_send('telegram', recipient, subject, text[:300], idem_key, status=status)
 
@@ -187,7 +188,7 @@ def process_retry_queue() -> dict:
 
         if channel == 'telegram':
             body = r.get('body_preview', '')
-            ok = _raw_telegram_send(body, chat_id=r.get('recipient', ''))
+            ok = _raw_telegram_send(body, event_type='critical_alert', user_requested=False)
         else:
             ok = False
             try:

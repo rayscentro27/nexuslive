@@ -48,15 +48,14 @@ logger = logging.getLogger('StrategyLab')
 # ── Telegram notification ─────────────────────────────────────────────────────
 
 def _notify(text: str):
-    if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
-        return
     try:
-        import requests
-        requests.post(
-            f'https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage',
-            json={'chat_id': settings.TELEGRAM_CHAT_ID, 'text': text, 'parse_mode': 'Markdown'},
-            timeout=10,
-        )
+        from lib.telegram_notification_policy import should_send_telegram_notification
+        from lib.hermes_gate import send as gate_send
+
+        allowed, _ = should_send_telegram_notification('run_summary')
+        if not allowed:
+            return
+        gate_send(text, event_type='run_summary', severity='summary')
     except Exception:
         pass
 

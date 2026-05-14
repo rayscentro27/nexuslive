@@ -62,22 +62,13 @@ VALID_TYPES = ['instagram_reel', 'tiktok_short', 'youtube_short', 'youtube_train
 # ── Telegram alert ────────────────────────────────────────────────────────────
 
 def _send_telegram(message: str):
-    import urllib.request, urllib.parse
-    token = os.environ.get('TELEGRAM_BOT_TOKEN', '')
-    chat_id = os.environ.get('TELEGRAM_CHAT_ID', '')
-    if not token or not chat_id:
+    from lib.telegram_notification_policy import should_send_telegram_notification
+    from lib.hermes_gate import send as gate_send
+
+    allowed, _ = should_send_telegram_notification('worker_summary')
+    if not allowed:
         return
-    try:
-        payload = json.dumps({'chat_id': chat_id, 'text': message, 'parse_mode': 'HTML'}).encode()
-        req = urllib.request.Request(
-            f'https://api.telegram.org/bot{token}/sendMessage',
-            data=payload,
-            headers={'Content-Type': 'application/json'},
-            method='POST',
-        )
-        urllib.request.urlopen(req, timeout=10)
-    except Exception:
-        pass
+    gate_send(message, event_type='worker_summary', severity='summary')
 
 
 # ── Single content run ────────────────────────────────────────────────────────

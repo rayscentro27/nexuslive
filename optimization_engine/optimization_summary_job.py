@@ -35,20 +35,12 @@ LOOKBACK_DAYS       = int(os.getenv('OPT_LOOKBACK_DAYS', '7'))
 
 def _send_telegram(text: str) -> None:
     from lib.telegram_notification_policy import should_send_telegram_notification
+    from lib.hermes_gate import send as gate_send
 
     allowed, _ = should_send_telegram_notification("worker_summary")
     if not allowed:
         return
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        return
-    url  = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    body = json.dumps({'chat_id': TELEGRAM_CHAT_ID, 'text': text, 'parse_mode': 'HTML'}).encode()
-    req  = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json'})
-    try:
-        with urllib.request.urlopen(req, timeout=10) as _:
-            pass
-    except Exception as e:
-        logger.warning(f"Telegram: {e}")
+    gate_send(text, event_type="worker_summary", severity="summary")
 
 
 def _store_metric(metric_type: str, value: float, meta: Optional[dict] = None) -> None:
