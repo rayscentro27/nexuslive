@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { shouldSendTelegram } from "../lib/telegram_spam_guard.js";
+import { shouldSendTelegramNotification } from "../lib/telegram_notification_policy.js";
 
 // ── SAFETY GUARD ──────────────────────────────────────────────────────────────
 // RESEARCH ONLY. No trading, no broker connections. Notification only.
@@ -14,6 +15,11 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
  * @param {Array<{transcript, classification, extracted}>} results
  */
 export async function sendIngestionAlert(results) {
+  const policy = shouldSendTelegramNotification("ingestion_summary");
+  if (!policy.ok) {
+    console.log(`[telegram-ingestion] Policy denied: ${policy.reason}`);
+    return;
+  }
   if ((process.env.TELEGRAM_RESEARCH_ALERTS_ENABLED || "false") !== "true") {
     console.log("[telegram-ingestion] TELEGRAM_RESEARCH_ALERTS_ENABLED=false — suppressed.");
     return;

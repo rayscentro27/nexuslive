@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { shouldSendTelegram } from "../lib/telegram_spam_guard.js";
+import { shouldSendTelegramNotification } from "../lib/telegram_notification_policy.js";
 
 // ── SAFETY GUARD ──────────────────────────────────────────────────────────────
 // RESEARCH ONLY. No trading, no broker connections.
@@ -19,6 +20,11 @@ const RESEARCH_ALERTS_ENABLED =
  * @returns {Promise<boolean>} true if sent successfully
  */
 async function sendTelegramMessage(text) {
+  const policy = shouldSendTelegramNotification("research_summary");
+  if (!policy.ok) {
+    console.log(`[telegram-research-alert] Policy denied: ${policy.reason}`);
+    return false;
+  }
   if (!RESEARCH_ALERTS_ENABLED) {
     console.log("[telegram-research-alert] TELEGRAM_RESEARCH_ALERTS_ENABLED=false — suppressed.");
     return false;

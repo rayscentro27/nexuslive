@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { shouldSendTelegram } from "../lib/telegram_spam_guard.js";
+import { shouldSendTelegramNotification } from "../lib/telegram_notification_policy.js";
 
 // ── SAFETY GUARD ──────────────────────────────────────────────────────────────
 // This module is RESEARCH ONLY. Sends research desk alerts to Telegram.
@@ -10,6 +11,11 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 async function sendTelegramMessage(text) {
+  const policy = shouldSendTelegramNotification("research_summary");
+  if (!policy.ok) {
+    console.log(`[telegram] Policy denied: ${policy.reason}`);
+    return;
+  }
   if ((process.env.TELEGRAM_RESEARCH_ALERTS_ENABLED || "false") !== "true") {
     console.log("[telegram] TELEGRAM_RESEARCH_ALERTS_ENABLED=false — suppressed.");
     return;
