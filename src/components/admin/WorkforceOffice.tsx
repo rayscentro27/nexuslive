@@ -248,6 +248,10 @@ export function WorkforceOffice() {
   const warnWorkers = departments.reduce((s, d) => s + d.workers.filter(w => w.state === 'warning' || w.state === 'offline').length, 0);
   const researchingCount = tickets.filter(t => t.status === 'researching').length;
   const reviewCount = tickets.filter(t => t.status === 'needs_review').length;
+  const overdueCount = tickets.filter(t => {
+    const age = (Date.now() - new Date(t.created_at).getTime()) / 3600000;
+    return age > 24 && ['submitted', 'queued', 'researching'].includes(t.status);
+  }).length;
 
   const PANELS = [
     { id: 'workforce' as const, label: 'Workforce', icon: Brain, count: activeWorkers },
@@ -294,7 +298,7 @@ export function WorkforceOffice() {
             { label: 'Active', value: activeWorkers, color: '#22c55e', bg: '#f0fdf4' },
             { label: 'Researching', value: researchingCount, color: '#7c3aed', bg: '#f5f3ff' },
             { label: 'Review Ready', value: reviewCount, color: reviewCount > 0 ? '#f59e0b' : '#9ca3af', bg: reviewCount > 0 ? '#fffbeb' : '#f9fafb' },
-            { label: 'Attention', value: warnWorkers, color: warnWorkers > 0 ? '#ef4444' : '#9ca3af', bg: warnWorkers > 0 ? '#fef2f2' : '#f9fafb' },
+            { label: 'Overdue', value: overdueCount, color: overdueCount > 0 ? '#ef4444' : '#9ca3af', bg: overdueCount > 0 ? '#fef2f2' : '#f9fafb' },
             { label: 'Opportunities', value: oppsCount, color: '#7c3aed', bg: '#f5f3ff' },
           ].map(s => (
             <div key={s.label} style={{
@@ -523,10 +527,11 @@ export function WorkforceOffice() {
         marginTop: 16, padding: '8px 12px', borderRadius: 10,
         background: '#f0fdf4', border: '1px solid #bbf7d0',
         display: 'flex', alignItems: 'center', gap: 7,
+        flexWrap: 'wrap',
       }}>
         <Shield size={12} color="#16a34a" />
         <p style={{ fontSize: 10, color: '#16a34a', fontWeight: 700, margin: 0 }}>
-          DRY_RUN=true · LIVE_TRADING=false · No broker execution · No auto social
+          DRY_RUN=true · LIVE_TRADING=false · DEMO trading only · No broker execution · No auto social
         </p>
       </div>
     </div>

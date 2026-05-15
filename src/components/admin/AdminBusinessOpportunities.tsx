@@ -115,11 +115,20 @@ export function AdminBusinessOpportunities() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filtered.length > 0 ? filtered.map(opp => (
+                {filtered.length > 0 ? filtered.map(opp => {
+                  const isAiDetected = opp.type === 'ai_detected';
+                  return (
                   <tr key={opp.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div>
-                        <p className="text-xs font-bold text-[#1A2244]">{opp.title}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-[#1A2244]">{opp.title}</p>
+                          {isAiDetected && (
+                            <span className="text-[7px] font-black bg-pink-50 text-pink-600 px-1.5 py-0.5 rounded uppercase tracking-wider flex-shrink-0">
+                              🤖 AI
+                            </span>
+                          )}
+                        </div>
                         {opp.description && <p className="text-[9px] text-slate-400 mt-0.5 truncate max-w-[200px]">{opp.description}</p>}
                       </div>
                     </td>
@@ -128,7 +137,18 @@ export function AdminBusinessOpportunities() {
                         {opp.type.replace('_', ' ')}
                       </span>
                     </td>
-                    <td className="px-6 py-4"><span className="text-xs font-black text-green-600">{fmtRange(opp.value_min, opp.value_max)}</span></td>
+                    <td className="px-6 py-4">
+                      <div>
+                        <span className="text-xs font-black text-green-600">{fmtRange(opp.value_min, opp.value_max)}</span>
+                        {(opp.value_max ?? 0) > 0 && (
+                          <div className="mt-1 h-0.5 bg-slate-100 rounded-full w-16 overflow-hidden">
+                            <div className="h-full bg-green-400 rounded-full" style={{
+                              width: `${Math.min(100, ((opp.value_max ?? 0) / 500000) * 100)}%`
+                            }} />
+                          </div>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-6 py-4"><span className="text-xs text-slate-400">{opp.deadline ? new Date(opp.deadline).toLocaleDateString() : '—'}</span></td>
                     <td className="px-6 py-4">
                       <span className={cn("px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest",
@@ -142,7 +162,8 @@ export function AdminBusinessOpportunities() {
                       </span>
                     </td>
                   </tr>
-                )) : (
+                  );
+                }) : (
                   <tr><td colSpan={6} className="px-6 py-12 text-center">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{search ? 'No matches' : 'No opportunities yet'}</p>
                     {!search && <p className="text-xs text-slate-400 mt-1">Click "Add Opportunity" to create your first one</p>}
