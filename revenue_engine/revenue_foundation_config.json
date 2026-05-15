@@ -1,0 +1,113 @@
+{
+  "version": "2026-05-15",
+  "read_only": true,
+  "newsletter": {
+    "provider": "beehiiv",
+    "name": "Nexus Funding Intelligence",
+    "publish_cadence": "weekly",
+    "topic_planner": [
+      "Small business funding updates",
+      "Business credit wins and mistakes",
+      "Grant opportunity snapshots",
+      "AI operations playbooks",
+      "Tool stack comparisons"
+    ],
+    "weekly_content_queue": [
+      {
+        "topic": "Funding readiness diagnostics",
+        "status": "planned",
+        "owner": "hermes",
+        "channel": "newsletter"
+      },
+      {
+        "topic": "Credit utilization improvement tactics",
+        "status": "planned",
+        "owner": "nova",
+        "channel": "newsletter"
+      }
+    ],
+    "sponsorship_readiness": {
+      "status": "placeholder",
+      "notes": "Activate once subscriber and open-rate thresholds are established."
+    }
+  },
+  "affiliate_offers": [
+    {"partner": "Bizee", "category": "business_formation", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "LegalZoom", "category": "business_formation", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Northwest Registered Agent", "category": "business_formation", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Novo", "category": "business_banking", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Bluevine", "category": "business_banking", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Relay", "category": "business_banking", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "SmartCredit", "category": "credit_monitoring", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "IdentityIQ", "category": "credit_monitoring", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Namecheap", "category": "domains", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Google Workspace", "category": "productivity", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Hostinger", "category": "hosting", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "OpenAI", "category": "ai_tools", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Anthropic", "category": "ai_tools", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Perplexity", "category": "ai_tools", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Notion", "category": "productivity", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "ClickUp", "category": "productivity", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Zapier", "category": "automation", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Make", "category": "automation", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Canva", "category": "creative", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Gumroad", "category": "digital_products", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"},
+    {"partner": "Payhip", "category": "digital_products", "tracking_id": "AFFILIATE_ID_PLACEHOLDER", "tracking_url": "TRACKING_URL_PLACEHOLDER", "status": "planned"}
+  ],
+  "lead_magnets": [
+    {"name": "Business Funding Readiness Checklist", "status": "draft", "format": "pdf"},
+    {"name": "Top 25 AI Tools to Start an Online Business", "status": "draft", "format": "pdf"},
+    {"name": "AI Business Automation Starter Guide", "status": "draft", "format": "pdf"},
+    {"name": "Business Credit Vendor Starter Pack", "status": "draft", "format": "pdf"}
+  ],
+  "ai_mini_tools": [
+    {"name": "Funding Readiness Score", "status": "roadmap", "surface": "web"},
+    {"name": "Credit Utilization Optimizer", "status": "roadmap", "surface": "web"},
+    {"name": "Grant Opportunity Summarizer", "status": "roadmap", "surface": "web"},
+    {"name": "AI Business Idea Generator", "status": "roadmap", "surface": "web"}
+  ],
+  "digital_products": [
+    {"name": "AI Employee Prompt Pack", "status": "outline"},
+    {"name": "Business Funding Starter Kit", "status": "outline"},
+    {"name": "AI Automation Blueprint", "status": "outline"}
+  ],
+  "nexus_waitlist": {
+    "status": "planned",
+    "source": "nexus launch funnel",
+    "capture_fields": ["email", "business_stage", "primary_goal", "interest_area"]
+  },
+  "landing_page_experiments": [
+    {"name": "Funding Readiness CTA", "status": "planned"},
+    {"name": "Credit Builder CTA", "status": "planned"},
+    {"name": "AI Automation CTA", "status": "planned"}
+  ],
+  "recommendation_rules": [
+    {
+      "rule_id": "funding-path",
+      "keywords": ["funding", "loan", "capital", "line of credit", "sba", "cdfi"],
+      "affiliate_partner": "Bluevine",
+      "lead_magnet": "Business Funding Readiness Checklist",
+      "newsletter_topic": "Funding readiness diagnostics",
+      "mini_tool": "Funding Readiness Score",
+      "landing_page_experiment": "Funding Readiness CTA"
+    },
+    {
+      "rule_id": "credit-growth",
+      "keywords": ["credit", "utilization", "tradeline", "score"],
+      "affiliate_partner": "SmartCredit",
+      "lead_magnet": "Business Credit Vendor Starter Pack",
+      "newsletter_topic": "Credit utilization improvement tactics",
+      "mini_tool": "Credit Utilization Optimizer",
+      "landing_page_experiment": "Credit Builder CTA"
+    },
+    {
+      "rule_id": "automation-build",
+      "keywords": ["automation", "workflow", "ai tool", "agency", "operations"],
+      "affiliate_partner": "Zapier",
+      "lead_magnet": "AI Business Automation Starter Guide",
+      "newsletter_topic": "AI automation build stacks",
+      "mini_tool": "AI Business Idea Generator",
+      "landing_page_experiment": "AI Automation CTA"
+    }
+  ]
+}

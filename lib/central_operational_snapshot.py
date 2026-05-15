@@ -5,6 +5,9 @@ from datetime import datetime, timezone
 import os
 from typing import Any
 
+from revenue_engine.revenue_foundation import build_revenue_dashboard_stub
+from lib.autonomous_demo_trading_lab import build_demo_status_snapshot
+
 
 def build_central_operational_snapshot(*, rest_select, model_preview: list[dict] | None = None) -> dict[str, Any]:
     """Build a read-only, centralized operational snapshot payload."""
@@ -172,6 +175,8 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
     sim_enabled = str(os.getenv("SIMULATED_TRADING_ENABLED", "false")).lower() in {"1", "true", "yes", "on"}
     auto_paper_enabled = str(os.getenv("AUTONOMOUS_PAPER_TRADING", "false")).lower() in {"1", "true", "yes", "on"}
     sim_mode_enabled = str(os.getenv("TRADING_SIMULATION_MODE", "false")).lower() in {"1", "true", "yes", "on"}
+    revenue_stub = build_revenue_dashboard_stub()
+    demo_status = build_demo_status_snapshot()
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -259,6 +264,8 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
             "active_count": experiment_status.get("running", 0) + experiment_status.get("queued", 0),
             "recent": experiment_rows[:12],
         },
+        "revenue_engine": revenue_stub,
+        "autonomous_demo_trading": demo_status,
         "worker_activity": {
             "recent_events": recent_activity,
             "feature_counts": dict(event_features),

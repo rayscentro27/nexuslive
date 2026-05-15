@@ -24,6 +24,13 @@ from collections import Counter
 
 from .env_loader import load_nexus_env
 from .nexus_semantic_concepts import expand_query, detect_hype, get_related_concepts
+from revenue_engine.revenue_foundation import suggest_revenue_bundle
+from .autonomous_demo_trading_lab import (
+    build_demo_status_snapshot,
+    last_losing_trade_lesson,
+    pause_demo_trading,
+    resume_demo_trading,
+)
 
 load_nexus_env()
 
@@ -443,7 +450,10 @@ def _handle_retrieval_query(text: str) -> str | None:
                 name = r.get("opportunity_name", "")
                 cat = r.get("category", "")
                 opp_score = r.get("opportunity_score", 0)
-                items.append(f"• {name} ({cat}) — score {opp_score}/100")
+                bundle = suggest_revenue_bundle(str(name), str(cat))
+                items.append(
+                    f"• {name} ({cat}) — score {opp_score}/100 | affiliate: {bundle['affiliate_partner']} | lead magnet: {bundle['lead_magnet']}"
+                )
             return "Nexus validated opportunities:\n" + "\n".join(items)
         return "No Nexus validated opportunities found yet. Run the opportunity worker to score your profile."
 
@@ -657,6 +667,47 @@ def _handle_retrieval_query(text: str) -> str | None:
                 parts.append(f"{len(active)} actively being researched right now.")
             return "\n".join(parts)
         return "No active opportunity validation tickets. Ask me to research a specific opportunity and I'll open a ticket."
+
+    if "what is sage trading in demo" in t:
+        snap = build_demo_status_snapshot()
+        return (
+            "Sage demo status (DEMO / PAPER ONLY):\n"
+            f"• Active demo trades: {snap.get('active_demo_trades', 0)}\n"
+            f"• Daily PnL: {snap.get('daily_demo_pnl', 0)}\n"
+            f"• Kill switch: {'ON' if snap.get('kill_switch') else 'OFF'}"
+        )
+
+    if "how did demo trading perform today" in t:
+        snap = build_demo_status_snapshot()
+        wl = snap.get("daily_win_loss") or {}
+        return (
+            "Demo trading performance today:\n"
+            f"• PnL: {snap.get('daily_demo_pnl', 0)}\n"
+            f"• Wins/Losses: {wl.get('wins', 0)}/{wl.get('losses', 0)}\n"
+            f"• Active demo trades: {snap.get('active_demo_trades', 0)}"
+        )
+
+    if "what did hermes learn from the last losing trade" in t:
+        return "Latest losing-trade lesson:\n" + last_losing_trade_lesson()
+
+    if "pause demo trading" in t:
+        pause_demo_trading(actor="hermes")
+        return "Demo trading paused. Real-money trading remains disabled."
+
+    if "resume demo trading" in t:
+        resume_demo_trading(actor="hermes")
+        return "Demo trading resumed. Real-money trading remains disabled."
+
+    if "show demo trading risk status" in t:
+        snap = build_demo_status_snapshot()
+        risk = snap.get("risk_status") or {}
+        return (
+            "Demo trading risk status (DEMO / PAPER ONLY):\n"
+            f"• Max concurrent trades: {risk.get('max_concurrent_demo_trades')}\n"
+            f"• Max trades/day: {risk.get('max_trades_per_day')}\n"
+            f"• Max daily drawdown: {risk.get('max_daily_demo_drawdown')}\n"
+            f"• Kill switch: {'ON' if snap.get('kill_switch') else 'OFF'}"
+        )
 
     if "ingestion operations" in t or "ingestion status" in t:
         return summarize_ingestion_operations(limit=50)
