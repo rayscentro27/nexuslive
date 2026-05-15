@@ -48,12 +48,15 @@ from .nexus_youtube_ops import (
     recommend_revenue_tieins as yt_recommend_revenue_tieins,
 )
 from .hermes_roadmap_intelligence import (
+    add_lesson,
     assign_task_to_worker,
     highest_priority_tasks,
+    momentum_view,
     next_steps,
     roadmap_summary,
     systems_weaknesses,
     tester_readiness_view,
+    travel_summary,
     update_task_status,
 )
 
@@ -101,6 +104,9 @@ _KNOWLEDGE_TRIGGERS: list[str] = [
     "what should opencode do", "what should claude code review", "what systems are weak",
     "how ready are we for testers", "what should we improve tonight", "summarize nexus progress",
     "show updated roadmap",
+    "catch me up", "where are we", "travel update", "what's happening", "what is happening",
+    "are we on track", "how is nexus performing",
+    "record lesson", "note lesson", "log lesson", "remember this lesson",
 ]
 
 # Topics that map to AI employee roles
@@ -151,6 +157,18 @@ _OPERATIONAL_ONLY_PATTERNS: list[str] = [
     "did nexus process the latest playlist",
     "ingestion status",
     "ingestion operations",
+    "catch me up",
+    "where are we",
+    "travel update",
+    "what's happening",
+    "what is happening",
+    "are we on track",
+    "how is nexus performing",
+    "summarize nexus progress",
+    "show roadmap",
+    "what should we work on",
+    "what are the next 20 steps",
+    "what systems are weak",
 ]
 
 # Content strings that indicate an empty/null knowledge auto-generated result
@@ -548,21 +566,39 @@ def _handle_retrieval_query(text: str) -> str | None:
         steps = next_steps(limit=5)
         if not steps:
             return "Roadmap is empty right now. Seed tasks first and I will prioritize them."
-        lines = ["Top next steps:"]
+        summary = roadmap_summary()
+        counts = summary.get("status_counts") or {}
+        lines = [
+            f"Here's where we stand — {counts.get('active', 0)} active, {counts.get('queued', 0)} queued, {counts.get('completed', 0)} done.",
+            "Top next steps:",
+        ]
         for s in steps:
-            lines.append(f"• Task {s.get('id')}: {s.get('title')} ({s.get('category')}) — priority {s.get('priority_score')}")
+            why = str(s.get("why_it_matters") or "").strip()
+            why_part = f" — {why[:60]}" if why else ""
+            worker = str(s.get("recommended_worker") or "").replace("_", " ")
+            worker_part = f" [{worker}]" if worker else ""
+            lines.append(f"• {s.get('title')}{worker_part}{why_part}")
+        lines.append("Ask me for 'next 20 steps' for the full priority list.")
         return "\n".join(lines)
 
     if "what are the next 20 steps" in t:
         steps = next_steps(limit=20)
-        lines = ["Next 20 roadmap steps:"]
-        for s in steps:
-            lines.append(f"• {s.get('id')}. {s.get('title')} [{s.get('status')}]")
+        summary = roadmap_summary()
+        counts = summary.get("status_counts") or {}
+        lines = [
+            f"Full roadmap — {counts.get('active', 0)} active · {counts.get('queued', 0)} queued · {counts.get('blocked', 0)} blocked · {counts.get('completed', 0)} done.",
+            "",
+        ]
+        for i, s in enumerate(steps, 1):
+            status_icon = {"active": "🔵", "queued": "⬜", "blocked": "🔴", "paused": "⏸️", "review": "👁️"}.get(str(s.get("status") or "queued"), "⬜")
+            lines.append(f"{status_icon} {i}. {s.get('title')} (P{s.get('priority_score')})")
         return "\n".join(lines)
 
     if "show highest priority tasks" in t:
         rows = highest_priority_tasks(limit=8)
-        return "Highest priority tasks:\n" + "\n".join(f"• {r.get('id')}: {r.get('title')} ({r.get('priority_score')})" for r in rows)
+        return "Highest priority tasks:\n" + "\n".join(
+            f"• P{r.get('priority_score')}: {r.get('title')} [{r.get('status')}]" for r in rows
+        )
 
     if "hermes do task" in t:
         m = re.search(r"task\s+(\d+)", t)
@@ -589,9 +625,21 @@ def _handle_retrieval_query(text: str) -> str | None:
     if "what did we learn" in t:
         summary = roadmap_summary()
         lessons = summary.get("lessons") or []
+        top = next_steps(limit=3)
         if not lessons:
-            return "No roadmap lessons recorded yet."
-        return "Recent lessons:\n" + "\n".join(f"• {l.get('note') or l}" for l in lessons[-5:])
+            learned = "No roadmap lessons recorded yet."
+        else:
+            learned = "Recent lessons:\n" + "\n".join(f"• {l.get('note') or l}" for l in lessons[-5:])
+        if top:
+            learned += f"\n\nBased on this, your top focus should be: {top[0].get('title')}."
+        return learned
+
+    if any(k in t for k in ["record lesson", "note lesson", "log lesson", "remember this lesson"]):
+        note = re.sub(r"^(record lesson|note lesson|log lesson|remember this lesson)[:\s]*", "", t, flags=re.I).strip()
+        if not note:
+            return "Tell me the lesson to record, e.g.: 'record lesson — always gate ingestion writes with env flags.'"
+        entry = add_lesson(note)
+        return f"Lesson recorded: '{entry['note']}'. I'll include this in future roadmap summaries."
 
     if "what's blocking progress" in t or "what is blocking progress" in t:
         blocked = [r for r in next_steps(limit=20) if str(r.get("status") or "") == "blocked"]
@@ -610,8 +658,13 @@ def _handle_retrieval_query(text: str) -> str | None:
     if "what systems are weak" in t:
         weak = systems_weaknesses(limit=6)
         if not weak:
-            return "No weak systems are flagged from roadmap state right now."
-        return "Weak systems to address:\n" + "\n".join(f"• {w.get('category')}: {w.get('title')} ({w.get('status')})" for w in weak)
+            return "No weak systems are flagged from roadmap state right now. Good sign — everything that was blocked has been addressed or de-prioritized."
+        lines = ["Weak / blocked systems:"]
+        for w in weak:
+            suggested = str(w.get("next_suggested_discussion") or "").strip()[:80]
+            remedy = f" → {suggested}" if suggested else ""
+            lines.append(f"• [{w.get('category')}] {w.get('title')} ({w.get('status')}){remedy}")
+        return "\n".join(lines)
 
     if "how ready are we for testers" in t:
         view = tester_readiness_view()
@@ -627,11 +680,52 @@ def _handle_retrieval_query(text: str) -> str | None:
     if "summarize nexus progress" in t:
         s = roadmap_summary()
         c = s.get("status_counts") or {}
+        total = s.get("total_tasks") or 1
+        done = c.get("completed", 0)
+        pct = round(done / total * 100)
+        lessons = s.get("lessons") or []
+        top = (s.get("top_priorities") or [])[:1]
+        lines = [
+            f"Nexus progress: {done}/{total} tasks complete ({pct}%)",
+            f"Active: {c.get('active', 0)} · Queued: {c.get('queued', 0)} · Blocked: {c.get('blocked', 0)} · Done: {done}",
+        ]
+        if top:
+            lines.append(f"Highest priority right now: {top[0].get('title')} (P{top[0].get('priority_score')})")
+        if lessons:
+            last = lessons[-1]
+            note = (last.get("note") or str(last))[:80]
+            lines.append(f"Last recorded lesson: {note}")
+        lines.append("Ask me 'next 20 steps', 'what systems are weak', or 'what should opencode do' for specific guidance.")
+        return "\n".join(lines)
+
+    if any(k in t for k in ["catch me up", "where are we", "travel update", "what's happening", "what is happening"]):
+        base = travel_summary()
+        proposed_k = _supabase_get("knowledge_items", {"select": "id", "status": "eq.proposed", "limit": "5"})
+        review_t = _supabase_get("research_requests", {"select": "id", "status": "eq.needs_review", "limit": "5"})
+        lines = [base]
+        actions = []
+        if proposed_k:
+            actions.append(f"• {len(proposed_k)} knowledge record(s) need your approval")
+        if review_t:
+            actions.append(f"• {len(review_t)} research ticket(s) ready to review")
+        if actions:
+            lines.append("\nAction needed:")
+            lines.extend(actions)
+        lines.append("\nAsk 'what should I focus on today' for priorities.")
+        return "\n".join(lines)
+
+    if "are we on track" in t or "how is nexus performing" in t:
+        s = roadmap_summary()
+        c = s.get("status_counts") or {}
+        total = max(s.get("total_tasks") or 1, 1)
+        done = c.get("completed", 0)
+        blocked = c.get("blocked", 0)
+        pct = round(done / total * 100)
+        health = "healthy" if blocked == 0 else f"{blocked} item(s) blocked"
         return (
-            "Nexus progress snapshot:\n"
-            f"• Total roadmap tasks: {s.get('total_tasks')}\n"
-            f"• Active: {c.get('active', 0)} | Queued: {c.get('queued', 0)} | Blocked: {c.get('blocked', 0)} | Completed: {c.get('completed', 0)}\n"
-            "• Ask me for next 20 steps or worker-specific priorities."
+            f"Nexus is {health} — {pct}% of roadmap tasks complete.\n"
+            f"Active: {c.get('active', 0)} · Queued: {c.get('queued', 0)} · Blocked: {blocked} · Done: {done}\n"
+            "No real-money trading. Research, ingestion, and demo learning are all within safe bounds."
         )
 
     if "send this to opencode" in t:

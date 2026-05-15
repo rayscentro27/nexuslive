@@ -117,3 +117,76 @@ def tester_readiness_view() -> dict[str, Any]:
         "tester_readiness_percent": round((done / max(1, len(tester))) * 100, 2),
         "next_tester_priorities": sorted(tester, key=lambda x: int(x.get("priority_score") or 0), reverse=True)[:5],
     }
+
+
+def travel_summary() -> str:
+    """Compact travel-mode digest — designed for reading on a phone."""
+    data = load_roadmap()
+    tasks = data.get("tasks") or []
+    counts: dict[str, int] = {}
+    for t in tasks:
+        s = str(t.get("status") or "queued")
+        counts[s] = counts.get(s, 0) + 1
+
+    total = len(tasks)
+    done = counts.get("completed", 0)
+    pct = round(done / max(1, total) * 100)
+    top3 = sorted(
+        [t for t in tasks if str(t.get("status") or "queued") in {"queued", "active"}],
+        key=lambda x: int(x.get("priority_score") or 0),
+        reverse=True,
+    )[:3]
+    blocked = [t for t in tasks if str(t.get("status") or "") == "blocked"]
+    lessons = (data.get("lessons") or [])[-1:]
+
+    lines = [
+        f"📍 Nexus status: {pct}% complete ({done}/{total} tasks)",
+        f"Active: {counts.get('active', 0)} · Queued: {counts.get('queued', 0)} · Blocked: {len(blocked)}",
+        "",
+    ]
+    if top3:
+        lines.append("Top priorities:")
+        for t in top3:
+            lines.append(f"• {t.get('title')}")
+    if blocked:
+        lines.append(f"\n⚠️ Blocked: {blocked[0].get('title')}" + (f" (+{len(blocked)-1} more)" if len(blocked) > 1 else ""))
+    if lessons:
+        note = (lessons[0].get("note") or str(lessons[0]))[:80]
+        lines.append(f"\nLast lesson: {note}")
+    lines.append("\nSafety: DRY_RUN=true · LIVE_TRADING=false · No broker execution")
+    return "\n".join(lines)
+
+
+def add_lesson(note: str) -> dict[str, Any]:
+    """Record a learning or observation to the roadmap."""
+    data = load_roadmap()
+    lessons = data.get("lessons") or []
+    entry: dict[str, Any] = {"note": note[:300], "recorded_at": _now()}
+    lessons.append(entry)
+    data["lessons"] = lessons[-50:]  # keep last 50
+    save_roadmap(data)
+    return entry
+
+
+def momentum_view() -> dict[str, Any]:
+    """Returns velocity indicators — tasks completed recently, active vs blocked ratio."""
+    data = load_roadmap()
+    tasks = data.get("tasks") or []
+    counts: dict[str, int] = {}
+    for t in tasks:
+        s = str(t.get("status") or "queued")
+        counts[s] = counts.get(s, 0) + 1
+    total = max(len(tasks), 1)
+    active = counts.get("active", 0)
+    blocked = counts.get("blocked", 0)
+    done = counts.get("completed", 0)
+    health = "healthy" if blocked == 0 else "degraded" if blocked <= 2 else "needs attention"
+    return {
+        "total_tasks": total,
+        "completed": done,
+        "active": active,
+        "blocked": blocked,
+        "completion_pct": round(done / total * 100),
+        "health": health,
+        "momentum": "strong" if active > blocked else "mixed" if active >= blocked else "blocked",
+    }

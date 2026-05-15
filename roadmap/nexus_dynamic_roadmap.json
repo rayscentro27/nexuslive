@@ -1,9 +1,13 @@
 {
-  "updated_at": "2026-05-15T15:47:32.167824+00:00",
+  "updated_at": "2026-05-15T16:12:46.091237+00:00",
   "lessons": [
     {
       "created_at": "2026-05-15T00:00:00+00:00",
       "note": "Reliability and conversational continuity drive operator trust while traveling."
+    },
+    {
+      "note": "Test lesson: verify the lesson recording works correctly",
+      "recorded_at": "2026-05-15T16:12:46.091188+00:00"
     }
   ],
   "tasks": [
