@@ -37,6 +37,14 @@ interface CentralSnapshot {
   tickets?: { total?: number };
   warnings?: string[];
   scheduler_health?: { status_counts?: Record<string, number> };
+  paper_trading?: {
+    autonomous_paper_trading?: boolean;
+    simulated_trading_enabled?: boolean;
+    trading_simulation_mode?: boolean;
+    outcomes_recent?: number;
+    win_rate?: number;
+    max_drawdown?: number;
+  };
 }
 
 function timeAgo(ts: string): string {
@@ -146,6 +154,12 @@ export function WorkforceOffice() {
     const warnings = centralSnapshot?.warnings || [];
     const schedulerFailed = centralSnapshot?.scheduler_health?.status_counts?.failed || 0;
     const grantCount = centralSnapshot?.grants?.recent_count || 0;
+    const paperTradingActive = Boolean(
+      centralSnapshot?.paper_trading?.autonomous_paper_trading
+      || centralSnapshot?.paper_trading?.simulated_trading_enabled
+      || centralSnapshot?.paper_trading?.trading_simulation_mode
+    );
+    const paperOutcomes = centralSnapshot?.paper_trading?.outcomes_recent || 0;
     const envDemo = ((import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_NEXUS_DEMO_MODE || 'false').toLowerCase();
     const isDemoMode = envDemo === '1' || envDemo === 'true' || envDemo === 'yes' || envDemo === 'on';
     setDemoSimulated(isDemoMode);
@@ -155,6 +169,8 @@ export function WorkforceOffice() {
       schedulerFailed,
       warnings,
       demoMode: isDemoMode,
+      paperTradingActive,
+      paperOutcomes,
     }));
     setLastRefresh(new Date().toISOString());
     setLoading(false);
@@ -238,6 +254,7 @@ export function WorkforceOffice() {
                 { label: 'Review Ready', value: reviewCount, color: reviewCount > 0 ? '#f59e0b' : '#9ca3af', bg: reviewCount > 0 ? '#fffbeb' : '#f9fafb' },
                 { label: 'Attention', value: warnWorkers, color: warnWorkers > 0 ? '#ef4444' : '#9ca3af', bg: warnWorkers > 0 ? '#fef2f2' : '#f9fafb' },
                 { label: 'Queue Pressure', value: snapshot?.ingestion?.ingestion_pressure || 0, color: '#2563eb', bg: '#eff6ff' },
+                { label: 'Sim Win Rate', value: `${Math.round(snapshot?.paper_trading?.win_rate || 0)}%`, color: '#0ea5e9', bg: '#ecfeff' },
                 { label: 'Opportunities', value: oppsCount, color: '#7c3aed', bg: '#f5f3ff' },
                 { label: 'Grants', value: snapshot?.grants?.recent_count || 0, color: '#0f766e', bg: '#ecfeff' },
               ].map(s => (

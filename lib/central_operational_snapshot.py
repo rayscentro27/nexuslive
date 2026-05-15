@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timezone
+import os
 from typing import Any
 
 
@@ -48,6 +49,12 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
     aggregate_rows = _safe(
         "hermes_aggregates?select=event_source,event_type,aggregated_summary,created_at&order=created_at.desc&limit=80"
     )
+    paper_journal_rows = _safe(
+        "paper_trading_journal_entries?select=id,entry_status,opened_at,closed_at,asset_class,symbol&order=opened_at.desc&limit=200"
+    )
+    paper_outcome_rows = _safe(
+        "paper_trading_outcomes?select=id,result_label,pnl_amount,pnl_percent,created_at&order=created_at.desc&limit=200"
+    )
 
     tq_status = Counter(str(r.get("status") or "unknown") for r in transcript_rows)
     tq_source = Counter(str(r.get("source_type") or "unknown") for r in transcript_rows)
@@ -59,6 +66,7 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
     scheduler_status = Counter(str(r.get("status") or "unknown") for r in scheduler_rows)
     research_backlog = Counter(str(r.get("status") or "unknown") for r in ticket_rows)
     event_features = Counter(str(r.get("feature") or "unknown") for r in analytics_rows)
+    outcome_labels = Counter(str(r.get("result_label") or "unknown") for r in paper_outcome_rows)
 
     learned_recent = []
     for row in knowledge_rows[:15]:
@@ -82,6 +90,8 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
         warnings.append(f"{research_backlog.get('queued', 0)} research tickets queued")
     if scheduler_status.get("failed", 0) > 0:
         warnings.append(f"{scheduler_status.get('failed', 0)} scheduler runs failed")
+    if outcome_labels.get("loss", 0) >= 10 and outcome_labels.get("loss", 0) > outcome_labels.get("win", 0):
+        warnings.append("paper trading losses exceed wins in recent outcomes")
 
     now_ts = datetime.now(timezone.utc).timestamp()
 
@@ -134,6 +144,25 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
                     "created_at": row.get("created_at"),
                 }
             )
+
+    pnl_values: list[float] = []
+    for row in paper_outcome_rows:
+        try:
+            pnl_values.append(float(row.get("pnl_amount") or 0.0))
+        except Exception:
+            continue
+
+    cumulative = 0.0
+    peak = 0.0
+    max_drawdown = 0.0
+    for value in pnl_values:
+        cumulative += value
+        peak = max(peak, cumulative)
+        max_drawdown = max(max_drawdown, peak - cumulative)
+
+    sim_enabled = str(os.getenv("SIMULATED_TRADING_ENABLED", "false")).lower() in {"1", "true", "yes", "on"}
+    auto_paper_enabled = str(os.getenv("AUTONOMOUS_PAPER_TRADING", "false")).lower() in {"1", "true", "yes", "on"}
+    sim_mode_enabled = str(os.getenv("TRADING_SIMULATION_MODE", "false")).lower() in {"1", "true", "yes", "on"}
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -189,6 +218,23 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
         "semantic_retrieval": {
             "metrics": retrieval_metrics,
             "routing_preview": model_preview or [],
+        },
+        "paper_trading": {
+            "autonomous_paper_trading": auto_paper_enabled,
+            "simulated_trading_enabled": sim_enabled,
+            "trading_simulation_mode": sim_mode_enabled,
+            "journal_entries_recent": len(paper_journal_rows),
+            "outcomes_recent": len(paper_outcome_rows),
+            "result_counts": dict(outcome_labels),
+            "win_rate": (
+                round((outcome_labels.get("win", 0) / max(1, outcome_labels.get("win", 0) + outcome_labels.get("loss", 0))) * 100, 2)
+                if (outcome_labels.get("win", 0) + outcome_labels.get("loss", 0)) > 0
+                else 0.0
+            ),
+            "net_pnl": round(sum(pnl_values), 2),
+            "max_drawdown": round(max_drawdown, 2),
+            "latest_journal": paper_journal_rows[:10],
+            "latest_outcomes": paper_outcome_rows[:10],
         },
         "worker_activity": {
             "recent_events": recent_activity,

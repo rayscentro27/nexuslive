@@ -65,6 +65,8 @@ export interface WorkforceSnapshotInputs {
   schedulerFailed?: number;
   warnings?: string[];
   demoMode?: boolean;
+  paperTradingActive?: boolean;
+  paperOutcomes?: number;
 }
 
 function providerToState(status: string): WorkerState {
@@ -134,6 +136,8 @@ export function buildWorkforceState(
   const schedulerFailed = Math.max(0, extras.schedulerFailed ?? 0);
   const warningCount = (extras.warnings || []).length;
   const demoMode = Boolean(extras.demoMode);
+  const paperTradingActive = Boolean(extras.paperTradingActive);
+  const paperOutcomes = Math.max(0, extras.paperOutcomes ?? 0);
 
   const departments: DepartmentStatus[] = [
     {
@@ -279,13 +283,13 @@ export function buildWorkforceState(
       id: 'trading_intelligence',
       name: 'Trading Intelligence',
       emoji: '📈',
-      isActive: recentFeatures.has('trading'),
+      isActive: recentFeatures.has('trading') || paperTradingActive,
       workers: [
         {
           id: 'paper_trading',
           label: 'Paper Trading',
           emoji: '📈',
-          state: recentFeatures.has('trading') ? 'active' : 'idle',
+          state: recentFeatures.has('trading') || paperTradingActive ? 'active' : 'idle',
           statusLine: demoMode ? 'Demo / Simulated mode active' : 'Paper mode — no real funds',
           department: 'trading_intelligence',
         },
@@ -295,6 +299,14 @@ export function buildWorkforceState(
           emoji: '⚙️',
           state: 'idle',
           statusLine: 'NEXUS_DRY_RUN=true',
+          department: 'trading_intelligence',
+        },
+        {
+          id: 'strategy_learning_journal',
+          label: 'Strategy Journal',
+          emoji: '📓',
+          state: paperOutcomes > 0 ? 'researching' : 'idle',
+          statusLine: paperOutcomes > 0 ? `${paperOutcomes} simulated outcomes tracked` : 'Awaiting paper outcomes',
           department: 'trading_intelligence',
         },
       ],

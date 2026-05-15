@@ -86,6 +86,7 @@ export function TradingDashboard() {
   const [apiError, setApiError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [snapshotTrading, setSnapshotTrading] = useState<{ win_rate?: number; net_pnl?: number; max_drawdown?: number; outcomes_recent?: number } | null>(null);
 
   const hasTradingAccess = isAtLeast('pro');
 
@@ -108,6 +109,17 @@ export function TradingDashboard() {
       setApiError(false);
     } catch {
       setApiError(true);
+    }
+
+    try {
+      const res = await fetch('/api/admin/ai-ops/status', { credentials: 'include' });
+      if (res.ok) {
+        const payload = await res.json();
+        const pt = payload?.data?.central_operational_snapshot?.paper_trading || payload?.central_operational_snapshot?.paper_trading || null;
+        setSnapshotTrading(pt);
+      }
+    } catch {
+      setSnapshotTrading(null);
     }
 
     setLoading(false);
@@ -226,6 +238,15 @@ export function TradingDashboard() {
               </span>
             ))}
           </div>
+        </div>
+      )}
+
+      {snapshotTrading && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="Sim Outcomes" value={snapshotTrading.outcomes_recent ?? 0} sub="recent journaled" />
+          <StatCard label="Sim Win Rate" value={`${Math.round(snapshotTrading.win_rate ?? 0)}%`} />
+          <StatCard label="Net Sim PnL" value={snapshotTrading.net_pnl ?? 0} />
+          <StatCard label="Max Drawdown" value={snapshotTrading.max_drawdown ?? 0} sub="simulated" />
         </div>
       )}
 
