@@ -12,9 +12,21 @@ Generated: 2026-05-14
 7. Monitor Telegram 15 minutes for spam
 
 ## Execution status
-- This CLI pass completed code/policy hardening and automated tests.
-- Full interactive Telegram live-message verification and 15-minute observation were **not executed** in this session.
+- Services restarted:
+  - `com.raymonddavis.nexus.telegram`
+  - `com.raymonddavis.nexus.scheduler`
+  - `ai.hermes.gateway`
+- Observation window completed: `2026-05-14T17:10:19-0700` to `2026-05-14T17:26:24-0700` (~16 min).
+- Safe worker triggers executed:
+  - `node workflows/ai_workforce/opportunity_worker/opportunity_worker.js --dry-run --quiet`
+  - `node workflows/ai_workforce/grant_worker/grant_worker.js --dry-run --quiet`
+  - `python3 scripts/process_knowledge_emails_once.py --dry-run`
+- Log checks for Telegram spam signatures (`NEXUS OPPORTUNITY BRIEF`, `NEXUS GRANT BRIEF`, `opportunities detected`, `Grant Programs Overview`) in `telegram-integration.log` returned no matches.
+
+## Limitations (explicit)
+- Direct end-user conversational probe (`"good morning"`) and explicit digest prompt (`"give me CEO digest"`) were not injected from this CLI context.
+- Therefore conversational round-trip and explicit-digest-in-chat were not directly validated in-chat here.
 
 ## Non-faked conclusion
-- Live no-spam behavior is expected from enforced deny policy and 31/31 guard pass.
-- A manual operator-run live check is still required to claim full real-chat validation.
+- During monitored window, no spam signatures were observed in Telegram integration logs.
+- Full operator chat validation still requires a manual message from the operator account.
