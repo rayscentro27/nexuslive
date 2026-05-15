@@ -454,13 +454,13 @@ def ingest_email_to_transcript_queue(
     parsed: ParsedKnowledgeEmail,
     *,
     apply: bool = False,
-    max_channel_videos: int = 10,
+    max_channel_videos: int = 30,
 ) -> dict[str, Any]:
     subject_meta = classify_mobile_subject(parsed.subject)
     domain = normalize_category(subject_meta.get("domain") or parsed.requested_category or "general")
     source_urls = list(parsed.urls)
     expanded_urls: list[str] = []
-    max_channel_videos = max(1, min(int(max_channel_videos or 10), 10))
+    max_channel_videos = max(1, min(int(max_channel_videos or 30), 30))
     for u in source_urls:
         if _youtube_channel(u):
             expanded_urls.append(u)
@@ -470,7 +470,7 @@ def ingest_email_to_transcript_queue(
                 pass
         else:
             expanded_urls.append(u)
-    expanded_urls = list(dict.fromkeys(expanded_urls))[: max(1, min(len(expanded_urls), 10))]
+    expanded_urls = list(dict.fromkeys(expanded_urls))[: max(1, min(len(expanded_urls), 30))]
 
     existing_urls = set()
     if apply and expanded_urls:

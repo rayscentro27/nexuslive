@@ -49,6 +49,12 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
     aggregate_rows = _safe(
         "hermes_aggregates?select=event_source,event_type,aggregated_summary,created_at&order=created_at.desc&limit=80"
     )
+    strategy_rows = _safe(
+        "strategies_catalog?select=id,name,asset_class,risk_level,ai_confidence,edge_health,is_active,updated_at&order=updated_at.desc&limit=80"
+    )
+    experiment_rows = _safe(
+        "candidate_variants?select=id,status,channel,headline,created_at,updated_at&order=updated_at.desc&limit=120"
+    )
     paper_journal_rows = _safe(
         "paper_trading_journal_entries?select=id,entry_status,opened_at,closed_at,asset_class,symbol&order=opened_at.desc&limit=200"
     )
@@ -67,6 +73,7 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
     research_backlog = Counter(str(r.get("status") or "unknown") for r in ticket_rows)
     event_features = Counter(str(r.get("feature") or "unknown") for r in analytics_rows)
     outcome_labels = Counter(str(r.get("result_label") or "unknown") for r in paper_outcome_rows)
+    experiment_status = Counter(str(r.get("status") or "unknown") for r in experiment_rows)
 
     learned_recent = []
     for row in knowledge_rows[:15]:
@@ -92,6 +99,8 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
         warnings.append(f"{scheduler_status.get('failed', 0)} scheduler runs failed")
     if outcome_labels.get("loss", 0) >= 10 and outcome_labels.get("loss", 0) > outcome_labels.get("win", 0):
         warnings.append("paper trading losses exceed wins in recent outcomes")
+    if experiment_status.get("running", 0) > 10:
+        warnings.append("high number of running business experiments")
 
     now_ts = datetime.now(timezone.utc).timestamp()
 
@@ -235,6 +244,20 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
             "max_drawdown": round(max_drawdown, 2),
             "latest_journal": paper_journal_rows[:10],
             "latest_outcomes": paper_outcome_rows[:10],
+        },
+        "strategy_rankings": {
+            "active_count": len([r for r in strategy_rows if bool(r.get("is_active"))]),
+            "top_active": sorted(
+                [r for r in strategy_rows if bool(r.get("is_active"))],
+                key=lambda r: float(r.get("ai_confidence") or 0.0),
+                reverse=True,
+            )[:8],
+        },
+        "business_experiments": {
+            "total_recent": len(experiment_rows),
+            "status_counts": dict(experiment_status),
+            "active_count": experiment_status.get("running", 0) + experiment_status.get("queued", 0),
+            "recent": experiment_rows[:12],
         },
         "worker_activity": {
             "recent_events": recent_activity,

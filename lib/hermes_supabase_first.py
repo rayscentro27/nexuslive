@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from collections import Counter
 
 from .env_loader import load_nexus_env
@@ -29,6 +30,7 @@ load_nexus_env()
 logger = logging.getLogger(__name__)
 
 RESEARCH_WRITES_ENABLED = os.getenv("RESEARCH_REQUEST_WRITES_ENABLED", "false").lower() == "true"
+CHANNEL_INGEST_APPLY = os.getenv("TELEGRAM_CHANNEL_INGEST_APPLY", "true").lower() in {"1", "true", "yes", "on"}
 
 # ── Trigger detection ─────────────────────────────────────────────────────────
 
@@ -57,6 +59,7 @@ _KNOWLEDGE_TRIGGERS: list[str] = [
     "playlist", "latest playlist", "playlist ingestion",
     "nexus validating", "validating opportunities",
     "what should i focus", "focus on today", "what to focus",
+    "ingest this channel", "what channels are processing", "what videos were ingested",
 ]
 
 # Topics that map to AI employee roles
@@ -266,6 +269,46 @@ def _supabase_get(table: str, params: dict) -> list[dict]:
         return []
 
 
+def _extract_youtube_channel_url(text: str) -> str | None:
+    m = re.search(r"(https?://(?:www\.)?youtube\.com/(?:@[^\s/]+|channel/[^\s/]+|c/[^\s/]+))", text, re.I)
+    return m.group(1).strip() if m else None
+
+
+def _ingest_channel_from_telegram(text: str) -> str | None:
+    tl = text.lower()
+    if "ingest this channel" not in tl:
+        return None
+    channel_url = _extract_youtube_channel_url(text)
+    if not channel_url:
+        return "Send the full YouTube channel URL like: ingest this channel https://youtube.com/@channelname"
+    try:
+        from .hermes_email_knowledge_intake import parse_knowledge_email, ingest_email_to_transcript_queue
+
+        parsed = parse_knowledge_email(
+            sender="Telegram Operator <telegram@nexus.local>",
+            subject="Telegram Channel Ingestion Request",
+            body=channel_url,
+            message_id=f"telegram-channel-{abs(hash(channel_url))}",
+        )
+        result = ingest_email_to_transcript_queue(
+            parsed,
+            apply=CHANNEL_INGEST_APPLY,
+            max_channel_videos=30,
+        )
+        inserted = int(result.get("transcript_rows_inserted") or 0)
+        prepared = int(result.get("transcript_rows_prepared") or 0)
+        dups = int(result.get("duplicates_skipped") or 0)
+        mode = "applied" if CHANNEL_INGEST_APPLY else "dry-run"
+        return (
+            f"Channel ingestion {mode}: {channel_url}\n"
+            f"Prepared {prepared} source rows, inserted {inserted}, duplicates skipped {dups}.\n"
+            "No automatic Telegram summary was sent."
+        )
+    except Exception as exc:
+        logger.warning("telegram channel ingest failed: %s", exc)
+        return f"Channel ingestion failed safely: {type(exc).__name__}."
+
+
 def summarize_recent_ingestions(domain: str | None = None, limit: int = 10) -> str:
     params = {
         "select": "title,source_url,status,domain,created_at,metadata",
@@ -381,6 +424,10 @@ def _handle_retrieval_query(text: str) -> str | None:
     Returns a formatted response string or None if not a retrieval pattern.
     """
     t = text.lower()
+
+    channel_ingest = _ingest_channel_from_telegram(text)
+    if channel_ingest is not None:
+        return channel_ingest
 
     # "What opportunities are Nexus validated?" / "What opportunities has Nexus researched?"
     if "opportunit" in t and any(k in t for k in ["validated", "researched", "nexus", "internal"]):
@@ -677,6 +724,43 @@ def _handle_retrieval_query(text: str) -> str | None:
         except Exception:
             pass
         return "No NitroTrades ingestion rows found yet in transcript_queue."
+
+    if "what channels are processing" in t:
+        rows = _supabase_get("transcript_queue", {
+            "select": "source_url,status,created_at,metadata,title",
+            "source_type": "ilike.*youtube_channel*",
+            "order": "created_at.desc",
+            "limit": "30",
+        })
+        if not rows:
+            rows = _supabase_get("transcript_queue", {
+                "select": "source_url,status,created_at,metadata,title",
+                "order": "created_at.desc",
+                "limit": "60",
+            })
+            rows = [r for r in rows if "youtube.com/@" in str(r.get("source_url") or "")]
+        if not rows:
+            return "No active YouTube channel ingestion rows right now."
+        by_status = Counter(str(r.get("status") or "unknown") for r in rows)
+        lines = [f"Channel ingestion rows: {len(rows)}"]
+        lines.append("Status: " + ", ".join([f"{k}={v}" for k, v in by_status.items()]))
+        for r in rows[:6]:
+            lines.append(f"• {r.get('source_url','channel')} ({r.get('status','unknown')})")
+        return "\n".join(lines)
+
+    if "what videos were ingested" in t:
+        rows = _supabase_get("transcript_queue", {
+            "select": "title,source_url,status,created_at,domain",
+            "order": "created_at.desc",
+            "limit": "20",
+        })
+        videos = [r for r in rows if "youtube.com/watch" in str(r.get("source_url") or "") or "youtu.be/" in str(r.get("source_url") or "")]
+        if not videos:
+            return "No recently ingested YouTube videos found yet."
+        lines = ["Recent ingested videos:"]
+        for r in videos[:10]:
+            lines.append(f"• [{r.get('domain','general')}] {r.get('title','video')} ({r.get('status','unknown')})")
+        return "\n".join(lines)
 
     return None
 
