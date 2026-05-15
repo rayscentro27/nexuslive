@@ -64,6 +64,12 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
     paper_outcome_rows = _safe(
         "paper_trading_outcomes?select=id,result_label,pnl_amount,pnl_percent,created_at&order=created_at.desc&limit=200"
     )
+    ai_task_rows = _safe(
+        "ai_task_queue?select=id,assigned_worker,status,created_at,started_at,completed_at,priority&order=created_at.desc&limit=200"
+    )
+    ai_worker_rows = _safe(
+        "ai_task_workers?select=worker_id,active,health_status,concurrency_limit,updated_at&order=worker_id"
+    )
 
     tq_status = Counter(str(r.get("status") or "unknown") for r in transcript_rows)
     tq_source = Counter(str(r.get("source_type") or "unknown") for r in transcript_rows)
@@ -77,6 +83,8 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
     event_features = Counter(str(r.get("feature") or "unknown") for r in analytics_rows)
     outcome_labels = Counter(str(r.get("result_label") or "unknown") for r in paper_outcome_rows)
     experiment_status = Counter(str(r.get("status") or "unknown") for r in experiment_rows)
+    task_status = Counter(str(r.get("status") or "unknown") for r in ai_task_rows)
+    worker_health = Counter(str(r.get("health_status") or "unknown") for r in ai_worker_rows)
 
     learned_recent = []
     for row in knowledge_rows[:15]:
@@ -178,6 +186,19 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
     revenue_stub = build_revenue_dashboard_stub()
     demo_status = build_demo_status_snapshot()
 
+    completion_seconds: list[float] = []
+    for row in ai_task_rows:
+        started = row.get("started_at")
+        completed = row.get("completed_at")
+        if not started or not completed:
+            continue
+        try:
+            st = datetime.fromisoformat(str(started).replace("Z", "+00:00"))
+            ct = datetime.fromisoformat(str(completed).replace("Z", "+00:00"))
+            completion_seconds.append(max(0.0, (ct - st).total_seconds()))
+        except Exception:
+            continue
+
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "read_only": True,
@@ -266,6 +287,19 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
         },
         "revenue_engine": revenue_stub,
         "autonomous_demo_trading": demo_status,
+        "ai_task_dispatch": {
+            "active_tasks": task_status.get("running", 0) + task_status.get("assigned", 0),
+            "task_counts": dict(task_status),
+            "backlog": task_status.get("queued", 0) + task_status.get("paused", 0),
+            "failed_tasks": task_status.get("failed", 0),
+            "worker_health": dict(worker_health),
+            "worker_utilization": {
+                "active_workers": len([w for w in ai_worker_rows if bool(w.get("active"))]),
+                "total_workers": len(ai_worker_rows),
+            },
+            "average_completion_seconds": round(sum(completion_seconds) / len(completion_seconds), 2) if completion_seconds else 0.0,
+            "recent_tasks": ai_task_rows[:12],
+        },
         "worker_activity": {
             "recent_events": recent_activity,
             "feature_counts": dict(event_features),

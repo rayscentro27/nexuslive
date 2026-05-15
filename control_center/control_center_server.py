@@ -2081,6 +2081,9 @@ def api_admin_ai_operations_workforce():
         "online_offline_summary": status_counts,
         "queue_load": _safe_select("job_queue?select=id,status,created_at&order=created_at.desc&limit=60"),
         "recent_activity": _safe_select("workflow_outputs?select=id,summary,status,created_at&order=created_at.desc&limit=30"),
+        "ai_task_queue": _safe_select("ai_task_queue?select=id,title,assigned_worker,status,priority,created_at,started_at,completed_at&order=created_at.desc&limit=80"),
+        "ai_task_workers": _safe_select("ai_task_workers?select=worker_id,health_status,active,concurrency_limit,runtime_environment,updated_at&order=worker_id&limit=20"),
+        "ai_task_recent_results": _safe_select("ai_task_results?select=task_id,worker_id,status,result_summary,created_at&order=created_at.desc&limit=30"),
     }
     return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
 
@@ -2783,8 +2786,14 @@ async function loadAll(){
     ]);
     const wf=wfR.data||wfR, ov=ovR.data||ovR, tl=tlR.data||tlR;
     const hbs=wf.worker_heartbeats||[];
-    const qrows=wf.queue_load||[];
+    const qrows=(wf.queue_load||[]).concat((wf.ai_task_queue||[]).map(r=>({
+      id:r.id,
+      status:r.status,
+      created_at:r.created_at,
+      metadata:{worker:r.assigned_worker,source:'ai_task_queue',priority:r.priority,title:r.title}
+    })));
     const activity=wf.recent_activity||[];
+    const taskResults=wf.ai_task_recent_results||[];
     const timeline=tl.timeline||[];
     const cnt=wf.online_offline_summary||{};
 
@@ -2824,6 +2833,15 @@ async function loadAll(){
     // Activity feed
     const merged=[
       ...activity.map(r=>({...r,at:r.created_at,type:['completed','approved','ready'].includes(String(r.status||'').toLowerCase())?'task_completed':r.status==='failed'?'task_failed':'workflow_output'})),
+      ...taskResults.map(r=>({
+        at:r.created_at,
+        type:String(r.status||'').toLowerCase()==='failed'?'task_failed':'task_completed',
+        source:'ai_task_results',
+        id:r.task_id,
+        event_type:'ai_task_result',
+        status:r.status,
+        summary:(r.worker_id?('['+r.worker_id+'] '):'')+(r.result_summary||'task update')
+      })),
       ...timeline.slice(0,30),
     ].sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')));
     document.getElementById('act-feed').innerHTML=feedHTML(merged);

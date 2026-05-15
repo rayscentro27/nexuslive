@@ -31,6 +31,13 @@ from .autonomous_demo_trading_lab import (
     pause_demo_trading,
     resume_demo_trading,
 )
+from .ai_task_dispatch import (
+    create_task,
+    list_tasks,
+    pause_worker_tasks,
+    resume_worker_tasks,
+    worker_registry_rows,
+)
 
 load_nexus_env()
 
@@ -67,6 +74,8 @@ _KNOWLEDGE_TRIGGERS: list[str] = [
     "nexus validating", "validating opportunities",
     "what should i focus", "focus on today", "what to focus",
     "ingest this channel", "what channels are processing", "what videos were ingested",
+    "send this to opencode", "ask claude code", "send this task to openclaude",
+    "what tasks are running", "show last opencode result", "pause opencode tasks", "resume claude code queue",
 ]
 
 # Topics that map to AI employee roles
@@ -435,6 +444,63 @@ def _handle_retrieval_query(text: str) -> str | None:
     channel_ingest = _ingest_channel_from_telegram(text)
     if channel_ingest is not None:
         return channel_ingest
+
+    if "send this to opencode" in t:
+        task = create_task(
+            created_by="telegram_user",
+            source="telegram",
+            title="Telegram-dispatched task for OpenCode",
+            instructions=text,
+            assigned_worker="opencode_codex",
+            task_type="coding",
+        )
+        return f"Queued for OpenCode/Codex as task {task.get('id')} (status: {task.get('status', 'queued')})."
+
+    if "ask claude code" in t:
+        task = create_task(
+            created_by="telegram_user",
+            source="telegram",
+            title="Telegram-dispatched task for Claude Code",
+            instructions=text,
+            assigned_worker="claude_code",
+            task_type="architecture",
+        )
+        return f"Queued for Claude Code as task {task.get('id')} (status: {task.get('status', 'queued')})."
+
+    if "send this task to openclaude" in t:
+        task = create_task(
+            created_by="telegram_user",
+            source="telegram",
+            title="Telegram-dispatched task for OpenClaude",
+            instructions=text,
+            assigned_worker="openclaude",
+            task_type="review",
+        )
+        return f"Queued for OpenClaude as task {task.get('id')} (status: {task.get('status', 'queued')})."
+
+    if "what tasks are running" in t:
+        rows = list_tasks(status="running", limit=8)
+        if not rows:
+            return "No tasks are currently running."
+        lines = ["Running tasks:"]
+        for row in rows[:6]:
+            lines.append(f"• {row.get('id')} — {row.get('title')} ({row.get('assigned_worker')})")
+        return "\n".join(lines)
+
+    if "show last opencode result" in t:
+        rows = [r for r in list_tasks(limit=20) if str(r.get("assigned_worker") or "") == "opencode_codex" and str(r.get("status") or "") == "completed"]
+        if not rows:
+            return "No completed OpenCode results yet."
+        row = rows[0]
+        return f"Last OpenCode result:\n• Task {row.get('id')}\n• {row.get('result_summary') or 'No summary recorded yet.'}"
+
+    if "pause opencode tasks" in t:
+        count = pause_worker_tasks("opencode_codex")
+        return f"Paused {count} OpenCode task(s)."
+
+    if "resume claude code queue" in t:
+        count = resume_worker_tasks("claude_code")
+        return f"Resumed {count} Claude Code task(s)."
 
     # "What opportunities are Nexus validated?" / "What opportunities has Nexus researched?"
     if "opportunit" in t and any(k in t for k in ["validated", "researched", "nexus", "internal"]):
