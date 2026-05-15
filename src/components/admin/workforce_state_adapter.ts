@@ -59,6 +59,14 @@ export interface ResearchTicketSummary {
   byDepartment: Record<string, number>;
 }
 
+export interface WorkforceSnapshotInputs {
+  grantCount?: number;
+  queuePressure?: number;
+  schedulerFailed?: number;
+  warnings?: string[];
+  demoMode?: boolean;
+}
+
 function providerToState(status: string): WorkerState {
   if (status === 'online') return 'active';
   if (status === 'degraded') return 'warning';
@@ -103,6 +111,8 @@ export function buildWorkforceState(
   recentEvents: AnalyticsEvent[],
   oppsCount: number,
   tickets: ResearchTicket[] = [],
+  transcriptQueueCount = 0,
+  extras: WorkforceSnapshotInputs = {},
 ): DepartmentStatus[] {
   const ticketSummary = summarizeTickets(tickets);
   const providerMap = Object.fromEntries(providers.map(p => [p.provider_name, p]));
@@ -119,12 +129,18 @@ export function buildWorkforceState(
     ? providerToState(hermes.status)
     : 'idle';
 
+  const grantCount = Math.max(0, extras.grantCount ?? 0);
+  const queuePressure = Math.max(0, extras.queuePressure ?? transcriptQueueCount);
+  const schedulerFailed = Math.max(0, extras.schedulerFailed ?? 0);
+  const warningCount = (extras.warnings || []).length;
+  const demoMode = Boolean(extras.demoMode);
+
   const departments: DepartmentStatus[] = [
     {
-      id: 'ops',
-      name: 'Operations Center',
+      id: 'hermes_operations',
+      name: 'Hermes Operations',
       emoji: '🎯',
-      isActive: hermesState === 'active',
+      isActive: hermesState === 'active' || queuePressure > 0,
       workers: [
         {
           id: 'hermes',
@@ -132,16 +148,26 @@ export function buildWorkforceState(
           emoji: '🤖',
           state: hermesState,
           statusLine: hermesState === 'active' ? 'Monitoring operations' : hermesState === 'idle' ? 'On standby' : 'Check connection',
-          department: 'ops',
+          department: 'hermes_operations',
           latency: hermes?.avg_latency_ms ?? undefined,
         },
         {
           id: 'anomaly',
           label: 'Anomaly Detector',
           emoji: '🔬',
-          state: 'active',
-          statusLine: 'Running 30-min scans',
-          department: 'ops',
+          state: recentFeatures.size > 0 ? 'active' : 'idle',
+          statusLine: recentFeatures.size > 0 ? 'Running 30-min scans' : 'Awaiting fresh events',
+          department: 'hermes_operations',
+        },
+        {
+          id: 'ingestion_queue',
+          label: 'Ingestion Queue',
+          emoji: '📥',
+          state: transcriptQueueCount > 0 ? 'researching' : 'idle',
+          statusLine: queuePressure > 0
+            ? `${queuePressure} source${queuePressure > 1 ? 's' : ''} waiting`
+            : 'No queued sources',
+          department: 'hermes_operations',
         },
         {
           id: 'provider_health',
@@ -149,12 +175,12 @@ export function buildWorkforceState(
           emoji: '📡',
           state: providers.length > 0 ? 'active' : 'idle',
           statusLine: providers.length > 0 ? `${providers.filter(p => p.status === 'online').length}/${providers.length} online` : 'No data yet',
-          department: 'ops',
+          department: 'hermes_operations',
         },
       ],
     },
     {
-      id: 'funding',
+      id: 'funding_intelligence',
       name: 'Funding Intelligence',
       emoji: '💰',
       isActive: recentFeatures.has('funding') || recentFeatures.has('credit'),
@@ -194,8 +220,8 @@ export function buildWorkforceState(
       ],
     },
     {
-      id: 'opportunities',
-      name: 'Opportunity Research',
+      id: 'business_opportunities',
+      name: 'Business Opportunities',
       emoji: '🔭',
       isActive: oppsCount > 0,
       workers: [
@@ -205,7 +231,7 @@ export function buildWorkforceState(
           emoji: '🔭',
           state: oppsCount > 0 ? 'researching' : 'idle',
           statusLine: oppsCount > 0 ? `${oppsCount} opps scored` : 'Pending first run',
-          department: 'opportunities',
+          department: 'business_opportunities',
         },
         {
           id: 'opp_validator',
@@ -213,7 +239,7 @@ export function buildWorkforceState(
           emoji: '✅',
           state: oppsCount > 0 ? 'active' : 'idle',
           statusLine: oppsCount > 0 ? 'Validating catalog' : 'No data yet',
-          department: 'opportunities',
+          department: 'business_opportunities',
         },
         {
           id: 'opp_research_tickets',
@@ -221,23 +247,23 @@ export function buildWorkforceState(
           emoji: '📋',
           state: ticketStateForDept('business_opportunities', ticketSummary),
           statusLine: ticketStatusLine('business_opportunities', ticketSummary),
-          department: 'opportunities',
+          department: 'business_opportunities',
         },
       ],
     },
     {
-      id: 'grants',
+      id: 'grant_research',
       name: 'Grant Research',
       emoji: '🏆',
-      isActive: recentFeatures.has('grants'),
+      isActive: recentFeatures.has('grants') || grantCount > 0,
       workers: [
         {
           id: 'grant_worker',
           label: 'Grant Finder',
           emoji: '🏆',
-          state: recentFeatures.has('grants') ? 'researching' : ticketStateForDept('grants_research', ticketSummary),
-          statusLine: recentFeatures.has('grants') ? 'Grant searches active' : ticketStatusLine('grants_research', ticketSummary),
-          department: 'grants',
+          state: recentFeatures.has('grants') || grantCount > 0 ? 'researching' : ticketStateForDept('grants_research', ticketSummary),
+          statusLine: grantCount > 0 ? `${grantCount} grants tracked` : ticketStatusLine('grants_research', ticketSummary),
+          department: 'grant_research',
         },
         {
           id: 'grant_research_tickets',
@@ -245,13 +271,13 @@ export function buildWorkforceState(
           emoji: '📋',
           state: ticketStateForDept('grants_research', ticketSummary),
           statusLine: ticketStatusLine('grants_research', ticketSummary),
-          department: 'grants',
+          department: 'grant_research',
         },
       ],
     },
     {
-      id: 'trading',
-      name: 'Trading Lab',
+      id: 'trading_intelligence',
+      name: 'Trading Intelligence',
       emoji: '📈',
       isActive: recentFeatures.has('trading'),
       workers: [
@@ -260,8 +286,8 @@ export function buildWorkforceState(
           label: 'Paper Trading',
           emoji: '📈',
           state: recentFeatures.has('trading') ? 'active' : 'idle',
-          statusLine: 'Demo mode — no real funds',
-          department: 'trading',
+          statusLine: demoMode ? 'Demo / Simulated mode active' : 'Paper mode — no real funds',
+          department: 'trading_intelligence',
         },
         {
           id: 'strategy_engine',
@@ -269,7 +295,71 @@ export function buildWorkforceState(
           emoji: '⚙️',
           state: 'idle',
           statusLine: 'NEXUS_DRY_RUN=true',
-          department: 'trading',
+          department: 'trading_intelligence',
+        },
+      ],
+    },
+    {
+      id: 'credit_intelligence',
+      name: 'Credit Intelligence',
+      emoji: '💳',
+      isActive: recentFeatures.has('credit') || (ticketSummary.byDepartment.credit_research ?? 0) > 0,
+      workers: [
+        {
+          id: 'credit_signal_mapper',
+          label: 'Credit Signal Mapper',
+          emoji: '🧮',
+          state: recentFeatures.has('credit') ? 'analyzing' : 'idle',
+          statusLine: recentFeatures.has('credit') ? 'Refreshing credit factors' : 'Awaiting credit deltas',
+          department: 'credit_intelligence',
+        },
+        {
+          id: 'credit_ticket_queue',
+          label: 'Research Queue',
+          emoji: '📋',
+          state: ticketStateForDept('credit_research', ticketSummary),
+          statusLine: ticketStatusLine('credit_research', ticketSummary),
+          department: 'credit_intelligence',
+        },
+      ],
+    },
+    {
+      id: 'marketing_intelligence',
+      name: 'Marketing Intelligence',
+      emoji: '📣',
+      isActive: recentFeatures.has('marketing') || (ticketSummary.byDepartment.marketing_intelligence ?? 0) > 0,
+      workers: [
+        {
+          id: 'campaign_scout',
+          label: 'Campaign Scout',
+          emoji: '📣',
+          state: recentFeatures.has('marketing') ? 'researching' : ticketStateForDept('marketing_intelligence', ticketSummary),
+          statusLine: recentFeatures.has('marketing') ? 'Campaign intelligence updating' : ticketStatusLine('marketing_intelligence', ticketSummary),
+          department: 'marketing_intelligence',
+        },
+      ],
+    },
+    {
+      id: 'system_monitoring',
+      name: 'System Monitoring',
+      emoji: '🛡️',
+      isActive: schedulerFailed > 0 || warningCount > 0 || providers.length > 0,
+      workers: [
+        {
+          id: 'scheduler_guard',
+          label: 'Scheduler Guard',
+          emoji: '⏱️',
+          state: schedulerFailed > 0 ? 'warning' : 'active',
+          statusLine: schedulerFailed > 0 ? `${schedulerFailed} failed runs` : 'Scheduler healthy',
+          department: 'system_monitoring',
+        },
+        {
+          id: 'warning_triage',
+          label: 'Warning Triage',
+          emoji: '🚨',
+          state: warningCount > 0 ? 'warning' : 'idle',
+          statusLine: warningCount > 0 ? `${warningCount} operational warnings` : 'No active warnings',
+          department: 'system_monitoring',
         },
       ],
     },

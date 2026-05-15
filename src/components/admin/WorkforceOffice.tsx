@@ -26,7 +26,17 @@ interface IngestEvent {
   id: string;
   title: string;
   domain: string;
+  source_type: string | null;
   created_at: string;
+}
+
+interface CentralSnapshot {
+  ingestion?: { transcript_queue_total?: number; ingestion_pressure?: number; source_type_summary?: Record<string, number> };
+  opportunities?: { recent_count?: number };
+  grants?: { recent_count?: number };
+  tickets?: { total?: number };
+  warnings?: string[];
+  scheduler_health?: { status_counts?: Record<string, number> };
 }
 
 function timeAgo(ts: string): string {
@@ -80,8 +90,21 @@ export function WorkforceOffice() {
   const [tickets, setAllTickets] = useState<ResearchTicket[]>([]);
   const [ingestFeed, setIngestFeed] = useState<IngestEvent[]>([]);
   const [activePanel, setActivePanel] = useState<'workforce' | 'research' | 'ingestion'>('workforce');
+  const [snapshot, setSnapshot] = useState<CentralSnapshot | null>(null);
+  const [demoSimulated, setDemoSimulated] = useState(false);
 
   const load = useCallback(async () => {
+    let centralSnapshot: CentralSnapshot | null = null;
+    try {
+      const statusRes = await fetch('/api/admin/ai-ops/status', { credentials: 'include' });
+      if (statusRes.ok) {
+        const payload = await statusRes.json();
+        centralSnapshot = payload?.data?.central_operational_snapshot || payload?.central_operational_snapshot || null;
+      }
+    } catch {
+      centralSnapshot = null;
+    }
+
     const [phRes, evRes, oppsRes, ticketRes, transcriptRes] = await Promise.all([
       supabase
         .from('provider_health')
@@ -103,7 +126,7 @@ export function WorkforceOffice() {
         .limit(50),
       supabase
         .from('transcript_queue')
-        .select('id,title,domain,created_at')
+        .select('id,title,domain,source_type,created_at')
         .order('created_at', { ascending: false })
         .limit(8),
     ]);
@@ -118,7 +141,21 @@ export function WorkforceOffice() {
     setOpenTickets(tkts.length);
     setAllTickets(tkts);
     setIngestFeed(ingest);
-    setDepartments(buildWorkforceState(providers, events, count, tkts));
+    setSnapshot(centralSnapshot);
+    const pressure = centralSnapshot?.ingestion?.ingestion_pressure ?? ingest.length;
+    const warnings = centralSnapshot?.warnings || [];
+    const schedulerFailed = centralSnapshot?.scheduler_health?.status_counts?.failed || 0;
+    const grantCount = centralSnapshot?.grants?.recent_count || 0;
+    const envDemo = ((import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_NEXUS_DEMO_MODE || 'false').toLowerCase();
+    const isDemoMode = envDemo === '1' || envDemo === 'true' || envDemo === 'yes' || envDemo === 'on';
+    setDemoSimulated(isDemoMode);
+    setDepartments(buildWorkforceState(providers, events, count, tkts, ingest.length, {
+      grantCount,
+      queuePressure: pressure,
+      schedulerFailed,
+      warnings,
+      demoMode: isDemoMode,
+    }));
     setLastRefresh(new Date().toISOString());
     setLoading(false);
     setRefreshing(false);
@@ -137,6 +174,18 @@ export function WorkforceOffice() {
   const warnWorkers = departments.reduce((s, d) => s + d.workers.filter(w => w.state === 'warning' || w.state === 'offline').length, 0);
   const researchingCount = tickets.filter(t => t.status === 'researching').length;
   const reviewCount = tickets.filter(t => t.status === 'needs_review').length;
+  const ingestionBreakdown = ingestFeed.reduce<Record<string, number>>((acc, item) => {
+    const sourceType = (item.source_type || '').toLowerCase();
+    const key = sourceType.includes('notebooklm')
+      ? 'notebooklm'
+      : sourceType.includes('email')
+        ? 'email'
+        : sourceType.includes('playlist') || sourceType.includes('youtube')
+          ? 'playlist'
+          : 'other';
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, { notebooklm: 0, email: 0, playlist: 0, other: 0 });
 
   const PANELS = [
     { id: 'workforce' as const, label: 'Workforce', icon: Brain, count: activeWorkers },
@@ -155,6 +204,11 @@ export function WorkforceOffice() {
           <p style={{ fontSize: 11, color: '#8b8fa8', margin: 0 }}>
             Admin — real-time operational intelligence
           </p>
+          {demoSimulated && (
+            <p style={{ fontSize: 10, color: '#b45309', margin: '4px 0 0', fontWeight: 700 }}>
+              Demo / Simulated
+            </p>
+          )}
         </div>
         <button
           onClick={handleRefresh}
@@ -177,14 +231,16 @@ export function WorkforceOffice() {
           animate={{ opacity: 1, y: 0 }}
           style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}
         >
-          {[
-            { label: 'Workers', value: totalWorkers, color: '#6366f1', bg: '#eef0fd' },
-            { label: 'Active', value: activeWorkers, color: '#22c55e', bg: '#f0fdf4' },
-            { label: 'Researching', value: researchingCount, color: '#7c3aed', bg: '#f5f3ff' },
-            { label: 'Review Ready', value: reviewCount, color: reviewCount > 0 ? '#f59e0b' : '#9ca3af', bg: reviewCount > 0 ? '#fffbeb' : '#f9fafb' },
-            { label: 'Attention', value: warnWorkers, color: warnWorkers > 0 ? '#ef4444' : '#9ca3af', bg: warnWorkers > 0 ? '#fef2f2' : '#f9fafb' },
-            { label: 'Opportunities', value: oppsCount, color: '#7c3aed', bg: '#f5f3ff' },
-          ].map(s => (
+              {[
+                { label: 'Workers', value: totalWorkers, color: '#6366f1', bg: '#eef0fd' },
+                { label: 'Active', value: activeWorkers, color: '#22c55e', bg: '#f0fdf4' },
+                { label: 'Researching', value: researchingCount, color: '#7c3aed', bg: '#f5f3ff' },
+                { label: 'Review Ready', value: reviewCount, color: reviewCount > 0 ? '#f59e0b' : '#9ca3af', bg: reviewCount > 0 ? '#fffbeb' : '#f9fafb' },
+                { label: 'Attention', value: warnWorkers, color: warnWorkers > 0 ? '#ef4444' : '#9ca3af', bg: warnWorkers > 0 ? '#fef2f2' : '#f9fafb' },
+                { label: 'Queue Pressure', value: snapshot?.ingestion?.ingestion_pressure || 0, color: '#2563eb', bg: '#eff6ff' },
+                { label: 'Opportunities', value: oppsCount, color: '#7c3aed', bg: '#f5f3ff' },
+                { label: 'Grants', value: snapshot?.grants?.recent_count || 0, color: '#0f766e', bg: '#ecfeff' },
+              ].map(s => (
             <div key={s.label} style={{
               flex: '1 1 70px', padding: '8px 10px', borderRadius: 10,
               background: s.bg, textAlign: 'center',
@@ -324,6 +380,31 @@ export function WorkforceOffice() {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))',
+                  gap: 6,
+                }}>
+                  {[
+                    ['NotebookLM', ingestionBreakdown.notebooklm],
+                    ['Email', ingestionBreakdown.email],
+                    ['Playlist', ingestionBreakdown.playlist],
+                    ['Other', ingestionBreakdown.other],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      style={{
+                        borderRadius: 8,
+                        border: '1px solid #e5e7eb',
+                        background: '#ffffff',
+                        padding: '6px 8px',
+                      }}
+                    >
+                      <p style={{ margin: 0, fontSize: 9, color: '#6b7280' }}>{label}</p>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#1f2937' }}>{value}</p>
+                    </div>
+                  ))}
+                </div>
                 {ingestFeed.map((item, idx) => (
                   <motion.div
                     key={item.id}
@@ -343,6 +424,7 @@ export function WorkforceOffice() {
                         {item.title || 'Untitled source'}
                       </p>
                       <p style={{ fontSize: 10, color: '#6b7280', margin: 0 }}>{item.domain}</p>
+                      <p style={{ fontSize: 9, color: '#9ca3af', margin: 0 }}>{(item.source_type || 'unknown').replace('_', ' ')}</p>
                     </div>
                     <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0 }}>{timeAgo(item.created_at)}</span>
                   </motion.div>

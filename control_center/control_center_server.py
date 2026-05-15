@@ -1534,6 +1534,7 @@ def api_admin_ai_ops_status():
         return _unauthorized_response()
 
     from scripts.prelaunch_utils import rest_select
+    from lib.central_operational_snapshot import build_central_operational_snapshot
 
     def _safe_select(path: str) -> list[dict]:
         try:
@@ -1702,6 +1703,11 @@ def api_admin_ai_ops_status():
     except Exception:
         ingestion_operations = {}
 
+    central_operational_snapshot = build_central_operational_snapshot(
+        rest_select=rest_select,
+        model_preview=routing_preview_rows,
+    )
+
     data = {
             "model_config": {
                 "active_default_provider": provider_default,
@@ -1724,6 +1730,7 @@ def api_admin_ai_ops_status():
                 "recent_model_usage_events": usage_rows,
             },
             "ingestion_operations": ingestion_operations,
+            "central_operational_snapshot": central_operational_snapshot,
             "knowledge_visibility": knowledge_visibility,
             "intelligence_visibility": intelligence_visibility,
         }

@@ -6,7 +6,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabase';
-import { Brain, TrendingUp, BookOpen, Activity, ChevronRight } from 'lucide-react';
+import { Brain, BookOpen, Activity, ChevronRight } from 'lucide-react';
 
 interface KnowledgeItem {
   id: string;
@@ -29,7 +29,22 @@ interface TranscriptItem {
   id: string;
   title: string;
   domain: string;
+  source_type: string | null;
   created_at: string;
+}
+
+interface IngestionSummary {
+  notebooklm: number;
+  email: number;
+  playlist: number;
+  other: number;
+}
+
+interface CentralSnapshot {
+  knowledge?: { learned_recent?: Array<{ title: string; domain: string; quality_score: number; created_at: string }> };
+  opportunities?: { recent_count?: number };
+  grants?: { recent_count?: number };
+  worker_activity?: { feature_counts?: Record<string, number> };
 }
 
 const DOMAIN_EMOJI: Record<string, string> = {
@@ -93,8 +108,20 @@ export function NexusIntelligencePanel({ compact = false, onNavigate }: Props) {
   const [transcripts, setTranscripts] = useState<TranscriptItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'learned' | 'queue' | 'ingestion'>('learned');
+  const [snapshot, setSnapshot] = useState<CentralSnapshot | null>(null);
 
   const load = useCallback(async () => {
+    let centralSnapshot: CentralSnapshot | null = null;
+    try {
+      const statusRes = await fetch('/api/admin/ai-ops/status', { credentials: 'include' });
+      if (statusRes.ok) {
+        const payload = await statusRes.json();
+        centralSnapshot = payload?.data?.central_operational_snapshot || payload?.central_operational_snapshot || null;
+      }
+    } catch {
+      centralSnapshot = null;
+    }
+
     const [kiRes, tkRes, trRes] = await Promise.all([
       supabase
         .from('knowledge_items')
@@ -109,13 +136,14 @@ export function NexusIntelligencePanel({ compact = false, onNavigate }: Props) {
         .limit(6),
       supabase
         .from('transcript_queue')
-        .select('id,title,domain,created_at')
+        .select('id,title,domain,source_type,created_at')
         .order('created_at', { ascending: false })
         .limit(5),
     ]);
     if (kiRes.data) setKnowledge(kiRes.data as KnowledgeItem[]);
     if (tkRes.data) setTickets(tkRes.data as ResearchTicket[]);
     if (trRes.data) setTranscripts(trRes.data as TranscriptItem[]);
+    setSnapshot(centralSnapshot);
     setLoading(false);
   }, []);
 
@@ -126,6 +154,33 @@ export function NexusIntelligencePanel({ compact = false, onNavigate }: Props) {
   }, [load]);
 
   const totalActivity = knowledge.length + tickets.length + transcripts.length;
+  const learnedToday = knowledge.filter(item =>
+    item.approved_at && Date.now() - new Date(item.approved_at).getTime() < 24 * 60 * 60 * 1000
+  ).length;
+
+  const queueByStatus = tickets.reduce<Record<string, number>>((acc, ticket) => {
+    acc[ticket.status] = (acc[ticket.status] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const ingestionSummary = transcripts.reduce<IngestionSummary>((acc, tr) => {
+    const sourceType = (tr.source_type || '').toLowerCase();
+    if (sourceType.includes('notebooklm')) {
+      acc.notebooklm += 1;
+    } else if (sourceType.includes('email')) {
+      acc.email += 1;
+    } else if (sourceType.includes('youtube') || sourceType.includes('playlist')) {
+      acc.playlist += 1;
+    } else {
+      acc.other += 1;
+    }
+    return acc;
+  }, { notebooklm: 0, email: 0, playlist: 0, other: 0 });
+
+  const trendingTopics = Object.entries(snapshot?.worker_activity?.feature_counts || {})
+    .filter(([k]) => k !== 'unknown')
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3);
 
   const TABS = [
     { id: 'learned' as const, label: 'Learned', count: knowledge.length, icon: Brain },
@@ -155,8 +210,13 @@ export function NexusIntelligencePanel({ compact = false, onNavigate }: Props) {
               Nexus Intelligence
             </h3>
             <p style={{ fontSize: 10, color: '#6b7280', margin: 0 }}>
-              {loading ? 'Loading...' : `${totalActivity} active signals`}
+              {loading ? 'Loading...' : `${totalActivity} active signals${learnedToday > 0 ? ` · ${learnedToday} learned today` : ''}`}
             </p>
+            {!loading && (
+              <p style={{ fontSize: 9, color: '#64748b', margin: '2px 0 0' }}>
+                {`Opportunities ${snapshot?.opportunities?.recent_count || 0} · Grants ${snapshot?.grants?.recent_count || 0}`}
+              </p>
+            )}
           </div>
         </div>
         {!loading && totalActivity > 0 && (
@@ -226,11 +286,20 @@ export function NexusIntelligencePanel({ compact = false, onNavigate }: Props) {
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {trendingTopics.length > 0 && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {trendingTopics.map(([topic, count]) => (
+                      <span key={topic} style={{ fontSize: 9, color: '#94a3b8', border: '1px solid rgba(148,163,184,0.25)', borderRadius: 999, padding: '1px 6px' }}>
+                        {topic}: {count}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {knowledge.slice(0, compact ? 3 : 6).map(item => (
                   <div key={item.id} style={{
                     display: 'flex', alignItems: 'center', gap: 8,
                     padding: '6px 8px', borderRadius: 8,
-                    background: item.status === 'approved'
+                    background: item.quality_score >= 70
                       ? 'rgba(34,197,94,0.08)'
                       : 'rgba(255,255,255,0.04)',
                     border: `1px solid ${item.quality_score >= 70 ? 'rgba(34,197,94,0.2)' : 'rgba(255,255,255,0.06)'}`,
@@ -267,6 +336,28 @@ export function NexusIntelligencePanel({ compact = false, onNavigate }: Props) {
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{
+                  display: 'flex',
+                  gap: 6,
+                  flexWrap: 'wrap',
+                  marginBottom: 2,
+                }}>
+                  {Object.entries(queueByStatus).slice(0, 4).map(([status, count]) => (
+                    <span
+                      key={status}
+                      style={{
+                        fontSize: 9,
+                        color: '#94a3b8',
+                        border: '1px solid rgba(148,163,184,0.25)',
+                        background: 'rgba(148,163,184,0.08)',
+                        borderRadius: 999,
+                        padding: '1px 6px',
+                      }}
+                    >
+                      {status}: {count}
+                    </span>
+                  ))}
+                </div>
                 {tickets.slice(0, compact ? 3 : 6).map(ticket => {
                   const isActive = ['researching', 'needs_review'].includes(ticket.status);
                   return (
@@ -307,6 +398,31 @@ export function NexusIntelligencePanel({ compact = false, onNavigate }: Props) {
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: compact ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))',
+                  gap: 6,
+                }}>
+                  {[
+                    ['NotebookLM', ingestionSummary.notebooklm],
+                    ['Email', ingestionSummary.email],
+                    ['Playlist', ingestionSummary.playlist],
+                    ['Other', ingestionSummary.other],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      style={{
+                        borderRadius: 7,
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        background: 'rgba(255,255,255,0.03)',
+                        padding: '5px 6px',
+                      }}
+                    >
+                      <p style={{ margin: 0, fontSize: 9, color: '#94a3b8' }}>{label}</p>
+                      <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#e5e7eb' }}>{value}</p>
+                    </div>
+                  ))}
+                </div>
                 {transcripts.map(tr => (
                   <div key={tr.id} style={{
                     display: 'flex', alignItems: 'center', gap: 8,
@@ -321,7 +437,7 @@ export function NexusIntelligencePanel({ compact = false, onNavigate }: Props) {
                         {tr.title || 'Untitled source'}
                       </p>
                       <p style={{ fontSize: 9, color: '#6b7280', margin: 0 }}>
-                        {tr.domain} · {timeAgo(tr.created_at)}
+                        {tr.domain} · {(tr.source_type || 'unknown').replace('_', ' ')} · {timeAgo(tr.created_at)}
                       </p>
                     </div>
                   </div>
