@@ -1,0 +1,28 @@
+{
+  "channel_name": "Nexus Funding Intelligence",
+  "handle": "@NexusFundingIntelligence",
+  "channel_url": "https://www.youtube.com/@NexusFundingIntelligence",
+  "channel_description": "Nexus shares practical systems for business funding, credit growth, AI automation, grants, and safe demo-only trading education.",
+  "content_pillars": [
+    "business_funding",
+    "business_credit",
+    "grants",
+    "ai_automation",
+    "business_opportunities",
+    "nexus_build_journey",
+    "local_ai_hermes",
+    "trading_education_demo_only"
+  ],
+  "audience": "Founders, operators, and side-hustlers building fundable, automation-ready businesses.",
+  "upload_cadence": "2 long-form videos per week + 3 shorts",
+  "brand_tone": "direct, tactical, transparent, no-hype",
+  "default_cta": "Subscribe and comment your business stage to get the next tactical playbook.",
+  "newsletter_cta": "Join the Nexus Funding Intelligence newsletter for weekly checklists and playbooks.",
+  "nexus_app_cta": "Join the Nexus waitlist to access readiness scoring, opportunity tracking, and AI workforce tooling.",
+  "affiliate_disclosure_template": "Some links may be affiliate links. If you choose to use them, Nexus may earn a commission at no extra cost to you.",
+  "api_placeholders": {
+    "YOUTUBE_API_KEY": "PLACEHOLDER_ONLY",
+    "YOUTUBE_CHANNEL_ID": "PLACEHOLDER_ONLY",
+    "YOUTUBE_UPLOADS_PLAYLIST_ID": "PLACEHOLDER_ONLY"
+  }
+}

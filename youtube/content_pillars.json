@@ -1,0 +1,108 @@
+{
+  "pillars": [
+    {
+      "id": "business_funding",
+      "name": "Business Funding",
+      "topic_ideas": ["30-day funding readiness plan", "Common lender rejection triggers", "SBA prep checklist"],
+      "audience_pain_points": ["low approval odds", "incomplete docs", "cash flow stress"],
+      "cta": "Download the Business Funding Readiness Checklist.",
+      "affiliate_tieins": ["Bizee", "LegalZoom", "Novo", "Bluevine"],
+      "affiliate_categories": ["business_formation", "business_banking"],
+      "nexus_modules": ["Funding Readiness", "Opportunity Validation"],
+      "lead_magnets": ["Business Funding Readiness Checklist"],
+      "mini_tools": ["Funding Readiness Score"],
+      "risk_compliance_notes": "Educational content only, no guaranteed approvals."
+    },
+    {
+      "id": "business_credit",
+      "name": "Business Credit",
+      "topic_ideas": ["Credit utilization playbook", "Vendor account ladder", "Credit profile repair"],
+      "audience_pain_points": ["high utilization", "thin file", "denied applications"],
+      "cta": "Get the Business Credit Vendor Starter Pack.",
+      "affiliate_tieins": ["SmartCredit", "IdentityIQ"],
+      "affiliate_categories": ["credit_monitoring"],
+      "nexus_modules": ["Credit Readiness", "Funding Intelligence"],
+      "lead_magnets": ["Business Credit Vendor Starter Pack"],
+      "mini_tools": ["Credit Utilization Optimizer"],
+      "risk_compliance_notes": "No credit repair guarantees; compliance-first guidance."
+    },
+    {
+      "id": "grants",
+      "name": "Grants",
+      "topic_ideas": ["Where to find quality grants", "Grant application mistakes", "Grant stack strategy"],
+      "audience_pain_points": ["unclear eligibility", "time waste", "low quality listings"],
+      "cta": "Join the newsletter for weekly grant tracking updates.",
+      "affiliate_tieins": ["Notion", "ClickUp"],
+      "affiliate_categories": ["productivity"],
+      "nexus_modules": ["Grant Research", "Knowledge Brain"],
+      "lead_magnets": ["AI Business Automation Starter Guide"],
+      "mini_tools": ["Grant Opportunity Summarizer"],
+      "risk_compliance_notes": "Grant outcomes vary and depend on applicant fit."
+    },
+    {
+      "id": "ai_automation",
+      "name": "AI Automation",
+      "topic_ideas": ["Operator workflow automation", "AI task routing setup", "Automated reporting loops"],
+      "audience_pain_points": ["manual bottlenecks", "tool sprawl", "inconsistent execution"],
+      "cta": "Download the AI Business Automation Starter Guide.",
+      "affiliate_tieins": ["Zapier", "Make", "Notion", "Canva"],
+      "affiliate_categories": ["automation", "productivity", "creative"],
+      "nexus_modules": ["AI Workforce", "Operations Snapshot"],
+      "lead_magnets": ["AI Business Automation Starter Guide"],
+      "mini_tools": ["AI Business Idea Generator"],
+      "risk_compliance_notes": "Automation should include human review for high-risk actions."
+    },
+    {
+      "id": "business_opportunities",
+      "name": "Business Opportunities",
+      "topic_ideas": ["Opportunity scoring breakdown", "Low-risk experiments", "Offer validation framework"],
+      "audience_pain_points": ["idea overload", "poor validation", "weak monetization"],
+      "cta": "Join the waitlist for Nexus opportunity scoring tools.",
+      "affiliate_tieins": ["Gumroad", "Payhip"],
+      "affiliate_categories": ["digital_products"],
+      "nexus_modules": ["Business Experiments", "Revenue Engine"],
+      "lead_magnets": ["Top 25 AI Tools to Start an Online Business"],
+      "mini_tools": ["AI Business Idea Generator"],
+      "risk_compliance_notes": "No income guarantees; run bounded tests first."
+    },
+    {
+      "id": "nexus_build_journey",
+      "name": "Nexus Build Journey",
+      "topic_ideas": ["What we shipped this week", "Lessons from failed experiments", "Roadmap updates"],
+      "audience_pain_points": ["lack of transparency", "execution drift"],
+      "cta": "Subscribe for weekly build updates and operator notes.",
+      "affiliate_tieins": ["OpenAI", "Anthropic", "Perplexity"],
+      "affiliate_categories": ["ai_tools"],
+      "nexus_modules": ["Operational Snapshot", "Workforce Office"],
+      "lead_magnets": ["Top 25 AI Tools to Start an Online Business"],
+      "mini_tools": ["AI Business Idea Generator"],
+      "risk_compliance_notes": "Share only approved internal data; redact sensitive info."
+    },
+    {
+      "id": "local_ai_hermes",
+      "name": "Local AI / Hermes",
+      "topic_ideas": ["Travel ops with Hermes", "Telegram command patterns", "Safe ops automation"],
+      "audience_pain_points": ["mobile ops friction", "context switching"],
+      "cta": "Join newsletter for CLI and Hermes workflows.",
+      "affiliate_tieins": ["Google Workspace", "Notion", "ClickUp"],
+      "affiliate_categories": ["productivity"],
+      "nexus_modules": ["Hermes", "Knowledge Ingestion"],
+      "lead_magnets": ["AI Business Automation Starter Guide"],
+      "mini_tools": ["AI Business Idea Generator"],
+      "risk_compliance_notes": "Avoid exposing keys or private operational details."
+    },
+    {
+      "id": "trading_education_demo_only",
+      "name": "Trading Education / Demo Only",
+      "topic_ideas": ["Demo journal breakdown", "Risk controls explained", "Learning from losing trades"],
+      "audience_pain_points": ["overtrading", "poor risk discipline", "inconsistent journaling"],
+      "cta": "Review the demo-only risk checklist before placing any simulation trades.",
+      "affiliate_tieins": ["Perplexity", "Notion"],
+      "affiliate_categories": ["ai_tools", "productivity"],
+      "nexus_modules": ["Demo Trading Lab", "Strategy Learning Loop"],
+      "lead_magnets": ["Business Funding Readiness Checklist"],
+      "mini_tools": ["Funding Readiness Score"],
+      "risk_compliance_notes": "DEMO/PAPER ONLY. No real-money trading advice."
+    }
+  ]
+}

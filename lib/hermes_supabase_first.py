@@ -38,6 +38,15 @@ from .ai_task_dispatch import (
     resume_worker_tasks,
     worker_registry_rows,
 )
+from .nexus_youtube_ops import (
+    add_idea as yt_add_idea,
+    generate_description as yt_generate_description,
+    generate_outline as yt_generate_outline,
+    ingest_channel_link as yt_ingest_channel_link,
+    ingest_playlist_link as yt_ingest_playlist_link,
+    list_ideas as yt_list_ideas,
+    recommend_revenue_tieins as yt_recommend_revenue_tieins,
+)
 
 load_nexus_env()
 
@@ -76,6 +85,8 @@ _KNOWLEDGE_TRIGGERS: list[str] = [
     "ingest this channel", "what channels are processing", "what videos were ingested",
     "send this to opencode", "ask claude code", "send this task to openclaude",
     "what tasks are running", "show last opencode result", "pause opencode tasks", "resume claude code queue",
+    "add youtube idea", "plan a youtube video", "generate youtube description",
+    "what youtube videos should i make next", "what content connects to revenue", "ingest this playlist",
 ]
 
 # Topics that map to AI employee roles
@@ -290,6 +301,11 @@ def _extract_youtube_channel_url(text: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
+def _extract_youtube_playlist_url(text: str) -> str | None:
+    m = re.search(r"(https?://(?:www\.)?youtube\.com/playlist\?list=[^\s]+)", text, re.I)
+    return m.group(1).strip() if m else None
+
+
 def _ingest_channel_from_telegram(text: str) -> str | None:
     tl = text.lower()
     if "ingest this channel" not in tl:
@@ -323,6 +339,41 @@ def _ingest_channel_from_telegram(text: str) -> str | None:
     except Exception as exc:
         logger.warning("telegram channel ingest failed: %s", exc)
         return f"Channel ingestion failed safely: {type(exc).__name__}."
+
+
+def _ingest_playlist_from_telegram(text: str) -> str | None:
+    tl = text.lower()
+    if "ingest this playlist" not in tl:
+        return None
+    playlist_url = _extract_youtube_playlist_url(text)
+    if not playlist_url:
+        return "Send the full YouTube playlist URL like: ingest this playlist https://youtube.com/playlist?list=..."
+    try:
+        from .hermes_email_knowledge_intake import parse_knowledge_email, ingest_email_to_transcript_queue
+
+        parsed = parse_knowledge_email(
+            sender="Telegram Operator <telegram@nexus.local>",
+            subject="Telegram Playlist Ingestion Request",
+            body=playlist_url,
+            message_id=f"telegram-playlist-{abs(hash(playlist_url))}",
+        )
+        result = ingest_email_to_transcript_queue(
+            parsed,
+            apply=CHANNEL_INGEST_APPLY,
+            max_channel_videos=30,
+        )
+        inserted = int(result.get("transcript_rows_inserted") or 0)
+        prepared = int(result.get("transcript_rows_prepared") or 0)
+        dups = int(result.get("duplicates_skipped") or 0)
+        mode = "applied" if CHANNEL_INGEST_APPLY else "dry-run"
+        return (
+            f"Playlist ingestion {mode}: {playlist_url}\n"
+            f"Prepared {prepared} source rows, inserted {inserted}, duplicates skipped {dups}.\n"
+            "No automatic Telegram summary was sent."
+        )
+    except Exception as exc:
+        logger.warning("telegram playlist ingest failed: %s", exc)
+        return f"Playlist ingestion failed safely: {type(exc).__name__}."
 
 
 def summarize_recent_ingestions(domain: str | None = None, limit: int = 10) -> str:
@@ -444,6 +495,40 @@ def _handle_retrieval_query(text: str) -> str | None:
     channel_ingest = _ingest_channel_from_telegram(text)
     if channel_ingest is not None:
         return channel_ingest
+
+    playlist_ingest = _ingest_playlist_from_telegram(text)
+    if playlist_ingest is not None:
+        return playlist_ingest
+
+    if "add youtube idea:" in t:
+        raw = text.split(":", 1)[1].strip() if ":" in text else "Untitled idea"
+        idea = yt_add_idea("business_funding", raw)
+        return f"Added YouTube idea: {idea.get('title')} (id: {idea.get('id')})."
+
+    if "plan a youtube video about" in t:
+        topic = text.split("about", 1)[1].strip() if "about" in t else text
+        outline = yt_generate_outline(topic, "business_funding")
+        return "Video plan:\n• Hook: " + str(outline.get("hook")) + "\n• Sections: " + ", ".join(outline.get("sections") or [])
+
+    if "generate youtube description for" in t:
+        title = text.split("for", 1)[1].strip() if "for" in t else text
+        return yt_generate_description(title, "business_funding")[:700]
+
+    if "what youtube videos should i make next" in t:
+        ideas = yt_list_ideas(status="idea")[:5]
+        if not ideas:
+            return "No queued idea entries yet. Add one with: Add YouTube idea: <title>."
+        return "Next YouTube ideas:\n" + "\n".join(f"• {r.get('title')}" for r in ideas)
+
+    if "what content connects to revenue" in t:
+        tieins = yt_recommend_revenue_tieins("business_funding")
+        return (
+            "Content to revenue tie-in:\n"
+            f"• Newsletter: {tieins.get('newsletter_topic')}\n"
+            f"• Lead magnet: {tieins.get('lead_magnet')}\n"
+            f"• Affiliates: {', '.join(tieins.get('affiliate_recommendation') or [])}\n"
+            f"• Mini tool: {tieins.get('mini_tool')}"
+        )
 
     if "send this to opencode" in t:
         task = create_task(
