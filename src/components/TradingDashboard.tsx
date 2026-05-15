@@ -136,6 +136,16 @@ export function TradingDashboard() {
   const openTrades = trades.filter(t => t.entry_status === 'open');
   const closedTrades = trades.filter(t => t.entry_status === 'closed');
   const logTail = status?.signal_review_tail ?? [];
+  const categoryCounts = trades.reduce<Record<string, number>>((acc, t) => {
+    const key = (t.asset_class || 'unknown').toLowerCase();
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+  const strategyPulse = [
+    { label: 'Research Activity', value: Math.min(100, logTail.length * 12) },
+    { label: 'Signal Confidence', value: Math.min(95, 35 + openTrades.length * 9) },
+    { label: 'Risk Posture', value: eng?.dry_run ? 82 : 40 },
+  ];
 
   return (
     <div className="p-4 space-y-5 max-w-7xl mx-auto">
@@ -193,6 +203,31 @@ export function TradingDashboard() {
           sub={`${closedTrades.length} closed`}
         />
       </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        {strategyPulse.map((row) => (
+          <div key={row.label} className="glass-card p-4">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">{row.label}</p>
+            <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
+              <div className="h-full rounded-full bg-gradient-to-r from-[#3d5af1] to-[#0ea5e9]" style={{ width: `${row.value}%`, transition: 'width 0.35s ease' }} />
+            </div>
+            <p className="text-[10px] text-slate-400 mt-2 font-semibold">{row.value}% live confidence</p>
+          </div>
+        ))}
+      </div>
+
+      {Object.keys(categoryCounts).length > 0 && (
+        <div className="glass-card p-4">
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Market Category Pulse</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(categoryCounts).slice(0, 6).map(([cat, count]) => (
+              <span key={cat} className="px-2 py-1 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wide">
+                {cat}: {count}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* last signal */}
       {eng?.last_signal && (

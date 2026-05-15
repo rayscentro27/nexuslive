@@ -265,6 +265,11 @@ export function OpportunityDashboard({ onNavigate, limit = 7 }: Props) {
   const filtered: Opportunity[] = categoryFilter === 'all' ? opportunities : opportunities.filter(o => o.category === categoryFilter);
 
   const validated = opportunities.filter(o => o.nexus_status === 'validated' || o.tested_by_nexus).length;
+  const avgOpportunity = opportunities.length ? Math.round(opportunities.reduce((s, o) => s + o.opportunity_score, 0) / opportunities.length) : 0;
+  const topCategories = Object.entries(opportunities.reduce<Record<string, number>>((acc, o) => {
+    acc[o.category] = (acc[o.category] ?? 0) + 1;
+    return acc;
+  }, {})).sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 4);
 
   return (
     <div style={{ padding: '16px 20px' }}>
@@ -285,6 +290,7 @@ export function OpportunityDashboard({ onNavigate, limit = 7 }: Props) {
             { label: 'Matched', value: opportunities.length, color: '#3d5af1', bg: '#eef0fd' },
             { label: 'Nexus Validated', value: validated, color: '#16a34a', bg: '#dcfce7' },
             { label: 'Avg Feasibility', value: `${Math.round(opportunities.reduce((s, o) => s + o.feasibility_score, 0) / opportunities.length)}%`, color: '#d97706', bg: '#fef3c7' },
+            { label: 'Opportunity Pulse', value: `${avgOpportunity}%`, color: '#0ea5e9', bg: '#ecfeff' },
           ].map(s => (
             <div key={s.label} style={{
               flex: '1 1 90px', padding: '10px 12px', borderRadius: 12,
@@ -295,6 +301,27 @@ export function OpportunityDashboard({ onNavigate, limit = 7 }: Props) {
               <p style={{ fontSize: 11, color: '#6b7280', margin: 0 }}>{s.label}</p>
             </div>
           ))}
+        </div>
+      )}
+
+      {!loading && topCategories.length > 0 && (
+        <div style={{
+          borderRadius: 12,
+          border: '1px solid #e5e7eb',
+          background: 'linear-gradient(135deg,#ffffff,#f8fafc)',
+          padding: '10px 12px',
+          marginBottom: 14,
+        }}>
+          <p style={{ fontSize: 10, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0, marginBottom: 8 }}>
+            Discovery Stream
+          </p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {topCategories.map(([cat, count]) => (
+              <span key={cat} style={{ fontSize: 11, fontWeight: 700, color: '#334155', background: '#eef2ff', borderRadius: 999, padding: '4px 10px', border: '1px solid #c7d2fe' }}>
+                {cat}: {count}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 

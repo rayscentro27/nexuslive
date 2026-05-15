@@ -96,6 +96,10 @@ export async function sendOpportunityBriefAlert(brief) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
     return false;
   }
+  if ((process.env.TELEGRAM_AUTO_REPORTS_ENABLED || "false") !== "true") {
+    console.log("telegram_policy denied=true reason=manual_only_default");
+    return false;
+  }
 
   const payload = {
     chat_id: TELEGRAM_CHAT_ID,

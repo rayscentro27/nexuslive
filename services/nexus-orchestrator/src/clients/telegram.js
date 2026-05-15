@@ -9,6 +9,10 @@ const CHAT_ID = getEnv('TELEGRAM_CHAT_ID', '');
 
 export async function notify(text) {
   if (!TOKEN || !CHAT_ID) return;
+  if ((process.env.TELEGRAM_AUTO_REPORTS_ENABLED || 'false') !== 'true') {
+    console.log('telegram_policy denied=true reason=manual_only_default');
+    return;
+  }
   try {
     await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
       method:  'POST',

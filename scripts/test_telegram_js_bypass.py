@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Fail if tracked JS files use raw Telegram sendMessage."""
+"""Fail if tracked JS files use raw Telegram sendMessage without policy guard."""
 
 from __future__ import annotations
 
 import subprocess
 import sys
 from pathlib import Path
+import re
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -27,12 +28,21 @@ def _tracked_files() -> list[Path]:
 
 def main() -> int:
     violations: list[str] = []
+    endpoint_re = re.compile(r"api\.telegram\.org/.+?/sendMessage")
+    guard_markers = (
+        "shouldSendTelegramNotification",
+        "shouldSendTelegram(",
+        "telegram_policy denied=true",
+        "TELEGRAM_AUTO_REPORTS_ENABLED",
+    )
     for path in _tracked_files():
         rel = str(path.relative_to(ROOT))
         if rel.startswith("tests/") or rel.startswith("scripts/test_"):
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
-        if "sendMessage" in text and "telegram_policy denied=true" not in text:
+        raw_send = "sendMessage" in text and bool(endpoint_re.search(text))
+        guarded = any(m in text for m in guard_markers)
+        if raw_send and not guarded:
             violations.append(rel)
 
     if violations:

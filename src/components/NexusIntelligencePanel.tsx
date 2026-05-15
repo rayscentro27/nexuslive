@@ -179,7 +179,7 @@ export function NexusIntelligencePanel({ compact = false, onNavigate }: Props) {
 
   const trendingTopics = Object.entries(snapshot?.worker_activity?.feature_counts || {})
     .filter(([k]) => k !== 'unknown')
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => Number(b[1]) - Number(a[1]))
     .slice(0, 3);
 
   const TABS = [

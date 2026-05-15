@@ -8,6 +8,10 @@ async function sendTelegramMessage(text) {
     console.warn("[telegram] TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID not set. Skipping.");
     return;
   }
+  if ((process.env.TELEGRAM_AUTO_REPORTS_ENABLED || "false") !== "true") {
+    console.log("telegram_policy denied=true reason=manual_only_default");
+    return;
+  }
 
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
   const res = await fetch(url, {

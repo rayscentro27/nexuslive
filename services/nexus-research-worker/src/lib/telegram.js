@@ -11,6 +11,10 @@ const logger = createLogger('telegram');
 
 export async function sendTelegram(text, { enabled = true } = {}) {
   if (!enabled) return;
+  if ((process.env.TELEGRAM_AUTO_REPORTS_ENABLED || 'false') !== 'true') {
+    logger.info('telegram_policy denied=true reason=manual_only_default');
+    return;
+  }
   if (!config.telegramToken || !config.telegramChatId) return;
   try {
     const res = await fetch(

@@ -14,6 +14,10 @@ const DECISION_EMOJI = { approved: "✅", manual_review: "⚠️" };
 
 export async function sendApprovalAlert(queueItem) {
   if (!BOT || !CHAT) return;
+  if ((process.env.TELEGRAM_AUTO_REPORTS_ENABLED || "false") !== "true") {
+    console.log("telegram_policy denied=true reason=manual_only_default");
+    return;
+  }
 
   const e      = DECISION_EMOJI[queueItem.decision] ?? "📋";
   const sym    = (queueItem.symbol ?? "").replace("_", "");
@@ -49,6 +53,10 @@ export async function sendApprovalAlert(queueItem) {
 
 export async function sendSystemAlert(text) {
   if (!BOT || !CHAT) return;
+  if ((process.env.TELEGRAM_AUTO_REPORTS_ENABLED || "false") !== "true") {
+    console.log("telegram_policy denied=true reason=manual_only_default");
+    return;
+  }
   await tgSend(`🏦 <b>Nexus Trading Lab</b>\n${text}`);
 }
 

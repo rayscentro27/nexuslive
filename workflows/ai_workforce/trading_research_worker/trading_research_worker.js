@@ -82,6 +82,10 @@ async function countRecentProposals() {
 
 async function sendTelegram(text) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+  if ((process.env.TELEGRAM_AUTO_REPORTS_ENABLED || "false") !== "true") {
+    console.log("telegram_policy denied=true reason=manual_only_default");
+    return;
+  }
   try {
     await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: "POST",

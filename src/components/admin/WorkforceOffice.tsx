@@ -265,6 +265,23 @@ export function WorkforceOffice() {
         </p>
       </div>
 
+      {!!snapshot?.warnings?.length && (
+        <div style={{
+          marginBottom: 12,
+          borderRadius: 10,
+          border: '1px solid #fecaca',
+          background: '#fff1f2',
+          padding: '8px 10px',
+        }}>
+          <p style={{ fontSize: 10, fontWeight: 800, color: '#b91c1c', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Operational Alerts
+          </p>
+          <p style={{ fontSize: 11, color: '#7f1d1d', margin: '4px 0 0' }}>
+            {(snapshot.warnings || []).slice(0, 3).join(' · ')}
+          </p>
+        </div>
+      )}
+
       {/* Panel tabs */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
         {PANELS.map(p => {

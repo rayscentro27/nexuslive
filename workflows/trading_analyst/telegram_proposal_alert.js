@@ -88,6 +88,10 @@ export async function sendProposalAlert(proposal) {
     console.warn("[telegram] BOT_TOKEN or CHAT_ID missing — skipping alert.");
     return;
   }
+  if ((process.env.TELEGRAM_AUTO_REPORTS_ENABLED || "false") !== "true") {
+    console.log("telegram_policy denied=true reason=manual_only_default");
+    return;
+  }
 
   const text = buildMessage(proposal);
 
@@ -120,6 +124,10 @@ export async function sendProposalAlert(proposal) {
  */
 export async function sendSystemAlert(text) {
   if (!BOT_TOKEN || !CHAT_ID) return;
+  if ((process.env.TELEGRAM_AUTO_REPORTS_ENABLED || "false") !== "true") {
+    console.log("telegram_policy denied=true reason=manual_only_default");
+    return;
+  }
 
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
     method: "POST",

@@ -17,6 +17,7 @@ const logger         = createLogger('alerts');
 const TELEGRAM_TOKEN = getEnv('TELEGRAM_BOT_TOKEN', '');
 const TELEGRAM_CHAT  = getEnv('TELEGRAM_CHAT_ID', '');
 const ALERTS_ENABLED = getEnv('ENABLE_TELEGRAM_ALERTS', 'true') !== 'false';
+const AUTO_REPORTS_ENABLED = getEnv('TELEGRAM_AUTO_REPORTS_ENABLED', 'false') === 'true';
 const COOLDOWN_MS    = parseInt(getEnv('ALERT_COOLDOWN_MS', '300000'), 10); // 5 min default
 
 // In-memory cooldown: alert_key → last emitted timestamp
@@ -26,6 +27,10 @@ const cooldown = new Map();
 
 async function sendTelegram(text) {
   if (!ALERTS_ENABLED || !TELEGRAM_TOKEN || !TELEGRAM_CHAT) return;
+  if (!AUTO_REPORTS_ENABLED) {
+    logger.info('telegram_policy denied=true reason=manual_only_default');
+    return;
+  }
   try {
     await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
       method:  'POST',

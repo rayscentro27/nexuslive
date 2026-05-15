@@ -17,6 +17,10 @@ function sym(s)          { return (s ?? "").replace("_", ""); }
 
 export async function sendProposalAlert(proposal) {
   if (!BOT || !CHAT) return;
+  if ((process.env.TELEGRAM_AUTO_REPORTS_ENABLED || "false") !== "true") {
+    console.log("telegram_policy denied=true reason=manual_only_default");
+    return;
+  }
 
   const e  = STATUS_EMOJI[proposal.status] ?? "⚪";
   const isOptions = proposal.asset_type === "options";

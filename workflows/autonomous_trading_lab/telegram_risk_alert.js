@@ -22,6 +22,10 @@ const FLAG_LABEL = {
 
 export async function sendRiskAlert(proposal, riskResult) {
   if (!BOT || !CHAT) return;
+  if ((process.env.TELEGRAM_AUTO_REPORTS_ENABLED || "false") !== "true") {
+    console.log("telegram_policy denied=true reason=manual_only_default");
+    return;
+  }
 
   const e     = DECISION_EMOJI[riskResult.decision] ?? "⚪";
   const score = riskResult.score ?? "—";
