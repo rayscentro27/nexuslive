@@ -47,6 +47,15 @@ from .nexus_youtube_ops import (
     list_ideas as yt_list_ideas,
     recommend_revenue_tieins as yt_recommend_revenue_tieins,
 )
+from .hermes_roadmap_intelligence import (
+    assign_task_to_worker,
+    highest_priority_tasks,
+    next_steps,
+    roadmap_summary,
+    systems_weaknesses,
+    tester_readiness_view,
+    update_task_status,
+)
 
 load_nexus_env()
 
@@ -87,6 +96,11 @@ _KNOWLEDGE_TRIGGERS: list[str] = [
     "what tasks are running", "show last opencode result", "pause opencode tasks", "resume claude code queue",
     "add youtube idea", "plan a youtube video", "generate youtube description",
     "what youtube videos should i make next", "what content connects to revenue", "ingest this playlist",
+    "what should we work on", "show roadmap", "what are the next 20 steps", "show highest priority tasks",
+    "hermes do task", "pause task", "resume roadmap", "what did we learn", "what's blocking progress",
+    "what should opencode do", "what should claude code review", "what systems are weak",
+    "how ready are we for testers", "what should we improve tonight", "summarize nexus progress",
+    "show updated roadmap",
 ]
 
 # Topics that map to AI employee roles
@@ -528,6 +542,96 @@ def _handle_retrieval_query(text: str) -> str | None:
             f"• Lead magnet: {tieins.get('lead_magnet')}\n"
             f"• Affiliates: {', '.join(tieins.get('affiliate_recommendation') or [])}\n"
             f"• Mini tool: {tieins.get('mini_tool')}"
+        )
+
+    if any(k in t for k in ["what should we work on", "show next steps", "show roadmap"]):
+        steps = next_steps(limit=5)
+        if not steps:
+            return "Roadmap is empty right now. Seed tasks first and I will prioritize them."
+        lines = ["Top next steps:"]
+        for s in steps:
+            lines.append(f"• Task {s.get('id')}: {s.get('title')} ({s.get('category')}) — priority {s.get('priority_score')}")
+        return "\n".join(lines)
+
+    if "what are the next 20 steps" in t:
+        steps = next_steps(limit=20)
+        lines = ["Next 20 roadmap steps:"]
+        for s in steps:
+            lines.append(f"• {s.get('id')}. {s.get('title')} [{s.get('status')}]")
+        return "\n".join(lines)
+
+    if "show highest priority tasks" in t:
+        rows = highest_priority_tasks(limit=8)
+        return "Highest priority tasks:\n" + "\n".join(f"• {r.get('id')}: {r.get('title')} ({r.get('priority_score')})" for r in rows)
+
+    if "hermes do task" in t:
+        m = re.search(r"task\s+(\d+)", t)
+        if not m:
+            return "Tell me the task number, for example: Hermes do task 5."
+        tid = int(m.group(1))
+        out = assign_task_to_worker(tid)
+        if not out:
+            return f"I could not find roadmap task {tid}."
+        r = out.get("roadmap_task") or {}
+        d = out.get("dispatch_task") or {}
+        return f"Started roadmap task {tid} with {r.get('recommended_worker')}. Dispatch task id: {d.get('id')}"
+
+    if "pause task" in t:
+        m = re.search(r"task\s+(\d+)", t)
+        if not m:
+            return "Tell me which task number to pause."
+        updated = update_task_status(int(m.group(1)), "paused")
+        return f"Paused task {m.group(1)}." if updated else "Task not found or invalid status transition."
+
+    if "resume roadmap" in t:
+        return "Roadmap active. Ask me for next steps and I'll reprioritize based on current operations."
+
+    if "what did we learn" in t:
+        summary = roadmap_summary()
+        lessons = summary.get("lessons") or []
+        if not lessons:
+            return "No roadmap lessons recorded yet."
+        return "Recent lessons:\n" + "\n".join(f"• {l.get('note') or l}" for l in lessons[-5:])
+
+    if "what's blocking progress" in t or "what is blocking progress" in t:
+        blocked = [r for r in next_steps(limit=20) if str(r.get("status") or "") == "blocked"]
+        if not blocked:
+            return "No roadmap tasks are currently marked blocked."
+        return "Current blockers:\n" + "\n".join(f"• Task {b.get('id')}: {b.get('title')}" for b in blocked)
+
+    if "what should opencode do" in t:
+        rows = [r for r in next_steps(limit=12) if str(r.get("recommended_worker") or "") == "opencode_codex"][:5]
+        return "Best OpenCode tasks now:\n" + "\n".join(f"• {r.get('id')}: {r.get('title')}" for r in rows)
+
+    if "what should claude code review" in t:
+        rows = [r for r in next_steps(limit=12) if str(r.get("recommended_worker") or "") == "claude_code"][:5]
+        return "Best Claude Code review/design tasks:\n" + "\n".join(f"• {r.get('id')}: {r.get('title')}" for r in rows)
+
+    if "what systems are weak" in t:
+        weak = systems_weaknesses(limit=6)
+        if not weak:
+            return "No weak systems are flagged from roadmap state right now."
+        return "Weak systems to address:\n" + "\n".join(f"• {w.get('category')}: {w.get('title')} ({w.get('status')})" for w in weak)
+
+    if "how ready are we for testers" in t:
+        view = tester_readiness_view()
+        return (
+            f"Tester readiness: {view.get('tester_readiness_percent')}%\n"
+            f"Completed {view.get('tester_tasks_completed')}/{view.get('tester_tasks_total')} tester-focused tasks."
+        )
+
+    if "what should we improve tonight" in t:
+        top = next_steps(limit=3)
+        return "Tonight's focus:\n" + "\n".join(f"• {r.get('title')} ({r.get('category')})" for r in top)
+
+    if "summarize nexus progress" in t:
+        s = roadmap_summary()
+        c = s.get("status_counts") or {}
+        return (
+            "Nexus progress snapshot:\n"
+            f"• Total roadmap tasks: {s.get('total_tasks')}\n"
+            f"• Active: {c.get('active', 0)} | Queued: {c.get('queued', 0)} | Blocked: {c.get('blocked', 0)} | Completed: {c.get('completed', 0)}\n"
+            "• Ask me for next 20 steps or worker-specific priorities."
         )
 
     if "send this to opencode" in t:

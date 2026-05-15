@@ -2085,6 +2085,12 @@ def api_admin_ai_operations_workforce():
         "ai_task_workers": _safe_select("ai_task_workers?select=worker_id,health_status,active,concurrency_limit,runtime_environment,updated_at&order=worker_id&limit=20"),
         "ai_task_recent_results": _safe_select("ai_task_results?select=task_id,worker_id,status,result_summary,created_at&order=created_at.desc&limit=30"),
     }
+    try:
+        from lib.hermes_roadmap_intelligence import roadmap_summary
+
+        data["roadmap"] = roadmap_summary()
+    except Exception:
+        data["roadmap"] = {}
     return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
 
 

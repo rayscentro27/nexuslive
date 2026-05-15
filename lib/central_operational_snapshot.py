@@ -7,6 +7,7 @@ from typing import Any
 
 from revenue_engine.revenue_foundation import build_revenue_dashboard_stub
 from lib.autonomous_demo_trading_lab import build_demo_status_snapshot
+from lib.hermes_roadmap_intelligence import roadmap_summary
 
 
 def build_central_operational_snapshot(*, rest_select, model_preview: list[dict] | None = None) -> dict[str, Any]:
@@ -185,6 +186,7 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
     sim_mode_enabled = str(os.getenv("TRADING_SIMULATION_MODE", "false")).lower() in {"1", "true", "yes", "on"}
     revenue_stub = build_revenue_dashboard_stub()
     demo_status = build_demo_status_snapshot()
+    roadmap = roadmap_summary()
 
     completion_seconds: list[float] = []
     for row in ai_task_rows:
@@ -300,6 +302,7 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
             "average_completion_seconds": round(sum(completion_seconds) / len(completion_seconds), 2) if completion_seconds else 0.0,
             "recent_tasks": ai_task_rows[:12],
         },
+        "conversational_roadmap": roadmap,
         "worker_activity": {
             "recent_events": recent_activity,
             "feature_counts": dict(event_features),
