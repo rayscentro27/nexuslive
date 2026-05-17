@@ -1,0 +1,59 @@
+{
+  "weeks": [
+    {"week": 1, "focus": "Stability + content pipeline activation", "status": "active"},
+    {"week": 2, "focus": "Lead magnet distribution + newsletter growth", "status": "queued"},
+    {"week": 3, "focus": "Onboarding conversion experiments", "status": "queued"},
+    {"week": 4, "focus": "Revenue loop refinement and retention", "status": "queued"}
+  ],
+  "ctas": {
+    "primary": "Download the checklist and join Nexus updates.",
+    "secondary": "Join Nexus waitlist for guided readiness tools."
+  },
+  "lead_magnets": [
+    {
+      "title": "Business Funding Readiness Checklist",
+      "cta": "Download the checklist",
+      "audience": "Founders preparing for funding",
+      "landing_page_copy": "Use this checklist to identify funding blockers in under 15 minutes.",
+      "newsletter_follow_up": "Funding readiness action steps",
+      "affiliate_tieins": ["Bizee", "Novo", "SmartCredit"],
+      "nexus_module_tieins": ["Funding Readiness", "Credit Readiness"]
+    },
+    {
+      "title": "30-Day Fundability Guide",
+      "cta": "Start your 30-day plan",
+      "audience": "Operators building lending-ready businesses",
+      "landing_page_copy": "Follow a practical 30-day sequence to improve fundability.",
+      "newsletter_follow_up": "Week-by-week fundability roadmap",
+      "affiliate_tieins": ["LegalZoom", "Bluevine", "IdentityIQ"],
+      "nexus_module_tieins": ["Funding Intelligence", "Operational Snapshot"]
+    },
+    {
+      "title": "AI Automation Starter Guide",
+      "cta": "Get the automation guide",
+      "audience": "Small teams and solo operators",
+      "landing_page_copy": "Deploy practical automation loops without overengineering.",
+      "newsletter_follow_up": "Automation stack recommendations",
+      "affiliate_tieins": ["Zapier", "Make", "Notion"],
+      "nexus_module_tieins": ["AI Workforce", "Task Dispatch"]
+    },
+    {
+      "title": "Grant Readiness Checklist",
+      "cta": "Check grant readiness",
+      "audience": "Businesses pursuing grant capital",
+      "landing_page_copy": "Verify eligibility and avoid common grant application misses.",
+      "newsletter_follow_up": "Grant opportunity brief",
+      "affiliate_tieins": ["ClickUp", "Notion"],
+      "nexus_module_tieins": ["Grant Research", "Knowledge Brain"]
+    },
+    {
+      "title": "AI Business Launch Blueprint",
+      "cta": "Launch with the blueprint",
+      "audience": "New founders and side-hustlers",
+      "landing_page_copy": "Turn an AI-enabled business idea into a launch-ready plan.",
+      "newsletter_follow_up": "Launch execution checklist",
+      "affiliate_tieins": ["Canva", "Gumroad", "Payhip"],
+      "nexus_module_tieins": ["Business Opportunities", "Revenue Engine"]
+    }
+  ]
+}

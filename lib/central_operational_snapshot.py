@@ -9,6 +9,12 @@ from revenue_engine.revenue_foundation import build_revenue_dashboard_stub
 from lib.autonomous_demo_trading_lab import build_demo_status_snapshot
 from lib.hermes_roadmap_intelligence import roadmap_summary
 from lib.adaptive_trading_intelligence import trading_intelligence_summary
+from lib.revenue_activation_system import (
+    content_pipeline_status,
+    operational_trust_snapshot,
+    today_in_nexus_summary,
+    travel_mobile_summary as revenue_travel_mobile_summary,
+)
 
 
 def build_central_operational_snapshot(*, rest_select, model_preview: list[dict] | None = None) -> dict[str, Any]:
@@ -189,6 +195,10 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
     demo_status = build_demo_status_snapshot()
     roadmap = roadmap_summary()
     adaptive = trading_intelligence_summary()
+    revenue_pipeline = content_pipeline_status()
+    revenue_mobile = revenue_travel_mobile_summary()
+    today_digest = today_in_nexus_summary()
+    trust_snapshot = operational_trust_snapshot()
 
     completion_seconds: list[float] = []
     for row in ai_task_rows:
@@ -323,6 +333,12 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
             "operator_hint": "Use 'what should we work on next' and 'summarize nexus progress' for travel-first check-ins.",
         },
         "adaptive_trading_intelligence": adaptive,
+        "revenue_activation": {
+            "pipeline": revenue_pipeline,
+            "mobile_summary": revenue_mobile,
+        },
+        "today_in_nexus": today_digest,
+        "operational_trust": trust_snapshot,
         "worker_activity": {
             "recent_events": recent_activity,
             "feature_counts": dict(event_features),

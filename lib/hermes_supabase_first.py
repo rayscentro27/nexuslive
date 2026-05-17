@@ -69,6 +69,22 @@ from .adaptive_trading_intelligence import (
     source_tier,
     trading_intelligence_summary,
 )
+from .revenue_activation_system import (
+    ai_employee_personality_profiles,
+    affiliate_revenue_map,
+    business_audit,
+    content_pipeline_status,
+    daily_content_suggestions,
+    daily_learnings_summary,
+    flagship_lead_magnet,
+    intelligence_brief_template,
+    lead_magnet_catalog,
+    operational_trust_snapshot,
+    opportunity_hall_of_fame,
+    strategy_hall_of_fame_refinement,
+    today_in_nexus_summary,
+    travel_mobile_summary,
+)
 
 load_nexus_env()
 
@@ -121,6 +137,8 @@ _KNOWLEDGE_TRIGGERS: list[str] = [
     "what did we learn from the last loss", "show hall of fame strategies", "what strategies are failing",
     "what strategy mutations look promising", "what market personalities are strongest today",
     "should we avoid trading right now", "summarize trading intelligence",
+    "how do we make money this week", "what content should we create", "what opportunities look promising",
+    "what did nexus learn today", "today in nexus", "nexus intelligence brief", "business funding readiness blueprint",
 ]
 
 # Topics that map to AI employee roles
@@ -790,6 +808,96 @@ def _handle_retrieval_query(text: str) -> str | None:
             f"• Loss autopsies: {s.get('loss_autopsy_count')}\n"
             f"• Source tiers A/B/C: {tiers.get('A',0)}/{tiers.get('B',0)}/{tiers.get('C',0)}\n"
             f"• Mutations in testing: {s.get('strategy_mutations_testing')}"
+        )
+
+    if "how do we make money this week" in t:
+        pipeline = content_pipeline_status()
+        leads = lead_magnet_catalog()[:2]
+        return (
+            "Best revenue path this week:\n"
+            f"• Focus: {pipeline.get('next_action')}\n"
+            f"• Publish content with lead magnet CTA: {leads[0].get('title') if leads else 'Funding Checklist'}\n"
+            "• Drive to newsletter, then Nexus onboarding follow-up.\n"
+            "• Run one conversion experiment and review results in 48 hours."
+        )
+
+    if "what content should we create" in t:
+        ideas = daily_content_suggestions()
+        return (
+            "Today's content plan:\n"
+            + "\n".join(f"• {i}" for i in (ideas.get("youtube_ideas") or [])[:4])
+            + "\nCTA: " + str(ideas.get("cta"))
+        )
+
+    if "what opportunities look promising" in t:
+        map_row = affiliate_revenue_map("business_opportunities")
+        return (
+            "Promising opportunity lane: low-cost AI service offers with automation leverage.\n"
+            f"Affiliate tie-ins: {', '.join(map_row.get('affiliate_tieins') or [])}\n"
+            f"Next move: {map_row.get('cta')}"
+        )
+
+    if "what did nexus learn today" in t:
+        learned = daily_learnings_summary()
+        lines = ["What Nexus learned today:"]
+        for row in (learned.get("latest") or [])[-4:]:
+            lines.append(f"• [{row.get('category','ops')}] {row.get('lesson')}")
+        return "\n".join(lines)
+
+    if "today in nexus" in t or "nexus intelligence brief" in t:
+        digest = today_in_nexus_summary()
+        sec = digest.get("sections") or {}
+        items = sec.get("content_ideas") or []
+        return (
+            f"{digest.get('headline')}:\n"
+            f"• Next focus: {(sec.get('roadmap_progress') or {}).get('next_focus')}\n"
+            f"• Opportunities: {', '.join((sec.get('opportunities_discovered') or [])[:2])}\n"
+            f"• Content today: {', '.join(items[:2])}\n"
+            "• Safety: demo-only trading, bounded automation\n"
+            f"CTA: {(digest.get('newsletter_ready') or {}).get('cta')}"
+        )
+
+    if "business funding readiness blueprint" in t:
+        pack = flagship_lead_magnet()
+        return (
+            f"Flagship lead magnet: {pack.get('name')}\n"
+            f"• Primary CTA: {pack.get('primary_cta')}\n"
+            f"• Includes: {', '.join((pack.get('components') or [])[:4])}\n"
+            f"• Follow-up: {pack.get('follow_up_cta')}"
+        )
+
+    if "show opportunity hall of fame" in t or "opportunity hall of fame" in t:
+        hof = opportunity_hall_of_fame()
+        return (
+            "Opportunity Hall of Fame:\n"
+            f"• Statuses: {', '.join(hof.get('statuses') or [])}\n"
+            f"• Ranking lens: {', '.join((hof.get('ranking_dimensions') or [])[:5])}\n"
+            f"• Rule: {hof.get('current_focus')}"
+        )
+
+    if "show strategy hall of fame" in t or "strategy hall of fame" in t:
+        hof = strategy_hall_of_fame_refinement()
+        return (
+            "Strategy Hall of Fame:\n"
+            f"• Dimensions: {', '.join((hof.get('dimensions') or [])[:5])}\n"
+            f"• Gate: {hof.get('gating_rule')}\n"
+            f"• Label: {hof.get('safety_label')}"
+        )
+
+    if "show ai employee personalities" in t or "ai employee personalities" in t:
+        profiles = ai_employee_personality_profiles()
+        return "AI employee specialties:\n" + "\n".join(
+            f"• {p.get('name')}: {p.get('domain')} ({p.get('style')})" for p in profiles[:8]
+        )
+
+    if "operational trust" in t or "trust status" in t:
+        trust = operational_trust_snapshot()
+        ts = trust.get("trading_safety") or {}
+        return (
+            "Operational trust snapshot:\n"
+            f"• Telegram: {trust.get('telegram_spam_guard')}\n"
+            f"• Automation: {trust.get('automation_boundaries')}\n"
+            f"• Safety flags: DRY_RUN={ts.get('NEXUS_DRY_RUN')} LIVE_TRADING={ts.get('LIVE_TRADING')}"
         )
 
     if any(k in t for k in ["catch me up", "where are we", "travel update", "what's happening", "what is happening"]):
