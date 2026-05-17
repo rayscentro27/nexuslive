@@ -7,6 +7,13 @@ Use handle_employee_query(role=employee.id, ...) to route any query.
 
 from dataclasses import dataclass, field
 
+from .ai_employee_prompt_loader import (
+    get_employee_confidence_threshold,
+    get_employee_decision_framework,
+    get_employee_prompt,
+    get_employee_voice,
+)
+
 
 @dataclass
 class AIEmployee:
@@ -17,6 +24,8 @@ class AIEmployee:
     domains: list[str]
     persona_prompt: str
     fallback_tone: str = "professional"
+    confidence_threshold: int = 50
+    decision_framework: str = "supabase_first_then_escalate"
 
 
 EMPLOYEES: list[AIEmployee] = [
@@ -122,6 +131,15 @@ EMPLOYEES: list[AIEmployee] = [
 EMPLOYEE_MAP: dict[str, AIEmployee] = {e.id: e for e in EMPLOYEES}
 
 
+for _id, _employee in list(EMPLOYEE_MAP.items()):
+    prompt = get_employee_prompt(_id)
+    if prompt:
+        _employee.persona_prompt = prompt
+    _employee.fallback_tone = get_employee_voice(_id)
+    _employee.decision_framework = get_employee_decision_framework(_id)
+    _employee.confidence_threshold = get_employee_confidence_threshold(_id, default=_employee.confidence_threshold)
+
+
 def get_employee(role: str) -> AIEmployee | None:
     return EMPLOYEE_MAP.get(role)
 
@@ -133,6 +151,30 @@ def list_employees() -> list[dict]:
             "display_name": e.display_name,
             "emoji": e.emoji,
             "department": e.department,
+            "fallback_tone": e.fallback_tone,
+            "confidence_threshold": e.confidence_threshold,
+            "decision_framework": e.decision_framework,
+        }
+        for e in EMPLOYEES
+    ]
+
+
+def get_role(role: str) -> AIEmployee | None:
+    return get_employee(role)
+
+
+def list_roles() -> list[dict]:
+    return list_employees()
+
+
+def role_routing_preview() -> list[dict]:
+    return [
+        {
+            "role": e.id,
+            "department": e.department,
+            "domains": e.domains,
+            "confidence_threshold": e.confidence_threshold,
+            "decision_framework": e.decision_framework,
         }
         for e in EMPLOYEES
     ]

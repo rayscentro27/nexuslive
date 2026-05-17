@@ -20,6 +20,7 @@ from typing import Any
 from dataclasses import dataclass, field
 
 from .env_loader import load_nexus_env
+from .ai_employee_registry import get_employee
 
 load_nexus_env()
 
@@ -30,6 +31,14 @@ SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_
 
 # Minimum confidence to answer without escalating (0-100)
 CONFIDENCE_THRESHOLD = int(os.getenv("KNOWLEDGE_CONFIDENCE_THRESHOLD", "50"))
+
+FORBIDDEN_PROMISE_PATTERNS = (
+    "guaranteed profit",
+    "guaranteed approval",
+    "guaranteed award",
+    "100% approval",
+    "risk free",
+)
 
 ROLE_DOMAIN_MAP: dict[str, list[str]] = {
     "hermes":                ["knowledge_items", "strategies_catalog", "user_opportunities", "provider_health"],
@@ -312,10 +321,12 @@ def route_query(
             sources.append("provider_health")
 
     confidence = _score_confidence(knowledge_hits, domain_hits, prior_hits, transcript_hits, pending_hits)
+    employee = get_employee(role)
+    threshold = int(employee.confidence_threshold if employee else CONFIDENCE_THRESHOLD)
 
     meaningful_internal = bool(knowledge_hits or domain_hits or prior_hits or transcript_hits)
-    escalation_needed = (confidence < CONFIDENCE_THRESHOLD) and not meaningful_internal
-    status = "found" if confidence >= CONFIDENCE_THRESHOLD else ("partial" if all_records else "not_found")
+    escalation_needed = (confidence < threshold) and not meaningful_internal
+    status = "found" if confidence >= threshold else ("partial" if all_records else "not_found")
 
     # Build summary from best records
     summary_parts: list[str] = []
@@ -365,7 +376,7 @@ def route_query(
     else:
         suggested_response = summary or "Nexus has limited internal context on this topic, but enough to continue without creating a new ticket yet."
 
-    return KnowledgeResult(
+    result = KnowledgeResult(
         status=status,
         confidence=confidence,
         sources=sources,
@@ -375,3 +386,11 @@ def route_query(
         escalation_needed=escalation_needed,
         raw_records=all_records,
     )
+    lower = (result.suggested_response or "").lower()
+    if any(p in lower for p in FORBIDDEN_PROMISE_PATTERNS):
+        result.suggested_response = (
+            "Nexus cannot guarantee outcomes here. Based on current internal evidence, "
+            "treat this as educational guidance and verify with approved sources or a research ticket."
+        )
+        result.risk_notes = (result.risk_notes + " Outcome guarantees are disallowed.").strip()
+    return result

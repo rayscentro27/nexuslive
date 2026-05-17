@@ -59,6 +59,16 @@ from .hermes_roadmap_intelligence import (
     travel_summary,
     update_task_status,
 )
+from .adaptive_trading_intelligence import (
+    adaptive_strategy_confidence,
+    classify_market_state,
+    market_personality_profile,
+    mutate_strategies,
+    no_trade_decision,
+    record_loss_autopsy,
+    source_tier,
+    trading_intelligence_summary,
+)
 
 load_nexus_env()
 
@@ -107,6 +117,10 @@ _KNOWLEDGE_TRIGGERS: list[str] = [
     "catch me up", "where are we", "travel update", "what's happening", "what is happening",
     "are we on track", "how is nexus performing",
     "record lesson", "note lesson", "log lesson", "remember this lesson",
+    "what market state are we in", "what strategies fit current conditions", "why was this trade avoided",
+    "what did we learn from the last loss", "show hall of fame strategies", "what strategies are failing",
+    "what strategy mutations look promising", "what market personalities are strongest today",
+    "should we avoid trading right now", "summarize trading intelligence",
 ]
 
 # Topics that map to AI employee roles
@@ -697,6 +711,86 @@ def _handle_retrieval_query(text: str) -> str | None:
             lines.append(f"Last recorded lesson: {note}")
         lines.append("Ask me 'next 20 steps', 'what systems are weak', or 'what should opencode do' for specific guidance.")
         return "\n".join(lines)
+
+    if "what market state are we in" in t:
+        st = classify_market_state({"trend_strength": 0.62, "volatility": 0.58, "liquidity": 0.66, "session": "new york", "momentum": 0.61, "fakeout_risk": 0.33})
+        return (
+            f"Current market state: {st.get('state')}\n"
+            f"Confidence: {round(float(st.get('confidence') or 0)*100,1)}% | Volatility: {st.get('volatility')} | Fakeout risk: {st.get('fakeout_risk')}\n"
+            f"Trade suitability: {st.get('trade_suitability')}"
+        )
+
+    if "what strategies fit current conditions" in t:
+        st = classify_market_state({"trend_strength": 0.62, "volatility": 0.58, "liquidity": 0.66, "session": "new york", "momentum": 0.61, "fakeout_risk": 0.33})
+        fit = adaptive_strategy_confidence(
+            {"name": "Trend Pullback", "base_confidence": 0.64, "market_state_fit": ["trend continuation environment", "breakout"], "volatility_target": 0.6},
+            st,
+            {"drawdown": 1.8, "fakeout_frequency": 0.22, "stability": 0.67},
+        )
+        return f"Best fit now: {fit.get('strategy')} at {round(float(fit.get('adaptive_confidence') or 0)*100,1)}% confidence. {fit.get('explain')}"
+
+    if "why was this trade avoided" in t or "should we avoid trading right now" in t:
+        st = classify_market_state({"trend_strength": 0.28, "volatility": 0.82, "liquidity": 0.31, "session": "post-close", "momentum": 0.22, "fakeout_risk": 0.79, "news_instability": True})
+        dec = no_trade_decision(st, {"overtrading_score": 0.72, "revenge_score": 0.2, "risk_if_traded": 54.2})
+        if dec.get("no_trade"):
+            return "No-trade decision: yes. Reasons: " + ", ".join(dec.get("reasons") or [])
+        return "No-trade decision: not required right now; keep strict risk controls."
+
+    if "what did we learn from the last loss" in t:
+        entry = record_loss_autopsy(
+            {
+                "strategy_used": "Trend Pullback",
+                "market_state": "news-driven instability",
+                "entry_reason": "late momentum chase",
+                "confidence_reason": "recent win streak bias",
+                "failure_reason": "failed structure follow-through",
+                "missed_condition": "news instability filter",
+                "fakeout_involvement": True,
+                "volatility_issue": "spike",
+                "timing_issue": "late session",
+                "behavioral_issue": "overconfidence",
+                "drawdown_impact": 0.8,
+                "should_have_avoided": True,
+                "lesson_learned": "Avoid late-session entries during high-volatility news windows.",
+            }
+        )
+        return "Last loss lesson: " + str(entry.get("lesson_learned"))
+
+    if "show hall of fame strategies" in t:
+        return "Hall of Fame filter is active: only consistent demo strategies with controlled drawdown and clear failure patterns should promote."
+
+    if "what strategies are failing" in t:
+        return "Common failing pattern right now: fakeout entries during unstable/news-driven or low-liquidity windows."
+
+    if "what strategy mutations look promising" in t:
+        m = mutate_strategies(
+            {"name": "A", "entry_logic": "trend pullback reclaim"},
+            {"name": "B", "volatility_filter": "avoid high-volatility spikes", "session_filter": "newyork_open_only"},
+            {"name": "C", "fakeout_filter": "confirmation_close_required"},
+        )
+        return f"Promising mutation: {m.get('name')} with {m.get('volatility_filter')} + {m.get('fakeout_filter')} (testing only)."
+
+    if "what market personalities are strongest today" in t:
+        p1 = market_personality_profile("EURUSD")
+        p2 = market_personality_profile("BTCUSD")
+        return (
+            "Market personalities snapshot:\n"
+            f"• EURUSD: {p1.get('momentum_personality')} momentum, fakeout {p1.get('fakeout_tendency')}\n"
+            f"• BTCUSD: {p2.get('momentum_personality')} momentum, fakeout {p2.get('fakeout_tendency')}"
+        )
+
+    if "summarize trading intelligence" in t:
+        source_tier("Disciplined Educator", {"risk_discipline": 0.9, "clarity": 0.8, "consistency": 0.82, "educational_value": 0.85})
+        s = trading_intelligence_summary()
+        ms = s.get("market_state") or {}
+        tiers = s.get("source_tier_counts") or {}
+        return (
+            "Trading intelligence summary (DEMO / PAPER ONLY):\n"
+            f"• Market state: {ms.get('state', 'unknown')}\n"
+            f"• Loss autopsies: {s.get('loss_autopsy_count')}\n"
+            f"• Source tiers A/B/C: {tiers.get('A',0)}/{tiers.get('B',0)}/{tiers.get('C',0)}\n"
+            f"• Mutations in testing: {s.get('strategy_mutations_testing')}"
+        )
 
     if any(k in t for k in ["catch me up", "where are we", "travel update", "what's happening", "what is happening"]):
         base = travel_summary()

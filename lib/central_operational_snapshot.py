@@ -8,6 +8,7 @@ from typing import Any
 from revenue_engine.revenue_foundation import build_revenue_dashboard_stub
 from lib.autonomous_demo_trading_lab import build_demo_status_snapshot
 from lib.hermes_roadmap_intelligence import roadmap_summary
+from lib.adaptive_trading_intelligence import trading_intelligence_summary
 
 
 def build_central_operational_snapshot(*, rest_select, model_preview: list[dict] | None = None) -> dict[str, Any]:
@@ -187,6 +188,7 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
     revenue_stub = build_revenue_dashboard_stub()
     demo_status = build_demo_status_snapshot()
     roadmap = roadmap_summary()
+    adaptive = trading_intelligence_summary()
 
     completion_seconds: list[float] = []
     for row in ai_task_rows:
@@ -320,6 +322,7 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
             },
             "operator_hint": "Use 'what should we work on next' and 'summarize nexus progress' for travel-first check-ins.",
         },
+        "adaptive_trading_intelligence": adaptive,
         "worker_activity": {
             "recent_events": recent_activity,
             "feature_counts": dict(event_features),

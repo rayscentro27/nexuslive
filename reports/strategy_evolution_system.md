@@ -1,12 +1,12 @@
 # Strategy Evolution System
 
-- Strategy evolution readiness improved by centralizing simulation outcomes and ranking context.
-- Added snapshot fields for:
-  - strategy rankings (`strategy_rankings.top_active`)
-  - confidence-oriented active strategy ordering
-  - paper-trading win/loss and drawdown context
-- Trading dashboard now reflects evolution inputs (outcomes, win rate, drawdown, net simulated PnL).
-- Workforce trading lane now reflects strategy-journal activity to indicate active learning cycles.
+Implemented safe strategy mutation in `lib/adaptive_trading_intelligence.py` via `mutate_strategies()`.
 
-## Current limits
-- Core strategy mutation remains bounded and review-oriented; no unbounded self-modifying execution path introduced.
+Evolution model:
+- combine entry logic, volatility filters, fakeout filters, and session filters from parent strategies
+- enforce explicit safety constraints:
+  - `blind_deploy=false`
+  - demo validation required
+  - human review required
+
+Mutation outputs are persisted to strategy memory for auditability.
