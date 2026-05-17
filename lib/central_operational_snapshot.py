@@ -272,6 +272,11 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
             "max_drawdown": round(max_drawdown, 2),
             "latest_journal": paper_journal_rows[:10],
             "latest_outcomes": paper_outcome_rows[:10],
+            "desk_label": "DEMO / PAPER TRADING ONLY",
+            "immersion_notes": [
+                "Strategy confidence and drawdown are simulation-only signals.",
+                "Use learning notes to refine setups before any expansion work.",
+            ],
         },
         "strategy_rankings": {
             "active_count": len([r for r in strategy_rows if bool(r.get("is_active"))]),
@@ -286,6 +291,10 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
             "status_counts": dict(experiment_status),
             "active_count": experiment_status.get("running", 0) + experiment_status.get("queued", 0),
             "recent": experiment_rows[:12],
+            "immersion_notes": [
+                "Opportunity confidence should drive queue order.",
+                "Revenue tie-ins remain recommendation-only until approved.",
+            ],
         },
         "revenue_engine": revenue_stub,
         "autonomous_demo_trading": demo_status,
@@ -303,6 +312,14 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
             "recent_tasks": ai_task_rows[:12],
         },
         "conversational_roadmap": roadmap,
+        "travel_mobile": {
+            "quick_status": {
+                "warnings": warnings[:4],
+                "active_workers": worker_status.get("running", 0) + worker_status.get("active", 0),
+                "task_backlog": task_status.get("queued", 0),
+            },
+            "operator_hint": "Use 'what should we work on next' and 'summarize nexus progress' for travel-first check-ins.",
+        },
         "worker_activity": {
             "recent_events": recent_activity,
             "feature_counts": dict(event_features),

@@ -61,6 +61,25 @@ def next_steps(limit: int = 20) -> list[dict[str, Any]]:
     return ranked[: max(1, min(limit, 50))]
 
 
+def build_next_step_brief(limit: int = 5) -> dict[str, Any]:
+    steps = next_steps(limit=limit)
+    rationale: list[str] = []
+    tradeoffs: list[str] = []
+    for step in steps[:3]:
+        rationale.append(
+            f"{step.get('title')} is prioritized because impact is {step.get('operational_impact')} and score is {step.get('priority_score')}."
+        )
+    if any(str(s.get("category") or "") == "Operational Stability" for s in steps):
+        tradeoffs.append("Stability-first focus may delay visual polish this cycle.")
+    if any(str(s.get("category") or "") in {"Visual UI", "Workforce Office"} for s in steps):
+        tradeoffs.append("UI immersion tasks improve demo quality but should not displace blocker resolution.")
+    return {
+        "steps": steps,
+        "rationale": rationale,
+        "tradeoffs": tradeoffs,
+    }
+
+
 def highest_priority_tasks(limit: int = 5) -> list[dict[str, Any]]:
     return next_steps(limit=limit)
 

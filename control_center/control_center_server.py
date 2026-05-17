@@ -2091,6 +2091,21 @@ def api_admin_ai_operations_workforce():
         data["roadmap"] = roadmap_summary()
     except Exception:
         data["roadmap"] = {}
+
+    try:
+        aiq = data.get("ai_task_queue") or []
+        running = len([r for r in aiq if str(r.get("status") or "").lower() == "running"])
+        blocked = len([r for r in aiq if str(r.get("status") or "").lower() in {"paused", "blocked", "failed"}])
+        queued = len([r for r in aiq if str(r.get("status") or "").lower() in {"queued", "assigned"}])
+        urgency = "high" if blocked >= 3 else "medium" if queued >= 5 else "normal"
+        data["mission_pressure"] = {
+            "running": running,
+            "queued": queued,
+            "blocked_or_failed": blocked,
+            "urgency": urgency,
+        }
+    except Exception:
+        data["mission_pressure"] = {"urgency": "unknown"}
     return _ok_response(data, read_only=True, extra={**data, "updated_at": datetime.now(timezone.utc).isoformat()})
 
 
