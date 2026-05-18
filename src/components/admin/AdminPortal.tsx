@@ -17,6 +17,7 @@ import { AdminSubscriptionSettings } from './AdminSubscriptionSettings';
 import { AdminInviteUsers } from './AdminInviteUsers';
 import { AdminGrantReviews } from './AdminGrantReviews';
 import { AdminCEOMode } from './AdminCEOMode';
+import { NexusVirtualOffice } from './NexusVirtualOffice';
 
 const ADMIN_DOCK = [
   { id: 'dashboard',     emoji: '🏠', label: 'Overview' },
@@ -34,8 +35,9 @@ const ADMIN_DOCK = [
   { id: 'reports',       emoji: '📋', label: 'Reports' },
   { id: 'subscriptions', emoji: '💳', label: 'Plans' },
   { id: 'grants-review', emoji: '🔬', label: 'Grants' },
-  { id: 'ceo-mode',      emoji: '🧠', label: 'CEO Mode' },
-  { id: 'settings',      emoji: '⚙️', label: 'Settings' },
+  { id: 'ceo-mode',       emoji: '🧠', label: 'CEO Mode' },
+  { id: 'virtual-office', emoji: '🏢', label: 'Virtual Office' },
+  { id: 'settings',       emoji: '⚙️', label: 'Settings' },
 ];
 
 function AdminDockButton({ item, isActive, onClick }: {
@@ -126,8 +128,9 @@ export function AdminPortal() {
           {activeTab === 'reports'       && <AdminReports />}
           {activeTab === 'subscriptions' && <AdminSubscriptionSettings />}
           {activeTab === 'grants-review' && <AdminGrantReviews />}
-          {activeTab === 'ceo-mode'      && <AdminCEOMode />}
-          {activeTab === 'settings'      && <AdminSettings onNavigate={setActiveTab} />}
+          {activeTab === 'ceo-mode'       && <AdminCEOMode />}
+          {activeTab === 'virtual-office' && <NexusVirtualOffice />}
+          {activeTab === 'settings'       && <AdminSettings onNavigate={setActiveTab} />}
         </div>
       </main>
 
