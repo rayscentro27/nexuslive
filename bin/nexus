@@ -1,0 +1,428 @@
+#!/usr/bin/env python3
+"""
+Nexus CLI — Operational command interface for the Nexus AI workforce.
+
+Usage:
+    nexus health [--json]
+    nexus report [--json]
+    nexus worker [list|status|pause <id>|resume <id>]
+    nexus funding [--dry-run]
+    nexus grants [--dry-run]
+    nexus comms [--dry-run]
+    nexus launch [--dry-run]
+    nexus seo [--dry-run]
+    nexus dispatch <prompt> [--dry-run]
+    nexus approvals [list|approve <id>|reject <id>]
+
+Safety: NEXUS_DRY_RUN=true | LIVE_TRADING=false | No real-money execution
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+try:
+    from lib.env_loader import load_nexus_env
+    load_nexus_env()
+except Exception:
+    pass
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _sb_url() -> str:
+    return os.getenv("SUPABASE_URL", "").strip()
+
+
+def _sb_key() -> str:
+    return (os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+            or os.getenv("SUPABASE_SERVICE_KEY")
+            or os.getenv("SUPABASE_KEY", ""))
+
+
+def _sb_get(path: str, timeout: int = 10) -> list:
+    try:
+        from scripts.prelaunch_utils import rest_select
+        return rest_select(path, timeout=timeout) or []
+    except Exception:
+        return []
+
+
+def _sb_post(table: str, payload: dict, timeout: int = 10) -> dict:
+    import urllib.request
+    url = _sb_url()
+    key = _sb_key()
+    if not url or not key:
+        return {"error": "supabase_not_configured"}
+    try:
+        data = json.dumps(payload).encode()
+        req = urllib.request.Request(
+            f"{url}/rest/v1/{table}",
+            data=data,
+            headers={
+                "apikey": key,
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json",
+                "Prefer": "return=representation",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            result = json.loads(r.read())
+            return result[0] if isinstance(result, list) and result else {}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def _sb_patch(table: str, match: dict, payload: dict, timeout: int = 10) -> bool:
+    import urllib.request
+    url = _sb_url()
+    key = _sb_key()
+    if not url or not key:
+        return False
+    try:
+        qs = "&".join(f"{k}=eq.{v}" for k, v in match.items())
+        data = json.dumps(payload).encode()
+        req = urllib.request.Request(
+            f"{url}/rest/v1/{table}?{qs}",
+            data=data,
+            headers={
+                "apikey": key,
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json",
+            },
+            method="PATCH",
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            r.read()
+        return True
+    except Exception:
+        return False
+
+
+# ─── Health ───────────────────────────────────────────────────────────────────
+
+def cmd_health(args: argparse.Namespace) -> None:
+    providers = _sb_get("provider_health?select=provider_name,status,avg_latency_ms,last_checked_at&order=provider_name")
+    tasks = _sb_get("ai_task_queue?select=status&limit=200")
+    workers = _sb_get("agent_capabilities?select=agent_key,display_name,is_enabled&limit=30")
+    approvals = _sb_get("human_approval_requests?select=id&status=eq.pending&limit=50")
+
+    status_counts: dict[str, int] = {}
+    for t in tasks:
+        s = str(t.get("status") or "unknown")
+        status_counts[s] = status_counts.get(s, 0) + 1
+
+    healthy_providers = [p for p in providers if str(p.get("status") or "").lower() in {"online", "healthy"}]
+    enabled_workers = [w for w in workers if w.get("is_enabled")]
+
+    if getattr(args, "json", False):
+        print(json.dumps({
+            "generated_at": _now(),
+            "providers": {"total": len(providers), "healthy": len(healthy_providers), "list": providers},
+            "tasks": status_counts,
+            "workers": {"total": len(workers), "enabled": len(enabled_workers)},
+            "pending_approvals": len(approvals),
+            "dry_run": True,
+            "live_trading": False,
+        }, indent=2))
+        return
+
+    print(f"\nNexus System Health — {_now()}")
+    print("=" * 50)
+    print(f"\n  Providers:  {len(healthy_providers)}/{len(providers)} healthy")
+    for p in providers:
+        status = str(p.get("status") or "unknown")
+        icon = "✅" if status.lower() in {"online", "healthy"} else "⚠️"
+        latency = p.get("avg_latency_ms")
+        latency_str = f"  ({latency}ms)" if latency else ""
+        print(f"    {icon} {p.get('provider_name'):<20} {status}{latency_str}")
+
+    print(f"\n  Task Queue:")
+    for s, n in sorted(status_counts.items()):
+        print(f"    {s:<20} {n}")
+
+    print(f"\n  Workers:    {len(enabled_workers)}/{len(workers)} enabled")
+    print(f"  Approvals:  {len(approvals)} pending")
+    print(f"\n  Safety: NEXUS_DRY_RUN=true | LIVE_TRADING=false")
+
+
+# ─── Report ───────────────────────────────────────────────────────────────────
+
+def cmd_report(args: argparse.Namespace) -> None:
+    try:
+        from lib.executive_reports import build_executive_report
+        report = build_executive_report()
+    except Exception as e:
+        report = {"error": str(e), "generated_at": _now()}
+
+    if getattr(args, "json", False):
+        print(json.dumps(report, indent=2, default=str))
+        return
+
+    print(f"\nNexus Executive Report — {_now()}")
+    print("=" * 50)
+    for key, val in report.items():
+        if isinstance(val, dict):
+            print(f"\n  {key}:")
+            for k2, v2 in val.items():
+                print(f"    {k2}: {v2}")
+        else:
+            print(f"\n  {key}: {val}")
+
+
+# ─── Worker ───────────────────────────────────────────────────────────────────
+
+def cmd_worker(args: argparse.Namespace) -> None:
+    sub = getattr(args, "worker_cmd", "list")
+    worker_id = getattr(args, "worker_id", None)
+
+    if sub == "list" or sub is None:
+        agents = _sb_get("agent_capabilities?select=agent_key,display_name,is_enabled,supported_task_types,allowed_risk_levels,priority&order=priority")
+        print(f"\nNexus Worker Registry — {len(agents)} agents")
+        print(f"{'Key':<22} {'Name':<25} {'Enabled':<8} {'Priority'}")
+        print("-" * 72)
+        for a in agents:
+            enabled = "✅" if a.get("is_enabled") else "❌"
+            print(f"  {str(a.get('agent_key','')):<20} {str(a.get('display_name','')):<25} {enabled:<8} {a.get('priority','?')}")
+        return
+
+    if sub == "status" and worker_id:
+        tasks = _sb_get(f"ai_task_queue?select=id,title,status,created_at&assigned_worker=eq.{worker_id}&order=created_at.desc&limit=10")
+        print(f"\nWorker {worker_id} — last {len(tasks)} tasks")
+        for t in tasks:
+            print(f"  [{t.get('status','?'):<12}] {str(t.get('title',''))[:50]}")
+        return
+
+    if sub in {"pause", "resume"} and worker_id:
+        try:
+            from lib.ai_task_dispatch import pause_worker_tasks, resume_worker_tasks
+            fn = pause_worker_tasks if sub == "pause" else resume_worker_tasks
+            count = fn(worker_id)
+            print(f"✅ {sub.capitalize()}d {count} task(s) for worker: {worker_id}")
+        except Exception as e:
+            print(f"❌ {sub} failed: {e}")
+        return
+
+    print("Usage: nexus worker [list|status <id>|pause <id>|resume <id>]")
+
+
+# ─── Dispatch ─────────────────────────────────────────────────────────────────
+
+def cmd_dispatch(args: argparse.Namespace) -> None:
+    prompt = " ".join(getattr(args, "prompt", []) or [])
+    dry_run = getattr(args, "dry_run", True)
+
+    if not prompt:
+        print("Usage: nexus dispatch <prompt> [--dry-run]")
+        sys.exit(1)
+
+    try:
+        from lib.agent_dispatcher.risk import assess_risk
+        from lib.agent_dispatcher.planner import classify_task_type, build_task_plan
+        task_type = classify_task_type(prompt)
+        risk = assess_risk(prompt, task_type)
+    except Exception as e:
+        task_type = "general"
+        risk = {"level": "low", "requires_approval": False, "blocked": False, "block_reason": ""}
+        print(f"[warn] Dispatcher unavailable: {e}")
+
+    if risk.get("blocked"):
+        print(f"❌ BLOCKED: {risk.get('block_reason')}")
+        print("Safety: This action is hard-blocked and cannot be dispatched.")
+        sys.exit(1)
+
+    print(f"\nDispatch Request")
+    print(f"  Prompt:    {prompt}")
+    print(f"  Type:      {task_type}")
+    print(f"  Risk:      {risk.get('level', 'low')}")
+    print(f"  Approval:  {'required' if risk.get('requires_approval') else 'not required'}")
+    print(f"  Mode:      {'[DRY RUN] — no changes' if dry_run else 'LIVE'}")
+
+    if dry_run:
+        print("\n[DRY RUN] Use --no-dry-run to submit.")
+        return
+
+    task_status = "awaiting_approval" if risk.get("requires_approval") else "received"
+    payload = {
+        "prompt": prompt,
+        "task_type": task_type,
+        "risk_level": risk.get("level", "low"),
+        "status": task_status,
+        "requires_approval": risk.get("requires_approval", False),
+        "requested_by": "nexus_cli",
+        "created_at": _now(),
+    }
+    result = _sb_post("agent_dispatch_tasks", payload)
+    if result.get("error"):
+        print(f"❌ Failed to create dispatch task: {result['error']}")
+        sys.exit(1)
+    print(f"\n✅ Dispatch task created: {result.get('id', 'unknown')}")
+    print(f"   Status: {task_status}")
+
+
+# ─── Approvals ────────────────────────────────────────────────────────────────
+
+def cmd_approvals(args: argparse.Namespace) -> None:
+    sub = getattr(args, "approvals_cmd", "list")
+    approval_id = getattr(args, "approval_id", None)
+
+    if sub == "list" or sub is None:
+        rows = _sb_get("human_approval_requests?select=id,task_type,risk_level,status,prompt_summary,created_at&status=eq.pending&order=created_at.desc&limit=20")
+        if not rows:
+            print("No pending approvals.")
+            return
+        print(f"\nPending Approvals ({len(rows)})")
+        print(f"{'ID':<38} {'Type':<20} {'Risk':<8} Summary")
+        print("-" * 90)
+        for r in rows:
+            rid = str(r.get("id") or "")[:36]
+            print(f"  {rid}  {str(r.get('task_type','')):<20} {str(r.get('risk_level','')):<8} {str(r.get('prompt_summary',''))[:40]}")
+        return
+
+    if sub in {"approve", "reject"} and approval_id:
+        new_status = "approved" if sub == "approve" else "rejected"
+        ok = _sb_patch(
+            "human_approval_requests",
+            {"id": approval_id},
+            {"status": new_status, "reviewed_at": _now(), "reviewed_by": "nexus_cli"},
+        )
+        if ok:
+            print(f"✅ Approval {approval_id} → {new_status}")
+        else:
+            print(f"❌ Failed to update approval {approval_id}")
+        return
+
+    print("Usage: nexus approvals [list|approve <id>|reject <id>]")
+
+
+# ─── Skill shortcuts ──────────────────────────────────────────────────────────
+
+def _run_skill(skill_key: str, dry_run: bool) -> None:
+    skills = _sb_get(f"nexus_skills?select=skill_key,display_name,risk_level,requires_approval,category&skill_key=eq.{skill_key}")
+    if not skills:
+        print(f"Skill '{skill_key}' not found in registry.")
+        return
+    skill = skills[0]
+    print(f"\nSkill: {skill.get('display_name')} [{skill.get('skill_key')}]")
+    print(f"  Category:  {skill.get('category')}")
+    print(f"  Risk:      {skill.get('risk_level')}")
+    print(f"  Approval:  {'required' if skill.get('requires_approval') else 'not required'}")
+    print(f"  Mode:      {'[DRY RUN] — no changes' if dry_run else 'LIVE'}")
+    if dry_run:
+        print(f"\n[DRY RUN] Use --no-dry-run to dispatch this skill.")
+    else:
+        payload = {
+            "prompt": f"Run skill: {skill.get('display_name')}",
+            "task_type": skill.get("category", "ops"),
+            "risk_level": skill.get("risk_level", "low"),
+            "status": "awaiting_approval" if skill.get("requires_approval") else "received",
+            "requires_approval": bool(skill.get("requires_approval")),
+            "requested_by": "nexus_cli",
+            "assigned_skill_key": skill_key,
+            "created_at": _now(),
+        }
+        result = _sb_post("agent_dispatch_tasks", payload)
+        if result.get("error"):
+            print(f"❌ {result['error']}")
+        else:
+            print(f"✅ Task created: {result.get('id')}")
+
+
+def cmd_funding(args: argparse.Namespace) -> None:
+    _run_skill("funding_readiness_v1", getattr(args, "dry_run", True))
+
+
+def cmd_grants(args: argparse.Namespace) -> None:
+    _run_skill("grant_research_v1", getattr(args, "dry_run", True))
+
+
+def cmd_comms(args: argparse.Namespace) -> None:
+    _run_skill("client_followup_draft_v1", getattr(args, "dry_run", True))
+
+
+def cmd_launch(args: argparse.Namespace) -> None:
+    _run_skill("business_launch_site_v1", getattr(args, "dry_run", True))
+
+
+def cmd_seo(args: argparse.Namespace) -> None:
+    _run_skill("seo_cluster_builder_v1", getattr(args, "dry_run", True))
+
+
+# ─── Main ─────────────────────────────────────────────────────────────────────
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        prog="nexus",
+        description="Nexus CLI — Operational command interface",
+    )
+    sub = parser.add_subparsers(dest="command")
+
+    p_health = sub.add_parser("health", help="Show system health")
+    p_health.add_argument("--json", action="store_true", help="Output as JSON")
+
+    p_report = sub.add_parser("report", help="Generate executive report")
+    p_report.add_argument("--json", action="store_true", help="Output as JSON")
+
+    p_worker = sub.add_parser("worker", help="Manage AI workers")
+    p_worker.add_argument("worker_cmd", nargs="?", choices=["list", "status", "pause", "resume"], default="list")
+    p_worker.add_argument("worker_id", nargs="?", default=None)
+
+    p_dispatch = sub.add_parser("dispatch", help="Dispatch a task prompt to the AI workforce")
+    p_dispatch.add_argument("prompt", nargs="+", help="Task prompt")
+    p_dispatch.add_argument("--dry-run", action="store_true", default=True, help="Dry run (default)")
+    p_dispatch.add_argument("--no-dry-run", dest="dry_run", action="store_false", help="Submit the task")
+
+    p_approvals = sub.add_parser("approvals", help="Manage pending approvals")
+    p_approvals.add_argument("approvals_cmd", nargs="?", choices=["list", "approve", "reject"], default="list")
+    p_approvals.add_argument("approval_id", nargs="?", default=None)
+
+    for cmd_name, help_text in [
+        ("funding", "Run funding readiness skill"),
+        ("grants", "Run grant research skill"),
+        ("comms", "Run client follow-up communications skill"),
+        ("launch", "Run business launch skill"),
+        ("seo", "Run SEO cluster builder skill"),
+    ]:
+        p = sub.add_parser(cmd_name, help=help_text)
+        p.add_argument("--dry-run", action="store_true", default=True)
+        p.add_argument("--no-dry-run", dest="dry_run", action="store_false")
+
+    args = parser.parse_args()
+
+    dispatch = {
+        "health":    cmd_health,
+        "report":    cmd_report,
+        "worker":    cmd_worker,
+        "dispatch":  cmd_dispatch,
+        "approvals": cmd_approvals,
+        "funding":   cmd_funding,
+        "grants":    cmd_grants,
+        "comms":     cmd_comms,
+        "launch":    cmd_launch,
+        "seo":       cmd_seo,
+    }
+
+    if not args.command:
+        parser.print_help()
+        sys.exit(0)
+
+    fn = dispatch.get(args.command)
+    if fn:
+        fn(args)
+    else:
+        parser.print_help()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

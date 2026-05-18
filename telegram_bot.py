@@ -989,6 +989,41 @@ class NexusTelegramBot:
         except Exception as e:
             return {"ok": False, "error": str(e), "status": "failed"}
 
+    def _handle_dispatch_task(self, prompt: str) -> str:
+        """Create an agent_dispatch_tasks record from a Telegram /dispatch command."""
+        try:
+            from lib.agent_dispatcher.risk import assess_risk
+            from lib.agent_dispatcher.planner import classify_task_type
+            task_type = classify_task_type(prompt)
+            risk = assess_risk(prompt, task_type)
+        except Exception:
+            task_type = "general"
+            risk = {"level": "low", "requires_approval": False, "blocked": False}
+
+        if risk.get("blocked"):
+            return (
+                f"⛔ Blocked: {risk.get('block_reason', 'safety rules prevent this action')}.\n"
+                "NEXUS_DRY_RUN=true | LIVE_TRADING=false"
+            )
+
+        status = "awaiting_approval" if risk.get("requires_approval") else "received"
+        try:
+            from api_gateway.agent_dispatch import create_task
+            result = create_task(prompt, task_type=task_type, requested_by="telegram")
+        except Exception as e:
+            result = {"ok": False, "error": str(e)}
+
+        if not result.get("ok"):
+            return f"⚠️ Dispatch failed: {result.get('error', 'unknown error')}. Task not created."
+
+        risk_label = risk.get("level", "low")
+        approval_note = " Awaiting your approval in Command Center." if risk.get("requires_approval") else ""
+        return (
+            f"✅ Dispatch task queued — ID: {str(result.get('id', ''))[:8]}...\n"
+            f"Type: {task_type} | Risk: {risk_label}{approval_note}\n"
+            "View in Admin → ⚡ Command. Safety: dry-run only, no live execution."
+        )
+
     def _task_selection_reply(self, raw: str) -> Optional[str]:
         txt = TASK_SELECTION_ALIASES.get((raw or "").strip().lower(), (raw or "").strip().lower())
         if not self.last_plan_items:
@@ -1114,6 +1149,11 @@ class NexusTelegramBot:
                 return "State reset complete."
             if cmd == "restart":
                 return "Restart request received. Use launchctl command from terminal to restart Hermes safely."
+            if cmd.startswith("dispatch"):
+                prompt = (normalized[len("/dispatch"):]).strip()
+                if not prompt:
+                    return "Usage: /dispatch <task prompt>. Example: /dispatch run funding readiness check"
+                return self._handle_dispatch_task(prompt)
             return self.render_short_status(self.safe_help_text())
         if normalized in DIAGNOSTIC_TO_COMMAND:
             return self.render_short_status(self.handle_basic_command(DIAGNOSTIC_TO_COMMAND[normalized]))
