@@ -21,6 +21,7 @@ from lib.notebooklm_cli_adapter import (
     sync_enabled,
 )
 from lib.ai_task_dispatch import create_task
+from lib.hermes_response_patterns import match_pattern, fill_template
 
 
 CONF_INTERNAL_CONFIRMED = "INTERNAL_CONFIRMED"
@@ -69,10 +70,60 @@ class InternalFirstReply:
     matched_topic: str
 
 
+def _build_operational_context_brief() -> str:
+    """Build a short one-line operational context for greeting responses."""
+    try:
+        mem = hermes_ops_memory.load_memory(updated_by="greeting_context")
+        active = (mem.get("active_priorities") or [])[:2]
+        if active:
+            return f"Active: {', '.join(str(x) for x in active)}."
+    except Exception:
+        pass
+    return ""
+
+
 def try_internal_first(raw: str) -> InternalFirstReply | None:
     text = (raw or "").strip().lower()
     if not text:
         return None
+
+    # ── Phase 1: Conversational/greeting patterns from Supabase ──────────────
+    # Handle greetings and social messages BEFORE operational keyword check.
+    # These return Nexus-aware conversational replies, not generic chatbot text.
+    try:
+        pattern = match_pattern(text)
+        if pattern:
+            intent = pattern.get("intent", "")
+            # Only handle genuinely conversational intents here — operational
+            # intents (status_check_nexus, notebooklm_status, etc.) flow through
+            # the full operational keyword path for richer data.
+            conversational_intents = {
+                "morning_greeting", "status_check_personal",
+                "completion_acknowledgement", "blocker_triage",
+            }
+            if intent in conversational_intents:
+                ctx: dict[str, str] = {}
+                if intent in {"morning_greeting", "status_check_personal"}:
+                    ctx["operational_context"] = _build_operational_context_brief()
+                    ctx["brief_status"] = _build_operational_context_brief()
+                    ctx["next_best_action"] = "Check 'what should I work on?' for priorities"
+                    ctx["next_best_action_prompt"] = "Ask 'what should I work on?' for the top priority"
+                elif intent == "completion_acknowledgement":
+                    ctx["context_note"] = ""
+                    ctx["next_action"] = "use 'show roadmap' to pick the next priority"
+                tmpl = pattern.get("response_template", "")
+                reply_text = fill_template(tmpl, ctx) if tmpl else None
+                if reply_text:
+                    return InternalFirstReply(
+                        text=reply_text,
+                        confidence=CONF_INTERNAL_CONFIRMED,
+                        source="hermes_response_patterns",
+                        matched_topic=pattern.get("pattern_key", "conversational"),
+                    )
+    except Exception:
+        pass  # Never block on pattern matching failure
+
+    # ── Phase 2: Operational keyword routing ─────────────────────────────────
     rules = _parse_json_env("HERMES_INTERNAL_FIRST_KEYWORDS", _default_rules())
     topic = ""
     for key, phrases in rules.items():
