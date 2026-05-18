@@ -73,6 +73,9 @@ def default_runtime_config() -> dict[str, Any]:
                 "what notebooklm research is ready", "summarize notebooklm intake queue", "notebooklm research",
                 "notebooklm queue", "notebooklm status", "what's in notebooklm",
                 "what is in notebooklm", "notebook research", "knowledge queue",
+                "list notebooklm notebooks", "sync forex notebook", "sync all enabled notebooks",
+                "what did notebooklm learn", "show notebook sync status", "pending review",
+                "summarize the grants notebook", "what trading strategies came from notebooklm",
             ],
             "ai_providers": [
                 "what ai providers are available", "ai providers available", "which ai providers",

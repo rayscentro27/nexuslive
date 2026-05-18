@@ -15,6 +15,8 @@ from lib.revenue_activation_system import (
     today_in_nexus_summary,
     travel_mobile_summary as revenue_travel_mobile_summary,
 )
+from lib.notebooklm_cli_adapter import load_registry
+from lib.notebooklm_ingest_adapter import QUEUE_FILE, load_dry_run_queue
 
 
 def build_central_operational_snapshot(*, rest_select, model_preview: list[dict] | None = None) -> dict[str, Any]:
@@ -78,6 +80,9 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
     ai_worker_rows = _safe(
         "ai_task_workers?select=worker_id,active,health_status,concurrency_limit,updated_at&order=worker_id"
     )
+    notebook_registry = load_registry()
+    notebook_rows = notebook_registry.get("notebooks") or []
+    notebook_queue = load_dry_run_queue(str(QUEUE_FILE))
 
     tq_status = Counter(str(r.get("status") or "unknown") for r in transcript_rows)
     tq_source = Counter(str(r.get("source_type") or "unknown") for r in transcript_rows)
@@ -338,6 +343,17 @@ def build_central_operational_snapshot(*, rest_select, model_preview: list[dict]
             "mobile_summary": revenue_mobile,
         },
         "today_in_nexus": today_digest,
+        "notebooklm": {
+            "notebooks_total": len(notebook_rows),
+            "enabled_count": len([r for r in notebook_rows if bool(r.get("enabled"))]),
+            "last_sync_at": max([str(r.get("last_sync_at") or "") for r in notebook_rows] or [""], default="") or None,
+            "pending_sync_count": len([r for r in notebook_rows if str(r.get("sync_status") or "") in {"idle", "error", "dry_run_ready"}]),
+            "latest_sync_status": (notebook_rows[-1].get("sync_status") if notebook_rows else "unknown"),
+            "latest_error": None,
+            "proposed_knowledge_count": len([r for r in knowledge_rows if str(r.get("status") or "") == "proposed"]),
+            "queue_rows_created": len(notebook_queue),
+            "categories_covered": sorted({str(r.get("category") or "operations") for r in notebook_rows}),
+        },
         "operational_trust": trust_snapshot,
         "worker_activity": {
             "recent_events": recent_activity,

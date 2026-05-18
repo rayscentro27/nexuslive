@@ -14,6 +14,13 @@ from lib.hermes_email_knowledge_intake import recent_knowledge_email_intake
 from lib.hermes_runtime_config import get_internal_first_keywords
 from lib.operational_priorities import top_focus_summary
 from lib.notebooklm_ingest_adapter import load_dry_run_queue, summarize_intake_queue
+from lib.notebooklm_cli_adapter import (
+    dry_run_sync,
+    list_notebooks as notebooklm_list_notebooks,
+    notebook_sync_status,
+    sync_enabled,
+)
+from lib.ai_task_dispatch import create_task
 
 
 CONF_INTERNAL_CONFIRMED = "INTERNAL_CONFIRMED"
@@ -156,6 +163,70 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         )
 
     if topic == "notebooklm":
+        if "list notebooklm notebooks" in text or "list notebooks" in text:
+            rows = notebooklm_list_notebooks()
+            if not rows:
+                return InternalFirstReply(
+                    text="NotebookLM notebooks unavailable from CLI right now (check auth or CLI availability).",
+                    confidence=CONF_INTERNAL_PARTIAL,
+                    source="notebooklm_cli",
+                    matched_topic=topic,
+                )
+            names = [str(r.get("title") or r.get("name") or "Untitled").strip() for r in rows[:12]]
+            return InternalFirstReply(
+                text="NotebookLM notebooks:\n" + "\n".join(f"- {n}" for n in names),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="notebooklm_cli.list",
+                matched_topic=topic,
+            )
+
+        if "show notebook sync status" in text or "notebooklm status" in text:
+            status = notebook_sync_status()
+            return InternalFirstReply(
+                text=(
+                    f"NotebookLM sync status: registry={status.get('registry_count')} enabled={status.get('enabled_count')} "
+                    f"pending_review={status.get('pending_review_count')}"
+                ),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="notebook_registry+dry_run_queue",
+                matched_topic=topic,
+            )
+
+        if "sync all enabled notebooks" in text:
+            task = create_task(
+                created_by="hermes",
+                source="hermes_notebooklm",
+                title="NotebookLM sync all enabled notebooks",
+                instructions="Run NotebookLM enabled sync in dry-run mode and report pending review counts.",
+                task_type="ops",
+                assigned_worker="opencode_codex",
+                repo_target="nexus-ai",
+                estimated_scope="small",
+            )
+            return InternalFirstReply(
+                text=f"Queued NotebookLM enabled sync task {task.get('id')} (dry-run path).",
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="ai_task_queue",
+                matched_topic=topic,
+            )
+
+        if "sync forex notebook" in text:
+            res = dry_run_sync("forex")
+            if not res.get("ok"):
+                return InternalFirstReply(
+                    text=f"Forex notebook sync dry-run failed: {res.get('error', 'unknown_error')}",
+                    confidence=CONF_INTERNAL_PARTIAL,
+                    source="notebooklm_cli_adapter",
+                    matched_topic=topic,
+                )
+            cnt = int(((res.get("normalized") or {}).get("source_count") or 0))
+            return InternalFirstReply(
+                text=f"Forex notebook dry-run complete. Normalized sources: {cnt}. No auto-approval performed.",
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="notebooklm_cli_adapter",
+                matched_topic=topic,
+            )
+
         queue_path = Path(__file__).resolve().parent.parent / "reports" / "knowledge_intake" / "notebooklm_intake_queue.json"
         queue = load_dry_run_queue(str(queue_path))
         msg = summarize_intake_queue(queue)
