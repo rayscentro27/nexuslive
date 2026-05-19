@@ -222,6 +222,8 @@ def generate_opportunity_report(opportunity_text: str, context: Optional[str] = 
     # Workforce assignments
     assignments = _assign_workers(opp_type, category)
 
+    competition = _competition_analysis(opp_type, score)
+
     report = f"""
 ╔══════════════════════════════════════════════╗
    NEXUS OPPORTUNITY REPORT
@@ -247,6 +249,11 @@ Operational Ease:    {dims['operational_ease']}/10
 REVENUE POTENTIAL
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {rev_estimate}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+COMPETITION ANALYSIS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+{competition}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 7-DAY ROADMAP
@@ -288,6 +295,9 @@ RECOMMENDATION: {_recommendation(category, score)}
 ⚠️ Educational analysis only. No financial guarantees.
 Results depend on execution, market conditions, and effort.
 """.strip()
+
+    # Auto-create a Supabase dispatch task so this opportunity is tracked
+    create_dispatch_task(opp_name, score, category)
 
     return report
 
@@ -440,3 +450,85 @@ def _recommendation(category: str, score: int) -> str:
     if category == 'Experimental':
         return "TEST FIRST — run a small validation experiment before committing"
     return "AVOID or RESEARCH MORE — score too low to recommend investment"
+
+
+def _competition_analysis(opp_type: str, score: int) -> str:
+    text = opp_type.lower()
+    if 'youtube' in text or 'faceless' in text:
+        return ("Competition: HIGH volume, but most content is low quality.\n"
+                "Differentiation: Niche down to business credit/funding/AI tools.\n"
+                "Moat: Consistency + Nexus proprietary data angle.\n"
+                "Barrier to entry: Low — advantage goes to first movers who niche.")
+    if 'saas' in text or 'software' in text:
+        return ("Competition: MEDIUM-HIGH — crowded market, but niche SaaS can dominate.\n"
+                "Differentiation: Solve a specific pain point better than existing tools.\n"
+                "Moat: Integrations, data network effects, switching costs.\n"
+                "Barrier to entry: Medium — technical build required.")
+    if 'newsletter' in text or 'email' in text:
+        return ("Competition: LOW-MEDIUM — newsletters have low discovery but high retention.\n"
+                "Differentiation: Curated niche + exclusive Nexus analysis angle.\n"
+                "Moat: Subscriber relationships — hard to migrate.\n"
+                "Barrier to entry: Very low — advantage to consistent, valuable publishers.")
+    if 'affiliate' in text:
+        return ("Competition: HIGH — many affiliates in most niches.\n"
+                "Differentiation: Authority content + first-touch SEO strategy.\n"
+                "Moat: Domain authority, email list, trust with audience.\n"
+                "Barrier to entry: Low — but SEO moat takes 6–12 months to build.")
+    if 'grant' in text or 'funding' in text or 'credit' in text:
+        return ("Competition: LOW — grant research and funding coaching is underserved.\n"
+                "Differentiation: AI-powered research at fraction of consultant price.\n"
+                "Moat: Data + reputation + client results.\n"
+                "Barrier to entry: Low — trust is the primary differentiator.")
+    if score >= 80:
+        return ("Competition: MODERATE — validated opportunity attracts players.\n"
+                "Differentiation: Move fast, niche down, build audience before competition scales.\n"
+                "Moat: First-mover advantage + Nexus AI infrastructure.\n"
+                "Barrier to entry: Low-Medium.")
+    return ("Competition: VARIABLE — research existing players before committing.\n"
+            "Recommended: Search top 10 YouTube videos and Google results for the niche.\n"
+            "Assess: Can we create content or a product better than the top 3 results?")
+
+
+def create_dispatch_task(opp_name: str, score: int, category: str) -> dict:
+    """
+    Create a Supabase dispatch task when an opportunity is analyzed.
+    Returns the created task dict or empty dict on failure.
+    """
+    try:
+        import os
+        import requests as _req
+        from datetime import datetime, timezone
+
+        url = os.environ.get('SUPABASE_URL', '')
+        key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
+        if not url or not key:
+            return {}
+
+        task = {
+            'source': 'lane4_opportunity',
+            'original_prompt': f'Opportunity analyzed: {opp_name[:120]}',
+            'normalized_goal': f'[{category}] Score {score}/100 — {opp_name[:80]}',
+            'task_type': 'research',
+            'risk_level': 'low',
+            'status': 'received',
+            'approval_required': False,
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'updated_at': datetime.now(timezone.utc).isoformat(),
+        }
+        r = _req.post(
+            f'{url}/rest/v1/agent_dispatch_tasks',
+            headers={
+                'apikey': key,
+                'Authorization': f'Bearer {key}',
+                'Content-Type': 'application/json',
+                'Prefer': 'return=representation',
+            },
+            json=task,
+            timeout=5,
+        )
+        if r.status_code in (200, 201):
+            data = r.json()
+            return data[0] if isinstance(data, list) else data
+    except Exception:
+        pass
+    return {}
