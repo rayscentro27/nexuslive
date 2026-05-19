@@ -123,6 +123,27 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
     except Exception:
         pass  # Never block on pattern matching failure
 
+    # ── Phase 1.5: Opportunity Intelligence ──────────────────────────────────
+    # Intercept URLs, business ideas, SaaS tools, affiliate programs, niche ideas
+    # before keyword routing so they receive full scored analysis, not a stub reply.
+    try:
+        from lib.opportunity_analyzer import is_opportunity_input, score_opportunity, generate_opportunity_report
+        if is_opportunity_input(raw):
+            scored = score_opportunity(raw)
+            score = scored.get("score", 0)
+            category = scored.get("category", "Unknown")
+            full_report = generate_opportunity_report(raw)
+            # Truncate to ~3800 chars to stay within Telegram/response limits
+            reply_text = full_report[:3800] + ("\n…[truncated]" if len(full_report) > 3800 else "")
+            return InternalFirstReply(
+                text=reply_text,
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="opportunity_analyzer",
+                matched_topic="opportunity_intelligence",
+            )
+    except Exception:
+        pass  # Never block the pipeline if analyzer fails
+
     # ── Phase 2: Operational keyword routing ─────────────────────────────────
     rules = _parse_json_env("HERMES_INTERNAL_FIRST_KEYWORDS", _default_rules())
     topic = ""
