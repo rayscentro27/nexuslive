@@ -28,6 +28,8 @@
     @apply text-slate-900 antialiased relative overflow-x-hidden;
     -webkit-text-size-adjust: 100%;   /* prevent iOS auto font inflation */
     text-size-adjust: 100%;
+    font-size: 15px;               /* P1 typography upgrade — was implicit 14px */
+    line-height: 1.6;
   }
 
   /* Prevent double-tap zoom on buttons/links — makes the app feel native */
@@ -42,14 +44,25 @@
 }
 
 @layer components {
-  /* Main card style — crisp white, subtle shadow */
+  /* Main card style — crisp white, layered depth shadow (P1 upgrade) */
   .glass-card {
     background: #ffffff;
     border: 1px solid #e8e9f2;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.07),
+      0 4px 12px rgba(0, 0, 0, 0.06),
+      0 8px 24px rgba(0, 0, 0, 0.04);
     border-radius: 16px;
     position: relative;
     z-index: 10;
+    transition: box-shadow 0.2s ease;
+  }
+
+  .glass-card:hover {
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.08),
+      0 8px 24px rgba(0, 0, 0, 0.08),
+      0 16px 48px rgba(0, 0, 0, 0.06);
   }
 
   /* Softer panel */
@@ -73,18 +86,20 @@
     background: linear-gradient(135deg, #3d5af1 0%, #5b8ef5 100%);
     color: white;
     border: none;
-    border-radius: 10px;
-    padding: 10px 22px;
-    font-weight: 600;
-    font-size: 14px;
+    border-radius: 28px;
+    padding: 0 32px;
+    height: 52px;              /* P1 CTA upgrade — minimum touch-friendly 52px */
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: -0.01em;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
-    transition: opacity 0.15s;
+    transition: opacity 0.15s, box-shadow 0.2s;
     font-family: inherit;
-    box-shadow: 0 4px 12px rgba(61, 90, 241, 0.25);
+    box-shadow: 0 4px 20px rgba(61, 90, 241, 0.35);
   }
 
   .nexus-button-primary:hover {
@@ -110,6 +125,124 @@
 
   .nexus-button-secondary:hover {
     background: #eef0fd;
+  }
+
+  .client-page-shell {
+    padding: 16px 18px 112px;
+    background: radial-gradient(circle at top right, #f7fbff 0%, #eef1fb 45%, #e9edf9 100%);
+    min-height: 100%;
+  }
+
+  .client-page-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .client-page-head h1 {
+    margin: 0;
+    font-size: 1.55rem;
+    font-weight: 800;
+    color: #1a2244;
+  }
+
+  .client-page-head p {
+    margin: 2px 0 0;
+    color: #7080a0;
+    font-size: 0.82rem;
+    font-weight: 500;
+  }
+
+  .client-page-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 12px;
+    align-items: start;
+  }
+
+  .client-page-main,
+  .client-page-rail,
+  .intelligence-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .nexus-widget {
+    border-radius: 24px;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(20px);
+    box-shadow: 0 14px 38px rgba(27, 52, 110, 0.1), 0 2px 8px rgba(27, 52, 110, 0.08);
+  }
+
+  .nexus-widget-dark {
+    background: linear-gradient(132deg, #0f183a 0%, #263e91 100%);
+    border-color: rgba(93, 126, 255, 0.38);
+    color: #dce7ff;
+  }
+
+  .nexus-widget-success { background: linear-gradient(145deg, #f2fdf6 0%, #ecfef4 100%); }
+  .nexus-widget-warning { background: linear-gradient(145deg, #fff9ec 0%, #fffef5 100%); }
+
+  .nexus-widget-head h3 { margin: 0; color: #1a2244; font-size: 0.95rem; font-weight: 800; }
+  .nexus-widget-head p { margin: 2px 0 0; color: #7c8aab; font-size: 0.72rem; font-weight: 600; }
+
+  .metric-tile {
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid #e7edf9;
+    border-radius: 18px;
+    padding: 10px 12px;
+  }
+  .metric-tile p { margin: 0; font-size: 0.68rem; color: #7a88a7; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+  .metric-tile h4 { margin: 5px 0 1px; font-size: 1.05rem; color: #0f1c3f; font-weight: 800; }
+  .metric-tile span { font-size: 0.68rem; color: #4b7ce2; font-weight: 700; }
+
+  .progress-ring-wrap { position: relative; width: 112px; height: 112px; display: grid; place-items: center; }
+  .progress-ring-svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .progress-ring-bg { fill: none; stroke: rgba(139, 159, 208, 0.3); stroke-width: 8; }
+  .progress-ring-fill { fill: none; stroke: #5a86ff; stroke-linecap: round; stroke-width: 8; transition: stroke-dashoffset .5s ease; }
+  .progress-ring-wrap div { position: absolute; text-align: center; display: flex; flex-direction: column; }
+  .progress-ring-wrap strong { font-size: 1rem; color: #ffffff; font-weight: 800; }
+  .progress-ring-wrap span { font-size: .62rem; color: #bdd0ff; font-weight: 700; }
+
+  .readiness-hero { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .readiness-hero > div > span { font-size: .67rem; text-transform: uppercase; font-weight: 800; color: #8db2ff; letter-spacing: .05em; }
+  .readiness-hero h2 { margin: 5px 0 2px; font-size: 1.24rem; color: #fff; font-weight: 900; }
+  .readiness-hero p { margin: 0; color: #bfd4ff; font-size: .78rem; font-weight: 600; }
+  .readiness-hero-next { margin-top: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: .72rem; color: #d7e3ff; font-weight: 600; }
+  .readiness-hero-cta { margin-top: 10px; }
+
+  .empty-upgrade { padding: 16px; border-radius: 18px; border: 1px dashed #ccdaf8; background: rgba(255, 255, 255, 0.72); text-align: left; }
+  .empty-upgrade h4 { margin: 0; color: #1a2244; font-size: .95rem; font-weight: 800; }
+  .empty-upgrade p { margin: 6px 0 0; color: #7080a0; font-size: .8rem; }
+
+  .dock-nav {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    z-index: 60;
+    background: rgba(247, 251, 255, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(24px);
+    box-shadow: 0 12px 34px rgba(36, 64, 119, 0.18);
+    border-radius: 24px;
+    padding: 8px 10px;
+  }
+
+  @media (max-width: 1200px) {
+    .client-page-grid { grid-template-columns: 1fr; }
+    .client-page-rail { order: 3; }
+  }
+
+  @media (max-width: 768px) {
+    .client-page-shell { padding: 12px 12px 98px; }
+    .client-page-head h1 { font-size: 1.25rem; }
   }
 }
 
