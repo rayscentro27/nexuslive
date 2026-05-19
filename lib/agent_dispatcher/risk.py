@@ -39,10 +39,25 @@ _MEDIUM_PATTERNS = frozenset({
 })
 
 # Hard-blocked actions — never allowed regardless of approval
+# Each entry is checked as a substring of the lowercased prompt.
 _HARD_BLOCKS = frozenset({
+    # Trading / money execution
     "live trading", "real money trading", "live execution", "real-money trading",
-    "expose secrets", "expose service role key", "disable rls",
-    "delete all knowledge", "mass approve blindly",
+    "execute live", "execute trade", "live trade", "live forex", "live crypto",
+    "live order", "live broker", "connect broker", "real broker",
+    "live stocks", "live options", "real money", "real-money",
+    # Secrets / security
+    "expose secrets", "expose service role key", "expose api key", "disable rls",
+    "show secret", "print secret", "log secret", "reveal secret",
+    # Data destruction
+    "delete all knowledge", "mass approve blindly", "drop table", "delete all data",
+    "truncate table", "delete all users",
+    # Dangerous deployment
+    "deploy to production", "push to production", "force push", "deploy production",
+    "production deploy", "prod deploy",
+    # Comms spam
+    "email blast", "send to all clients", "message all users", "mass email",
+    "send email to all", "bulk email", "email all",
 })
 
 

@@ -1014,7 +1014,8 @@ class NexusTelegramBot:
             result = {"ok": False, "error": str(e)}
 
         if not result.get("ok"):
-            return f"⚠️ Dispatch failed: {result.get('error', 'unknown error')}. Task not created."
+            err = result.get("error", "unknown error")
+            return f"⚠️ Dispatch failed: {err}. Task not created."
 
         risk_label = risk.get("level", "low")
         approval_note = " Awaiting your approval in Command Center." if risk.get("requires_approval") else ""

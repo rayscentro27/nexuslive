@@ -176,15 +176,15 @@ def create_task(
             "reason": risk.get("block_reason", "Hard-blocked by safety rules"),
         }
 
-    status = "awaiting_approval" if risk.get("requires_approval") else "received"
+    requires = risk.get("requires_approval", False)
+    status = "awaiting_approval" if requires else "received"
     payload = {
-        "prompt": prompt,
+        "original_prompt": prompt,
         "task_type": resolved_type,
         "risk_level": risk.get("level", "low"),
         "status": status,
-        "requires_approval": risk.get("requires_approval", False),
-        "requested_by": requested_by,
-        "dry_run": NEXUS_DRY_RUN,
+        "approval_required": requires,
+        "source": requested_by or "admin",
         "created_at": _now(),
     }
     result = _post("agent_dispatch_tasks", payload)
@@ -220,17 +220,14 @@ def plan_task(task_id: str) -> dict[str, Any]:
         routed = route_subtask(st)
         payload = {
             "parent_task_id": task_id,
-            "sequence_order": i + 1,
+            "title": st.get("prompt_summary", st.get("title", f"Subtask {i+1}")),
+            "description": st.get("description", ""),
             "task_type": st.get("task_type", "general"),
-            "prompt_summary": st.get("prompt_summary", ""),
             "assigned_agent_key": routed.get("assigned_agent_key"),
             "assigned_skill_key": routed.get("assigned_skill_key"),
             "assigned_cli_key": routed.get("assigned_cli_key"),
             "assigned_provider_key": routed.get("assigned_provider_key"),
-            "risk_level": routed.get("risk_level", "low"),
-            "requires_approval": routed.get("requires_approval", False),
-            "status": "awaiting_approval" if routed.get("requires_approval") else "planned",
-            "routing_reason": routed.get("routing_reason", ""),
+            "status": "queued",
             "created_at": _now(),
         }
         result = _post("agent_dispatch_subtasks", payload)
@@ -266,17 +263,18 @@ def approve_request(approval_id: str, reviewed_by: str = "admin") -> dict[str, A
 
     Approves a pending human approval request.
     Safety: only marks as approved — does not auto-execute anything.
+    reviewed_by is stored in metadata (uuid FK can't hold text names).
     """
     ok = _patch(
         "human_approval_requests",
         "id",
         approval_id,
-        {"status": "approved", "reviewed_at": _now(), "reviewed_by": reviewed_by},
+        {"status": "approved", "reviewed_at": _now()},
     )
     if not ok:
         return {"ok": False, "error": "patch_failed"}
     logger.info("approval_approved id=%s by=%s", approval_id, reviewed_by)
-    return {"ok": True, "id": approval_id, "status": "approved"}
+    return {"ok": True, "id": approval_id, "status": "approved", "reviewed_by": reviewed_by}
 
 
 def reject_request(approval_id: str, reviewed_by: str = "admin", reason: str = "") -> dict[str, Any]:
@@ -285,15 +283,8 @@ def reject_request(approval_id: str, reviewed_by: str = "admin", reason: str = "
 
     Rejects a pending human approval request.
     """
-    payload: dict[str, Any] = {
-        "status": "rejected",
-        "reviewed_at": _now(),
-        "reviewed_by": reviewed_by,
-    }
-    if reason:
-        payload["rejection_reason"] = reason
-    ok = _patch("human_approval_requests", "id", approval_id, payload)
+    ok = _patch("human_approval_requests", "id", approval_id, {"status": "rejected", "reviewed_at": _now()})
     if not ok:
         return {"ok": False, "error": "patch_failed"}
-    logger.info("approval_rejected id=%s by=%s", approval_id, reviewed_by)
-    return {"ok": True, "id": approval_id, "status": "rejected"}
+    logger.info("approval_rejected id=%s by=%s reason=%s", approval_id, reviewed_by, reason)
+    return {"ok": True, "id": approval_id, "status": "rejected", "reviewed_by": reviewed_by}

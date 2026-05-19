@@ -252,14 +252,15 @@ def cmd_dispatch(args: argparse.Namespace) -> None:
         print("\n[DRY RUN] Use --no-dry-run to submit.")
         return
 
-    task_status = "awaiting_approval" if risk.get("requires_approval") else "received"
+    requires = risk.get("requires_approval", False)
+    task_status = "awaiting_approval" if requires else "received"
     payload = {
-        "prompt": prompt,
+        "original_prompt": prompt,
         "task_type": task_type,
         "risk_level": risk.get("level", "low"),
         "status": task_status,
-        "requires_approval": risk.get("requires_approval", False),
-        "requested_by": "nexus_cli",
+        "approval_required": requires,
+        "source": "nexus_cli",
         "created_at": _now(),
     }
     result = _sb_post("agent_dispatch_tasks", payload)
@@ -277,16 +278,16 @@ def cmd_approvals(args: argparse.Namespace) -> None:
     approval_id = getattr(args, "approval_id", None)
 
     if sub == "list" or sub is None:
-        rows = _sb_get("human_approval_requests?select=id,task_type,risk_level,status,prompt_summary,created_at&status=eq.pending&order=created_at.desc&limit=20")
+        rows = _sb_get("human_approval_requests?select=id,approval_type,risk_level,status,request_summary,created_at&status=eq.pending&order=created_at.desc&limit=20")
         if not rows:
             print("No pending approvals.")
             return
         print(f"\nPending Approvals ({len(rows)})")
-        print(f"{'ID':<38} {'Type':<20} {'Risk':<8} Summary")
-        print("-" * 90)
+        print(f"{'ID':<38} {'Type':<30} {'Risk':<8} Summary")
+        print("-" * 100)
         for r in rows:
             rid = str(r.get("id") or "")[:36]
-            print(f"  {rid}  {str(r.get('task_type','')):<20} {str(r.get('risk_level','')):<8} {str(r.get('prompt_summary',''))[:40]}")
+            print(f"  {rid}  {str(r.get('approval_type','')):<30} {str(r.get('risk_level','')):<8} {str(r.get('request_summary',''))[:50]}")
         return
 
     if sub in {"approve", "reject"} and approval_id:
@@ -294,7 +295,7 @@ def cmd_approvals(args: argparse.Namespace) -> None:
         ok = _sb_patch(
             "human_approval_requests",
             {"id": approval_id},
-            {"status": new_status, "reviewed_at": _now(), "reviewed_by": "nexus_cli"},
+            {"status": new_status, "reviewed_at": _now()},
         )
         if ok:
             print(f"✅ Approval {approval_id} → {new_status}")
@@ -322,13 +323,12 @@ def _run_skill(skill_key: str, dry_run: bool) -> None:
         print(f"\n[DRY RUN] Use --no-dry-run to dispatch this skill.")
     else:
         payload = {
-            "prompt": f"Run skill: {skill.get('display_name')}",
+            "original_prompt": f"Run skill: {skill.get('display_name')}",
             "task_type": skill.get("category", "ops"),
             "risk_level": skill.get("risk_level", "low"),
             "status": "awaiting_approval" if skill.get("requires_approval") else "received",
-            "requires_approval": bool(skill.get("requires_approval")),
-            "requested_by": "nexus_cli",
-            "assigned_skill_key": skill_key,
+            "approval_required": bool(skill.get("requires_approval")),
+            "source": "nexus_cli",
             "created_at": _now(),
         }
         result = _sb_post("agent_dispatch_tasks", payload)
