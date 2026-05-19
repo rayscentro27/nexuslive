@@ -1,873 +1,1253 @@
 /**
- * NexusVirtualOffice — 2D animated AI workforce visualization.
- * Movement and state driven by real Supabase operational data.
- * Demo mode active when no real data is present.
+ * NexusVirtualOffice — Living AI workforce simulation.
+ * Agents physically walk between zones, receive tasks, work, and return results.
+ * Simulation-first: task flow is visible on the office floor at all times.
  */
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { motion, AnimatePresence, LayoutGroup } from 'motion/react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { supabase } from '../../lib/supabase';
-import { Shield, RefreshCw, AlertTriangle, Wifi, WifiOff, Coffee, ChevronDown, ChevronUp } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type EmployeeId = 'hermes' | 'sage' | 'rex' | 'vera' | 'aria' | 'nova' | 'mira' | 'orion';
-type RoomId = 'command' | 'trading' | 'funding' | 'credit' | 'grants' | 'opportunities' | 'marketing' | 'system' | 'research' | 'break';
-type EmployeeStatus = 'idle' | 'researching' | 'analyzing' | 'reviewing' | 'blocked' | 'learning' | 'coordinating' | 'monitoring' | 'writing';
+type ZoneId =
+  | 'hermes_command' | 'review_table'
+  | 'trading_desk' | 'opportunity_lab' | 'grants_research'
+  | 'funding_strategy' | 'credit_intel' | 'marketing_studio'
+  | 'research_library' | 'system_monitor' | 'break_area';
 
-interface EmployeeState {
-  status: EmployeeStatus;
-  task: string;
-  urgency: 'low' | 'medium' | 'high' | 'critical';
+type AgentId = 'hermes' | 'sage' | 'rex' | 'vera' | 'aria' | 'nova' | 'mira' | 'orion';
+
+type MovementState =
+  | 'idle' | 'resting' | 'walking_to_hermes' | 'receiving_task'
+  | 'walking_to_department' | 'working' | 'blocked'
+  | 'returning_result' | 'reviewing' | 'completed';
+
+type Priority = 'low' | 'medium' | 'high' | 'critical';
+type ViewMode = 'full' | 'follow_hermes' | 'follow_task' | 'trading' | 'opportunity' | 'system';
+
+interface ZoneConfig {
+  label: string;
+  emoji: string;
+  color: string;
+  bg: string;
+  border: string;
+  // logical coords on 800×560 canvas
+  x: number; y: number; w: number; h: number;
+  capacity: number;
+  description: string;
 }
 
-interface ProviderHealth {
-  provider_name: string;
-  status: string;
-  avg_latency_ms: number | null;
+interface AgentConfig {
+  name: string;
+  emoji: string;
+  color: string;
+  homeZone: ZoneId;
+  role: string;
+  departmentZone: ZoneId;
 }
 
-interface ResearchTicket {
+interface TaskBubble {
   id: string;
-  department: string;
-  status: string;
-  topic: string;
-  created_at: string;
+  title: string;
+  source: string;
+  priority: Priority;
+  riskLevel: 'low' | 'medium' | 'high';
+  description: string;
 }
 
-interface VirtualOfficeData {
-  providers: ProviderHealth[];
-  tickets: ResearchTicket[];
-  opportunityCount: number;
-  recentFeatures: Set<string>;
-  ingestCount: number;
-  knowledgeCount: number;
-  revenueEventCount: number;
+interface ResultCard {
+  taskId: string;
+  outcome: 'completed' | 'blocked' | 'review';
+  summary: string;
+  nextAction?: string;
+  approvalNeeded?: boolean;
+}
+
+interface AgentSimState {
+  agentId: AgentId;
+  currentZone: ZoneId;
+  targetZone: ZoneId;
+  movementState: MovementState;
+  currentTask: TaskBubble | null;
+  result: ResultCard | null;
+  ticksInState: number;
+  urgency: Priority;
+  destinationReason: string;
+}
+
+interface OfficeData {
   isDemo: boolean;
+  pendingTasks: TaskBubble[];
+  providerHealth: { name: string; status: 'online' | 'offline' | 'degraded'; latency?: number }[];
+  approvalCount: number;
+  taskQueueCount: number;
 }
 
-// ─── Employee + Room Config ───────────────────────────────────────────────────
+// ─── Zone Layout (800×560 logical canvas) ────────────────────────────────────
 
-const EMPLOYEES: Record<EmployeeId, { name: string; emoji: string; role: string; homeRoom: RoomId; color: string }> = {
-  hermes: { name: 'Hermes', emoji: '🤖', role: 'Chief Operations', homeRoom: 'command', color: '#3d5af1' },
-  sage:   { name: 'Sage',   emoji: '📈', role: 'Trading Analyst',    homeRoom: 'trading',   color: '#22c55e' },
-  rex:    { name: 'Rex',    emoji: '💰', role: 'Funding Strategist', homeRoom: 'funding',   color: '#f59e0b' },
-  vera:   { name: 'Vera',   emoji: '🛡️', role: 'Credit Coach',       homeRoom: 'credit',    color: '#6366f1' },
-  aria:   { name: 'Aria',   emoji: '🏆', role: 'Grant Researcher',   homeRoom: 'grants',    color: '#8b5cf6' },
-  nova:   { name: 'Nova',   emoji: '🔭', role: 'Opportunity Analyst', homeRoom: 'opportunities', color: '#0d9488' },
-  mira:   { name: 'Mira',   emoji: '🎨', role: 'Marketing Strategist', homeRoom: 'marketing', color: '#ec4899' },
-  orion:  { name: 'Orion',  emoji: '📡', role: 'Systems Monitor',    homeRoom: 'system',    color: '#ef4444' },
+const ZONES: Record<ZoneId, ZoneConfig> = {
+  hermes_command: {
+    label: 'Hermes Command', emoji: '🎯', color: '#3d5af1',
+    bg: 'rgba(61,90,241,0.12)', border: 'rgba(61,90,241,0.5)',
+    x: 300, y: 20, w: 200, h: 90, capacity: 2,
+    description: 'Central coordination hub',
+  },
+  review_table: {
+    label: 'Review Table', emoji: '📋', color: '#64748b',
+    bg: 'rgba(100,116,139,0.10)', border: 'rgba(100,116,139,0.4)',
+    x: 280, y: 140, w: 240, h: 70, capacity: 4,
+    description: 'Blocked tasks & approval review',
+  },
+  trading_desk: {
+    label: 'Trading Desk', emoji: '📊', color: '#22c55e',
+    bg: 'rgba(34,197,94,0.10)', border: 'rgba(34,197,94,0.4)',
+    x: 20, y: 50, w: 180, h: 100, capacity: 2,
+    description: 'DEMO / PAPER ONLY — no live execution',
+  },
+  opportunity_lab: {
+    label: 'Opportunity Lab', emoji: '💡', color: '#0d9488',
+    bg: 'rgba(13,148,136,0.10)', border: 'rgba(13,148,136,0.4)',
+    x: 20, y: 190, w: 180, h: 95, capacity: 2,
+    description: 'Business opportunity scoring',
+  },
+  grants_research: {
+    label: 'Grants Research', emoji: '🏆', color: '#8b5cf6',
+    bg: 'rgba(139,92,246,0.10)', border: 'rgba(139,92,246,0.4)',
+    x: 20, y: 335, w: 180, h: 95, capacity: 2,
+    description: 'Grant discovery & eligibility',
+  },
+  funding_strategy: {
+    label: 'Funding Strategy', emoji: '💰', color: '#f59e0b',
+    bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.4)',
+    x: 600, y: 50, w: 180, h: 100, capacity: 2,
+    description: 'Funding readiness & lender match',
+  },
+  credit_intel: {
+    label: 'Credit Intelligence', emoji: '🛡️', color: '#6366f1',
+    bg: 'rgba(99,102,241,0.10)', border: 'rgba(99,102,241,0.4)',
+    x: 600, y: 190, w: 180, h: 95, capacity: 2,
+    description: 'Credit score analysis & coaching',
+  },
+  marketing_studio: {
+    label: 'Marketing Studio', emoji: '🎨', color: '#ec4899',
+    bg: 'rgba(236,72,153,0.10)', border: 'rgba(236,72,153,0.4)',
+    x: 600, y: 335, w: 180, h: 95, capacity: 2,
+    description: 'Content & campaign strategy',
+  },
+  research_library: {
+    label: 'Research Library', emoji: '📚', color: '#78716c',
+    bg: 'rgba(120,113,108,0.08)', border: 'rgba(120,113,108,0.35)',
+    x: 220, y: 260, w: 160, h: 80, capacity: 3,
+    description: 'Knowledge ingestion & learning',
+  },
+  system_monitor: {
+    label: 'System Monitor', emoji: '📡', color: '#ef4444',
+    bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.35)',
+    x: 420, y: 260, w: 160, h: 80, capacity: 2,
+    description: 'Infrastructure & AI provider health',
+  },
+  break_area: {
+    label: 'Break Area', emoji: '☕', color: '#9ca3af',
+    bg: 'rgba(156,163,175,0.07)', border: 'rgba(156,163,175,0.3)',
+    x: 300, y: 380, w: 200, h: 65, capacity: 8,
+    description: 'Standby / idle',
+  },
 };
 
-interface RoomConfig {
-  name: string; emoji: string; color: string; bg: string; border: string;
-  gridArea: string; description: string;
-}
-
-const ROOMS: Record<RoomId, RoomConfig> = {
-  command:       { name: 'Hermes Command',     emoji: '🎯', color: '#3d5af1', bg: '#eef0fd', border: '#c7d2fe', gridArea: 'command',   description: 'Central coordination hub' },
-  trading:       { name: 'Trading Desk',        emoji: '📊', color: '#22c55e', bg: '#f0fdf4', border: '#bbf7d0', gridArea: 'trading',   description: 'Demo / paper trading only' },
-  funding:       { name: 'Funding Strategy',    emoji: '💰', color: '#f59e0b', bg: '#fffbeb', border: '#fde68a', gridArea: 'funding',   description: 'Funding readiness & strategy' },
-  credit:        { name: 'Credit Intelligence', emoji: '🛡️', color: '#6366f1', bg: '#eef2ff', border: '#c7d2fe', gridArea: 'credit',    description: 'Credit analysis & coaching' },
-  grants:        { name: 'Grants Research',     emoji: '🏆', color: '#8b5cf6', bg: '#f5f3ff', border: '#ddd6fe', gridArea: 'grants',    description: 'Grant discovery & eligibility' },
-  opportunities: { name: 'Opportunity Lab',     emoji: '💡', color: '#0d9488', bg: '#f0fdfa', border: '#99f6e4', gridArea: 'opps',      description: 'Business opportunity scoring' },
-  marketing:     { name: 'Marketing Studio',    emoji: '🎨', color: '#ec4899', bg: '#fdf2f8', border: '#fbcfe8', gridArea: 'marketing', description: 'Content & campaign strategy' },
-  system:        { name: 'System Monitor',      emoji: '📡', color: '#ef4444', bg: '#fef2f2', border: '#fecaca', gridArea: 'system',    description: 'Infrastructure & AI health' },
-  research:      { name: 'Research Library',    emoji: '📚', color: '#78716c', bg: '#fafaf9', border: '#e7e5e4', gridArea: 'library',   description: 'Knowledge ingestion & learning' },
-  break:         { name: 'Break Area',          emoji: '☕', color: '#9ca3af', bg: '#f9fafb', border: '#e5e7eb', gridArea: 'break',     description: 'Standby / idle' },
+// Agent center within a zone (with slight offsets so they don't overlap)
+const ZONE_AGENT_SLOTS: Partial<Record<ZoneId, [number, number][]>> = {
+  hermes_command: [[0, 0], [40, 0]],
+  review_table:   [[-40, 0], [0, 0], [40, 0]],
+  break_area:     [[-60, 0], [-20, 0], [20, 0], [60, 0]],
 };
 
-const STATUS_COLORS: Record<EmployeeStatus, string> = {
-  idle:        '#9ca3af',
-  researching: '#7c3aed',
-  analyzing:   '#0d9488',
-  reviewing:   '#f59e0b',
-  blocked:     '#ef4444',
-  learning:    '#6366f1',
-  coordinating:'#3d5af1',
-  monitoring:  '#ef4444',
-  writing:     '#ec4899',
+function getZoneCenter(zoneId: ZoneId): { x: number; y: number } {
+  const z = ZONES[zoneId];
+  return { x: z.x + z.w / 2, y: z.y + z.h / 2 };
+}
+
+// ─── Agent Config ─────────────────────────────────────────────────────────────
+
+const AGENTS: Record<AgentId, AgentConfig> = {
+  hermes: { name: 'Hermes', emoji: '🤖', color: '#3d5af1', homeZone: 'hermes_command', departmentZone: 'hermes_command', role: 'Chief Operations' },
+  sage:   { name: 'Sage',   emoji: '📈', color: '#22c55e', homeZone: 'break_area',     departmentZone: 'trading_desk',    role: 'Trading Analyst (Paper)' },
+  rex:    { name: 'Rex',    emoji: '💰', color: '#f59e0b', homeZone: 'break_area',     departmentZone: 'funding_strategy', role: 'Funding Strategist' },
+  vera:   { name: 'Vera',   emoji: '🛡️', color: '#6366f1', homeZone: 'break_area',     departmentZone: 'credit_intel',    role: 'Credit Coach' },
+  aria:   { name: 'Aria',   emoji: '🏆', color: '#8b5cf6', homeZone: 'break_area',     departmentZone: 'grants_research',  role: 'Grant Researcher' },
+  nova:   { name: 'Nova',   emoji: '🔭', color: '#0d9488', homeZone: 'break_area',     departmentZone: 'opportunity_lab',  role: 'Opportunity Analyst' },
+  mira:   { name: 'Mira',   emoji: '🎨', color: '#ec4899', homeZone: 'break_area',     departmentZone: 'marketing_studio', role: 'Marketing Strategist' },
+  orion:  { name: 'Orion',  emoji: '📡', color: '#ef4444', homeZone: 'system_monitor', departmentZone: 'system_monitor',   role: 'Systems Monitor' },
 };
 
-const STATUS_ICONS: Record<EmployeeStatus, string> = {
-  idle:         '💤',
-  researching:  '🔬',
-  analyzing:    '📊',
-  reviewing:    '👁️',
-  blocked:      '🚫',
-  learning:     '📖',
-  coordinating: '🔗',
-  monitoring:   '📡',
-  writing:      '✍️',
+// ─── Demo Task Queue ──────────────────────────────────────────────────────────
+
+const DEMO_TASKS: Record<AgentId, TaskBubble[]> = {
+  sage: [
+    { id: 'sage-1', title: 'London Breakout Analysis', source: 'strategy_v1', priority: 'medium', riskLevel: 'low', description: 'Paper trade journal — GBP/USD session setup' },
+    { id: 'sage-2', title: 'EMA Pullback Review', source: 'strategy_v2', priority: 'low', riskLevel: 'low', description: 'EUR/USD trend continuation check' },
+  ],
+  nova: [
+    { id: 'nova-1', title: 'Opportunity Scoring: Affiliate Stack', source: 'phase2_opportunity', priority: 'high', riskLevel: 'low', description: 'Score Lendio + Bluevine + Nav affiliate stack' },
+    { id: 'nova-2', title: 'Faceless YouTube Channel Fit', source: 'phase2_content', priority: 'medium', riskLevel: 'low', description: 'Validate Business Credit Lab niche score' },
+  ],
+  rex: [
+    { id: 'rex-1', title: 'Funding Readiness Audit', source: 'phase2_monetization', priority: 'high', riskLevel: 'low', description: 'Generate $297 audit report for test client' },
+  ],
+  vera: [
+    { id: 'vera-1', title: 'PAYDEX Score Article', source: 'phase2_content', priority: 'medium', riskLevel: 'low', description: 'SEO article — paydex score keyword' },
+  ],
+  aria: [
+    { id: 'aria-1', title: 'SBIR/STTR Eligibility Check', source: 'grant_research_v1', priority: 'medium', riskLevel: 'low', description: 'Phase I tech business grant match' },
+    { id: 'aria-2', title: 'Women-Owned Business Grants', source: 'grant_research_v1', priority: 'low', riskLevel: 'low', description: 'Top 10 sources ranked 2026' },
+  ],
+  mira: [
+    { id: 'mira-1', title: 'Newsletter Issue #1', source: 'nexus_business_brief', priority: 'medium', riskLevel: 'low', description: 'Week 1: funding tip + credit move + grant watch' },
+  ],
+  orion: [
+    { id: 'orion-1', title: 'Provider Health Alert', source: 'system_monitor', priority: 'high', riskLevel: 'low', description: 'ollama + claude_cli offline — investigating' },
+  ],
+  hermes: [],
 };
 
-// ─── Demo Data ────────────────────────────────────────────────────────────────
+// ─── Simulation Engine ────────────────────────────────────────────────────────
 
-function buildDemoData(): VirtualOfficeData {
-  return {
-    providers: [
-      { provider_name: 'openrouter', status: 'online',   avg_latency_ms: 312 },
-      { provider_name: 'groq',       status: 'online',   avg_latency_ms: 89  },
-      { provider_name: 'ollama',     status: 'degraded', avg_latency_ms: null },
-    ],
-    tickets: [
-      { id: 'd1', department: 'grants_research',      status: 'researching', topic: 'SBIR Phase I eligibility for tech startups', created_at: new Date(Date.now() - 3600000).toISOString() },
-      { id: 'd2', department: 'trading_intelligence', status: 'queued',      topic: 'RSI divergence strategy back-test', created_at: new Date(Date.now() - 7200000).toISOString() },
-      { id: 'd3', department: 'funding_intelligence', status: 'submitted',   topic: 'SBA 7(a) approval factor analysis', created_at: new Date(Date.now() - 1800000).toISOString() },
-    ],
-    opportunityCount: 7,
-    recentFeatures: new Set(['grants', 'funding', 'trading']),
-    ingestCount: 3,
-    knowledgeCount: 12,
-    revenueEventCount: 0,
-    isDemo: true,
-  };
-}
+const MOVEMENT_DURATIONS: Record<MovementState, number> = {
+  idle:                  0,
+  resting:               8,
+  walking_to_hermes:     3,
+  receiving_task:        2,
+  walking_to_department: 3,
+  working:               10,
+  blocked:               4,
+  returning_result:      3,
+  reviewing:             3,
+  completed:             2,
+};
 
-// ─── State Mapping ────────────────────────────────────────────────────────────
-
-function deptTickets(tickets: ResearchTicket[], dept: string, status?: string) {
-  return tickets.filter(t => t.department === dept && (status ? t.status === status : true));
-}
-
-function computeRooms(data: VirtualOfficeData): Record<EmployeeId, RoomId> {
-  const { providers, tickets, opportunityCount, recentFeatures } = data;
-
-  const criticalProviders = providers.filter(p => p.status !== 'online').length;
-  const grantResearching  = deptTickets(tickets, 'grants_research', 'researching').length;
-  const grantActive       = deptTickets(tickets, 'grants_research').length;
-  const tradingActive     = deptTickets(tickets, 'trading_intelligence').length > 0 || recentFeatures.has('trading');
-  const fundingActive     = deptTickets(tickets, 'funding_intelligence').length > 0 || recentFeatures.has('funding');
-  const creditActive      = deptTickets(tickets, 'credit_research').length > 0 || recentFeatures.has('credit');
-  const mktActive         = recentFeatures.has('marketing') || recentFeatures.has('content');
-
-  // Hermes: stays in command, moves to busiest dept when ≥3 active tickets there
-  const deptActivity: Array<[RoomId, number]> = [
-    ['trading',       deptTickets(tickets, 'trading_intelligence').length],
-    ['grants',        grantActive],
-    ['funding',       deptTickets(tickets, 'funding_intelligence').length],
-    ['credit',        deptTickets(tickets, 'credit_research').length],
-    ['opportunities', opportunityCount > 5 ? 2 : 0],
-  ];
-  const [topRoom, topCount] = deptActivity.sort((a, b) => b[1] - a[1])[0];
-  const hermes: RoomId = topCount >= 3 ? topRoom : 'command';
-
-  return {
-    hermes,
-    sage:  tradingActive ? 'trading'      : 'break',
-    rex:   fundingActive ? 'funding'      : 'break',
-    vera:  creditActive  ? 'credit'       : 'break',
-    aria:  grantResearching > 0 ? 'research' : grantActive > 0 ? 'grants' : 'break',
-    nova:  opportunityCount > 0 ? 'opportunities' : 'research',
-    mira:  mktActive     ? 'marketing'   : 'break',
-    orion: criticalProviders >= 2 ? 'command' : 'system',
-  };
-}
-
-function computeStatuses(data: VirtualOfficeData, rooms: Record<EmployeeId, RoomId>): Record<EmployeeId, EmployeeState> {
-  const { providers, tickets, opportunityCount, recentFeatures, ingestCount } = data;
-
-  const hermesProvider = providers.find(p => ['claude_cli', 'ollama', 'openrouter'].includes(p.provider_name));
-  const onlineCount = providers.filter(p => p.status === 'online').length;
-  const offlineCount = providers.filter(p => p.status !== 'online').length;
-
-  const grantTasks = deptTickets(tickets, 'grants_research');
-  const tradingTasks = deptTickets(tickets, 'trading_intelligence');
-  const fundingTasks = deptTickets(tickets, 'funding_intelligence');
-  const creditTasks = deptTickets(tickets, 'credit_research');
-
-  return {
-    hermes: {
-      status: hermesProvider?.status === 'online' ? 'coordinating' : rooms.hermes !== 'command' ? 'coordinating' : 'idle',
-      task: rooms.hermes !== 'command'
-        ? `Coordinating with ${ROOMS[rooms.hermes].name}`
-        : `Monitoring ${onlineCount} providers · ${tickets.length} active tasks`,
-      urgency: offlineCount >= 2 ? 'critical' : tickets.length > 3 ? 'high' : 'low',
-    },
-    sage: {
-      status: tradingTasks.some(t => t.status === 'researching') ? 'analyzing' : tradingTasks.length > 0 ? 'researching' : 'idle',
-      task: tradingTasks.length > 0 ? tradingTasks[0].topic.slice(0, 48) : 'No active trades — paper mode',
+function buildInitialAgentStates(officeData: OfficeData): AgentSimState[] {
+  return (Object.keys(AGENTS) as AgentId[]).map((agentId) => {
+    const cfg = AGENTS[agentId];
+    return {
+      agentId,
+      currentZone: agentId === 'hermes' ? 'hermes_command' : agentId === 'orion' ? 'system_monitor' : 'break_area',
+      targetZone: agentId === 'hermes' ? 'hermes_command' : agentId === 'orion' ? 'system_monitor' : 'break_area',
+      movementState: agentId === 'hermes' ? 'idle' : 'resting',
+      currentTask: null,
+      result: null,
+      ticksInState: 0,
       urgency: 'low',
-    },
-    rex: {
-      status: fundingTasks.some(t => t.status === 'researching') ? 'researching' : fundingTasks.length > 0 ? 'reviewing' : 'idle',
-      task: fundingTasks.length > 0 ? `${fundingTasks.length} funding task${fundingTasks.length > 1 ? 's' : ''} in queue` : 'Standby — funding readiness monitoring',
-      urgency: fundingTasks.length > 2 ? 'medium' : 'low',
-    },
-    vera: {
-      status: recentFeatures.has('credit') ? 'analyzing' : creditTasks.length > 0 ? 'reviewing' : 'idle',
-      task: creditTasks.length > 0 ? `${creditTasks.length} credit analysis task${creditTasks.length > 1 ? 's' : ''}` : 'Credit score monitoring standby',
-      urgency: 'low',
-    },
-    aria: {
-      status: grantTasks.some(t => t.status === 'researching') ? 'researching' : grantTasks.length > 0 ? 'reviewing' : 'idle',
-      task: grantTasks.length > 0 ? grantTasks[0].topic.slice(0, 48) : 'Grant catalog standby',
-      urgency: grantTasks.length > 2 ? 'medium' : 'low',
-    },
-    nova: {
-      status: opportunityCount > 0 ? 'analyzing' : 'learning',
-      task: opportunityCount > 0 ? `${opportunityCount} opportunities scored in catalog` : 'Scanning for new opportunities',
-      urgency: opportunityCount > 10 ? 'medium' : 'low',
-    },
-    mira: {
-      status: recentFeatures.has('marketing') ? 'writing' : 'idle',
-      task: recentFeatures.has('marketing') ? 'Crafting content strategy' : 'Content queue standby',
-      urgency: 'low',
-    },
-    orion: {
-      status: offlineCount > 0 ? 'monitoring' : providers.length > 0 ? 'monitoring' : 'idle',
-      task: offlineCount > 0
-        ? `⚠️ ${offlineCount} provider${offlineCount > 1 ? 's' : ''} degraded — investigating`
-        : `All ${onlineCount} providers online · ${ingestCount} ingestion items`,
-      urgency: offlineCount >= 2 ? 'critical' : offlineCount === 1 ? 'high' : 'low',
-    },
-  };
+      destinationReason: agentId === 'hermes' ? 'Coordinating workforce' : 'Standby',
+    };
+  });
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+function tickAgentState(
+  agent: AgentSimState,
+  taskQueue: TaskBubble[],
+  hasApprovals: boolean,
+): AgentSimState {
+  const cfg = AGENTS[agent.agentId];
+  const duration = MOVEMENT_DURATIONS[agent.movementState];
+  const nextTick = agent.ticksInState + 1;
 
-function EmployeeAvatar({ id, state, size = 'md', showTask = false }: {
-  id: EmployeeId;
-  state: EmployeeState;
-  size?: 'sm' | 'md';
-  showTask?: boolean;
-}) {
-  const emp = EMPLOYEES[id];
-  const statusColor = STATUS_COLORS[state.status];
-  const isActive = state.status !== 'idle';
-  const dim = size === 'sm' ? 40 : 52;
-  const emojiSize = size === 'sm' ? 18 : 22;
-
-  const urgencyGlow: Record<string, string> = {
-    critical: '0 0 20px rgba(239,68,68,0.5)',
-    high:     '0 0 14px rgba(245,158,11,0.4)',
-    medium:   `0 0 12px ${emp.color}33`,
-    low:      isActive ? `0 0 8px ${emp.color}22` : 'none',
-  };
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-      {showTask && state.status !== 'idle' && (
-        <motion.div
-          initial={{ opacity: 0, y: 4, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          style={{
-            background: '#1a1c3a', color: '#fff',
-            fontSize: 9, fontWeight: 600, padding: '3px 7px',
-            borderRadius: 6, maxWidth: 120, textAlign: 'center',
-            lineHeight: 1.3, marginBottom: 2,
-          }}
-        >
-          {STATUS_ICONS[state.status]} {state.task.length > 40 ? state.task.slice(0, 40) + '…' : state.task}
-        </motion.div>
-      )}
-
-      <div style={{ position: 'relative' }}>
-        {isActive && (
-          <motion.div
-            animate={{ scale: [1, 1.5, 1], opacity: [0.4, 0, 0.4] }}
-            transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
-            style={{
-              position: 'absolute', inset: -5, borderRadius: '50%',
-              background: statusColor, opacity: 0.2, pointerEvents: 'none',
-            }}
-          />
-        )}
-
-        <motion.div
-          animate={isActive ? { y: [0, -3, 0] } : {}}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-          style={{
-            width: dim, height: dim, borderRadius: '50%',
-            background: isActive ? `${emp.color}15` : '#f3f4f6',
-            border: `2.5px solid ${isActive ? emp.color : '#d1d5db'}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: emojiSize,
-            boxShadow: urgencyGlow[state.urgency],
-          }}
-        >
-          {emp.emoji}
-        </motion.div>
-
-        {/* Status dot */}
-        <div style={{
-          position: 'absolute', bottom: 1, right: 1,
-          width: 10, height: 10, borderRadius: '50%',
-          background: statusColor, border: '2px solid #fff',
-        }} />
-
-        {/* Urgency badge */}
-        {(state.urgency === 'critical' || state.urgency === 'high') && (
-          <motion.div
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ duration: 0.8, repeat: Infinity }}
-            style={{
-              position: 'absolute', top: -4, right: -4,
-              width: 14, height: 14, borderRadius: '50%',
-              background: state.urgency === 'critical' ? '#ef4444' : '#f59e0b',
-              border: '2px solid #fff', fontSize: 7,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff',
-            }}
-          >
-            !
-          </motion.div>
-        )}
-      </div>
-
-      <div style={{ textAlign: 'center' }}>
-        <p style={{ fontSize: size === 'sm' ? 9 : 10, fontWeight: 700, color: '#1a1c3a', margin: 0 }}>
-          {emp.name}
-        </p>
-        <p style={{ fontSize: 8, color: statusColor, margin: 0, fontWeight: 600 }}>
-          {state.status}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function RoomCard({ roomId, employees, statuses, expanded, onToggle, isMobile }: {
-  roomId: RoomId;
-  employees: EmployeeId[];
-  statuses: Record<EmployeeId, EmployeeState>;
-  expanded?: boolean;
-  onToggle?: () => void;
-  isMobile?: boolean;
-}) {
-  const room = ROOMS[roomId];
-  const activeCount = employees.filter(id => statuses[id]?.status !== 'idle').length;
-  const hasCritical = employees.some(id => statuses[id]?.urgency === 'critical');
-  const hasHigh = employees.some(id => statuses[id]?.urgency === 'high');
-
-  const borderColor = hasCritical ? '#ef4444' : hasHigh ? '#f59e0b' : activeCount > 0 ? room.border : '#e5e7eb';
-  const bgColor = employees.length === 0 ? '#f9fafb' : room.bg;
-
-  if (isMobile && onToggle) {
-    return (
-      <div style={{
-        borderRadius: 12, border: `1.5px solid ${borderColor}`,
-        background: bgColor, overflow: 'hidden',
-        boxShadow: activeCount > 0 ? `0 2px 10px ${room.color}15` : 'none',
-      }}>
-        <button
-          onClick={onToggle}
-          style={{
-            width: '100%', padding: '10px 14px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            background: 'transparent', border: 'none', cursor: 'pointer',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 16 }}>{room.emoji}</span>
-            <div style={{ textAlign: 'left' }}>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#1a1c3a', margin: 0 }}>{room.name}</p>
-              <p style={{ fontSize: 10, color: '#6b7280', margin: 0 }}>
-                {employees.length === 0 ? 'Empty' : `${employees.length} employee${employees.length > 1 ? 's' : ''}${activeCount > 0 ? ` · ${activeCount} active` : ''}`}
-              </p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {activeCount > 0 && (
-              <motion.div
-                animate={{ opacity: [1, 0.3, 1] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-                style={{ width: 6, height: 6, borderRadius: '50%', background: room.color }}
-              />
-            )}
-            {expanded ? <ChevronUp size={14} color="#9ca3af" /> : <ChevronDown size={14} color="#9ca3af" />}
-          </div>
-        </button>
-        <AnimatePresence>
-          {expanded && employees.length > 0 && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              style={{ overflow: 'hidden' }}
-            >
-              <div style={{ padding: '8px 14px 12px', display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {employees.map(id => (
-                  <EmployeeAvatar key={id} id={id} state={statuses[id]} size="sm" showTask />
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    );
+  if (agent.agentId === 'hermes') {
+    return {
+      ...agent,
+      movementState: 'idle',
+      ticksInState: nextTick,
+      urgency: hasApprovals ? 'high' : 'low',
+      destinationReason: hasApprovals
+        ? `${taskQueue.length} pending — dispatching`
+        : 'Monitoring workforce',
+    };
   }
 
+  // State machine transitions
+  switch (agent.movementState) {
+    case 'resting':
+    case 'idle': {
+      if (taskQueue.length === 0) {
+        return { ...agent, ticksInState: nextTick };
+      }
+      if (nextTick < 2) return { ...agent, ticksInState: nextTick };
+      const task = taskQueue[0];
+      return {
+        ...agent,
+        movementState: 'walking_to_hermes',
+        targetZone: 'hermes_command',
+        currentTask: task,
+        ticksInState: 0,
+        urgency: task.priority,
+        destinationReason: 'Picking up task',
+      };
+    }
+
+    case 'walking_to_hermes': {
+      if (nextTick < duration) {
+        return {
+          ...agent,
+          currentZone: agent.currentZone === agent.targetZone ? agent.currentZone : agent.currentZone,
+          ticksInState: nextTick,
+        };
+      }
+      return {
+        ...agent,
+        currentZone: 'hermes_command',
+        movementState: 'receiving_task',
+        ticksInState: 0,
+        destinationReason: 'Receiving task from Hermes',
+      };
+    }
+
+    case 'receiving_task': {
+      if (nextTick < MOVEMENT_DURATIONS.receiving_task) {
+        return { ...agent, ticksInState: nextTick };
+      }
+      return {
+        ...agent,
+        movementState: 'walking_to_department',
+        targetZone: cfg.departmentZone,
+        ticksInState: 0,
+        destinationReason: `Heading to ${ZONES[cfg.departmentZone].label}`,
+      };
+    }
+
+    case 'walking_to_department': {
+      if (nextTick < duration) {
+        return { ...agent, ticksInState: nextTick };
+      }
+      return {
+        ...agent,
+        currentZone: cfg.departmentZone,
+        movementState: 'working',
+        ticksInState: 0,
+        destinationReason: `Working: ${agent.currentTask?.title ?? '—'}`,
+      };
+    }
+
+    case 'working': {
+      if (nextTick < MOVEMENT_DURATIONS.working) {
+        return { ...agent, ticksInState: nextTick };
+      }
+      const shouldBlock = agent.currentTask?.riskLevel === 'high';
+      if (shouldBlock) {
+        return {
+          ...agent,
+          movementState: 'blocked',
+          targetZone: 'review_table',
+          ticksInState: 0,
+          destinationReason: 'Blocked — needs review',
+          urgency: 'high',
+        };
+      }
+      return {
+        ...agent,
+        movementState: 'returning_result',
+        targetZone: 'hermes_command',
+        ticksInState: 0,
+        result: {
+          taskId: agent.currentTask?.id ?? '',
+          outcome: 'completed',
+          summary: `${agent.currentTask?.title ?? 'Task'} — done`,
+          nextAction: 'Review output',
+          approvalNeeded: false,
+        },
+        destinationReason: 'Returning result to Hermes',
+      };
+    }
+
+    case 'blocked': {
+      if (nextTick < MOVEMENT_DURATIONS.blocked) {
+        return { ...agent, ticksInState: nextTick };
+      }
+      return {
+        ...agent,
+        currentZone: 'review_table',
+        movementState: 'reviewing',
+        ticksInState: 0,
+        destinationReason: 'Under review at approval table',
+      };
+    }
+
+    case 'reviewing': {
+      if (nextTick < MOVEMENT_DURATIONS.reviewing) {
+        return { ...agent, ticksInState: nextTick };
+      }
+      return {
+        ...agent,
+        movementState: 'returning_result',
+        targetZone: 'hermes_command',
+        ticksInState: 0,
+        result: {
+          taskId: agent.currentTask?.id ?? '',
+          outcome: 'review',
+          summary: `${agent.currentTask?.title ?? 'Task'} — reviewed`,
+          approvalNeeded: true,
+        },
+        destinationReason: 'Returning reviewed result',
+      };
+    }
+
+    case 'returning_result': {
+      if (nextTick < MOVEMENT_DURATIONS.returning_result) {
+        return { ...agent, ticksInState: nextTick };
+      }
+      return {
+        ...agent,
+        currentZone: 'hermes_command',
+        movementState: 'completed',
+        ticksInState: 0,
+        destinationReason: 'Result delivered',
+      };
+    }
+
+    case 'completed': {
+      if (nextTick < MOVEMENT_DURATIONS.completed) {
+        return { ...agent, ticksInState: nextTick };
+      }
+      return {
+        ...agent,
+        movementState: 'resting',
+        currentZone: 'break_area',
+        targetZone: 'break_area',
+        currentTask: null,
+        result: null,
+        ticksInState: 0,
+        urgency: 'low',
+        destinationReason: 'Standby',
+      };
+    }
+
+    default:
+      return { ...agent, ticksInState: nextTick };
+  }
+}
+
+// Returns x,y on the canvas for an agent given its current movement state
+function getAgentPosition(agent: AgentSimState): { x: number; y: number } {
+  if (
+    agent.movementState === 'walking_to_hermes' ||
+    agent.movementState === 'walking_to_department' ||
+    agent.movementState === 'returning_result' ||
+    agent.movementState === 'blocked'
+  ) {
+    const target = getZoneCenter(agent.targetZone);
+    const current = getZoneCenter(agent.currentZone);
+    return {
+      x: (current.x + target.x) / 2,
+      y: (current.y + target.y) / 2,
+    };
+  }
+  return getZoneCenter(agent.currentZone);
+}
+
+// ─── Data Fetching ────────────────────────────────────────────────────────────
+
+async function fetchOfficeData(): Promise<OfficeData> {
+  try {
+    const [providerRes, approvalRes, taskRes] = await Promise.allSettled([
+      supabase.from('provider_health').select('provider_name,status,avg_latency_ms').limit(10),
+      supabase.from('human_approval_requests').select('id').eq('status', 'pending'),
+      supabase.from('agent_dispatch_tasks').select('id').eq('status', 'received'),
+    ]);
+
+    const providers = providerRes.status === 'fulfilled'
+      ? (providerRes.value.data ?? []).map((p: { provider_name: string; status: string; avg_latency_ms: number | null }) => ({
+          name: p.provider_name,
+          status: (p.status === 'online' ? 'online' : p.status === 'degraded' ? 'degraded' : 'offline') as 'online' | 'offline' | 'degraded',
+          latency: p.avg_latency_ms ?? undefined,
+        }))
+      : [];
+
+    const approvalCount = approvalRes.status === 'fulfilled'
+      ? (approvalRes.value.data?.length ?? 0) : 0;
+
+    const taskQueueCount = taskRes.status === 'fulfilled'
+      ? (taskRes.value.data?.length ?? 0) : 0;
+
+    return { isDemo: false, pendingTasks: [], providerHealth: providers, approvalCount, taskQueueCount };
+  } catch {
+    return buildDemoOfficeData();
+  }
+}
+
+function buildDemoOfficeData(): OfficeData {
+  return {
+    isDemo: true,
+    pendingTasks: [],
+    providerHealth: [
+      { name: 'openrouter', status: 'online', latency: 312 },
+      { name: 'groq', status: 'online', latency: 89 },
+      { name: 'ollama', status: 'offline' },
+      { name: 'claude_cli', status: 'offline' },
+    ],
+    approvalCount: 0,
+    taskQueueCount: 12,
+  };
+}
+
+// ─── Visual Components ────────────────────────────────────────────────────────
+
+const PRIORITY_COLORS: Record<Priority, string> = {
+  low: '#22c55e', medium: '#f59e0b', high: '#ef4444', critical: '#7c3aed',
+};
+
+const MOVEMENT_LABELS: Record<MovementState, string> = {
+  idle: 'Idle', resting: 'Resting', walking_to_hermes: 'Walking to Hermes',
+  receiving_task: 'Receiving task', walking_to_department: 'Heading to dept',
+  working: 'Working', blocked: 'Blocked', returning_result: 'Returning result',
+  reviewing: 'Reviewing', completed: 'Task complete',
+};
+
+function TaskBubbleView({ task, priority }: { task: TaskBubble; priority: Priority }) {
   return (
-    <div style={{
-      gridArea: room.gridArea,
-      borderRadius: 12,
-      border: `1.5px solid ${borderColor}`,
-      background: bgColor,
-      padding: '10px 12px',
-      display: 'flex', flexDirection: 'column', gap: 8,
-      minHeight: 120,
-      position: 'relative',
-      overflow: 'hidden',
-      boxShadow: activeCount > 0 ? `0 2px 10px ${room.color}15` : 'none',
-      transition: 'border-color 0.3s, box-shadow 0.3s',
-    }}>
-      {/* Room header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 7,
-            background: activeCount > 0 ? `${room.color}20` : '#f3f4f6',
-            border: `1px solid ${activeCount > 0 ? room.color + '40' : '#e5e7eb'}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
-          }}>
-            {room.emoji}
-          </div>
-          <div>
-            <p style={{ fontSize: 11, fontWeight: 800, color: '#1a1c3a', margin: 0, lineHeight: 1.2 }}>
-              {room.name}
-            </p>
-            <p style={{ fontSize: 9, color: '#9ca3af', margin: 0 }}>{room.description}</p>
-          </div>
-        </div>
-        {activeCount > 0 && (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.7, y: -8 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.7, y: -8 }}
+      style={{
+        position: 'absolute',
+        bottom: '100%', left: '50%',
+        transform: 'translateX(-50%)',
+        marginBottom: 6,
+        background: '#0f1117',
+        border: `1.5px solid ${PRIORITY_COLORS[priority]}55`,
+        borderRadius: 10,
+        padding: '5px 10px',
+        minWidth: 110,
+        maxWidth: 180,
+        textAlign: 'center',
+        pointerEvents: 'none',
+        zIndex: 20,
+        boxShadow: `0 2px 12px ${PRIORITY_COLORS[priority]}30`,
+      }}
+    >
+      <div style={{ fontSize: 9, fontWeight: 700, color: PRIORITY_COLORS[priority], textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        {priority}
+      </div>
+      <div style={{ fontSize: 10, fontWeight: 600, color: '#fff', lineHeight: 1.3, marginTop: 2 }}>
+        {task.title.length > 32 ? task.title.slice(0, 32) + '…' : task.title}
+      </div>
+      <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 2, lineHeight: 1.2 }}>
+        {task.source}
+      </div>
+    </motion.div>
+  );
+}
+
+function ResultBadge({ result }: { result: ResultCard }) {
+  const colors = {
+    completed: { bg: '#166534', border: '#22c55e', text: '#4ade80' },
+    blocked: { bg: '#7f1d1d', border: '#ef4444', text: '#f87171' },
+    review: { bg: '#78350f', border: '#f59e0b', text: '#fbbf24' },
+  };
+  const c = colors[result.outcome];
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.7 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0 }}
+      style={{
+        position: 'absolute',
+        bottom: '100%', left: '50%',
+        transform: 'translateX(-50%)',
+        marginBottom: 6,
+        background: c.bg,
+        border: `1.5px solid ${c.border}`,
+        borderRadius: 8,
+        padding: '4px 10px',
+        minWidth: 100,
+        maxWidth: 160,
+        textAlign: 'center',
+        pointerEvents: 'none',
+        zIndex: 20,
+      }}
+    >
+      <div style={{ fontSize: 10, fontWeight: 700, color: c.text }}>
+        {result.outcome === 'completed' ? '✅ Done' : result.outcome === 'blocked' ? '🚫 Blocked' : '👁 Review'}
+      </div>
+      <div style={{ fontSize: 9, color: '#cbd5e1', marginTop: 1 }}>
+        {result.summary.length > 30 ? result.summary.slice(0, 30) + '…' : result.summary}
+      </div>
+      {result.approvalNeeded && (
+        <div style={{ fontSize: 8, color: '#fbbf24', marginTop: 2 }}>⚡ Approval needed</div>
+      )}
+    </motion.div>
+  );
+}
+
+interface AgentAvatarProps {
+  agent: AgentSimState;
+  canvasW: number;
+  canvasH: number;
+  reducedMotion: boolean;
+  onClick: (id: AgentId) => void;
+}
+
+function AgentAvatar({ agent, canvasW, canvasH, reducedMotion, onClick }: AgentAvatarProps) {
+  const cfg = AGENTS[agent.agentId];
+  const pos = getAgentPosition(agent);
+  const isMoving = [
+    'walking_to_hermes', 'walking_to_department',
+    'returning_result', 'blocked',
+  ].includes(agent.movementState);
+  const isWorking = agent.movementState === 'working';
+  const isBlocked = agent.movementState === 'blocked' || agent.movementState === 'reviewing';
+
+  const px = (pos.x / 800) * canvasW - 24;
+  const py = (pos.y / 560) * canvasH - 24;
+
+  return (
+    <motion.div
+      key={agent.agentId}
+      animate={{ x: px, y: py }}
+      transition={reducedMotion
+        ? { duration: 0 }
+        : { type: 'spring', stiffness: 60, damping: 14, mass: 1.2 }
+      }
+      style={{
+        position: 'absolute',
+        top: 0, left: 0,
+        width: 48, height: 48,
+        zIndex: 15,
+        cursor: 'pointer',
+      }}
+      onClick={() => onClick(agent.agentId)}
+    >
+      <div style={{ position: 'relative', width: 48, height: 48 }}>
+
+        {/* Working pulse ring */}
+        {isWorking && !reducedMotion && (
           <motion.div
-            animate={{ opacity: [1, 0.3, 1] }}
-            transition={{ duration: 1.8, repeat: Infinity }}
-            style={{ width: 7, height: 7, borderRadius: '50%', background: room.color, flexShrink: 0 }}
+            animate={{ scale: [1, 1.6, 1], opacity: [0.5, 0, 0.5] }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+            style={{
+              position: 'absolute', inset: -6, borderRadius: '50%',
+              border: `2px solid ${cfg.color}`, opacity: 0.5,
+              pointerEvents: 'none',
+            }}
           />
         )}
-      </div>
 
-      {/* Desk element */}
-      {employees.length > 0 && (
-        <div style={{
-          flex: 1, borderRadius: 8,
-          background: activeCount > 0 ? `${room.color}08` : 'rgba(0,0,0,0.02)',
-          border: `1px dashed ${activeCount > 0 ? room.color + '30' : '#e5e7eb'}`,
-          display: 'flex', flexWrap: 'wrap', gap: 8,
-          padding: '8px 10px', alignItems: 'flex-start', alignContent: 'flex-start',
-        }}>
-          {employees.map(id => (
-            <motion.div key={id} layoutId={`employee-${id}`} layout transition={{ duration: 0.5, ease: 'easeInOut' }}>
-              <EmployeeAvatar id={id} state={statuses[id]} size="sm" showTask />
-            </motion.div>
-          ))}
-        </div>
-      )}
+        {/* Blocked indicator */}
+        {isBlocked && !reducedMotion && (
+          <motion.div
+            animate={{ opacity: [1, 0.5, 1] }}
+            transition={{ duration: 1, repeat: Infinity }}
+            style={{
+              position: 'absolute', inset: -4, borderRadius: '50%',
+              border: '2px solid #ef4444', pointerEvents: 'none',
+            }}
+          />
+        )}
 
-      {employees.length === 0 && (
-        <div style={{
-          flex: 1, borderRadius: 8,
-          background: 'rgba(0,0,0,0.02)',
-          border: '1px dashed #e5e7eb',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <p style={{ fontSize: 10, color: '#d1d5db', margin: 0 }}>Empty</p>
-        </div>
-      )}
-
-      {/* Special: Trading room safety badge */}
-      {roomId === 'trading' && (
-        <div style={{
-          position: 'absolute', top: 6, right: 6,
-          background: '#f0fdf4', border: '1px solid #bbf7d0',
-          borderRadius: 6, padding: '2px 6px',
-          fontSize: 8, fontWeight: 700, color: '#16a34a',
-        }}>
-          DEMO ONLY
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TodayPanel({ data, statuses }: { data: VirtualOfficeData; statuses: Record<EmployeeId, EmployeeState> }) {
-  const activeEmployees = (Object.keys(statuses) as EmployeeId[]).filter(id => statuses[id].status !== 'idle');
-  const criticalItems = (Object.keys(statuses) as EmployeeId[]).filter(id => statuses[id].urgency === 'critical' || statuses[id].urgency === 'high');
-  const onlineProviders = data.providers.filter(p => p.status === 'online').length;
-
-  return (
-    <div style={{
-      padding: '12px 14px',
-      background: '#1a1c3a',
-      borderRadius: 12,
-      color: '#fff',
-      display: 'flex', flexDirection: 'column', gap: 10,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {/* Agent circle */}
         <motion.div
-          animate={{ opacity: [1, 0.4, 1] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-          style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }}
-        />
-        <p style={{ fontSize: 11, fontWeight: 800, color: '#a5b4fc', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Today in Nexus
-        </p>
-      </div>
+          animate={isMoving && !reducedMotion ? { y: [0, -4, 0] } : {}}
+          transition={{ duration: 0.6, repeat: Infinity, ease: 'easeInOut' }}
+          style={{
+            width: 48, height: 48, borderRadius: '50%',
+            background: cfg.color + '22',
+            border: `2.5px solid ${cfg.color}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 22,
+            boxShadow: agent.urgency === 'critical'
+              ? `0 0 18px ${cfg.color}99`
+              : agent.urgency === 'high'
+              ? `0 0 12px ${cfg.color}66`
+              : `0 0 6px ${cfg.color}33`,
+          }}
+        >
+          {cfg.emoji}
+        </motion.div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {[
-          { label: 'Active', value: activeEmployees.length, color: '#22c55e' },
-          { label: 'Tasks', value: data.tickets.length, color: '#7c3aed' },
-          { label: 'Opps', value: data.opportunityCount, color: '#0d9488' },
-          { label: 'AI Providers', value: onlineProviders, color: '#3d5af1' },
-        ].map(s => (
-          <div key={s.label} style={{ flex: '1 1 50px', textAlign: 'center' }}>
-            <p style={{ fontSize: 20, fontWeight: 800, color: s.color, margin: 0, lineHeight: 1 }}>{s.value}</p>
-            <p style={{ fontSize: 8, color: 'rgba(255,255,255,0.5)', margin: '2px 0 0', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {criticalItems.length > 0 && (
-        <div style={{ padding: '7px 10px', borderRadius: 8, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)' }}>
-          <p style={{ fontSize: 10, fontWeight: 700, color: '#fca5a5', margin: 0 }}>
-            ⚠️ {criticalItems.map(id => EMPLOYEES[id].name).join(', ')} need attention
-          </p>
+        {/* Name label */}
+        <div style={{
+          position: 'absolute', bottom: -16, left: '50%',
+          transform: 'translateX(-50%)',
+          fontSize: 9, fontWeight: 700, color: cfg.color,
+          whiteSpace: 'nowrap',
+          textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+        }}>
+          {cfg.name}
         </div>
-      )}
 
-      {data.isDemo && (
-        <div style={{ padding: '6px 10px', borderRadius: 8, background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)', textAlign: 'center' }}>
-          <p style={{ fontSize: 9, fontWeight: 700, color: '#fbbf24', margin: 0, letterSpacing: '0.04em' }}>
-            DEMO / SIMULATED — No live data yet
-          </p>
-        </div>
-      )}
-
-      {/* Active tasks */}
-      {data.tickets.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <p style={{ fontSize: 9, fontWeight: 700, color: 'rgba(255,255,255,0.4)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Open Tasks
-          </p>
-          {data.tickets.slice(0, 3).map(t => (
-            <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 5, height: 5, borderRadius: '50%', background: t.status === 'researching' ? '#7c3aed' : '#6b7280', flexShrink: 0 }} />
-              <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.7)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {t.topic}
-              </p>
-            </div>
-          ))}
-          {data.tickets.length > 3 && (
-            <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.3)', margin: 0 }}>
-              +{data.tickets.length - 3} more tasks
-            </p>
+        {/* Task bubble or result */}
+        <AnimatePresence>
+          {agent.currentTask && agent.movementState !== 'resting' && agent.movementState !== 'completed' && (
+            <TaskBubbleView
+              key={`tb-${agent.currentTask.id}`}
+              task={agent.currentTask}
+              priority={agent.urgency}
+            />
           )}
-        </div>
-      )}
-    </div>
+          {agent.result && agent.movementState === 'returning_result' && (
+            <ResultBadge key={`rb-${agent.result.taskId}`} result={agent.result} />
+          )}
+        </AnimatePresence>
+
+        {/* Movement state dot */}
+        <div style={{
+          position: 'absolute', top: 0, right: 0,
+          width: 12, height: 12, borderRadius: '50%',
+          background: PRIORITY_COLORS[agent.urgency],
+          border: '2px solid #1e2235',
+          boxShadow: `0 0 6px ${PRIORITY_COLORS[agent.urgency]}66`,
+        }} />
+      </div>
+    </motion.div>
   );
 }
 
-function SystemStatusBar({ providers, isDemo }: { providers: ProviderHealth[]; isDemo: boolean }) {
-  const online = providers.filter(p => p.status === 'online').length;
-  const degraded = providers.filter(p => p.status === 'degraded').length;
-  const offline = providers.filter(p => !['online', 'degraded'].includes(p.status)).length;
+// ─── Office Floor Zone Renderer ───────────────────────────────────────────────
+
+function OfficeZone({
+  zoneId, config, canvasW, canvasH, activeAgents, isActive,
+}: {
+  zoneId: ZoneId;
+  config: ZoneConfig;
+  canvasW: number;
+  canvasH: number;
+  activeAgents: number;
+  isActive: boolean;
+}) {
+  const scaleX = canvasW / 800;
+  const scaleY = canvasH / 560;
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-      padding: '8px 14px', borderRadius: 10,
-      background: offline > 0 ? '#fef2f2' : degraded > 0 ? '#fffbeb' : '#f0fdf4',
-      border: `1px solid ${offline > 0 ? '#fecaca' : degraded > 0 ? '#fde68a' : '#bbf7d0'}`,
-    }}>
-      {providers.length === 0 ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          <WifiOff size={12} color="#9ca3af" />
-          <p style={{ fontSize: 10, color: '#9ca3af', margin: 0, fontWeight: 600 }}>No provider data yet</p>
+    <motion.div
+      animate={isActive ? { boxShadow: [`0 0 0 0 ${config.color}00`, `0 0 12px 2px ${config.color}44`, `0 0 0 0 ${config.color}00`] } : {}}
+      transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+      style={{
+        position: 'absolute',
+        left: config.x * scaleX,
+        top: config.y * scaleY,
+        width: config.w * scaleX,
+        height: config.h * scaleY,
+        background: config.bg,
+        border: `1.5px solid ${isActive ? config.color : config.border}`,
+        borderRadius: 12,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '4px 6px',
+        overflow: 'hidden',
+        transition: 'border-color 0.4s ease',
+      }}
+    >
+      <div style={{ fontSize: zoneId === 'hermes_command' ? 18 : 14, lineHeight: 1 }}>
+        {config.emoji}
+      </div>
+      <div style={{
+        fontSize: zoneId === 'hermes_command' ? 9 : 8,
+        fontWeight: 700,
+        color: isActive ? config.color : '#64748b',
+        textAlign: 'center',
+        lineHeight: 1.2,
+        marginTop: 2,
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        maxWidth: '100%',
+      }}>
+        {config.label}
+      </div>
+
+      {/* Capacity dots */}
+      {activeAgents > 0 && (
+        <div style={{ display: 'flex', gap: 3, marginTop: 3 }}>
+          {Array.from({ length: Math.min(activeAgents, config.capacity) }).map((_, i) => (
+            <div key={i} style={{
+              width: 5, height: 5, borderRadius: '50%',
+              background: isActive ? config.color : '#64748b',
+              opacity: 0.8,
+            }} />
+          ))}
         </div>
-      ) : (
-        <>
-          <Wifi size={12} color={offline > 0 ? '#ef4444' : '#22c55e'} />
-          <p style={{ fontSize: 10, fontWeight: 700, color: offline > 0 ? '#ef4444' : '#16a34a', margin: 0 }}>
-            AI Providers: {online} online{degraded > 0 ? ` · ${degraded} degraded` : ''}{offline > 0 ? ` · ${offline} offline` : ''}
-          </p>
-        </>
       )}
-      {providers.filter(p => p.status !== 'online').map(p => (
-        <div key={p.provider_name} style={{
-          display: 'flex', alignItems: 'center', gap: 4,
-          padding: '2px 6px', borderRadius: 5,
-          background: p.status === 'degraded' ? '#fffbeb' : '#fef2f2',
-          border: `1px solid ${p.status === 'degraded' ? '#fde68a' : '#fecaca'}`,
+
+      {/* Trading desk safety label */}
+      {zoneId === 'trading_desk' && (
+        <div style={{
+          fontSize: 7, fontWeight: 700,
+          color: '#22c55e', marginTop: 2,
+          background: 'rgba(34,197,94,0.15)',
+          padding: '1px 5px', borderRadius: 4,
         }}>
-          <AlertTriangle size={9} color={p.status === 'degraded' ? '#f59e0b' : '#ef4444'} />
-          <span style={{ fontSize: 9, fontWeight: 600, color: '#1a1c3a' }}>{p.provider_name}</span>
-        </div>
-      ))}
-      {isDemo && (
-        <div style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 5, background: '#fffbeb', border: '1px solid #fde68a' }}>
-          <span style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b' }}>DEMO MODE</span>
+          PAPER ONLY
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-function timeAgo(ts: string) {
-  const s = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
-  if (s < 60) return `${s}s ago`;
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  return `${Math.floor(s / 3600)}h ago`;
-}
-
 export function NexusVirtualOffice() {
-  const [data, setData] = useState<VirtualOfficeData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState(new Date().toISOString());
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [expandedRooms, setExpandedRooms] = useState<Set<RoomId>>(new Set(['command', 'trading', 'system']));
-  const prevRooms = useRef<Record<EmployeeId, RoomId> | null>(null);
+  const reducedMotion = useReducedMotion() ?? false;
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [canvasSize, setCanvasSize] = useState({ w: 800, h: 560 });
+  const [officeData, setOfficeData] = useState<OfficeData>(buildDemoOfficeData());
+  const [agentStates, setAgentStates] = useState<AgentSimState[]>([]);
+  const [taskQueues, setTaskQueues] = useState<Record<AgentId, TaskBubble[]>>(DEMO_TASKS as Record<AgentId, TaskBubble[]>);
+  const [viewMode, setViewMode] = useState<ViewMode>('full');
+  const [selectedAgent, setSelectedAgent] = useState<AgentId | null>(null);
+  const [showRoster, setShowRoster] = useState(false);
+  const [tick, setTick] = useState(0);
+  const tickRef = useRef(0);
 
+  // Canvas resize observer
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    if (!canvasRef.current) return;
+    const ro = new ResizeObserver(([entry]) => {
+      const { width } = entry.contentRect;
+      setCanvasSize({ w: width, h: Math.round(width * 0.7) });
+    });
+    ro.observe(canvasRef.current);
+    return () => ro.disconnect();
   }, []);
 
-  const load = useCallback(async () => {
-    const [phRes, evRes, oppsRes, ticketRes, transcriptRes, knowledgeRes] = await Promise.all([
-      supabase.from('provider_health').select('provider_name,status,avg_latency_ms').order('provider_name'),
-      supabase.from('analytics_events').select('feature,event_name,created_at').order('created_at', { ascending: false }).limit(60),
-      supabase.from('user_opportunities').select('id', { count: 'exact', head: true }),
-      supabase.from('research_requests').select('id,department,status,topic,created_at').in('status', ['submitted', 'queued', 'researching', 'needs_review']).order('created_at', { ascending: false }).limit(30),
-      supabase.from('transcript_queue').select('id', { count: 'exact', head: true }),
-      supabase.from('knowledge_items').select('id', { count: 'exact', head: true }).eq('status', 'approved'),
-    ]);
-
-    const providers = (phRes.data || []) as ProviderHealth[];
-    const events = ((evRes.data || []) as Array<{ feature: string | null; created_at: string }>);
-    const tickets = (ticketRes.data || []) as ResearchTicket[];
-    const opportunityCount = oppsRes.count || 0;
-    const ingestCount = transcriptRes.count || 0;
-    const knowledgeCount = knowledgeRes.count || 0;
-
-    const minutesAgo = (ts: string) => Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
-    const recentFeatures = new Set(
-      events.filter(e => minutesAgo(e.created_at) < 60).map(e => e.feature).filter(Boolean) as string[]
-    );
-
-    const hasRealData = providers.length > 0 || tickets.length > 0 || opportunityCount > 0;
-
-    if (!hasRealData) {
-      setData(buildDemoData());
-    } else {
-      setData({ providers, tickets, opportunityCount, recentFeatures, ingestCount, knowledgeCount, revenueEventCount: 0, isDemo: false });
-    }
-
-    setLastRefresh(new Date().toISOString());
-    setLoading(false);
-    setRefreshing(false);
+  // Fetch live data
+  useEffect(() => {
+    fetchOfficeData().then(setOfficeData).catch(() => {});
+    const interval = setInterval(() => {
+      fetchOfficeData().then(setOfficeData).catch(() => {});
+    }, 30_000);
+    return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => { void load(); const t = setInterval(() => void load(), 90_000); return () => clearInterval(t); }, [load]);
+  // Initialize agent states
+  useEffect(() => {
+    setAgentStates(buildInitialAgentStates(officeData));
+  }, []);
 
-  const handleRefresh = () => { setRefreshing(true); void load(); };
+  // Simulation tick — every 2 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      tickRef.current += 1;
+      setTick(tickRef.current);
 
-  if (loading || !data) {
-    return (
-      <div style={{ padding: 20 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {[...Array(6)].map((_, i) => (
-            <div key={i} style={{ height: 80, borderRadius: 12, background: '#f3f4f6', animation: 'pulse 1.5s infinite' }} />
-          ))}
-        </div>
-      </div>
+      setAgentStates(prev => prev.map(agent => {
+        if (agent.agentId === 'hermes') {
+          return {
+            ...agent,
+            movementState: 'idle',
+            ticksInState: agent.ticksInState + 1,
+            urgency: officeData.approvalCount > 0 ? 'high' : 'low',
+            destinationReason: officeData.approvalCount > 0
+              ? `${officeData.approvalCount} approval${officeData.approvalCount > 1 ? 's' : ''} pending`
+              : `Coordinating ${Object.values(taskQueues).flat().length} queued tasks`,
+          };
+        }
+
+        const queue = taskQueues[agent.agentId] ?? [];
+        const currentTasks = queue.filter(t =>
+          !agent.currentTask || agent.currentTask.id !== t.id
+        );
+        const nextState = tickAgentState(agent, currentTasks, officeData.approvalCount > 0);
+
+        // Pop task from queue when agent picks it up
+        if (
+          nextState.movementState === 'walking_to_hermes' &&
+          nextState.currentTask &&
+          nextState.currentTask !== agent.currentTask
+        ) {
+          setTaskQueues(prev => ({
+            ...prev,
+            [agent.agentId]: prev[agent.agentId].filter(t => t.id !== nextState.currentTask!.id),
+          }));
+        }
+
+        // Re-add task to queue after completion (demo loop)
+        if (nextState.movementState === 'resting' && agent.movementState === 'completed') {
+          const completedTask = agent.currentTask;
+          if (completedTask && officeData.isDemo) {
+            setTimeout(() => {
+              setTaskQueues(prev => ({
+                ...prev,
+                [agent.agentId]: [...(prev[agent.agentId] ?? []), { ...completedTask, id: `${completedTask.id}-${Date.now()}` }],
+              }));
+            }, 8000);
+          }
+        }
+
+        return nextState;
+      }));
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [officeData, taskQueues]);
+
+  // Count agents in each zone
+  const agentsInZone = useMemo(() => {
+    const counts: Partial<Record<ZoneId, number>> = {};
+    agentStates.forEach(a => {
+      counts[a.currentZone] = (counts[a.currentZone] ?? 0) + 1;
+    });
+    return counts;
+  }, [agentStates]);
+
+  // Active zones (have agents working)
+  const activeZones = useMemo(() => {
+    return new Set(
+      agentStates
+        .filter(a => a.movementState === 'working' || a.movementState === 'receiving_task')
+        .map(a => a.currentZone)
     );
-  }
+  }, [agentStates]);
 
-  const employeeRooms = computeRooms(data);
-  const statuses = computeStatuses(data, employeeRooms);
+  const handleAgentClick = useCallback((id: AgentId) => {
+    setSelectedAgent(prev => prev === id ? null : id);
+  }, []);
 
-  // Track movements (for logging, could be used for notifications)
-  if (prevRooms.current) {
-    (Object.keys(employeeRooms) as EmployeeId[]).forEach(id => {
-      if (prevRooms.current![id] !== employeeRooms[id]) {
-        // Employee moved rooms — motion/react layoutId handles the animation
-      }
-    });
-  }
-  prevRooms.current = employeeRooms;
+  const selectedAgentState = selectedAgent ? agentStates.find(a => a.agentId === selectedAgent) : null;
 
-  // Group employees by room
-  const roomEmployees = (Object.keys(ROOMS) as RoomId[]).reduce((acc, roomId) => {
-    acc[roomId] = (Object.keys(employeeRooms) as EmployeeId[]).filter(id => employeeRooms[id] === roomId);
-    return acc;
-  }, {} as Record<RoomId, EmployeeId[]>);
-
-  const toggleRoom = (roomId: RoomId) => {
-    setExpandedRooms(prev => {
-      const next = new Set(prev);
-      if (next.has(roomId)) next.delete(roomId);
-      else next.add(roomId);
-      return next;
-    });
-  };
-
-  const ROOM_ORDER: RoomId[] = ['command', 'system', 'trading', 'opportunities', 'research', 'funding', 'credit', 'marketing', 'grants', 'break'];
+  // Provider health summary
+  const onlineProviders = officeData.providerHealth.filter(p => p.status === 'online').length;
+  const totalProviders = officeData.providerHealth.length;
 
   return (
-    <div style={{ padding: '14px 18px', paddingBottom: 120 }}>
+    <div style={{
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      background: '#0d0f1a',
+      borderRadius: 16,
+      overflow: 'hidden',
+      border: '1px solid #1e2a4a',
+    }}>
+
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div>
-          <h2 style={{ fontSize: 19, fontWeight: 800, color: '#1a1c3a', margin: 0, marginBottom: 2 }}>
-            🏢 Nexus Virtual Office
-          </h2>
-          <p style={{ fontSize: 11, color: '#8b8fa8', margin: 0 }}>
-            AI workforce — real-time operational visualization
-          </p>
+      <div style={{
+        padding: '12px 16px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        borderBottom: '1px solid #1e2a4a',
+        background: 'rgba(61,90,241,0.06)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 18 }}>🏢</span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0' }}>
+              Nexus Virtual Office
+            </div>
+            <div style={{ fontSize: 10, color: '#64748b' }}>
+              Living AI workforce simulation · {agentStates.length} agents active
+            </div>
+          </div>
+          {officeData.isDemo && (
+            <div style={{
+              fontSize: 9, fontWeight: 700, padding: '2px 8px',
+              background: 'rgba(245,158,11,0.15)',
+              border: '1px solid rgba(245,158,11,0.4)',
+              borderRadius: 20, color: '#f59e0b',
+            }}>
+              DEMO / SIMULATED
+            </div>
+          )}
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <motion.div
-            animate={{ opacity: [1, 0.4, 1] }}
-            transition={{ duration: 3, repeat: Infinity }}
-            style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }}
-          />
-          <span style={{ fontSize: 10, color: '#8b8fa8' }}>Synced {timeAgo(lastRefresh)}</span>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* View mode selector */}
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['full', 'trading', 'opportunity', 'system'] as ViewMode[]).map(v => (
+              <button
+                key={v}
+                onClick={() => setViewMode(v)}
+                style={{
+                  fontSize: 9, fontWeight: 600,
+                  padding: '3px 8px', borderRadius: 6,
+                  border: '1px solid',
+                  borderColor: viewMode === v ? '#3d5af1' : '#1e2a4a',
+                  background: viewMode === v ? 'rgba(61,90,241,0.2)' : 'transparent',
+                  color: viewMode === v ? '#818cf8' : '#64748b',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  textTransform: 'capitalize',
+                }}
+              >
+                {v === 'full' ? '🗺 Full' : v === 'trading' ? '📊 Trading' : v === 'opportunity' ? '💡 Opps' : '📡 System'}
+              </button>
+            ))}
+          </div>
+
           <button
-            onClick={handleRefresh}
-            disabled={refreshing}
+            onClick={() => setShowRoster(v => !v)}
             style={{
-              display: 'flex', alignItems: 'center', gap: 4,
-              padding: '5px 10px', borderRadius: 8, border: '1px solid #e5e7eb',
-              background: '#fff', color: '#3d5af1', fontWeight: 600, fontSize: 11, cursor: 'pointer',
+              fontSize: 9, fontWeight: 600, padding: '3px 8px',
+              borderRadius: 6, border: '1px solid #1e2a4a',
+              background: showRoster ? 'rgba(61,90,241,0.15)' : 'transparent',
+              color: showRoster ? '#818cf8' : '#64748b',
+              cursor: 'pointer',
             }}
           >
-            <RefreshCw size={10} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
-            Refresh
+            👥 Roster
           </button>
         </div>
       </div>
 
-      {/* Demo banner */}
-      {data.isDemo && (
-        <motion.div
-          initial={{ opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
-          style={{
-            padding: '8px 14px', borderRadius: 10, marginBottom: 12,
-            background: '#fffbeb', border: '1.5px solid #fde68a',
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}
-        >
-          <span style={{ fontSize: 14 }}>🎭</span>
-          <div>
-            <p style={{ fontSize: 11, fontWeight: 800, color: '#92400e', margin: 0 }}>
-              DEMO / SIMULATED MODE
-            </p>
-            <p style={{ fontSize: 10, color: '#78350f', margin: 0 }}>
-              Showing simulated office activity — real data will appear once Nexus operations are running
-            </p>
+      {/* Status bar */}
+      <div style={{
+        padding: '6px 16px',
+        display: 'flex', gap: 16, flexWrap: 'wrap',
+        borderBottom: '1px solid #1e2a4a',
+        background: 'rgba(0,0,0,0.3)',
+      }}>
+        <div style={{ fontSize: 10, color: '#64748b' }}>
+          <span style={{ color: onlineProviders === totalProviders ? '#22c55e' : '#f59e0b' }}>●</span>
+          {' '}{onlineProviders}/{totalProviders} providers online
+        </div>
+        <div style={{ fontSize: 10, color: '#64748b' }}>
+          <span style={{ color: '#3d5af1' }}>●</span>
+          {' '}{Object.values(taskQueues).flat().length} tasks queued
+        </div>
+        {officeData.approvalCount > 0 && (
+          <div style={{ fontSize: 10, color: '#ef4444', fontWeight: 700 }}>
+            ⚡ {officeData.approvalCount} approval{officeData.approvalCount > 1 ? 's' : ''} needed
           </div>
-        </motion.div>
-      )}
-
-      {/* System status */}
-      <div style={{ marginBottom: 12 }}>
-        <SystemStatusBar providers={data.providers} isDemo={data.isDemo} />
+        )}
+        <div style={{ fontSize: 10, color: '#22c55e', marginLeft: 'auto' }}>
+          🔒 DRY_RUN=true · LIVE_TRADING=false
+        </div>
       </div>
 
-      {/* Desktop: 2D office floor plan */}
-      {!isMobile ? (
-        <LayoutGroup>
-          <div style={{ display: 'flex', gap: 14 }}>
-            {/* Main office grid */}
-            <div style={{
-              flex: 1,
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr 1fr',
-              gridTemplateRows: 'auto auto auto auto',
-              gridTemplateAreas: `
-                "command command system"
-                "trading opps library"
-                "funding credit marketing"
-                "grants grants break"
-              `,
-              gap: 10,
-            }}>
-              {(Object.keys(ROOMS) as RoomId[]).map(roomId => (
-                <RoomCard
-                  key={roomId}
-                  roomId={roomId}
-                  employees={roomEmployees[roomId]}
-                  statuses={statuses}
+      <div style={{ display: 'flex' }}>
+        {/* Office canvas */}
+        <div
+          ref={canvasRef}
+          style={{
+            flex: 1,
+            position: 'relative',
+            height: canvasSize.h,
+            background: 'linear-gradient(135deg, #0d0f1a 0%, #0f1424 100%)',
+            overflow: 'hidden',
+            minHeight: 300,
+          }}
+        >
+          {/* Zone backgrounds */}
+          {(Object.entries(ZONES) as [ZoneId, ZoneConfig][]).map(([id, cfg]) => (
+            <OfficeZone
+              key={id}
+              zoneId={id}
+              config={cfg}
+              canvasW={canvasSize.w}
+              canvasH={canvasSize.h}
+              activeAgents={agentsInZone[id] ?? 0}
+              isActive={activeZones.has(id)}
+            />
+          ))}
+
+          {/* Walking path lines */}
+          <svg
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 5 }}
+          >
+            {agentStates.map(agent => {
+              if (!['walking_to_hermes', 'walking_to_department', 'returning_result'].includes(agent.movementState)) return null;
+              const from = getZoneCenter(agent.currentZone);
+              const to = getZoneCenter(agent.targetZone);
+              const cfg = AGENTS[agent.agentId];
+              const scaleX = canvasSize.w / 800;
+              const scaleY = canvasSize.h / 560;
+              return (
+                <line
+                  key={`path-${agent.agentId}`}
+                  x1={from.x * scaleX} y1={from.y * scaleY}
+                  x2={to.x * scaleX} y2={to.y * scaleY}
+                  stroke={cfg.color}
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  opacity={0.35}
                 />
-              ))}
-            </div>
+              );
+            })}
+          </svg>
 
-            {/* Today panel sidebar */}
-            <div style={{ width: 200, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <TodayPanel data={data} statuses={statuses} />
+          {/* Agent avatars */}
+          <AnimatePresence>
+            {agentStates.map(agent => (
+              <AgentAvatar
+                key={agent.agentId}
+                agent={agent}
+                canvasW={canvasSize.w}
+                canvasH={canvasSize.h}
+                reducedMotion={reducedMotion}
+                onClick={handleAgentClick}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
 
-              {/* Employee roster */}
-              <div style={{
-                borderRadius: 12, border: '1px solid #e5e7eb',
-                background: '#fff', padding: '12px',
-              }}>
-                <p style={{ fontSize: 10, fontWeight: 800, color: '#6b7280', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Employee Roster
-                </p>
-                {(Object.keys(EMPLOYEES) as EmployeeId[]).map(id => {
-                  const emp = EMPLOYEES[id];
-                  const state = statuses[id];
-                  const room = ROOMS[employeeRooms[id]];
+        {/* Roster panel */}
+        <AnimatePresence>
+          {showRoster && (
+            <motion.div
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 200, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              style={{
+                overflow: 'hidden',
+                borderLeft: '1px solid #1e2a4a',
+                background: '#0a0c15',
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ padding: '12px 10px', minWidth: 200 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  Agent Roster
+                </div>
+                {agentStates.map(agent => {
+                  const cfg = AGENTS[agent.agentId];
                   return (
-                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
-                      <span style={{ fontSize: 14 }}>{emp.emoji}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: 10, fontWeight: 700, color: '#1a1c3a', margin: 0 }}>{emp.name}</p>
-                        <p style={{ fontSize: 9, color: '#9ca3af', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {room.emoji} {room.name}
-                        </p>
+                    <div
+                      key={agent.agentId}
+                      onClick={() => handleAgentClick(agent.agentId)}
+                      style={{
+                        padding: '7px 8px',
+                        borderRadius: 8,
+                        marginBottom: 4,
+                        cursor: 'pointer',
+                        background: selectedAgent === agent.agentId ? `${cfg.color}22` : 'transparent',
+                        border: selectedAgent === agent.agentId ? `1px solid ${cfg.color}55` : '1px solid transparent',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 14 }}>{cfg.emoji}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: cfg.color }}>
+                            {cfg.name}
+                          </div>
+                          <div style={{ fontSize: 9, color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {MOVEMENT_LABELS[agent.movementState]}
+                          </div>
+                        </div>
+                        <div style={{
+                          width: 7, height: 7, borderRadius: '50%',
+                          background: PRIORITY_COLORS[agent.urgency],
+                          flexShrink: 0,
+                        }} />
                       </div>
-                      <div style={{
-                        width: 7, height: 7, borderRadius: '50%',
-                        background: STATUS_COLORS[state.status], flexShrink: 0,
-                      }} />
+                      {agent.currentTask && (
+                        <div style={{ fontSize: 9, color: '#475569', marginTop: 3, paddingLeft: 20, lineHeight: 1.3 }}>
+                          {agent.currentTask.title.length > 28 ? agent.currentTask.title.slice(0, 28) + '…' : agent.currentTask.title}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Selected agent detail panel */}
+      <AnimatePresence>
+        {selectedAgentState && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ overflow: 'hidden', borderTop: '1px solid #1e2a4a' }}
+          >
+            <div style={{
+              padding: '12px 16px',
+              background: 'rgba(0,0,0,0.4)',
+              display: 'flex', gap: 16, flexWrap: 'wrap',
+            }}>
+              {(() => {
+                const cfg = AGENTS[selectedAgentState.agentId];
+                return (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{
+                        width: 44, height: 44, borderRadius: '50%',
+                        background: `${cfg.color}22`,
+                        border: `2px solid ${cfg.color}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 20,
+                      }}>
+                        {cfg.emoji}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: cfg.color }}>{cfg.name}</div>
+                        <div style={{ fontSize: 10, color: '#64748b' }}>{cfg.role}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      {[
+                        { label: 'State', value: MOVEMENT_LABELS[selectedAgentState.movementState] },
+                        { label: 'Zone', value: ZONES[selectedAgentState.currentZone].label },
+                        { label: 'Urgency', value: selectedAgentState.urgency },
+                        { label: 'Queue', value: `${taskQueues[selectedAgentState.agentId]?.length ?? 0} tasks` },
+                      ].map(({ label, value }) => (
+                        <div key={label}>
+                          <div style={{ fontSize: 9, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0', marginTop: 2 }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {selectedAgentState.currentTask && (
+                      <div style={{
+                        background: 'rgba(255,255,255,0.04)',
+                        border: '1px solid #1e2a4a',
+                        borderRadius: 8, padding: '8px 12px',
+                        maxWidth: 280,
+                      }}>
+                        <div style={{ fontSize: 9, color: '#64748b', marginBottom: 3 }}>Current task</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>
+                          {selectedAgentState.currentTask.title}
+                        </div>
+                        <div style={{ fontSize: 10, color: '#475569', marginTop: 3 }}>
+                          {selectedAgentState.currentTask.description}
+                        </div>
+                        <div style={{ fontSize: 9, color: '#334155', marginTop: 4 }}>
+                          Source: {selectedAgentState.currentTask.source}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedAgentState.destinationReason && (
+                      <div style={{ fontSize: 10, color: '#475569', alignSelf: 'center', fontStyle: 'italic' }}>
+                        💬 {selectedAgentState.destinationReason}
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
             </div>
-          </div>
-        </LayoutGroup>
-      ) : (
-        /* Mobile: swipeable stacked rooms */
-        <LayoutGroup>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {/* Today panel on mobile (compact) */}
-            <TodayPanel data={data} statuses={statuses} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            {ROOM_ORDER.map(roomId => (
-              <RoomCard
-                key={roomId}
-                roomId={roomId}
-                employees={roomEmployees[roomId]}
-                statuses={statuses}
-                expanded={expandedRooms.has(roomId)}
-                onToggle={() => toggleRoom(roomId)}
-                isMobile
-              />
-            ))}
-          </div>
-        </LayoutGroup>
-      )}
-
-      {/* Safety footer */}
+      {/* Footer */}
       <div style={{
-        marginTop: 16, padding: '8px 14px', borderRadius: 10,
-        background: '#f0fdf4', border: '1px solid #bbf7d0',
-        display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+        padding: '8px 16px',
+        borderTop: '1px solid #1e2a4a',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        background: 'rgba(0,0,0,0.2)',
       }}>
-        <Shield size={12} color="#16a34a" />
-        <p style={{ fontSize: 10, color: '#16a34a', fontWeight: 700, margin: 0 }}>
-          NEXUS_DRY_RUN=true · LIVE_TRADING=false · DEMO trading only · No real-money execution · No automated social posting
-        </p>
+        <div style={{ display: 'flex', gap: 12 }}>
+          {[
+            { label: 'Working', color: '#22c55e' },
+            { label: 'Walking', color: '#3d5af1' },
+            { label: 'Blocked', color: '#ef4444' },
+            { label: 'Resting', color: '#475569' },
+          ].map(({ label, color }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: color }} />
+              <span style={{ fontSize: 9, color: '#475569' }}>{label}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 9, color: '#1e2a4a' }}>
+          tick #{tick} · 2s interval · Click agent to inspect
+        </div>
       </div>
     </div>
   );
 }
+
+export default NexusVirtualOffice;
