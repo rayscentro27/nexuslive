@@ -44,10 +44,10 @@ module.exports = {
     {
       name: "nexus-claw3d",
       script: "node",
-      args: "server/index.js --dev",
+      args: "server/index.js",
       cwd: "/Users/raymonddavis/nexus-claw3d",
       interpreter: "none",
-      env: { NODE_ENV: "development", PORT: "3001" },
+      env: { NODE_ENV: "production", PORT: "3001" },
 
       autorestart: true,
       max_restarts: 10,
