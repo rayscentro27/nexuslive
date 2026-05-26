@@ -44,13 +44,14 @@ _OR_KEY   = os.getenv("OPENROUTER_API_KEY", "")
 # Tier → ordered model list (first available + healthy wins)
 TIER_MODELS: dict[str, list[str]] = {
     "premium": [
-        os.getenv("CONTENT_PREMIUM_MODEL", "anthropic/claude-3.5-sonnet"),
-        "openai/gpt-4o",
+        os.getenv("CONTENT_PREMIUM_MODEL", "openai/gpt-4o"),
+        "openai/gpt-4o-mini",
         "deepseek/deepseek-r1",
         "deepseek/deepseek-chat",
     ],
     "reasoning": [
         os.getenv("CONTENT_REASONING_MODEL", "deepseek/deepseek-r1"),
+        "openai/gpt-4o-mini",
         "deepseek/deepseek-chat",
     ],
     "lightweight": [
