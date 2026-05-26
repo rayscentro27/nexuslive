@@ -40,7 +40,30 @@ const SHARED_ENV = {
 module.exports = {
   apps: [
 
-    // ── Telegram Bot ─────────────────────────────────────────────────────────
+    // ── Claw3D 3D Office ─────────────────────────────────────────────────────
+    {
+      name: "nexus-claw3d",
+      script: "node",
+      args: "server/index.js --dev",
+      cwd: "/Users/raymonddavis/nexus-claw3d",
+      interpreter: "none",
+      env: { NODE_ENV: "development", PORT: "3001" },
+
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: "15s",
+      restart_delay: 5000,
+      watch: false,
+
+      out_file: `${LOG_DIR}/pm2-claw3d.out.log`,
+      error_file: `${LOG_DIR}/pm2-claw3d.err.log`,
+      log_date_format: "YYYY-MM-DD HH:mm:ss",
+      merge_logs: true,
+      max_memory_restart: "512M",
+      instances: 1,
+      exec_mode: "fork",
+    },
+
     // ── Watcher Loop ─────────────────────────────────────────────────────────
     {
       name: "nexus-watchers",
