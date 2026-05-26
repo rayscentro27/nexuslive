@@ -48,6 +48,14 @@ ICT_CONCEPT_MAP: dict[str, list[str]] = {
         "entry model", "pd array", "price delivery", "optimal trade entry",
         "ote", "fibonacci retracement", "0.618", "0.705",
     ],
+    "risk management": [
+        "risk management", "position sizing", "max drawdown", "risk to reward",
+        "rr", "stop loss", "take profit", "daily loss limit", "trailing stop",
+    ],
+    "funded account": [
+        "prop firm", "funded account", "evaluation phase", "consistency rule",
+        "payout", "funding challenge", "max loss rule", "daily drawdown",
+    ],
 }
 
 # ── Grants & Funding Concepts ────────────────────────────────────────────────
@@ -77,6 +85,10 @@ GRANTS_CONCEPT_MAP: dict[str, list[str]] = {
         "startup grant", "seed funding", "startup capital", "pre-revenue",
         "founder grant", "idea stage funding", "early stage",
     ],
+    "government contracting": [
+        "sam.gov", "uei", "capability statement", "set aside", "govcon",
+        "federal contract", "state contract", "procurement", "rfp",
+    ],
 }
 
 FUNDING_CONCEPT_MAP: dict[str, list[str]] = {
@@ -96,6 +108,14 @@ FUNDING_CONCEPT_MAP: dict[str, list[str]] = {
         "revenue share", "merchant cash advance", "mca", "factor rate",
         "revenue advance", "daily repayment",
     ],
+    "sba loan": [
+        "sba 7a", "sba 504", "sba express", "debt service coverage ratio",
+        "dscr", "collateral", "personal guarantee", "loan packaging",
+    ],
+    "invoice financing qualification": [
+        "accounts receivable aging", "invoice terms", "b2b receivables", "debtor quality",
+        "concentration risk", "factoring reserve", "recourse factoring",
+    ],
 }
 
 BUSINESS_CONCEPT_MAP: dict[str, list[str]] = {
@@ -110,6 +130,14 @@ BUSINESS_CONCEPT_MAP: dict[str, list[str]] = {
     "agency model": [
         "ai agency", "automation agency", "saas agency", "done for you",
         "dfy", "client acquisition", "retainer model",
+    ],
+    "offer design": [
+        "offer stack", "value proposition", "positioning", "guarantee",
+        "pricing psychology", "core offer", "upsell", "downsell",
+    ],
+    "client acquisition": [
+        "cold outreach", "warm outreach", "appointment setting", "lead magnet",
+        "funnel", "sales call", "closing", "follow up",
     ],
 }
 
@@ -127,6 +155,14 @@ CREDIT_CONCEPT_MAP: dict[str, list[str]] = {
         "personal credit score", "fico score", "credit repair",
         "derogatory marks", "collections", "charge off",
         "credit inquiry", "hard pull",
+    ],
+    "business credit cards": [
+        "business card", "0% intro apr", "charge card", "points strategy",
+        "issuer relationship", "statement balance", "payment history",
+    ],
+    "credit profile cleanup": [
+        "dispute letter", "goodwill deletion", "late payment removal", "credit bureau",
+        "experian", "equifax", "transunion", "factual dispute",
     ],
 }
 
@@ -158,13 +194,19 @@ SOURCE_TRUST: dict[str, int] = {
     "helloalice.com": 90,
     "investopedia.com": 85,
     "federalreserve.gov": 95,
+    "sec.gov": 95,
+    "ftc.gov": 95,
     "score.org": 85,
     "cdfi.org": 90,
+    "sam.gov": 92,
+    "nafcu.org": 80,
     # Medium trust — established educational
     "youtube.com": 60,
+    "youtu.be": 60,
     "udemy.com": 65,
     "coursera.org": 70,
     "skillshare.com": 65,
+    "khanacademy.org": 78,
     # Lower trust — social / unknown
     "twitter.com": 40,
     "tiktok.com": 35,

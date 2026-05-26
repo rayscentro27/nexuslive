@@ -358,6 +358,531 @@ def cmd_seo(args: argparse.Namespace) -> None:
     _run_skill("seo_cluster_builder_v1", getattr(args, "dry_run", True))
 
 
+# ─── Workforce commands ────────────────────────────────────────────────────────
+
+def cmd_workforce(args: argparse.Namespace) -> None:
+    sub = getattr(args, "workforce_cmd", "status")
+
+    if sub == "status":
+        try:
+            from lib.worker_accountability import get_worker_status
+            workers = get_worker_status()
+        except Exception as exc:
+            print(f"❌ {exc}")
+            return
+        print(f"\nNexus Workforce Status — {_now()}")
+        print("=" * 50)
+        if not workers:
+            print("  No worker heartbeats found.")
+        for w in workers:
+            last = str(w.get("last_seen") or "never")[:19]
+            print(f"  {w.get('status','?'):10} {w.get('worker_id','?'):30} {w.get('role','?')} | last seen {last}")
+        print()
+
+    elif sub == "productivity":
+        try:
+            from lib.worker_accountability import get_productivity_report
+            days = getattr(args, "days", 7)
+            print(get_productivity_report(days=days))
+        except Exception as exc:
+            print(f"❌ {exc}")
+
+    elif sub == "assign":
+        worker_id = getattr(args, "worker_id", None)
+        task_desc = getattr(args, "task", None)
+        if not worker_id or not task_desc:
+            print("Usage: nexus workforce assign <worker_id> --task '<description>'")
+            return
+        try:
+            from lib.worker_accountability import assign_task_to_worker
+            result = assign_task_to_worker(worker_id, task_desc)
+            if result.get("error"):
+                print(f"❌ {result['error']}")
+            else:
+                print(f"✅ Task assigned to {worker_id}: {result.get('id')}")
+        except Exception as exc:
+            print(f"❌ {exc}")
+
+    elif sub == "report":
+        try:
+            from lib.worker_accountability import rollup_worker_productivity, get_productivity_report
+            print("Computing rollups...")
+            rollups = rollup_worker_productivity()
+            print(f"Rolled up {len(rollups)} workers.\n")
+            print(get_productivity_report(days=1))
+        except Exception as exc:
+            print(f"❌ {exc}")
+
+    else:
+        print(f"Unknown workforce subcommand: {sub}")
+        print("Available: status | productivity | assign | report")
+
+
+# ─── CEO briefing ──────────────────────────────────────────────────────────────
+
+def cmd_ceo(args: argparse.Namespace) -> None:
+    sub = getattr(args, "ceo_cmd", "briefing")
+
+    if sub == "briefing":
+        try:
+            from lib.ceo_morning_briefing import generate_morning_briefing, deliver_briefing
+            print("Generating CEO briefing...")
+            briefing = generate_morning_briefing()
+            print(briefing["body_markdown"])
+            print("\n--- Saving ---")
+            log = deliver_briefing(briefing)
+            sid = log.get("supabase_row_id")
+            print(f"✅ Saved to Supabase: {sid}")
+            tg = log.get("telegram")
+            if tg:
+                print(f"✅ Telegram: message_id={log.get('telegram_message_id')}")
+            else:
+                print(f"  Telegram skipped: {log.get('telegram_reason') or log.get('telegram_error','')}")
+        except Exception as exc:
+            print(f"❌ {exc}")
+    else:
+        print(f"Unknown ceo subcommand: {sub}")
+
+
+# ─── Claw3D commands ───────────────────────────────────────────────────────────
+
+def cmd_claw3d(args: argparse.Namespace) -> None:
+    sub = getattr(args, "claw3d_cmd", "status")
+    claw_dir = Path(ROOT) / ".." / "nexus-claw3d"
+    if not claw_dir.exists():
+        claw_dir = Path.home() / "nexus-claw3d"
+
+    if sub == "status":
+        print(f"\nClaw3D Status — {_now()}")
+        print("=" * 40)
+        if claw_dir.exists():
+            pkg = claw_dir / "package.json"
+            version = "?"
+            if pkg.exists():
+                try:
+                    import json as _json
+                    d = _json.loads(pkg.read_text())
+                    version = d.get("version", "?")
+                except Exception:
+                    pass
+            print(f"  Install:  ✅ {claw_dir}")
+            print(f"  Version:  {version}")
+            env_file = claw_dir / ".env"
+            print(f"  .env:     {'✅ present' if env_file.exists() else '⚠️  missing'}")
+            node_modules = claw_dir / "node_modules"
+            print(f"  npm deps: {'✅ installed' if node_modules.exists() else '⚠️  run npm install'}")
+        else:
+            print(f"  ❌ Not found at {claw_dir}")
+            print(f"  Run: git clone https://github.com/iamlukethedev/Claw3D.git ~/nexus-claw3d")
+        print(f"\n  Hermes gateway: {os.getenv('HERMES_GATEWAY_URL','http://127.0.0.1:8642')}")
+        print(f"  Adapter port:   18789 (ws://localhost:18789)")
+        print(f"  To start:       cd ~/nexus-claw3d && npm run hermes-adapter")
+        print(f"  Then open:      http://localhost:3000")
+        print()
+
+    elif sub == "start":
+        print("Starting Claw3D Hermes adapter...")
+        print(f"  Run in a separate terminal: cd {claw_dir} && npm run hermes-adapter")
+        print(f"  Then: cd {claw_dir} && npm run dev")
+        print("  Connect to: http://localhost:3000")
+        print("  Gateway: ws://localhost:18789 (Hermes adapter)")
+
+    else:
+        print(f"Unknown claw3d subcommand: {sub}")
+        print("Available: status | start")
+
+
+# ─── Hermes audit ──────────────────────────────────────────────────────────────
+
+def cmd_loop(args: argparse.Namespace) -> None:
+    try:
+        from lib.executor_loop import run_loop
+        once = getattr(args, "once", False)
+        run_loop(once=once)
+    except Exception as exc:
+        print(f"❌ {exc}")
+
+
+def cmd_monetization(args: argparse.Namespace) -> None:
+    sub = getattr(args, "monetization_cmd", "audit")
+    if sub == "audit":
+        try:
+            from lib.affiliate_engine import run_affiliate_audit
+            result = run_affiliate_audit()
+            print(f"\n✅ Affiliate audit complete")
+            print(f"  Programs: {result['total_programs']}")
+            print(f"  Apply now: {result['immediately_applicable']}")
+            print(f"  Recommendations: {result['recommendations_created']}")
+            print(f"  Top pick: {result['top_opportunity']}")
+            print(f"  Report: {result['report_path']}")
+        except Exception as exc:
+            print(f"❌ {exc}")
+
+
+def cmd_content(args: argparse.Namespace) -> None:
+    sub = getattr(args, "content_cmd", "pipeline")
+    if sub == "pipeline":
+        try:
+            from lib.daily_content_engine import run_daily_pipeline, _topic_of_day
+            topic = getattr(args, "topic", None)
+            dry_run = getattr(args, "dry_run", False)
+            print(f"Topic: {topic or _topic_of_day()}")
+            result = run_daily_pipeline(topic=topic, dry_run=dry_run)
+            print(f"\n✅ Content pipeline complete")
+            print(f"  Date: {result['date']}")
+            print(f"  Topic: {result['topic']}")
+            print(f"  Outputs: {result['total_outputs']}")
+            print(f"  Errors: {len(result['errors'])}")
+            for o in result["outputs"]:
+                p = Path(o.get("path","?"))
+                print(f"    {o.get('type','?'):20} → {p.name}")
+        except Exception as exc:
+            print(f"❌ {exc}")
+    elif sub == "status":
+        try:
+            from scripts.prelaunch_utils import rest_select
+            today = _now()[:10]
+            rows = rest_select(f"content_outputs?select=output_type,status,created_at&order=created_at.desc&limit=20", timeout=8) or []
+            print(f"\nContent outputs (recent 20):")
+            for r in rows:
+                print(f"  {str(r.get('output_type','?')):25} {str(r.get('status','?')):12} {str(r.get('created_at','?'))[:16]}")
+        except Exception as exc:
+            print(f"❌ {exc}")
+
+
+def cmd_trading_report(args: argparse.Namespace) -> None:
+    sub = getattr(args, "trading_cmd", "report")
+    print(f"\nNexus Trading Research Lab — {_now()}")
+    print("=" * 50)
+    try:
+        from scripts.prelaunch_utils import rest_select
+        strategies = rest_select(
+            "strategy_performance?select=strategy_name,win_rate,expectancy,sharpe_ratio,created_at"
+            "&order=created_at.desc&limit=10",
+            timeout=8,
+        ) or []
+        paper_trades = rest_select(
+            "paper_trades?select=id,status,strategy,created_at&order=created_at.desc&limit=5",
+            timeout=8,
+        ) or []
+
+        print(f"\n  Paper mode: ACTIVE | Live trading: DISABLED")
+        print(f"\n  Strategy performance ({len(strategies)} records):")
+        if strategies:
+            for s in strategies:
+                wr = s.get("win_rate", "?")
+                print(f"    {str(s.get('strategy_name','?')):30} WR:{wr} | E:{s.get('expectancy','?')} | SR:{s.get('sharpe_ratio','?')}")
+        else:
+            print("    No strategy performance data yet — run backtest to populate")
+
+        print(f"\n  Recent paper trades: {len(paper_trades)}")
+        print(f"\n  Safety: REAL_MONEY_TRADING=false | LIVE_TRADING=false")
+        print(f"  Run: python3 bin/nexus trading report for live data")
+    except Exception as exc:
+        print(f"  ⚠️  {exc}")
+
+
+def cmd_research(args: argparse.Namespace) -> None:
+    sub = getattr(args, "research_cmd", "pipeline")
+    limit = getattr(args, "limit", 10)
+    if sub == "pipeline":
+        try:
+            from lib.research_synthesis_pipeline import run_research_pipeline
+            result = run_research_pipeline(limit=limit)
+            print(f"\n✅ Research synthesis complete")
+            print(f"  Artifacts: {result['artifacts_found']}")
+            print(f"  Processed: {result['processed']}")
+            print(f"  Recommendations: {result['recommendations_created']}")
+            print(f"  Tasks created: {result['tasks_created']}")
+        except Exception as exc:
+            print(f"❌ {exc}")
+
+
+def cmd_hermes_audit(args: argparse.Namespace) -> None:
+    print(f"\nHermes Audit — {_now()}")
+    print("=" * 50)
+
+    # 1. Evidence guard scan
+    try:
+        from lib.evidence_guard import audit_false_completions, status_summary
+        print(f"\n[Evidence Guard]")
+        print(f"  {status_summary()}")
+        false_tasks = audit_false_completions(limit=10)
+        if false_tasks:
+            print(f"  False completion candidates ({len(false_tasks)}):")
+            for t in false_tasks[:5]:
+                print(f"    - {t.get('id','?')[:8]}... | {str(t.get('normalized_goal','?'))[:60]}")
+        else:
+            print("  No false completion candidates found.")
+    except Exception as exc:
+        print(f"  ⚠️  Evidence guard check failed: {exc}")
+
+    # 2. Hermes internal-first routing check
+    print(f"\n[Internal-First Routing]")
+    try:
+        from lib.hermes_internal_first import try_internal_first
+        test_queries = [
+            "what is the claw3d status",
+            "workforce status",
+            "generate ceo briefing",
+        ]
+        for q in test_queries:
+            result = try_internal_first(q)
+            if result:
+                print(f"  ✅ '{q}' → {result.source} [{result.confidence}]")
+            else:
+                print(f"  ⚠️  '{q}' → no internal match (falls to LLM)")
+    except Exception as exc:
+        print(f"  ⚠️  Routing check failed: {exc}")
+
+    # 3. Improvement queue
+    print(f"\n[Autonomous Improvement Queue]")
+    try:
+        from lib.autonomous_improvement_queue import queue_status
+        qs = queue_status()
+        print(f"  Planned: {qs['planned']} | Running: {qs['running']} | Done: {qs['completed_with_evidence']}")
+        if qs.get("planned_tasks"):
+            for t in qs["planned_tasks"][:3]:
+                print(f"    - {t}")
+        if qs["planned"] == 0:
+            print("  Queue empty — seeding tasks...")
+            from lib.autonomous_improvement_queue import seed_improvement_tasks
+            seeded = seed_improvement_tasks(limit=3)
+            print(f"  Seeded {len(seeded)} tasks.")
+    except Exception as exc:
+        print(f"  ⚠️  Improvement queue check failed: {exc}")
+
+    print()
+
+
+def cmd_watchers(args: argparse.Namespace) -> None:
+    watcher_cmd = getattr(args, "watcher_cmd", "status")
+
+    if watcher_cmd == "run":
+        once = getattr(args, "once", False)
+        try:
+            from lib.nexus_watcher_loop import run_watcher_loop, run_watcher_cycle
+            if once:
+                print(f"\nRunning watcher cycle — {_now()}")
+                summary = run_watcher_cycle()
+                if summary["watchers_ran"]:
+                    print(f"  Active: {', '.join(summary['watchers_ran'])}")
+                    print(f"  Findings: {summary['total_findings']}")
+                else:
+                    print("  All watchers idle (none due)")
+            else:
+                run_watcher_loop()
+        except Exception as exc:
+            print(f"Watcher run failed: {exc}")
+
+    elif watcher_cmd == "status":
+        print(f"\nWatcher Status — {_now()}")
+        try:
+            from pathlib import Path
+            import json
+            flag_dir = Path(__file__).resolve().parent.parent / "artifacts" / "watcher_flags"
+            if not flag_dir.exists():
+                print("  No watcher runs recorded yet.")
+            else:
+                for f in sorted(flag_dir.glob("*_last_run.json")):
+                    data = json.loads(f.read_text())
+                    print(f"  {f.stem.replace('_last_run',''):30} ran: {data.get('ran_at','?')[:16]} | findings: {data.get('findings', data.get('ranked_count', 0))}")
+        except Exception as exc:
+            print(f"Status check failed: {exc}")
+
+    elif watcher_cmd == "consensus":
+        print(f"\nRunning Consensus Engine — {_now()}")
+        try:
+            from lib.nexus_consensus_engine import run_consensus
+            result = run_consensus(save_to_supabase=True)
+            print(f"  Ranked: {result['ranked_count']} opportunities")
+            print(f"  CRITICAL: {result['critical_count']} | HIGH: {result['high_count']}")
+            if result.get("top_opportunity"):
+                top = result["top_opportunity"]
+                print(f"  Top: [{top.get('priority','?')}] {top.get('title','?')}")
+            print(f"  Saved to: {result.get('evidence_file','?')}")
+        except Exception as exc:
+            print(f"Consensus failed: {exc}")
+
+
+def cmd_scouts(args: argparse.Namespace) -> None:
+    scout_cmd = getattr(args, "scout_cmd", "list")
+
+    if scout_cmd == "list":
+        try:
+            from lib.nexus_scout_registry import scout_registry_summary
+            print(f"\n{scout_registry_summary()}")
+        except Exception as exc:
+            print(f"Scout registry unavailable: {exc}")
+
+    elif scout_cmd == "due":
+        try:
+            from lib.nexus_scout_registry import get_due_scouts
+            due = get_due_scouts()
+            if due:
+                print(f"\nScouts due to run ({len(due)}):")
+                for s in due:
+                    print(f"  {s['scout_id']:35} every {s['schedule_hours']}h")
+            else:
+                print("All scouts are current.")
+        except Exception as exc:
+            print(f"Scout check failed: {exc}")
+
+
+def cmd_kb_push(args: argparse.Namespace) -> None:
+    """Push operational state and executive memory to Hermes Knowledge Brain."""
+    print(f"\nNexus KB Push — {_now()}")
+    print("=" * 50)
+    results: list[str] = []
+
+    # 1. Push executive memory to Supabase (refresh + verify)
+    print("\n[1] Executive Memory")
+    try:
+        from lib.hermes_executive_memory import load_memory, refresh_from_live_data, status_summary
+        changes = refresh_from_live_data()
+        mem = load_memory(force_refresh=True)
+        cats_loaded = sum(1 for k in mem if k in ["monetization_priorities", "business_goals",
+                          "affiliate_campaigns", "content_backlog", "unfinished_systems",
+                          "infrastructure_problems", "active_workers", "operational_philosophy",
+                          "execution_priorities"])
+        print(f"  ✅ {cats_loaded}/9 categories active | Live updates: {sum(changes.values())}")
+        results.append(f"executive_memory: {cats_loaded}/9 categories")
+    except Exception as exc:
+        print(f"  ⚠️  Executive memory push failed: {exc}")
+        results.append(f"executive_memory: FAILED ({exc})")
+
+    # 2. Run consensus engine (re-rank opportunities)
+    print("\n[2] Opportunity Consensus Engine")
+    try:
+        from lib.nexus_consensus_engine import run_consensus
+        result = run_consensus(save_to_supabase=True)
+        print(f"  ✅ Ranked {result['ranked_count']} opportunities | {result['critical_count']} CRITICAL")
+        if result.get("top_opportunity"):
+            print(f"  Top: {result['top_opportunity'].get('title','?')[:60]}")
+        results.append(f"consensus: {result['ranked_count']} opportunities ranked")
+    except Exception as exc:
+        print(f"  ⚠️  Consensus failed: {exc}")
+        results.append(f"consensus: FAILED")
+
+    # 3. Push content strategy state
+    print("\n[3] Content Strategy State")
+    try:
+        from pathlib import Path
+        state_files = list((Path(__file__).resolve().parent.parent / "state").glob("*.yaml"))
+        print(f"  ✅ {len(state_files)} state YAML files present")
+        for f in state_files:
+            print(f"    - {f.name}")
+        results.append(f"state_files: {len(state_files)}")
+    except Exception as exc:
+        print(f"  ⚠️  State file check failed: {exc}")
+
+    # 4. Knowledge brain ingestion (if available)
+    print("\n[4] Knowledge Brain Ingestion")
+    try:
+        from lib.knowledge_ingestion_ops import ingest_pending_knowledge
+        ingested = ingest_pending_knowledge()
+        print(f"  ✅ Ingested {ingested} knowledge items")
+        results.append(f"knowledge_ingestion: {ingested}")
+    except ImportError:
+        print("  (knowledge_ingestion_ops.ingest_pending_knowledge not available — skipping)")
+    except Exception as exc:
+        print(f"  ⚠️  Knowledge ingestion failed: {exc}")
+
+    # 5. Seed improvement tasks
+    print("\n[5] Autonomous Improvement Queue")
+    try:
+        from lib.autonomous_improvement_queue import queue_status, seed_improvement_tasks
+        qs = queue_status()
+        if qs["planned"] < 3:
+            seeded = seed_improvement_tasks(limit=3)
+            print(f"  ✅ Seeded {len(seeded)} improvement tasks")
+            results.append(f"improvement_queue: seeded {len(seeded)}")
+        else:
+            print(f"  ✅ Queue already has {qs['planned']} planned tasks")
+            results.append(f"improvement_queue: {qs['planned']} queued")
+    except Exception as exc:
+        print(f"  ⚠️  Improvement queue failed: {exc}")
+
+    print(f"\n{'='*50}")
+    print(f"KB Push complete: {len(results)} systems updated")
+    for r in results:
+        print(f"  ✓ {r}")
+
+
+def cmd_executive_memory(args: argparse.Namespace) -> None:
+    mem_cmd = getattr(args, "mem_cmd", "status")
+
+    if mem_cmd == "status":
+        try:
+            from lib.hermes_executive_memory import status_summary
+            print(status_summary())
+        except Exception as exc:
+            print(f"Executive memory unavailable: {exc}")
+
+    elif mem_cmd == "context":
+        try:
+            from lib.hermes_executive_memory import build_context_block
+            print(build_context_block())
+        except Exception as exc:
+            print(f"Context block unavailable: {exc}")
+
+    elif mem_cmd == "refresh":
+        try:
+            from lib.hermes_executive_memory import refresh_from_live_data, status_summary
+            print("Refreshing executive memory from live Supabase data...")
+            changes = refresh_from_live_data()
+            for cat, count in changes.items():
+                print(f"  {cat}: {count} items updated")
+            if not changes:
+                print("  No live data changes detected (Supabase may be unreachable)")
+            print(f"\nCurrent state:\n{status_summary()}")
+        except Exception as exc:
+            print(f"Refresh failed: {exc}")
+
+    elif mem_cmd == "set":
+        category = getattr(args, "category", None)
+        items_raw = getattr(args, "items", None)
+        if not category or not items_raw:
+            print("Usage: nexus memory set <category> <item1> [item2 ...]")
+            return
+        try:
+            from lib.hermes_executive_memory import update_category, CATEGORIES
+            if category not in CATEGORIES:
+                print(f"Invalid category. Valid: {', '.join(CATEGORIES)}")
+                return
+            ok = update_category(category, items_raw, source="cli_set")
+            if ok:
+                print(f"✅ Updated '{category}' ({len(items_raw)} items) → Supabase")
+            else:
+                print(f"⚠️  Updated '{category}' locally only (Supabase write failed)")
+        except Exception as exc:
+            print(f"Set failed: {exc}")
+
+    elif mem_cmd == "append":
+        category = getattr(args, "category", None)
+        items_raw = getattr(args, "items", None)
+        if not category or not items_raw:
+            print("Usage: nexus memory append <category> <item>")
+            return
+        try:
+            from lib.hermes_executive_memory import append_to_category
+            item = " ".join(items_raw)
+            ok = append_to_category(category, item, source="cli_append")
+            print(f"{'✅' if ok else '⚠️ '} Appended to '{category}': {item}")
+        except Exception as exc:
+            print(f"Append failed: {exc}")
+
+    elif mem_cmd == "quality":
+        print(f"\nResponse Quality Guard Stats — {_now()}")
+        try:
+            from lib.hermes_response_quality import quality_stats
+            stats = quality_stats()
+            print(f"  Flag counts: {stats['flag_counts']}")
+            print(f"  Active sessions tracked: {stats['session_count']}")
+        except Exception as exc:
+            print(f"Quality stats unavailable: {exc}")
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -397,19 +922,117 @@ def main() -> None:
         p.add_argument("--dry-run", action="store_true", default=True)
         p.add_argument("--no-dry-run", dest="dry_run", action="store_false")
 
+    # ── Workforce management ───────────────────────────────────────────────────
+    p_wf = sub.add_parser("workforce", help="Manage AI worker workforce")
+    p_wf.add_argument(
+        "workforce_cmd", nargs="?",
+        choices=["status", "productivity", "assign", "report"],
+        default="status",
+    )
+    p_wf.add_argument("worker_id", nargs="?", default=None, help="Worker ID (for assign)")
+    p_wf.add_argument("--task", default=None, help="Task description (for assign)")
+    p_wf.add_argument("--days", type=int, default=7, help="Days window for productivity report")
+
+    # ── CEO briefing ───────────────────────────────────────────────────────────
+    p_ceo = sub.add_parser("ceo", help="CEO operational intelligence")
+    p_ceo.add_argument(
+        "ceo_cmd", nargs="?",
+        choices=["briefing"],
+        default="briefing",
+    )
+
+    # ── Claw3D ─────────────────────────────────────────────────────────────────
+    p_claw = sub.add_parser("claw3d", help="Claw3D 3D office integration")
+    p_claw.add_argument(
+        "claw3d_cmd", nargs="?",
+        choices=["status", "start"],
+        default="status",
+    )
+
+    # ── Hermes audit ───────────────────────────────────────────────────────────
+    p_hermes_audit = sub.add_parser("hermes", help="Hermes audit and diagnostics")
+    p_hermes_audit.add_argument(
+        "hermes_cmd", nargs="?",
+        choices=["audit"],
+        default="audit",
+    )
+
+    # ── Workforce loop ─────────────────────────────────────────────────────────
+    p_wf_loop = sub.add_parser("loop", help="Run persistent executor loop")
+    p_wf_loop.add_argument("--once", action="store_true", help="Run one cycle then exit")
+
+    # ── Monetization audit ─────────────────────────────────────────────────────
+    p_mon = sub.add_parser("monetization", help="Monetization and affiliate audit")
+    p_mon.add_argument("monetization_cmd", nargs="?", choices=["audit"], default="audit")
+
+    # ── Content pipeline ───────────────────────────────────────────────────────
+    p_content = sub.add_parser("content", help="Content generation pipeline")
+    p_content.add_argument("content_cmd", nargs="?", choices=["pipeline", "status"], default="pipeline")
+    p_content.add_argument("--topic", default=None, help="Override content topic")
+    p_content.add_argument("--dry-run", action="store_true", default=False)
+
+    # ── Trading report ─────────────────────────────────────────────────────────
+    p_trading = sub.add_parser("trading", help="Trading strategy report")
+    p_trading.add_argument("trading_cmd", nargs="?", choices=["report", "status"], default="report")
+
+    # ── Research pipeline ──────────────────────────────────────────────────────
+    p_research = sub.add_parser("research", help="Research synthesis pipeline")
+    p_research.add_argument("research_cmd", nargs="?", choices=["pipeline", "status"], default="pipeline")
+    p_research.add_argument("--limit", type=int, default=10)
+
+    p_memory = sub.add_parser("memory", help="Hermes Executive Memory Layer")
+    p_memory.add_argument(
+        "mem_cmd",
+        nargs="?",
+        choices=["status", "context", "refresh", "set", "append", "quality"],
+        default="status",
+    )
+    p_memory.add_argument("category", nargs="?", default=None)
+    p_memory.add_argument("items", nargs="*", default=[])
+
+    p_watchers = sub.add_parser("watchers", help="Nexus intelligence watcher loops")
+    p_watchers.add_argument(
+        "watcher_cmd", nargs="?",
+        choices=["run", "status", "consensus"],
+        default="status",
+    )
+    p_watchers.add_argument("--once", action="store_true", default=False)
+
+    p_scouts = sub.add_parser("scouts", help="Scout registry and status")
+    p_scouts.add_argument(
+        "scout_cmd", nargs="?",
+        choices=["list", "due"],
+        default="list",
+    )
+
+    sub.add_parser("kb", help="Push operational state to Knowledge Brain")
+
     args = parser.parse_args()
 
     dispatch = {
-        "health":    cmd_health,
-        "report":    cmd_report,
-        "worker":    cmd_worker,
-        "dispatch":  cmd_dispatch,
-        "approvals": cmd_approvals,
-        "funding":   cmd_funding,
-        "grants":    cmd_grants,
-        "comms":     cmd_comms,
-        "launch":    cmd_launch,
-        "seo":       cmd_seo,
+        "health":       cmd_health,
+        "report":       cmd_report,
+        "worker":       cmd_worker,
+        "dispatch":     cmd_dispatch,
+        "approvals":    cmd_approvals,
+        "funding":      cmd_funding,
+        "grants":       cmd_grants,
+        "comms":        cmd_comms,
+        "launch":       cmd_launch,
+        "seo":          cmd_seo,
+        "workforce":    cmd_workforce,
+        "ceo":          cmd_ceo,
+        "claw3d":       cmd_claw3d,
+        "hermes":       cmd_hermes_audit,
+        "loop":         cmd_loop,
+        "monetization": cmd_monetization,
+        "content":      cmd_content,
+        "trading":      cmd_trading_report,
+        "research":     cmd_research,
+        "memory":       cmd_executive_memory,
+        "watchers":     cmd_watchers,
+        "scouts":       cmd_scouts,
+        "kb":           cmd_kb_push,
     }
 
     if not args.command:

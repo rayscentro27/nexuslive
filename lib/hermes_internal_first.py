@@ -22,6 +22,7 @@ from lib.notebooklm_cli_adapter import (
 )
 from lib.ai_task_dispatch import create_task
 from lib.hermes_response_patterns import match_pattern, fill_template
+from lib import hermes_executive_memory as _exec_mem
 
 
 CONF_INTERNAL_CONFIRMED = "INTERNAL_CONFIRMED"
@@ -71,7 +72,21 @@ class InternalFirstReply:
 
 
 def _build_operational_context_brief() -> str:
-    """Build a short one-line operational context for greeting responses."""
+    """Build a short operational context for greeting responses using executive memory."""
+    try:
+        exec_mem = _exec_mem.load_memory()
+        priorities = exec_mem.get("execution_priorities", [])[:2]
+        problems = exec_mem.get("infrastructure_problems", [])[:1]
+        parts = []
+        if priorities:
+            parts.append("Priorities: " + " | ".join(str(p) for p in priorities))
+        if problems:
+            parts.append("Issues: " + str(problems[0]))
+        if parts:
+            return " ".join(parts) + "."
+    except Exception:
+        pass
+    # Fallback to ops memory
     try:
         mem = hermes_ops_memory.load_memory(updated_by="greeting_context")
         active = (mem.get("active_priorities") or [])[:2]
@@ -554,6 +569,284 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
                 text="Circuit breaker module unavailable. Check /api/admin/circuit-breakers for live status.",
                 confidence=CONF_INTERNAL_PARTIAL,
                 source="circuit_breaker_module",
+                matched_topic=topic,
+            )
+
+    # ── Phase 3 topics: Workforce, CEO Briefing, Claw3D, Evidence Guard ──────
+
+    if topic == "workforce":
+        try:
+            from lib.worker_accountability import get_worker_status, get_productivity_report
+            workers = get_worker_status()
+            active  = [w for w in workers if str(w.get("status","")).lower() == "active"]
+            stalled = [w for w in workers if str(w.get("status","")).lower() in ("stalled","idle")]
+            lines = [
+                f"Nexus AI Workforce — {len(workers)} workers tracked | {len(active)} active | {len(stalled)} stalled",
+            ]
+            for w in workers[:8]:
+                icon = "🟢" if str(w.get("status","")).lower() == "active" else "🟡"
+                lines.append(f"  {icon} {w.get('worker_id','?'):30} {w.get('role','?')}")
+            lines.append(f"\nRun `nexus workforce productivity` for full score report.")
+            return InternalFirstReply(
+                text="\n".join(lines),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="worker_heartbeats + worker_accountability",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=f"Workforce status unavailable: {exc}. Run `nexus workforce status` directly.",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="worker_accountability",
+                matched_topic=topic,
+            )
+
+    if topic == "ceo_briefing":
+        try:
+            from lib.ceo_morning_briefing import generate_morning_briefing
+            briefing = generate_morning_briefing()
+            # Truncate for Telegram/chat reply
+            body = briefing["body_markdown"]
+            reply = body[:3600] + ("\n…[full briefing truncated — run `nexus ceo briefing`]" if len(body) > 3600 else "")
+            return InternalFirstReply(
+                text=reply,
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="ceo_morning_briefing",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=f"CEO briefing generation failed: {exc}. Run `nexus ceo briefing` in terminal.",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="ceo_morning_briefing",
+                matched_topic=topic,
+            )
+
+    if topic == "claw3d":
+        from pathlib import Path as _Path
+        import shutil
+        claw_dir = _Path.home() / "nexus-claw3d"
+        installed = claw_dir.exists()
+        npm_ok    = (claw_dir / "node_modules").exists() if installed else False
+        env_ok    = (claw_dir / ".env").exists() if installed else False
+        lines = [
+            f"Claw3D 3D Office Integration",
+            f"  Installed: {'✅ ' + str(claw_dir) if installed else '❌ Not found'}",
+            f"  npm deps:  {'✅ installed' if npm_ok else '⚠️  run: cd ~/nexus-claw3d && npm install'}",
+            f"  .env:      {'✅ configured' if env_ok else '⚠️  missing'}",
+            f"  Hermes:    http://127.0.0.1:8642",
+            f"  Adapter:   ws://localhost:18789",
+            f"",
+            f"To launch: bash scripts/start_claw3d.sh",
+            f"Then open: http://localhost:3000",
+            f"Agent movement reflects real Supabase task/heartbeat/queue state.",
+        ]
+        return InternalFirstReply(
+            text="\n".join(lines),
+            confidence=CONF_INTERNAL_CONFIRMED,
+            source="nexus-claw3d/.env + filesystem",
+            matched_topic=topic,
+        )
+
+    if topic == "evidence":
+        try:
+            from lib.evidence_guard import status_summary, audit_false_completions
+            summary = status_summary()
+            false_tasks = audit_false_completions(limit=5)
+            reply = summary
+            if false_tasks:
+                reply += f"\n\nTop false completion candidates:\n"
+                for t in false_tasks[:5]:
+                    reply += f"  - {str(t.get('id','?'))[:8]}... {str(t.get('normalized_goal','?'))[:60]}\n"
+                reply += f"Run `nexus hermes audit` to flag and remediate."
+            return InternalFirstReply(
+                text=reply,
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="evidence_guard + agent_dispatch_tasks",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=f"Evidence guard check failed: {exc}",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="evidence_guard",
+                matched_topic=topic,
+            )
+
+    if topic == "improvement":
+        try:
+            from lib.autonomous_improvement_queue import queue_status, seed_improvement_tasks
+            qs = queue_status()
+            lines = [
+                f"Autonomous Improvement Queue",
+                f"  Planned:   {qs['planned']}",
+                f"  Running:   {qs['running']}",
+                f"  Completed: {qs['completed_with_evidence']}",
+            ]
+            if qs.get("planned_tasks"):
+                lines.append(f"\nQueued tasks:")
+                for t in qs["planned_tasks"][:4]:
+                    lines.append(f"  - {t}")
+            if qs["planned"] == 0:
+                seeded = seed_improvement_tasks(limit=2)
+                lines.append(f"\nQueue was empty — seeded {len(seeded)} new tasks.")
+            return InternalFirstReply(
+                text="\n".join(lines),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="autonomous_improvement_queue",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=f"Improvement queue unavailable: {exc}",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="autonomous_improvement_queue",
+                matched_topic=topic,
+            )
+
+    if topic == "executive_memory":
+        try:
+            summary = _exec_mem.status_summary()
+            return InternalFirstReply(
+                text=summary[:3600],
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_executive_memory",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=f"Executive memory unavailable: {exc}",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_executive_memory",
+                matched_topic=topic,
+            )
+
+    if topic == "execution_priorities":
+        try:
+            exec_mem = _exec_mem.load_memory()
+            priorities = exec_mem.get("execution_priorities", [])
+            problems = exec_mem.get("infrastructure_problems", [])
+            unfinished = exec_mem.get("unfinished_systems", [])
+            lines = ["**Today's Execution Priorities**"]
+            for i, p in enumerate(priorities[:5], 1):
+                lines.append(f"  {i}. {p}")
+            if problems:
+                lines.append("\n**Infrastructure Issues**")
+                for p in problems[:3]:
+                    lines.append(f"  ⚠️  {p}")
+            if unfinished:
+                lines.append("\n**Unfinished Systems**")
+                for u in unfinished[:3]:
+                    lines.append(f"  🔧 {u}")
+            lines.append("\nRun `nexus ceo briefing` for full executive briefing.")
+            return InternalFirstReply(
+                text="\n".join(lines),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_executive_memory.execution_priorities",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=f"Execution priorities unavailable: {exc}",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_executive_memory",
+                matched_topic=topic,
+            )
+
+    if topic == "monetization":
+        try:
+            exec_mem = _exec_mem.load_memory()
+            mono = exec_mem.get("monetization_priorities", [])
+            affiliates = exec_mem.get("affiliate_campaigns", [])
+            goals = exec_mem.get("business_goals", [])
+            lines = ["**Monetization Priorities**"]
+            for m in mono[:5]:
+                lines.append(f"  • {m}")
+            if affiliates:
+                lines.append("\n**Active Affiliate Campaigns**")
+                for a in affiliates[:4]:
+                    lines.append(f"  • {a}")
+            if goals:
+                lines.append("\n**Business Goals**")
+                for g in goals[:3]:
+                    lines.append(f"  • {g}")
+            lines.append("\nRun `nexus monetization audit` for live affiliate scoring.")
+            return InternalFirstReply(
+                text="\n".join(lines),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_executive_memory.monetization",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=f"Monetization data unavailable: {exc}",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_executive_memory",
+                matched_topic=topic,
+            )
+
+    if topic == "scouts":
+        try:
+            from lib.nexus_scout_registry import scout_registry_summary, get_due_scouts
+            summary = scout_registry_summary()
+            due = get_due_scouts()
+            reply = summary
+            if due:
+                reply += f"\n\nDue to run NOW ({len(due)}):\n"
+                reply += "\n".join(f"  - {s['scout_id']}" for s in due[:5])
+            try:
+                from lib.nexus_consensus_engine import get_top_opportunities
+                top = get_top_opportunities(limit=3)
+                if top:
+                    reply += "\n\nTop Opportunities:\n"
+                    for o in top:
+                        reply += f"  [{o.get('priority','?')} {o.get('consensus_score',0):.0f}] {o.get('title','?')}\n"
+            except Exception:
+                pass
+            return InternalFirstReply(
+                text=reply[:3600],
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="nexus_scout_registry",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=f"Scout registry unavailable: {exc}",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="nexus_scout_registry",
+                matched_topic=topic,
+            )
+
+    if topic == "watchers":
+        try:
+            from pathlib import Path as _Path
+            import json as _json
+            flag_dir = _Path(__file__).resolve().parent.parent / "artifacts" / "watcher_flags"
+            lines = ["**Nexus Watcher Status**"]
+            if flag_dir.exists():
+                flags = sorted(flag_dir.glob("*_last_run.json"))
+                if flags:
+                    for f in flags:
+                        data = _json.loads(f.read_text())
+                        name = f.stem.replace("_last_run", "")
+                        findings = data.get("findings", data.get("ranked_count", 0))
+                        lines.append(f"  {name:30} ran: {data.get('ran_at','?')[:16]} | {findings} findings")
+                else:
+                    lines.append("  No watcher runs yet. Run `nexus watchers run --once`")
+            else:
+                lines.append("  No watcher runs yet. Run `nexus watchers run --once`")
+            lines.append("\nRun `nexus watchers consensus` to re-score all opportunities.")
+            return InternalFirstReply(
+                text="\n".join(lines),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="watcher_flags",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=f"Watcher status unavailable: {exc}",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="nexus_watcher_loop",
                 matched_topic=topic,
             )
 

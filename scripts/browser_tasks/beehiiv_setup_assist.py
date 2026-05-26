@@ -29,6 +29,7 @@ import asyncio
 import sys
 import os
 import re
+import time
 from datetime import datetime
 from pathlib import Path
 from playwright.async_api import async_playwright, TimeoutError as PWTimeoutError
@@ -38,7 +39,9 @@ from playwright.async_api import async_playwright, TimeoutError as PWTimeoutErro
 CHROME_EXECUTABLE = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 CHROME_USER_DATA  = str(Path.home() / "Library/Application Support/Google/Chrome")
 ARTIFACTS_DIR     = Path(__file__).resolve().parent.parent.parent / "artifacts" / "browser_tasks" / "beehiiv"
+SESSION_STATE     = Path(__file__).resolve().parent.parent.parent / "artifacts" / "browser_tasks" / ".beehiiv_session.json"
 BEEHIIV_APP_URL   = "https://app.beehiiv.com"
+LOGIN_WAIT_SEC    = 240   # seconds to wait for manual login
 
 TARGET_HEADLINE    = "AI-Powered Intelligence. Real-World Wealth."
 TARGET_SUBHEADLINE = (
@@ -61,7 +64,13 @@ def ts() -> str:
     return datetime.now().strftime("%H%M%S")
 
 def log(msg: str) -> None:
-    print(f"[beehiiv_worker {ts()}] {msg}")
+    print(f"[beehiiv_worker {ts()}] {msg}", flush=True)
+
+def countdown(seconds: int, msg: str) -> None:
+    for i in range(seconds, 0, -1):
+        print(f"\r{msg} ({i}s) — Ctrl+C to abort...  ", end="", flush=True)
+        time.sleep(1)
+    print(f"\r{msg} — proceeding.                      ", flush=True)
 
 def is_blocked_action(text: str) -> bool:
     text_lower = text.lower().strip()
@@ -95,11 +104,9 @@ async def run():
     log(f"Artifacts: {ARTIFACTS_DIR}")
     log("Safety: PUBLISH blocked | BILLING blocked | CREDENTIALS never stored")
     log("")
-    log("⚠️  IMPORTANT: Close Google Chrome before continuing.")
-    log("   (Chrome must not be running to use its profile.)")
-    log("")
-
-    input("Press ENTER when Chrome is closed to start the browser session...")
+    log("Chrome must be closed to use existing session.")
+    log("Starting in 5 seconds — Ctrl+C to abort...")
+    countdown(5, "Launching browser")
 
     results = {
         "screenshots": [],
@@ -109,25 +116,25 @@ async def run():
     }
 
     async with async_playwright() as pw:
-        # ── Launch Chrome with existing profile (reuses Beehiiv session) ──────
-        log("Launching Chrome with existing profile (session reuse)...")
-        try:
-            context = await pw.chromium.launch_persistent_context(
-                user_data_dir=CHROME_USER_DATA,
-                executable_path=CHROME_EXECUTABLE,
-                headless=False,                 # SUPERVISED — Ray can watch + intervene
-                slow_mo=400,                    # Deliberate — easy to follow
-                viewport={"width": 1440, "height": 900},
-                args=["--start-maximized"],
-                ignore_default_args=["--enable-automation"],  # less bot-like appearance
-            )
-        except Exception as e:
-            log(f"ERROR launching with Chrome profile: {e}")
-            log("Falling back to fresh Chromium (will require manual login)...")
-            browser = await pw.chromium.launch(headless=False, slow_mo=400)
-            context = await browser.new_context(viewport={"width": 1440, "height": 900})
+        # ── Launch Chromium — reuse saved session state if available ──────────
+        session_exists = SESSION_STATE.exists()
+        if session_exists:
+            log(f"Session state found at {SESSION_STATE.name} — reusing (no login needed)")
+        else:
+            log("No saved session — will open login page (120s window to log in)")
 
-        page = context.pages[0] if context.pages else await context.new_page()
+        browser = await pw.chromium.launch(
+            headless=False,
+            slow_mo=350,
+            args=["--start-maximized", "--window-size=1440,900"],
+        )
+
+        ctx_kwargs = {"viewport": {"width": 1440, "height": 900}}
+        if session_exists:
+            ctx_kwargs["storage_state"] = str(SESSION_STATE)
+
+        context = await browser.new_context(**ctx_kwargs)
+        page = await context.new_page()
 
         # ── Step 1: Navigate to Beehiiv ───────────────────────────────────────
         log("Step 1: Navigating to Beehiiv...")
@@ -143,50 +150,89 @@ async def run():
             await screenshot(page, "02_not_logged_in")
             log("")
             log("⚠️  NOT LOGGED IN — Beehiiv login page detected.")
-            log("   Please log in manually in the browser window.")
+            log("   >>> Click 'Sign in with Google' in the browser window NOW. <<<")
             log("   This script does NOT handle credentials.")
+            log(f"   Polling for login completion (up to {LOGIN_WAIT_SEC}s) — will proceed automatically...")
             log("")
-            input("Press ENTER after you have logged in manually...")
+
+            # Poll URL every 2 seconds — proceed immediately when login succeeds
+            login_ok = False
+            for remaining in range(LOGIN_WAIT_SEC, 0, -2):
+                print(f"\rWaiting for login ({remaining}s remaining)...  ", end="", flush=True)
+                await asyncio.sleep(2)
+                poll_url = page.url
+                if "login" not in poll_url and "sign_in" not in poll_url and "signup" not in poll_url:
+                    print(f"\rLogin detected! Proceeding...                  ", flush=True)
+                    login_ok = True
+                    break
+            if not login_ok:
+                print(f"\rLogin wait expired.                              ", flush=True)
+
             await wait_and_screenshot(page, "03_after_manual_login")
-            results["needs_manual"].append("Manual login required — session not found in Chrome profile")
+            # Save session so next run skips login
+            post_login_url = page.url
+            if "login" not in post_login_url and "sign_in" not in post_login_url:
+                SESSION_STATE.parent.mkdir(parents=True, exist_ok=True)
+                await context.storage_state(path=str(SESSION_STATE))
+                log(f"Session saved — next run skips login automatically")
+                results["completed"].append("Session state saved for future runs")
+            else:
+                results["needs_manual"].append(
+                    f"Login not completed in {LOGIN_WAIT_SEC}s — re-run and click Sign in with Google quickly"
+                )
 
         # ── Step 2: Find the Nexus AI Wealth publication ──────────────────────
         log("Step 2: Looking for 'Nexus AI Wealth' publication...")
         await screenshot(page, "04_dashboard")
+        await page.wait_for_timeout(2000)  # let dashboard fully load
 
         pub_link = page.get_by_text("Nexus AI Wealth", exact=False).first
         if await pub_link.count() > 0:
             log("Found 'Nexus AI Wealth' — clicking...")
             await safe_click(page, pub_link, "Nexus AI Wealth publication link")
-            await wait_and_screenshot(page, "05_pub_selected")
+            await wait_and_screenshot(page, "05_pub_selected", delay_ms=2000)
             results["completed"].append("Located and selected 'Nexus AI Wealth' publication")
         else:
-            log("'Nexus AI Wealth' not found on dashboard — taking screenshot for review")
+            log("'Nexus AI Wealth' not visible — screenshot for review")
             await screenshot(page, "05_pub_not_found")
-            results["needs_manual"].append("Could not locate 'Nexus AI Wealth' publication link — may need manual navigation")
+            results["needs_manual"].append("Click on 'Nexus AI Wealth' publication manually if not auto-detected")
 
         # ── Step 3: Navigate to Website Editor ────────────────────────────────
-        log("Step 3: Looking for Website / Editor navigation...")
+        log("Step 3: Navigating to Website Editor...")
         await screenshot(page, "06_pre_editor_nav")
 
-        # Try multiple selector strategies for the website editor link
-        editor_found = False
-        for nav_text in ["Website", "Design", "Editor", "Site"]:
-            try:
-                nav_link = page.get_by_role("link", name=nav_text, exact=False).first
-                if await nav_link.count() > 0:
-                    log(f"Found nav link: '{nav_text}'")
-                    await safe_click(page, nav_link, nav_text)
-                    await wait_and_screenshot(page, f"07_nav_{nav_text.lower()}")
-                    editor_found = True
-                    results["completed"].append(f"Navigated to '{nav_text}' section")
-                    break
-            except PWTimeoutError:
-                continue
+        # Try Beehiiv's direct website editor URL pattern
+        current = page.url
+        pub_id_match = re.search(r'/publications/([a-zA-Z0-9_-]+)', current)
+        if pub_id_match:
+            pub_id = pub_id_match.group(1)
+            editor_url = f"https://app.beehiiv.com/publications/{pub_id}/website/editor"
+            log(f"Navigating directly to editor: {editor_url}")
+            await page.goto(editor_url, wait_until="domcontentloaded", timeout=20000)
+            await wait_and_screenshot(page, "07_direct_editor", delay_ms=3000)
+            results["completed"].append(f"Navigated to website editor for pub {pub_id}")
+            editor_found = True
+        else:
+            # Fall back to sidebar nav
+            editor_found = False
+            for nav_text in ["Website", "Design", "Editor", "Site"]:
+                try:
+                    nav_link = page.get_by_role("link", name=nav_text, exact=False).first
+                    if await nav_link.count() > 0:
+                        log(f"Found nav link: '{nav_text}'")
+                        await safe_click(page, nav_link, nav_text)
+                        await wait_and_screenshot(page, f"07_nav_{nav_text.lower()}", delay_ms=2000)
+                        editor_found = True
+                        results["completed"].append(f"Navigated via '{nav_text}' sidebar link")
+                        break
+                except (PWTimeoutError, Exception):
+                    continue
 
-        if not editor_found:
-            log("Could not find editor navigation automatically")
-            results["needs_manual"].append("Navigate to Website > Editor manually, then re-run or continue from browser")
+            if not editor_found:
+                log("Could not auto-navigate to editor")
+                results["needs_manual"].append(
+                    "Navigate to Website > Editor manually in the browser window"
+                )
 
         await screenshot(page, "08_editor_view")
 
@@ -360,7 +406,8 @@ async def run():
         print("🔒 CREDENTIALS: Never logged, stored, or passed to script")
         print("\n" + "=" * 60)
 
-        input("\nPress ENTER to close the browser when done reviewing...")
+        log("Review the browser. Closing in 30 seconds...")
+        countdown(30, "Closing browser")
         await context.close()
         log("Browser closed. Task complete.")
 

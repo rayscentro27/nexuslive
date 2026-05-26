@@ -182,10 +182,13 @@ TASK_SELECTION_ALIASES = {
 
 
 def _build_ops_context_snippet() -> str:
-    """Build a short operational context string to inject into the LLM system prompt."""
+    """Build operational context string injected into the LLM system prompt.
+    Combines legacy ops memory with the executive memory layer for full context.
+    """
+    parts = ["Current Nexus operational state:"]
     try:
         from lib import hermes_ops_memory
-        from lib.notebooklm_ingest_adapter import load_dry_run_queue, summarize_intake_queue
+        from lib.notebooklm_ingest_adapter import load_dry_run_queue
         from pathlib import Path
 
         mem = hermes_ops_memory.load_memory(updated_by="context_snippet")
@@ -195,10 +198,6 @@ def _build_ops_context_snippet() -> str:
         nlm_path = Path(__file__).resolve().parent / "reports" / "knowledge_intake" / "notebooklm_intake_queue.json"
         nlm_queue = load_dry_run_queue(str(nlm_path)) if nlm_path.exists() else []
 
-        openrouter_ok = bool(os.getenv("OPENROUTER_API_KEY", "").strip())
-        provider_note = f"OpenRouter {'available' if openrouter_ok else 'key missing'}"
-
-        parts = ["Current Nexus operational state:"]
         if pending:
             parts.append(f"- {len(pending)} pending approval(s) in queue")
         if completed:
@@ -207,11 +206,22 @@ def _build_ops_context_snippet() -> str:
             parts.append(f"- Last completed: {task_name[:60]}")
         if nlm_queue:
             parts.append(f"- NotebookLM queue: {len(nlm_queue)} item(s) ready")
-        parts.append(f"- AI provider: {provider_note}")
-
-        return " ".join(parts) if len(parts) > 1 else ""
     except Exception:
-        return ""
+        pass
+
+    # Executive memory — top priorities and infrastructure issues
+    try:
+        from lib.hermes_executive_memory import build_telegram_context
+        exec_ctx = build_telegram_context(max_chars=400)
+        if exec_ctx:
+            parts.append(f"- Executive context: {exec_ctx}")
+    except Exception:
+        pass
+
+    openrouter_ok = bool(os.getenv("OPENROUTER_API_KEY", "").strip())
+    parts.append(f"- AI provider: OpenRouter {'available' if openrouter_ok else 'key missing'}")
+
+    return " ".join(parts) if len(parts) > 1 else ""
 
 
 def email_summaries_enabled() -> bool:
@@ -578,6 +588,20 @@ class NexusTelegramBot:
             resp.raise_for_status()
             data = resp.json()
             reply = str(((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+
+            # Quality guard — detect and escalate generic/filler responses
+            try:
+                from lib.hermes_response_quality import quality_check, escalate, record_flag
+                qr = quality_check(reply, chat_id=str(chat_id))
+                if qr.flagged:
+                    record_flag(qr.reason)
+                    logger.warning("telegram quality_flag reason=%s score=%.2f chat_id=%s", qr.reason, qr.score, chat_id)
+                    better = escalate(raw, qr, chat_id=str(chat_id))
+                    if better and len(better) > 20:
+                        reply = better
+            except Exception:
+                pass
+
             hermes_conversation_memory.record_turn(chat_id, "user", raw)
             hermes_conversation_memory.record_turn(chat_id, "assistant", reply)
             return format_telegram_reply(reply)

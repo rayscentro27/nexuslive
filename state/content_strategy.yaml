@@ -1,0 +1,42 @@
+# Nexus Content Strategy
+# Updated: 2026-05-26
+
+daily_quotas:
+  youtube_scripts: 1
+  newsletters: 1
+  tiktok_hooks: 3
+  x_posts: 5
+  linkedin_posts: 1
+  seo_articles: 1
+
+content_pillars:
+  - "AI automation for small business"
+  - "Business funding and credit building"
+  - "Passive income and affiliate systems"
+  - "Trading intelligence and market research"
+  - "Nexus AI platform capabilities"
+
+monetization_ctas:
+  primary: "Subscribe to Nexus Newsletter → nexus-ai-wealth.beehiiv.com"
+  affiliate_funding: "Get business funding via Lendio (affiliate link)"
+  affiliate_credit: "Build business credit via Nav.com (affiliate link)"
+  youtube_growth: "Grow your YouTube channel with TubeBuddy (affiliate link)"
+  consultation: "Book a free Nexus consultation at goclearonline.cc"
+
+seo_target_keywords:
+  - "AI tools for small business"
+  - "business funding 2026"
+  - "how to build business credit"
+  - "affiliate marketing for beginners"
+  - "best AI automation tools"
+  - "AI passive income"
+  - "Nexus AI wealth"
+
+content_channels:
+  youtube: "https://youtube.com/@nexusaiwealth"
+  newsletter: "https://nexus-ai-wealth.beehiiv.com"
+  tiktok: "https://www.tiktok.com/@nexusaiwealth"
+  x: "https://x.com/goclearonline"
+  instagram: "https://instagram.com/goclearonline"
+  linkedin: "https://www.linkedin.com/in/nexusai577024410"
+  website: "https://goclearonline.cc"
