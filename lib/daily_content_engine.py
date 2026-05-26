@@ -152,16 +152,52 @@ def _save_file(subdir: str, filename: str, content: str) -> Path:
     return path
 
 
-def _call_model(prompt: str, system: str = "", task_type: str = "draft") -> str:
+_CONTENT_TIER_MAP: dict[str, str] = {
+    "draft":  "premium",    # YouTube scripts, newsletters, SEO articles, LinkedIn
+    "cheap":  "lightweight", # TikTok hooks, X posts
+    "reason": "reasoning",
+}
+
+
+def _call_model(prompt: str, system: str = "", task_type: str = "draft",
+                content_type: str = "", min_words: int = 0) -> str:
+    tier = _CONTENT_TIER_MAP.get(task_type, "premium")
+    try:
+        from lib.content_generation_router import generate_content, is_template_output
+        result = generate_content(
+            prompt, system=system, tier=tier,
+            content_type=content_type, min_words=min_words,
+            timeout=120, max_tokens=4096,
+        )
+        text = result.get("response") or ""
+        if result.get("success") and text and not is_template_output(text):
+            _log_generation(task_type, tier, result)
+            return text
+        # Quality below threshold or template — log and fall through
+        _log_generation(task_type, tier, result, warn=True)
+        if text:
+            return text  # return even low-quality output rather than template
+        return _template_fallback(prompt)
+    except Exception as exc:
+        print(f"[content_engine] content_generation_router error: {exc} — using nexus_model_caller")
+    # Direct fallback to nexus_model_caller
     try:
         from lib.nexus_model_caller import call
         result = call(prompt, task_type=task_type, system=system, timeout=120)
         if result.get("success") and result.get("response"):
             return str(result["response"]).strip()
-        # Fallback: structured template if model unavailable
-        return _template_fallback(prompt)
     except Exception:
-        return _template_fallback(prompt)
+        pass
+    return _template_fallback(prompt)
+
+
+def _log_generation(task_type: str, tier: str, result: dict, warn: bool = False) -> None:
+    provider = result.get("provider", "?")
+    model = result.get("model", "?")
+    score = result.get("quality_score", "?")
+    words = result.get("word_count", "?")
+    flag = "WARN" if warn else "OK"
+    print(f"[content_engine] {flag} {task_type}/{tier} → {provider}:{model} | {words}w | q={score}")
 
 
 def _template_fallback(prompt: str) -> str:
@@ -199,7 +235,8 @@ def generate_youtube_script(topic: str | None = None) -> dict:
         f"TAGS: (10 tags)\n\n"
         f"Length: 8-12 minute script. Faceless format — no camera required."
     )
-    body = _call_model(prompt, system=system, task_type="draft")
+    body = _call_model(prompt, system=system, task_type="draft",
+                       content_type="youtube_script", min_words=500)
     slug = _slugify(topic)
     filename = f"{_today_compact()}_{slug}_yt_script.md"
     path = _save_file("youtube", filename, f"# YouTube Script — {topic}\n\n{body}")
@@ -242,7 +279,8 @@ def generate_newsletter_draft(topic: str | None = None) -> dict:
         f"[SIGN-OFF]: (brief, personal tone)\n\n"
         f"Word count target: 400-600 words."
     )
-    body = _call_model(prompt, system=system, task_type="draft")
+    body = _call_model(prompt, system=system, task_type="draft",
+                       content_type="newsletter", min_words=300)
     slug = _slugify(topic)
     filename = f"{_today_compact()}_{slug}_newsletter.md"
     path = _save_file("newsletter", filename, f"# Newsletter Draft — {topic}\n\n{body}")
@@ -280,7 +318,8 @@ def generate_tiktok_hooks(topic: str | None = None, count: int = 3) -> list[dict
         f"- Target business owners and entrepreneurs\n\n"
         f"Format each as:\nHOOK 1: ...\nHOOK 2: ...\nHOOK 3: ..."
     )
-    body = _call_model(prompt, system=system, task_type="cheap")
+    body = _call_model(prompt, system=system, task_type="cheap",
+                       content_type="tiktok_hook", min_words=8)
     slug = _slugify(topic)
     filename = f"{_today_compact()}_{slug}_tiktok_hooks.md"
     path = _save_file("tiktok", filename, f"# TikTok Hooks — {topic}\n\n{body}")
@@ -320,7 +359,8 @@ def generate_x_posts(topic: str | None = None, count: int = 5) -> list[dict]:
         f"- Not use hashtags (they reduce reach on X)\n\n"
         f"Format:\nPOST 1: ...\nPOST 2: ...\n(etc)"
     )
-    body = _call_model(prompt, system=system, task_type="cheap")
+    body = _call_model(prompt, system=system, task_type="cheap",
+                       content_type="x_post", min_words=10)
     slug = _slugify(topic)
     filename = f"{_today_compact()}_{slug}_x_posts.md"
     path = _save_file("x_posts", filename, f"# X Posts — {topic}\n\n{body}")
@@ -360,7 +400,8 @@ def generate_linkedin_post(topic: str | None = None) -> dict:
         f"Lines 9-10: Call to action (ask about free tool at {NEXUS_CTA} or ask a question)\n\n"
         f"Length: 200-300 words. Short paragraphs. Professional but not corporate."
     )
-    body = _call_model(prompt, system=system, task_type="draft")
+    body = _call_model(prompt, system=system, task_type="draft",
+                       content_type="linkedin_post", min_words=120)
     slug = _slugify(topic)
     filename = f"{_today_compact()}_{slug}_linkedin.md"
     path = _save_file("linkedin", filename, f"# LinkedIn Post — {topic}\n\n{body}")
@@ -406,7 +447,8 @@ def generate_seo_article(topic: str | None = None) -> dict:
         f"[Recap + CTA to {NEXUS_CTA}]\n\n"
         f"Target word count: 1,200-1,800 words."
     )
-    body = _call_model(prompt, system=system, task_type="draft", max_tokens=3000) if False else _call_model(prompt, system=system, task_type="draft")
+    body = _call_model(prompt, system=system, task_type="draft",
+                       content_type="seo_article", min_words=900)
     slug = _slugify(topic)
     filename = f"{_today_compact()}_{slug}_seo_article.md"
     path = _save_file("seo", filename, f"# SEO Article Draft — {topic}\n\n{body}")
