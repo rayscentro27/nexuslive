@@ -1,0 +1,565 @@
+# Nexus Intelligence Source Registry
+# Updated: 2026-05-26
+# Format: source_id, division, scout, tier, frequency_hours, url, extraction_goals
+
+# ── Confidence Tiers ──────────────────────────────────────────────────────────
+# Tier A: Proven practitioners, high-signal operators, verifiable results
+# Tier B: Strong practitioners, consistent output, moderate signal density
+# Tier C: General educators, mixed signal quality
+# Tier D: Aggregators, lower signal density
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MONETIZATION INTELLIGENCE DIVISION
+# ─────────────────────────────────────────────────────────────────────────────
+monetization_sources:
+
+  - source_id: julian_goldie_seo_cohere
+    name: "Julian Goldie SEO — Cohere Command A+ AI"
+    url: "https://www.youtube.com/watch?v=7BfRIEREUcQ"
+    type: video
+    tier: A
+    scout: seo_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - ai_seo_tools
+      - content_automation
+      - affiliate_opportunities
+      - workflow_automation
+    tags: [seo, ai_tools, automation, content]
+
+  - source_id: faceless_youtube_automation
+    name: "Faceless YouTube + AI Automation"
+    url: "https://www.youtube.com/watch?v=AgZl40EeHLE"
+    type: video
+    tier: A
+    scout: youtube_growth_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - faceless_channel_strategy
+      - youtube_automation
+      - passive_income_systems
+      - content_templates
+    tags: [youtube, automation, passive_income, content_factory]
+
+  - source_id: ai_income_system_kbarton
+    name: "AI Income System"
+    url: "https://www.youtube.com/watch?v=kB-ngXxKV7A"
+    type: video
+    tier: A
+    scout: affiliate_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - ai_income_strategies
+      - automation_systems
+      - recurring_revenue_models
+      - tool_stack
+    tags: [ai_income, automation, recurring_revenue]
+
+  - source_id: online_business_system
+    name: "Online Business System"
+    url: "https://www.youtube.com/watch?v=SuixPyXkEa4"
+    type: video
+    tier: B
+    scout: affiliate_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - business_model_analysis
+      - revenue_streams
+      - funnel_strategy
+      - affiliate_systems
+    tags: [online_business, funnel, affiliate]
+
+  - source_id: success_with_stephen_smith_channel
+    name: "Success With Stephen Smith"
+    url: "https://www.youtube.com/@Successwithstephensmith"
+    type: channel
+    tier: A
+    scout: affiliate_scout
+    division: monetization_intelligence
+    frequency_hours: 48
+    max_videos: 5
+    extraction_goals:
+      - business_funding_strategies
+      - credit_building_tactics
+      - affiliate_opportunities
+      - funding_intelligence
+    tags: [business_funding, credit, affiliate, business_growth]
+
+  - source_id: digital_marketing_tactics
+    name: "Digital Marketing Tactics"
+    url: "https://www.youtube.com/watch?v=psZrQ7xGGaQ"
+    type: video
+    tier: B
+    scout: content_trend_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - content_marketing_tactics
+      - cta_strategies
+      - conversion_optimization
+      - viral_hooks
+    tags: [digital_marketing, cta, conversion, content]
+
+  - source_id: newsletter_growth_tactics
+    name: "Newsletter Growth"
+    url: "https://www.youtube.com/watch?v=Pi-m8R068r4"
+    type: video
+    tier: A
+    scout: newsletter_growth_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - newsletter_growth_tactics
+      - subscriber_acquisition
+      - email_monetization
+      - open_rate_optimization
+    tags: [newsletter, email_marketing, subscriber_growth]
+
+  - source_id: affiliate_system_50k
+    name: "Affiliate System $50K"
+    url: "https://www.youtube.com/watch?v=50iWtrj9Mkw"
+    type: video
+    tier: A
+    scout: affiliate_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - affiliate_program_selection
+      - commission_stacking
+      - traffic_strategies
+      - affiliate_funnel_design
+    tags: [affiliate_marketing, passive_income, funnel]
+
+  - source_id: koerner_office_channel
+    name: "The Koerner Office"
+    url: "https://www.youtube.com/@thekoerneroffice/videos"
+    type: channel
+    tier: A
+    scout: affiliate_scout
+    division: monetization_intelligence
+    frequency_hours: 48
+    max_videos: 5
+    extraction_goals:
+      - online_business_models
+      - recurring_revenue_systems
+      - acquisition_strategies
+      - niche_opportunities
+    tags: [online_business, acquisition, recurring_revenue, niche]
+
+  - source_id: codeglitch_ai_automation
+    name: "CodeGlitch TV — AI Automation"
+    url: "https://www.youtube.com/@codeglitchTV/videos"
+    type: channel
+    tier: B
+    scout: content_trend_scout
+    division: monetization_intelligence
+    frequency_hours: 48
+    max_videos: 4
+    extraction_goals:
+      - ai_automation_workflows
+      - saas_tool_opportunities
+      - no_code_solutions
+      - automation_income
+    tags: [ai_automation, no_code, saas, workflow]
+
+  - source_id: ai_business_tools_xgt
+    name: "AI Business Tools"
+    url: "https://www.youtube.com/watch?v=XGt8W3ti6Gk"
+    type: video
+    tier: B
+    scout: seo_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - ai_tool_stack
+      - business_automation
+      - productivity_systems
+      - cost_reduction
+    tags: [ai_tools, business_automation, productivity]
+
+  - source_id: seo_content_strategy_hfnoaad
+    name: "SEO Content Strategy"
+    url: "https://www.youtube.com/watch?v=hFnoAAd-pkQ"
+    type: video
+    tier: B
+    scout: seo_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - seo_article_structure
+      - keyword_strategy
+      - content_silos
+      - traffic_generation
+    tags: [seo, content_strategy, keyword_research]
+
+  - source_id: youtube_growth_gl220
+    name: "YouTube Growth System"
+    url: "https://www.youtube.com/watch?v=gL220WHXWeo"
+    type: video
+    tier: B
+    scout: youtube_growth_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - youtube_algorithm_signals
+      - title_optimization
+      - thumbnail_strategy
+      - channel_growth_tactics
+    tags: [youtube, algorithm, growth, thumbnails]
+
+  - source_id: passive_income_95scwntqkqi
+    name: "Passive Income System"
+    url: "https://www.youtube.com/watch?v=95SCwNTQKQI"
+    type: video
+    tier: B
+    scout: affiliate_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - passive_income_models
+      - scalable_systems
+      - automation_leverage
+      - income_diversification
+    tags: [passive_income, automation, scalable]
+
+  - source_id: digital_product_creation
+    name: "Digital Product Creation"
+    url: "https://www.youtube.com/watch?v=0Lewxi0OS5E"
+    type: video
+    tier: B
+    scout: content_trend_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - digital_product_ideas
+      - info_product_strategy
+      - pricing_models
+      - sales_funnel
+    tags: [digital_products, info_products, funnel, pricing]
+
+  - source_id: cal_barton_channel
+    name: "Cal Barton"
+    url: "https://www.youtube.com/@calbarton/videos"
+    type: channel
+    tier: A
+    scout: affiliate_scout
+    division: monetization_intelligence
+    frequency_hours: 48
+    max_videos: 5
+    extraction_goals:
+      - affiliate_marketing_systems
+      - traffic_generation
+      - email_marketing
+      - conversion_tactics
+    tags: [affiliate, traffic, email, conversion]
+
+  - source_id: ai_agency_lv9ras
+    name: "AI Agency Business"
+    url: "https://www.youtube.com/watch?v=lv9Ras17wL4"
+    type: video
+    tier: B
+    scout: content_trend_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - ai_service_business
+      - client_acquisition
+      - agency_model
+      - recurring_contracts
+    tags: [ai_agency, service_business, client_acquisition]
+
+  - source_id: newsletter_monetization_f8tbu
+    name: "Newsletter Monetization"
+    url: "https://www.youtube.com/watch?v=F8TbuMaocmE"
+    type: video
+    tier: A
+    scout: newsletter_growth_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - newsletter_revenue_models
+      - sponsorship_rates
+      - paid_newsletter_strategy
+      - cta_placement
+    tags: [newsletter, sponsorship, paid_content, monetization]
+
+  - source_id: content_business_jasxmo
+    name: "Content Business System"
+    url: "https://www.youtube.com/watch?v=JasXmO5dft4"
+    type: video
+    tier: B
+    scout: content_trend_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - content_business_model
+      - content_repurposing
+      - multi_platform_strategy
+      - content_monetization
+    tags: [content_business, repurposing, multi_platform]
+
+  - source_id: recurring_revenue_uunn
+    name: "Recurring Revenue Systems"
+    url: "https://www.youtube.com/watch?v=uUNnAcsL9tw"
+    type: video
+    tier: A
+    scout: affiliate_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - subscription_models
+      - membership_strategy
+      - recurring_revenue_tactics
+      - churn_reduction
+    tags: [recurring_revenue, membership, subscription, saas]
+
+  - source_id: ai_rush_minutes_channel
+    name: "AI Rush Minutes"
+    url: "https://www.youtube.com/@airushminutes"
+    type: channel
+    tier: B
+    scout: content_trend_scout
+    division: monetization_intelligence
+    frequency_hours: 24
+    max_videos: 5
+    extraction_goals:
+      - ai_news_opportunities
+      - emerging_ai_tools
+      - automation_opportunities
+      - viral_ai_topics
+    tags: [ai_news, emerging_tools, viral_topics, automation]
+
+  - source_id: funding_business_bthwks
+    name: "Business Funding Strategy"
+    url: "https://www.youtube.com/watch?v=bthWKs2ZvJU"
+    type: video
+    tier: A
+    scout: funding_opportunity_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - business_funding_tactics
+      - credit_leverage
+      - capital_access
+      - funding_sources
+    tags: [business_funding, credit, capital, leverage]
+
+  - source_id: ai_automation_fbwpzm
+    name: "AI Automation Business"
+    url: "https://www.youtube.com/watch?v=FBWPZMAawxE"
+    type: video
+    tier: B
+    scout: content_trend_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - ai_automation_income
+      - workflow_productization
+      - client_results
+      - automation_pricing
+    tags: [ai_automation, income, workflow, pricing]
+
+  - source_id: youtube_seo_dk5a1g
+    name: "YouTube SEO Strategy"
+    url: "https://www.youtube.com/watch?v=dK5A1gXsjG0"
+    type: video
+    tier: B
+    scout: youtube_growth_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - youtube_seo_tactics
+      - keyword_ranking
+      - video_optimization
+      - search_traffic
+    tags: [youtube_seo, ranking, video_optimization, search]
+
+  - source_id: niche_site_x38zy
+    name: "Niche Site Income"
+    url: "https://www.youtube.com/watch?v=X38zyawXeUQ"
+    type: video
+    tier: B
+    scout: seo_scout
+    division: monetization_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - niche_selection_criteria
+      - content_site_strategy
+      - affiliate_seo_integration
+      - traffic_monetization
+    tags: [niche_site, affiliate_seo, content_site, traffic]
+
+  - source_id: luuk_alleman_channel
+    name: "Luuk Alleman"
+    url: "https://www.youtube.com/@LuukAlleman/videos"
+    type: channel
+    tier: B
+    scout: content_trend_scout
+    division: monetization_intelligence
+    frequency_hours: 48
+    max_videos: 5
+    extraction_goals:
+      - online_income_tactics
+      - digital_marketing_trends
+      - content_creation_systems
+      - monetization_ideas
+    tags: [online_income, digital_marketing, content_creation]
+
+  - source_id: stedman_waiters_channel
+    name: "Stedman Waiters"
+    url: "https://www.youtube.com/@StedmanWaiters/videos"
+    type: channel
+    tier: B
+    scout: affiliate_scout
+    division: monetization_intelligence
+    frequency_hours: 48
+    max_videos: 5
+    extraction_goals:
+      - business_growth_tactics
+      - revenue_strategies
+      - entrepreneurship_insights
+      - monetization_models
+    tags: [business_growth, revenue, entrepreneurship, monetization]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MARKET INTELLIGENCE DIVISION
+# ─────────────────────────────────────────────────────────────────────────────
+market_intelligence_sources:
+
+  - source_id: jj_simon_news_trading_8lbkj0
+    name: "JJ Simon — $1.3M News Trading Strategy"
+    url: "https://www.youtube.com/watch?v=8lbkj0PF1uM"
+    type: video
+    tier: A
+    scout: strategy_lab_scout
+    division: market_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - news_trading_strategy
+      - entry_exit_timing
+      - risk_management
+      - session_timing
+      - paper_trading_setups
+    tags: [news_trading, strategy, risk_management, session_timing]
+
+  - source_id: jj_simon_channel
+    name: "JJ Simon — Channel"
+    url: "https://www.youtube.com/@itsjjsimon"
+    type: channel
+    tier: A
+    scout: strategy_lab_scout
+    division: market_intelligence
+    frequency_hours: 24
+    max_videos: 5
+    extraction_goals:
+      - trading_strategy_signals
+      - market_regime_analysis
+      - entry_models
+      - risk_frameworks
+      - session_timing_intel
+    tags: [trading, strategy, market_regime, risk, sessions]
+
+  - source_id: the_one_lance_b_channel
+    name: "TheOneLanceB — Channel"
+    url: "https://www.youtube.com/@TheOneLanceB"
+    type: channel
+    tier: A
+    scout: strategy_lab_scout
+    division: market_intelligence
+    frequency_hours: 24
+    max_videos: 5
+    extraction_goals:
+      - institutional_trading_concepts
+      - smart_money_concepts
+      - market_structure_analysis
+      - order_flow_reading
+      - confluence_frameworks
+    tags: [institutional, smart_money, market_structure, order_flow]
+
+  - source_id: macro_strategy_zspMXJ
+    name: "Macro Strategy Analysis"
+    url: "https://www.youtube.com/watch?v=zspMXJVbfAY"
+    type: video
+    tier: A
+    scout: macro_scout
+    division: market_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - macro_economic_signals
+      - institutional_positioning
+      - fed_policy_implications
+      - sector_rotation_signals
+      - risk_on_off_framework
+    tags: [macro, institutional, fed_policy, sector_rotation, risk]
+
+  - source_id: volatility_strategy_flZA58
+    name: "Volatility Strategy"
+    url: "https://www.youtube.com/watch?v=flZA58F0BOQ"
+    type: video
+    tier: A
+    scout: volatility_scout
+    division: market_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - volatility_analysis
+      - vix_interpretation
+      - options_flow_signals
+      - vol_regime_detection
+      - risk_management_vol
+    tags: [volatility, vix, options_flow, risk_regime]
+
+  - source_id: market_regime_tvWks6
+    name: "Market Regime Analysis"
+    url: "https://www.youtube.com/watch?v=TvWks6oJ-9U"
+    type: video
+    tier: A
+    scout: macro_scout
+    division: market_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - market_regime_identification
+      - trend_vs_range_detection
+      - regime_transition_signals
+      - strategy_adaptation
+      - risk_parameter_adjustment
+    tags: [market_regime, trend, range, strategy_adaptation]
+
+  - source_id: institutional_flow_lilVaC
+    name: "Institutional Flow Intelligence"
+    url: "https://www.youtube.com/watch?v=lilVaCcfzJY"
+    type: video
+    tier: A
+    scout: insider_scout
+    division: market_intelligence
+    frequency_hours: 168
+    extraction_goals:
+      - institutional_order_flow
+      - whale_positioning
+      - smart_money_signals
+      - accumulation_distribution
+      - consensus_market_view
+    tags: [institutional, whale_tracking, smart_money, order_flow, consensus]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RECENCY WEIGHTING RULES
+# ─────────────────────────────────────────────────────────────────────────────
+recency_weighting:
+  age_0_7_days: 1.0
+  age_8_30_days: 0.85
+  age_31_90_days: 0.70
+  age_91_180_days: 0.50
+  age_181_365_days: 0.35
+  age_over_1_year: 0.20
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TIER QUALITY MULTIPLIERS
+# ─────────────────────────────────────────────────────────────────────────────
+tier_multipliers:
+  A: 1.0
+  B: 0.80
+  C: 0.60
+  D: 0.40

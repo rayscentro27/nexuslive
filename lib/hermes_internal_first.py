@@ -817,6 +817,28 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
                 matched_topic=topic,
             )
 
+    if topic == "source_intelligence":
+        try:
+            from lib.youtube_intelligence_worker import (
+                source_registry_summary, daily_intelligence_summary
+            )
+            reg = source_registry_summary()
+            summary = daily_intelligence_summary()
+            reply = f"{reg}\n\n{summary}"
+            return InternalFirstReply(
+                text=reply[:3600],
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="youtube_intelligence_worker",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=f"Intelligence sources unavailable: {exc}. Run `nexus intelligence run` to extract.",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="youtube_intelligence_worker",
+                matched_topic=topic,
+            )
+
     if topic == "watchers":
         try:
             from pathlib import Path as _Path

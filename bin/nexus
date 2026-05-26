@@ -655,6 +655,65 @@ def cmd_hermes_audit(args: argparse.Namespace) -> None:
     print()
 
 
+def cmd_intelligence(args: argparse.Namespace) -> None:
+    intel_cmd = getattr(args, "intel_cmd", "status")
+    division_filter = getattr(args, "division", None)
+    limit = getattr(args, "limit", 10)
+    force = getattr(args, "force", False)
+
+    if intel_cmd == "status":
+        try:
+            from lib.youtube_intelligence_worker import source_registry_summary
+            print(f"\n{source_registry_summary()}")
+        except Exception as exc:
+            print(f"Source registry unavailable: {exc}")
+
+    elif intel_cmd == "run":
+        print(f"\nRunning YouTube intelligence extraction — {_now()}")
+        if division_filter:
+            print(f"  Division filter: {division_filter}")
+        print(f"  Limit: {limit} sources | Force: {force}")
+        try:
+            from lib.youtube_intelligence_worker import run_due_sources
+            result = run_due_sources(division=division_filter, limit=limit, force=force)
+            print(f"\n  Sources due: {result['total_due']}")
+            print(f"  Processed: {result['processed']}")
+            print(f"  Findings: {result['total_findings']}")
+            print(f"  Evidence rows: {result['evidence_count']}")
+            if result.get("results"):
+                print("\n  Details:")
+                for r in result["results"]:
+                    if not r.get("skipped"):
+                        print(f"    {r['source_id']:40} {r.get('videos_processed',0)} videos | {r.get('findings',0)} findings")
+            # Re-run consensus
+            print("\n  Re-ranking opportunities via consensus engine...")
+            from lib.nexus_consensus_engine import run_consensus
+            consensus = run_consensus(save_to_supabase=True)
+            print(f"  Ranked: {consensus['ranked_count']} | CRITICAL: {consensus['critical_count']}")
+        except Exception as exc:
+            print(f"Intelligence run failed: {exc}")
+            import traceback; traceback.print_exc()
+
+    elif intel_cmd == "summary":
+        try:
+            from lib.youtube_intelligence_worker import daily_intelligence_summary
+            print(f"\n{daily_intelligence_summary()}")
+        except Exception as exc:
+            print(f"Intelligence summary failed: {exc}")
+
+    elif intel_cmd == "sources":
+        division_arg = getattr(args, "source_division", None)
+        try:
+            from lib.youtube_intelligence_worker import get_all_sources, get_sources_by_division
+            sources = get_sources_by_division(division_arg) if division_arg else get_all_sources()
+            print(f"\nRegistered sources ({len(sources)}):")
+            for s in sources:
+                print(f"  [{s.get('tier','?')}] {s['source_id']:40} {s.get('type','?'):8} every {s.get('frequency_hours','?')}h")
+                print(f"       → {s['url'][:70]}")
+        except Exception as exc:
+            print(f"Source list failed: {exc}")
+
+
 def cmd_watchers(args: argparse.Namespace) -> None:
     watcher_cmd = getattr(args, "watcher_cmd", "status")
 
@@ -1007,6 +1066,16 @@ def main() -> None:
 
     sub.add_parser("kb", help="Push operational state to Knowledge Brain")
 
+    p_intel = sub.add_parser("intelligence", help="YouTube intelligence extraction")
+    p_intel.add_argument(
+        "intel_cmd", nargs="?",
+        choices=["run", "status", "summary", "sources"],
+        default="status",
+    )
+    p_intel.add_argument("--division", default=None, choices=["monetization_intelligence", "market_intelligence"])
+    p_intel.add_argument("--limit", type=int, default=10)
+    p_intel.add_argument("--force", action="store_true", default=False)
+
     args = parser.parse_args()
 
     dispatch = {
@@ -1033,6 +1102,7 @@ def main() -> None:
         "watchers":     cmd_watchers,
         "scouts":       cmd_scouts,
         "kb":           cmd_kb_push,
+        "intelligence": cmd_intelligence,
     }
 
     if not args.command:

@@ -171,6 +171,15 @@ def default_runtime_config() -> dict[str, Any]:
                 "content trends", "affiliate watcher", "seo watcher",
                 "funding watcher", "trading watcher",
             ],
+            "source_intelligence": [
+                "youtube intelligence", "source intelligence", "what sources are registered",
+                "intelligence sources", "show sources", "source extractions",
+                "what did the scouts extract", "intelligence summary", "daily intelligence",
+                "source findings", "youtube scout findings", "latest intel",
+                "what intelligence is available", "channel intelligence",
+                "jj simon", "the one lance b", "cal barton", "koerner office",
+                "codeglitch", "ai rush minutes", "luuk alleman", "stedman waiters",
+            ],
         },
         "hermes_project_aliases": {
             "opencode": ["dev-agent bridge", "mac mini operational sessions", "ai ops dashboard"],

@@ -289,21 +289,31 @@ def _section_revenue_progress() -> dict:
 
 
 def _section_market_intelligence() -> dict:
-    """Pull market intelligence scout outputs and trading research status."""
+    """Pull market intelligence from scout outputs and source extractions."""
     result = {
         "strategies_in_testing": 0,
         "paper_trades_this_week": 0,
         "top_macro_signal": "",
         "research_artifacts_today": 0,
+        "source_extractions_24h": 0,
+        "top_source_insight": "",
     }
     try:
         from datetime import timedelta
-        today = date.today().isoformat()
+        yesterday = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        extractions = _sb_get(
+            f"source_extractions?select=video_title,summary,confidence_score,division"
+            f"&division=eq.market_intelligence&created_at=gte.{yesterday}"
+            f"&order=confidence_score.desc&limit=5"
+        )
+        result["source_extractions_24h"] = len(extractions)
+        if extractions:
+            result["top_source_insight"] = str(extractions[0].get("summary", ""))[:120]
+
         artifacts = _sb_get(
-            f"research_artifacts?select=id,topic,title&created_at=gte.{today}T00:00:00Z&limit=20"
+            f"research_artifacts?select=id,topic,title&created_at=gte.{date.today().isoformat()}T00:00:00Z&limit=20"
         )
         result["research_artifacts_today"] = len(artifacts)
-
         trading_artifacts = [a for a in artifacts if "trad" in str(a.get("topic", "")).lower()]
         result["strategies_in_testing"] = len(trading_artifacts)
     except Exception:
@@ -626,8 +636,13 @@ def _build_full_briefing(
         f"- YouTube scripts queued: {content['youtube_scripts_queued']}",
         "",
         "## 6. MARKET INTELLIGENCE",
+        f"- Source extractions (24h): {market_intel.get('source_extractions_24h', 0)}",
         f"- Research artifacts today: {market_intel['research_artifacts_today']}",
         f"- Strategies in paper testing: {market_intel['strategies_in_testing']}",
+    ]
+    if market_intel.get("top_source_insight"):
+        lines.append(f"- Top signal: {market_intel['top_source_insight']}")
+    lines += [
         "",
         "## 7. SCOUT PRODUCTIVITY",
     ]

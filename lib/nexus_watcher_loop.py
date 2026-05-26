@@ -261,6 +261,29 @@ def watch_content_trends(interval_hours: float = 2.0) -> dict:
     return result
 
 
+# ── YouTube intelligence watcher ─────────────────────────────────────────────
+
+def watch_youtube_intelligence(
+    interval_hours: float = 12.0,
+    division: str | None = None,
+    limit: int = 8,
+) -> dict:
+    """Process due YouTube sources, extract intelligence, feed consensus."""
+    if not division and _last_run_hours("youtube_intelligence") < interval_hours:
+        return {"skipped": True, "reason": "not_due"}
+
+    try:
+        from lib.youtube_intelligence_worker import run_due_sources
+        result = run_due_sources(division=division, limit=limit)
+        if result.get("processed", 0) > 0:
+            _log(f"  YouTube intel: {result['processed']} sources | {result['total_findings']} findings | {result['evidence_count']} evidence rows")
+            _mark_run("youtube_intelligence", result)
+        return result
+    except Exception as exc:
+        _log(f"YouTube intelligence watcher error: {exc}")
+        return {"error": str(exc), "findings": 0}
+
+
 # ── Consensus runner ──────────────────────────────────────────────────────────
 
 def run_consensus_if_due(interval_hours: float = 6.0) -> dict:
@@ -291,6 +314,7 @@ def run_watcher_cycle() -> dict:
         ("seo_opportunity",      lambda: watch_seo_opportunity(6.0)),
         ("funding_intelligence", lambda: watch_funding_intelligence(24.0)),
         ("content_trends",       lambda: watch_content_trends(2.0)),
+        ("youtube_intelligence", lambda: watch_youtube_intelligence(12.0)),
     ]
 
     for name, fn in watchers:
