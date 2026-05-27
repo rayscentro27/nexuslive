@@ -1,0 +1,4 @@
+# Constraints to exclude packages that require LLVM compilation on Python 3.14
+# smartmoneyconcepts requires numba >= 0.58.1 which requires llvmlite which needs LLVM headers
+# These are used for Smart Money Concepts indicators — not required for core backtesting
+# Remove this file once Python 3.14 pre-built wheels for llvmlite become available.

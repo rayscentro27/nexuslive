@@ -1,0 +1,11 @@
+# Vibe-Trading integration — never commit these
+.venv/
+workspace/
+reports/
+.env
+*.lock
+__pycache__/
+*.pyc
+*.pyo
+# sample_outputs/*.json  — tracked for reference
+vendor/

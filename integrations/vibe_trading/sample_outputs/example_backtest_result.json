@@ -1,0 +1,14 @@
+{
+  "task_type": "backtest",
+  "prompt": "Education-only paper-trading research. Backtest a simple EUR/USD RSI(14) mean-reversion strategy...",
+  "command": "vibe-trading run -p '[EDUCATION-ONLY...] Backtest RSI(14) on EURUSD...'",
+  "return_code": 0,
+  "stdout": "Strategy: RSI(14) Mean-Reversion | EUR/USD Daily\nData: 2020-01-01 to 2024-12-31 (yfinance)\n\nResults:\n  Total Trades:   47\n  Win Rate:       55.3%\n  Net Return:     +12.4%\n  Sharpe Ratio:   0.82\n  Max Drawdown:   -8.7%\n  Avg Duration:   6.2 days\n\nAssumptions:\n  - No commissions or slippage modeled\n  - Daily bars (not intraday)\n  - Position size: fixed 1 unit\n  - RSI < 30 = buy signal\n  - RSI > 50 = exit signal\n  - Hard cap: 10 bars max hold\n\nData Source: Yahoo Finance (free, EURUSD=X ticker)\nLimitations: Historical data only. Does not account for weekend gaps,\n  news events, or spread costs. Past performance does not predict future results.\n\n---\nEDUCATIONAL DISCLAIMER: This output is for research and education only...",
+  "stderr": "",
+  "timestamp": "2026-05-27T00:00:00+00:00",
+  "safety_mode": "education_only_paper_trading",
+  "cost_mode": "free_or_local_only",
+  "disclaimer": "\n\n---\nEDUCATIONAL DISCLAIMER: This output is for research and education only. No live trades were executed. No broker was connected. Past performance does not predict future results. This is a paper-trading simulation — not financial advice.\nSafety mode: education_only_paper_trading | Cost mode: free_or_local_only",
+  "report_path": "integrations/vibe_trading/reports/backtest_20260527_000000.json",
+  "_note": "This is a SAMPLE OUTPUT for documentation. Not a real backtest result."
+}
