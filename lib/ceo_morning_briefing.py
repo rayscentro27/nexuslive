@@ -751,6 +751,15 @@ def deliver_briefing(briefing: dict, send_telegram: bool | None = None) -> dict:
         log["telegram"] = False
         log["telegram_reason"] = "TELEGRAM_AUTO_REPORTS_ENABLED=false"
 
+    # Discord delivery — always attempt if webhook is configured
+    try:
+        from lib.discord_notifier import ceo as _discord_ceo
+        ok = _discord_ceo.send_briefing(briefing["body_markdown"])
+        log["discord"] = ok
+    except Exception as exc:
+        log["discord"] = False
+        log["discord_error"] = str(exc)
+
     return log
 
 

@@ -317,6 +317,7 @@ def run_watcher_cycle() -> dict:
         ("youtube_intelligence", lambda: watch_youtube_intelligence(12.0)),
     ]
 
+    errors = []
     for name, fn in watchers:
         try:
             result = fn()
@@ -327,12 +328,27 @@ def run_watcher_cycle() -> dict:
                 _log(f"  {name}: {findings} findings")
         except Exception as exc:
             _log(f"  {name} ERROR: {exc}")
+            errors.append({"watcher": name, "error": str(exc)})
 
     # Run consensus every 6h
     consensus = run_consensus_if_due(6.0)
     if not consensus.get("skipped"):
         summary["watchers_ran"].append("consensus_engine")
         summary["consensus_top"] = consensus.get("top_opportunity", {}).get("title", "")
+
+    # Discord: post watcher errors immediately, summary every 6h
+    try:
+        from lib.discord_notifier import ops as _discord_ops
+        for e in errors:
+            _discord_ops.alert(
+                "warning",
+                f"Watcher failed: {e['watcher']}",
+                detail=e["error"],
+            )
+        if summary["watchers_ran"]:
+            _discord_ops.send_watcher_summary(summary)
+    except Exception:
+        pass
 
     return summary
 

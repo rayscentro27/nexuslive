@@ -518,6 +518,36 @@ def run_daily_pipeline(topic: str | None = None, dry_run: bool = False) -> dict:
         for e in errors:
             print(f"  ❌ {e['label']}: {e['error']}")
 
+    # Discord: post individual drafts (skip short x_posts/tiktok_hook batches — post summary only)
+    if not dry_run and outputs:
+        try:
+            from lib.discord_notifier import content as _dc
+            _SKIP_INDIVIDUAL = {"tiktok_hook", "x_post"}
+            for o in outputs:
+                ct = o.get("type", "")
+                if ct in _SKIP_INDIVIDUAL:
+                    continue
+                body_path = o.get("path", "")
+                body_text = ""
+                if body_path:
+                    try:
+                        body_text = Path(body_path).read_text(encoding="utf-8")[:1200]
+                    except Exception:
+                        pass
+                _dc.send_draft(
+                    content_type=ct,
+                    title=o.get("title") or f"{ct}: {topic}",
+                    body=body_text,
+                    topic=topic,
+                    word_count=o.get("words", 0),
+                    quality_score=0,
+                    row_id=str(o.get("row_id") or ""),
+                )
+            # Pipeline summary
+            _dc.send_pipeline_summary(_today(), topic, outputs, errors)
+        except Exception as exc:
+            print(f"[content_engine] Discord post error: {exc}")
+
     return {
         "date": _today(),
         "topic": topic,

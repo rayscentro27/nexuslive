@@ -40,6 +40,36 @@ const SHARED_ENV = {
 module.exports = {
   apps: [
 
+    // ── Claw3D Hermes Gateway Adapter ────────────────────────────────────────
+    // Bridges Claw3D WebSocket protocol → Hermes HTTP on port 8642
+    {
+      name: "nexus-claw3d-adapter",
+      script: "node",
+      args: "server/hermes-gateway-adapter.js",
+      cwd: "/Users/raymonddavis/nexus-claw3d",
+      interpreter: "none",
+      env: {
+        HERMES_API_URL: "http://localhost:8642",
+        HERMES_API_KEY: "a29d9fd7b6c34b91a5e80f1f20260422c1a87e1139bb4f58",
+        HERMES_ADAPTER_PORT: "18790",
+        HERMES_AGENT_NAME: "Hermes",
+      },
+
+      autorestart: true,
+      max_restarts: 10,
+      min_uptime: "10s",
+      restart_delay: 5000,
+      watch: false,
+
+      out_file: `${LOG_DIR}/pm2-claw3d-adapter.out.log`,
+      error_file: `${LOG_DIR}/pm2-claw3d-adapter.err.log`,
+      log_date_format: "YYYY-MM-DD HH:mm:ss",
+      merge_logs: true,
+      max_memory_restart: "256M",
+      instances: 1,
+      exec_mode: "fork",
+    },
+
     // ── Claw3D 3D Office ─────────────────────────────────────────────────────
     {
       name: "nexus-claw3d",
