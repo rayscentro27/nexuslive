@@ -325,27 +325,36 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         )
 
     if topic == "ai_providers":
-        # Read live status of known provider routes
+        try:
+            from lib.hermes_provider_policy import get_policy
+            policy = get_policy(refresh=True)
+            return InternalFirstReply(
+                text=policy.telegram_report(),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_provider_policy (live detection)",
+                matched_topic=topic,
+            )
+        except Exception:
+            pass
+        # Fallback to static env-based summary if policy module fails
+        openai_key = bool(os.getenv("OPENAI_API_KEY", "").strip())
         openrouter_key = bool(os.getenv("OPENROUTER_API_KEY", "").strip())
-        openrouter_model = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-chat")
-        hermes_url = os.getenv("HERMES_GATEWAY_URL", "http://127.0.0.1:8642")
+        openrouter_allowed = os.getenv("HERMES_ALLOW_OPENROUTER_FALLBACK", "false").lower() == "true"
         ollama_primary = os.getenv("HERMES_REASONING_MODEL", "qwen3:8b")
-        oracle_host = "161.153.40.41"
         lines = [
-            "Internally, these are the known Nexus provider routes:",
-            f"• OpenRouter API ({openrouter_model}): {'configured ✓' if openrouter_key else 'key missing ✗'} — used for Telegram conversational replies",
-            f"• Hermes local Ollama ({ollama_primary}): {hermes_url} — tunnel required, currently unreachable if tunnel is down",
-            f"• Oracle VM Ollama (qwen2.5:14b): {oracle_host} — frequently unreachable (100% packet loss when down)",
-            "• Claude Code CLI: available locally for coding tasks",
-            "• OpenClaw: ChatGPT session routing — active when OPENCLAW_ENABLED=true",
+            "Hermes provider priority (chatgpt_auth → codex_auth → openclaw → local_ollama → openrouter):",
+            f"• ChatGPT/OpenAI auth: {'configured ✓' if openai_key else 'key missing ✗'} — preferred for strategic conversation",
+            f"• Codex CLI auth: check ~/.codex/auth.json",
+            f"• OpenClaw ChatGPT auth: active when OPENCLAW_CHATGPT_AUTH=true",
+            f"• Local Ollama ({ollama_primary}): probe http://localhost:11434",
+            f"• OpenRouter: {'ENABLED (HERMES_ALLOW_OPENROUTER_FALLBACK=true)' if openrouter_allowed else 'DISABLED by policy (requires HERMES_ALLOW_OPENROUTER_FALLBACK=true)'}",
             "",
-            "Best current fallback: OpenRouter (deepseek-chat) for conversation, Claude Code CLI for code tasks.",
-            "To check live Ollama status, run /models or ask 'worker status'.",
+            "Run 'show provider status' for live availability check.",
         ]
         return InternalFirstReply(
             text="\n".join(lines),
             confidence=CONF_INTERNAL_CONFIRMED,
-            source="env_config + known_topology",
+            source="env_config",
             matched_topic=topic,
         )
 

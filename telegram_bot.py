@@ -494,6 +494,11 @@ class NexusTelegramBot:
         text = self._truncate_response(message or "")
         if not text:
             return False
+        try:
+            from lib.hermes_final_response_gate import gate
+            text = gate(text)
+        except Exception:
+            pass
         digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
         now = time.time()
         if digest == self._last_reply_hash and (now - self._last_reply_ts) < 4.0:
@@ -542,52 +547,30 @@ class NexusTelegramBot:
         # Build operational context snapshot to anchor identity
         ops_context = _build_ops_context_snippet()
 
+        # ── Provider-policy reasoning path ────────────────────────────────────────
         try:
-            base_url = (os.getenv("OPENROUTER_BASE_URL") or "https://openrouter.ai/api/v1").rstrip("/")
-            model = (os.getenv("OPENROUTER_MODEL") or "deepseek/deepseek-chat").strip()
-            key = (os.getenv("OPENROUTER_API_KEY") or "").strip()
-            if not key:
-                raise RuntimeError("OPENROUTER_API_KEY missing")
-            url = f"{base_url}/chat/completions"
-            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
-            system_prompt = (
-                "You are Hermes, the AI Chief of Staff for Nexus — Raymond's private business intelligence and credit platform. "
-                "You have access to Nexus internal state: operational memory, knowledge queue, provider status, pending tasks. "
-                "You are NOT a generic assistant. You ONLY answer in the context of Nexus operations. "
-                "Personality: calm, sharp, strategic. You speak like a chief of staff who has read every internal report and knows exactly what needs attention. "
-                "Rules: "
-                "(1) Short — 2-4 sentences max unless the user asks for detail. No markdown headers in conversational mode. "
-                "(2) Operational first — reference Nexus state, tickets, and knowledge pipeline when relevant. "
-                "(3) AI providers are Nexus-internal only: OpenRouter, Ollama, Claude Code, OpenClaw. Never name external AI products. "
-                "(4) For 'what to focus on today' — give 2-3 specific Nexus priorities: pending knowledge approvals, open tickets, demo readiness. Never give generic life advice. "
-                "(5) Conversational tone — you are a chief of staff, not a report generator. Avoid 'Summary:', 'Here is a list:', header dumps. "
-                "(6) Follow-up questions: use prior conversation context naturally. Continue the thread. "
-                "(7) For Nexus-specific knowledge: the Supabase-first router already checked the knowledge base. If the question reaches you, answer from Nexus operational context only. "
-                "    Never say 'I don't have live data' or 'Run Nexus search'. If you can't answer, say 'I can submit that to the research team' and nothing else. "
-                "(8) Trading topics: speak like a trading-aware chief of staff — reference ICT concepts, session timing, and NitroTrades as sources where relevant. "
-                "(9) Grant/funding topics: reference the knowledge pipeline, Hello Alice, SBA, and upcoming deadlines. Be actionable. "
-                f"{ops_context}"
-            )
-            messages = [{"role": "system", "content": system_prompt}]
-            if is_followup and history:
-                messages.extend(history[-6:])
-            else:
-                messages.extend(history[-3:])
-            messages.append({"role": "user", "content": raw})
-            payload = {
-                "model": model,
-                "messages": messages,
-                "max_tokens": 300,
-                "temperature": 0.5,
-            }
+            from lib.hermes_truth_layer import collect_truth
+            from lib.hermes_reasoning_layer import reason
+            from lib.hermes_provider_policy import get_policy
+
+            truth = collect_truth()
+            evidence_text = truth.summary_text()
+            policy = get_policy()
+            strategic_provider = policy.best_for_strategic()
+
             logger.info(
-                "telegram conversational model=openrouter/%s history_turns=%d followup=%s",
-                model, len(history), is_followup,
+                "telegram conversational provider=%s history_turns=%d followup=%s",
+                strategic_provider, len(history), is_followup,
             )
-            resp = requests.post(url, headers=headers, json=payload, timeout=45)
-            resp.raise_for_status()
-            data = resp.json()
-            reply = str(((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+
+            result = reason(
+                question=raw,
+                evidence_text=evidence_text,
+                ops_context=ops_context,
+                history=history,
+                is_followup=is_followup,
+            )
+            reply = result.reply
 
             # Quality guard — detect and escalate generic/filler responses
             try:
@@ -604,6 +587,10 @@ class NexusTelegramBot:
 
             hermes_conversation_memory.record_turn(chat_id, "user", raw)
             hermes_conversation_memory.record_turn(chat_id, "assistant", reply)
+            logger.info(
+                "telegram route=chat provider=%s model=%s evidence_refs=%d",
+                result.provider_used, result.model_used, result.evidence_refs,
+            )
             return format_telegram_reply(reply)
         except Exception:
             return "Hermes is online — conversational model unavailable right now. Try /status, /models, or ask a specific operational question."

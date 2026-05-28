@@ -81,7 +81,21 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
 
     (["pending handoff", "what needs my approval",
       "waiting on me", "show handoffs", "what do you need",
-      "need my sign", "approval required"],                         "handoff_check",             "high",   False),
+      "need my sign", "approval required",
+      "needs approval", "what is pending my"],                      "handoff_check",             "high",   False),
+
+    (["what evidence do you have", "show verified status",
+      "show me verified", "verified status only",
+      "what is verified", "show evidence",
+      "evidence only", "what artifacts do you have"],               "nexus_status",              "high",   False),
+
+    (["what youtube videos did i send", "what youtube did i send today",
+      "youtube videos today", "which youtube did i send",
+      "what links did i send today", "what videos did i send"],     "source_intake_status",      "medium", False),
+
+    (["what happened to the last link", "last link i sent",
+      "what did you do with the link", "did you process the link",
+      "what happened to the link i sent"],                          "source_intake_status",      "medium", False),
 
     (["hermes decided", "decision log", "what did hermes decide",
       "autonomous decision", "hermes own decision"],                "decision_log",              "medium", False),
@@ -151,6 +165,16 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "backfill the artifact registry"],                           "source_intake_status",       "medium", False),
     (["show artifact registry", "artifact registry", "show all artifacts",
       "what artifacts exist"],                                     "artifact_registry_status",   "low",    False),
+
+    # ── Provider / brain status ──────────────────────────────────────────────
+    (["what brain are you using", "which brain",
+      "are you using chatgpt", "chatgpt auth", "are you using openai",
+      "are you using openrouter", "is openrouter enabled", "openrouter status",
+      "show provider status", "provider status", "which llm", "what llm",
+      "what model are you using", "which model", "brain status",
+      "disable openrouter", "disable open router",
+      "show evidence mode status", "evidence mode status",
+      "what provider", "which provider"],                          "provider_status",             "low",    False),
 ]
 
 

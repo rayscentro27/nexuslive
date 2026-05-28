@@ -923,6 +923,35 @@ def _run_youtube_source_status() -> tuple[str, list[str], str]:
     )
 
 
+def _run_provider_status() -> tuple[str, list[str], str]:
+    """Report live provider availability and policy via hermes_provider_policy."""
+    try:
+        from lib.hermes_provider_policy import get_policy
+        policy = get_policy(refresh=True)
+        summary = policy.summary_dict()
+        evidence = [
+            f"strategic_provider: {summary['best_for_strategic']}",
+            f"summary_provider:   {summary['best_for_summary']}",
+            f"best_available:     {summary['best_available']}",
+            f"openrouter_allowed: {summary['openrouter_allowed']}",
+            f"priority_order:     {', '.join(summary['priority'])}",
+        ]
+        for p in summary["providers"]:
+            icon = "✅" if p["available"] else "❌"
+            note = f" ({p['reason']})" if p["reason"] and not p["available"] else ""
+            evidence.append(f"{icon} {p['provider']}{note}")
+        status = "healthy" if summary["best_for_strategic"] != "evidence_only" else "degraded"
+        rec = (
+            f"Active brain: {summary['best_for_strategic']}. "
+            "OpenRouter is DISABLED unless HERMES_ALLOW_OPENROUTER_FALLBACK=true."
+            if not summary["openrouter_allowed"]
+            else f"Active brain: {summary['best_for_strategic']}. OpenRouter fallback is ENABLED."
+        )
+        return status, evidence, rec
+    except Exception as e:
+        return "unknown", [f"provider_policy error: {e}"], "Check lib/hermes_provider_policy.py"
+
+
 # ── Routing table ──────────────────────────────────────────────────────────────
 
 def _run_ceo_digest() -> tuple[str, list[str], str]:
@@ -963,6 +992,8 @@ _INTENT_HANDLERS = {
     # ── Source intake / artifact registry ────────────────────────────────────
     "source_intake_status":      _run_source_intake_status,
     "artifact_registry_status":  _run_artifact_registry_status,
+    # ── Provider / brain status ───────────────────────────────────────────────
+    "provider_status":           _run_provider_status,
 }
 
 _SCRIPT_ROUTES = {
