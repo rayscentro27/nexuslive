@@ -7,6 +7,8 @@ Safety contract:
 - Adds educational disclaimer to every result.
 - Saves every run to JSON in reports/.
 - Shell tools disabled via env.
+- NEXUS_ALLOW_PAID_LLM=false (default) blocks paid LLM providers (openrouter, openai, deepseek).
+  Set NEXUS_ALLOW_PAID_LLM=true in .env to explicitly allow paid providers.
 
 Usage:
     from integrations.vibe_trading.vibe_trading_adapter import run_vibe_trading_task
@@ -65,6 +67,10 @@ BLOCKED_KEYWORDS = {
     "sell market", "connect broker", "live account",
 }
 
+# Providers that incur API costs — blocked unless NEXUS_ALLOW_PAID_LLM=true
+PAID_PROVIDERS = {"openrouter", "openai", "deepseek", "anthropic", "groq", "mistral"}
+FREE_PROVIDERS  = {"ollama", "openai-codex", "local"}
+
 EDUCATIONAL_DISCLAIMER = (
     "\n\n---\n"
     "EDUCATIONAL DISCLAIMER: This output is for research and education only. "
@@ -103,6 +109,44 @@ def _check_blocked(prompt: str, task_type: str) -> str | None:
     return None
 
 
+def _check_paid_llm_allowed() -> None:
+    """
+    Raise ValueError if a paid LLM provider is configured but
+    NEXUS_ALLOW_PAID_LLM is not explicitly set to 'true'.
+
+    Free providers (ollama, local) are always allowed.
+    Paid providers (openrouter, openai, deepseek, anthropic…) require
+    NEXUS_ALLOW_PAID_LLM=true in integrations/vibe_trading/.env.
+    """
+    allow_paid = os.getenv("NEXUS_ALLOW_PAID_LLM", "false").lower().strip()
+    provider   = os.getenv("LANGCHAIN_PROVIDER", "").lower().strip()
+
+    if not provider:
+        # No provider configured — vibe-trading will fail its own preflight,
+        # but that's a config error, not a cost-control violation.
+        return
+
+    if provider in FREE_PROVIDERS:
+        return
+
+    if provider in PAID_PROVIDERS and allow_paid != "true":
+        raise ValueError(
+            f"NEXUS_ALLOW_PAID_LLM=false but LANGCHAIN_PROVIDER='{provider}' is a paid provider. "
+            f"Paid providers: {sorted(PAID_PROVIDERS)}. "
+            "To allow: set NEXUS_ALLOW_PAID_LLM=true in integrations/vibe_trading/.env. "
+            "To use free: set LANGCHAIN_PROVIDER=ollama with OLLAMA_BASE_URL."
+        )
+
+    # Unknown provider and paid guard is off — warn but allow
+    if provider not in PAID_PROVIDERS and provider not in FREE_PROVIDERS and allow_paid != "true":
+        import warnings
+        warnings.warn(
+            f"Unknown LANGCHAIN_PROVIDER='{provider}'. "
+            "If this is a paid provider, set NEXUS_ALLOW_PAID_LLM=true to suppress this warning.",
+            stacklevel=3,
+        )
+
+
 def _save_report(result: dict) -> Path:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     task = result.get("task_type", "unknown").replace(" ", "_")
@@ -135,6 +179,9 @@ def run_vibe_trading_task(
             f"Prompt contains blocked keyword '{blocked_kw}'. "
             "Live trading and broker connections are disabled."
         )
+
+    # Cost guard: block paid LLM providers unless explicitly allowed
+    _check_paid_llm_allowed()
 
     # Safety: force shell tools off in subprocess env
     safe_env = os.environ.copy()
