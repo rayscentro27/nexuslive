@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
+from typing import Callable
 
 
 ROUTE_CHAT = "chat"
@@ -13,31 +15,56 @@ ROUTE_REPORT_REQUEST = "report_request"
 ROUTE_FUNDING_INSIGHTS = "funding_insights"
 ROUTE_CREDIT_INSIGHTS = "credit_insights"
 ROUTE_KNOWLEDGE_REPORT = "knowledge_report"
+# ── Strategic operating partner routes (Part 12) ────────────────────────────��─
+ROUTE_NEXUS_STATUS    = "nexus_status"       # "catch me up", "where are we"
+ROUTE_STRATEGIC_CHAT  = "strategic_chat"     # open-ended strategic question
+ROUTE_HANDOFF_CHECK   = "handoff_check"      # "what needs my approval", "pending handoffs"
+ROUTE_DECISION_LOG    = "decision_log"       # "what did Hermes decide"
+ROUTE_DEMO_STATUS     = "demo_status"        # "OANDA demo status", "last demo order"
+ROUTE_PREMIUM_BLOCKER = "premium_blocker"    # "free alternative to Beehiiv"
+ROUTE_SAVE_FEEDBACK   = "save_feedback"      # "record lesson", "remember this"
+
+# Patterns that trigger each strategic route (checked before classify_message_route)
+_STRATEGIC_PATTERNS: list[tuple[str, str]] = [
+    (r"catch me up|where are we|are we on track|what did nexus produce|what happened since", ROUTE_NEXUS_STATUS),
+    (r"pending handoff|what.*approv|waiting.*on me|what.*need.*sign", ROUTE_HANDOFF_CHECK),
+    (r"what.*hermes.*decid|decision log|hermes.*own decision", ROUTE_DECISION_LOG),
+    (r"oanda|demo.*order|demo.*broker|last.*trade.*demo", ROUTE_DEMO_STATUS),
+    (r"beehiiv.*alternative|premium.*blocker|free.*alternative.*to\s+\w+|replace.*beehiiv", ROUTE_PREMIUM_BLOCKER),
+    (r"record lesson|remember this|save.*feedback|save.*lesson", ROUTE_SAVE_FEEDBACK),
+]
 
 
 @dataclass
 class TelegramRouter:
-    classify_message_route: callable
-    handle_command_mode: callable
-    build_daily_plan: callable
-    task_selection_reply: callable
-    handle_approval_reply: callable
-    risky_action_requested: callable
-    conversational_reply: callable
-    report_email: callable
-    send_report_email: callable
-    report_confirmation: callable
-    funding_insights_reply: callable
-    credit_insights_reply: callable
-    knowledge_report_email: callable
-    knowledge_report_confirmation: callable
-    help_text: callable
-    email_reports_enabled: callable
-    full_reports_enabled: callable
-    report_response: callable
-    approval_request_response: callable
-    chat_response: callable
-    model_error_response: callable | None = None
+    classify_message_route: Callable
+    handle_command_mode: Callable
+    build_daily_plan: Callable
+    task_selection_reply: Callable
+    handle_approval_reply: Callable
+    risky_action_requested: Callable
+    conversational_reply: Callable
+    report_email: Callable
+    send_report_email: Callable
+    report_confirmation: Callable
+    funding_insights_reply: Callable
+    credit_insights_reply: Callable
+    knowledge_report_email: Callable
+    knowledge_report_confirmation: Callable
+    help_text: Callable
+    email_reports_enabled: Callable
+    full_reports_enabled: Callable
+    report_response: Callable
+    approval_request_response: Callable
+    chat_response: Callable
+    model_error_response: Callable | None = None
+    # ── Strategic operating partner handlers (optional — default to None) ──────
+    nexus_status_reply: Callable | None = None      # "catch me up"
+    handoff_check_reply: Callable | None = None     # "pending handoffs"
+    decision_log_reply: Callable | None = None      # "decision log"
+    demo_status_reply: Callable | None = None       # "OANDA demo status"
+    premium_blocker_reply: Callable | None = None   # "Beehiiv alternative"
+    save_feedback_reply: Callable | None = None     # "record lesson"
 
     def route_incoming_message(self, text: str) -> tuple[str, str]:
         approval = self.handle_approval_reply(text)
@@ -47,6 +74,11 @@ class TelegramRouter:
         risky = self.risky_action_requested(text)
         if risky:
             return ROUTE_APPROVAL, self.approval_request_response(risky)
+
+        # ── Strategic operating partner routes (checked before general classify) ──
+        strategic_route = self._match_strategic(text)
+        if strategic_route:
+            return self._handle_strategic(strategic_route, text)
 
         route = self.classify_message_route(text)
         if route == ROUTE_COMMAND:
@@ -82,4 +114,37 @@ class TelegramRouter:
         except Exception as e:
             if self.model_error_response is not None:
                 return ROUTE_CHAT, self.chat_response(self.model_error_response(e))
+            return ROUTE_CHAT, self.chat_response(self.help_text())
+
+    # ── Strategic route helpers ────────────────────────────────────────────────
+
+    def _match_strategic(self, text: str) -> str | None:
+        lower = text.lower()
+        for pattern, route in _STRATEGIC_PATTERNS:
+            if re.search(pattern, lower):
+                return route
+        return None
+
+    def _handle_strategic(self, route: str, text: str) -> tuple[str, str]:
+        handler_map = {
+            ROUTE_NEXUS_STATUS:    self.nexus_status_reply,
+            ROUTE_HANDOFF_CHECK:   self.handoff_check_reply,
+            ROUTE_DECISION_LOG:    self.decision_log_reply,
+            ROUTE_DEMO_STATUS:     self.demo_status_reply,
+            ROUTE_PREMIUM_BLOCKER: self.premium_blocker_reply,
+            ROUTE_SAVE_FEEDBACK:   self.save_feedback_reply,
+        }
+        handler = handler_map.get(route)
+        if handler is not None:
+            try:
+                reply = handler(text)
+                return route, self.chat_response(reply)
+            except Exception as e:
+                return route, self.chat_response(f"Strategic handler error: {e}")
+        # Fallback: delegate to hermes_collaboration_service
+        try:
+            from lib.hermes_collaboration_service import HermesCollaboration
+            result = HermesCollaboration().handle(text)
+            return route, self.chat_response(result.get("answer", "No response generated."))
+        except Exception as e:
             return ROUTE_CHAT, self.chat_response(self.help_text())
