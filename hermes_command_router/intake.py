@@ -89,7 +89,10 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
     (["demo order", "oanda demo", "demo broker",
       "demo trade", "last trade demo", "practice order"],           "demo_broker_status",        "medium", False),
 
-    (["beehiiv alternative", "premium blocker",
+    (["beehiiv", "beehive", "bee hive", "bee-hive", "behive", "behiiv",
+      "newsletter alternative", "newsletter platform",
+      "email platform alternative", "newsletter tool alternative",
+      "premium blocker",
       "free alternative", "replace beehiiv",
       "cheap alternative", "tool blocker"],                         "premium_blocker_resolver",  "low",    False),
 
@@ -138,10 +141,24 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "user profile", "user readiness", "who are my users"],       "user_intelligence_status",  "medium", False),
     (["platform analytics", "usage stats",
       "how many users", "user count", "active users"],             "platform_analytics",        "medium", False),
+    # ── Source intake status queries ─────────────────────────────────────────
+    (["show source intake", "what links did i send", "what youtube did i send",
+      "what happened to the last link", "show failed source", "continue processing",
+      "reroute this source", "assign this to claude", "assign to youtube",
+      "show pending source", "source intake queue",
+      "what artifacts did nexus create", "what did claude code finish",
+      "what did codex finish", "show unregistered artifacts",
+      "backfill the artifact registry"],                           "source_intake_status",       "medium", False),
+    (["show artifact registry", "artifact registry", "show all artifacts",
+      "what artifacts exist"],                                     "artifact_registry_status",   "low",    False),
 ]
 
 
 def classify_intent(text: str) -> tuple[str, Priority, bool]:
+    import re as _re
+    # Detect any URL → source intake
+    if _re.search(r'https?://[^\s]+', text):
+        return "source_intake", "medium", False
     lowered = text.lower()
     for keywords, intent, priority, requires_approval in _INTENT_MAP:
         if any(kw in lowered for kw in keywords):

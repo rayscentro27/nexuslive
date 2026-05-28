@@ -4,6 +4,18 @@ import re
 from dataclasses import dataclass, field
 from typing import Callable
 
+# Evidence gating — NO ARTIFACT = NO CLAIM
+try:
+    from lib.hermes_evidence_mode import (
+        is_fake_trading_claim as _is_fake_trading,
+        has_theatrical_language as _has_theatrical,
+    )
+    _EVIDENCE_GATING = True
+except ImportError:
+    _EVIDENCE_GATING = False
+    def _is_fake_trading(t: str) -> bool: return False  # type: ignore[misc]
+    def _has_theatrical(t: str) -> bool: return False  # type: ignore[misc]
+
 
 ROUTE_CHAT = "chat"
 ROUTE_COMMAND = "command"
@@ -67,6 +79,14 @@ class TelegramRouter:
     save_feedback_reply: Callable | None = None     # "record lesson"
 
     def route_incoming_message(self, text: str) -> tuple[str, str]:
+        # ── Evidence gate: block all fake trading execution claims globally ───
+        if _EVIDENCE_GATING and _is_fake_trading(text):
+            return ROUTE_DEMO_STATUS, self.chat_response(
+                "I cannot report trade execution claims without a verified broker artifact. "
+                "No order ID found. OANDA demo requires a real execution packet.\n\n"
+                "To check real demo status: ask 'show me oanda demo status'"
+            )
+
         approval = self.handle_approval_reply(text)
         if approval:
             return ROUTE_APPROVAL, self.chat_response(approval)
@@ -126,6 +146,15 @@ class TelegramRouter:
         return None
 
     def _handle_strategic(self, route: str, text: str) -> tuple[str, str]:
+        # ── Evidence gate: block fake trading claims before routing ───────────
+        if _EVIDENCE_GATING and _is_fake_trading(text) and route == ROUTE_DEMO_STATUS:
+            return route, self.chat_response(
+                "I cannot report trade execution claims without a verified broker artifact. "
+                "No order ID found in OANDA demo reports.\n\n"
+                "To check real demo status, run: "
+                "`python scripts/test_oanda_demo_execution_loop.py --dry-run`"
+            )
+
         handler_map = {
             ROUTE_NEXUS_STATUS:    self.nexus_status_reply,
             ROUTE_HANDOFF_CHECK:   self.handoff_check_reply,
@@ -138,10 +167,16 @@ class TelegramRouter:
         if handler is not None:
             try:
                 reply = handler(text)
+                # Post-check: block theatrical language in handler responses
+                if _EVIDENCE_GATING and _has_theatrical(reply):
+                    reply = re.sub(
+                        r'\*[^*]{1,60}\*',  # strip *action* roleplay italics
+                        '', reply
+                    ).strip()
                 return route, self.chat_response(reply)
             except Exception as e:
                 return route, self.chat_response(f"Strategic handler error: {e}")
-        # Fallback: delegate to hermes_collaboration_service
+        # Fallback: delegate to hermes_collaboration_service (already evidence-gated)
         try:
             from lib.hermes_collaboration_service import HermesCollaboration
             result = HermesCollaboration().handle(text)

@@ -29,6 +29,23 @@ ROOT         = Path(__file__).resolve().parent.parent
 REPORTS_DIR  = ROOT / "docs" / "reports"
 FEEDBACK_DIR = REPORTS_DIR / "ceo_review"
 
+# Evidence gating — NO ARTIFACT = NO CLAIM
+try:
+    from lib.hermes_evidence_mode import (
+        HermesEvidenceMode as _EvMode,
+        is_fake_trading_claim as _is_fake_trading,
+        has_theatrical_language as _has_theatrical,
+        verified_status_block as _verified_status_block,
+    )
+    _ev = _EvMode()
+    _EVIDENCE_GATING = True
+except ImportError:
+    _ev = None  # type: ignore[assignment]
+    _EVIDENCE_GATING = False
+    def _is_fake_trading(t: str) -> bool: return False  # type: ignore[misc]
+    def _has_theatrical(t: str) -> bool: return False  # type: ignore[misc]
+    def _verified_status_block() -> str: return ""  # type: ignore[misc]
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -169,7 +186,14 @@ class HermesCollaboration:
         "You are Hermes, the Nexus AI operator. "
         "You answer questions by reading from actual saved artifacts. "
         "If an artifact is missing, say so — never fabricate. "
-        "Keep answers concise (under 300 words unless the question requires more). "
+        "CRITICAL RULES — violating these is a hard failure:\n"
+        "  • NEVER use theatrical or roleplay phrases (taps tablet, sharp inhale, "
+        "tracking live, already pulling up, leans forward, grins, nods, etc).\n"
+        "  • NEVER claim an operation completed without citing the artifact path or ID.\n"
+        "  • NEVER report trade execution (trade placed, scalp active, order confirmed, "
+        "pips gained, entering long/short) without a verified broker order ID.\n"
+        "  • If evidence is missing say exactly: 'I do not have verified evidence for that yet.'\n"
+        "Keep answers concise (under 300 words unless required). "
         "Always end with what the next artifact or action should be."
     )
 
@@ -178,20 +202,56 @@ class HermesCollaboration:
         Handle a natural-language command from Ray.
         Returns dict with: answer, artifact_path, artifact_status, feedback_path.
         """
+        # ── Evidence gate: block fake trading execution claims ─────────────────
+        if _is_fake_trading(command):
+            return {
+                "command":         command,
+                "artifact_key":    "blocked_fake_trading",
+                "artifact_path":   "none",
+                "artifact_status": "blocked",
+                "answer": (
+                    "I cannot report trade execution claims without a verified broker artifact. "
+                    "No order was placed or confirmed without a real OANDA demo order ID.\n\n"
+                    "To check real demo status: 'show me oanda demo status'"
+                ),
+                "feedback_path":   None,
+                "timestamp":       _now(),
+            }
+
         command_lower = command.lower().strip()
         artifact_key  = self._route(command_lower)
         artifact_path = ARTIFACT_RESOLVERS[artifact_key]() if artifact_key in ARTIFACT_RESOLVERS else None
         artifact_text = _read_artifact(artifact_path)
 
         if artifact_text == "artifact_missing":
-            answer = (
-                f"artifact_missing — No artifact found for '{artifact_key}'. "
-                f"To generate one, run the relevant operating cycle:\n"
-                f"`python scripts/run_nexus_monetization_operating_cycle.py --mode validation --cost free "
-                f"--focus {self._suggest_focus(artifact_key)} --require-artifacts true`"
-            )
+            # Use evidence mode's formatted response when available
+            if _EVIDENCE_GATING and _ev is not None:
+                ev_result = _ev.require_evidence_for_claim(
+                    self._artifact_key_to_claim_type(artifact_key), command
+                )
+                answer = _ev.format_missing_evidence_response(ev_result)
+            else:
+                answer = (
+                    f"I do not have verified evidence for that yet.\n\n"
+                    f"**Missing:** {artifact_key.replace('_', ' ')} artifact\n\n"
+                    f"**Next safe action:** Run the relevant operating cycle:\n"
+                    f"`python scripts/run_nexus_monetization_operating_cycle.py --mode validation --cost free "
+                    f"--focus {self._suggest_focus(artifact_key)} --require-artifacts true`"
+                )
         else:
             answer = self._synthesize(command, artifact_text)
+            # For nexus status queries, attach the verified status block
+            if artifact_key in ("ceo_packet",) and _EVIDENCE_GATING:
+                try:
+                    status_block = _verified_status_block()
+                    if status_block:
+                        answer = answer + "\n\n---\n" + status_block
+                except Exception:
+                    pass
+            # Post-synthesis evidence attachment
+            if _EVIDENCE_GATING and _ev is not None:
+                ev_result = _ev.find_evidence(command)
+                answer = _ev.attach_evidence_to_response(answer, ev_result)
 
         feedback_path = None
         if feedback:
@@ -251,6 +311,21 @@ Here is the relevant Nexus artifact:
 Answer Ray's question directly from the artifact. Be specific, cite the artifact. Under 250 words.
 If the artifact doesn't fully answer the question, say what's missing and what artifact would."""
         return _llm(prompt, system=self.SYSTEM, tier="lightweight")
+
+    def _artifact_key_to_claim_type(self, artifact_key: str) -> str:
+        mapping = {
+            "ceo_packet":       "ceo_packet",
+            "handoffs":         "approval_queue",
+            "decision_log":     "decisions_made",
+            "demo_exec":        "oanda_demo",
+            "premium_blockers": "premium_blocker",
+            "notifications":    "notifications",
+            "30_day_plan":      "monetization_packet",
+            "compliance_review": "compliance_review",
+            "github_trends":    "github_trends",
+            "continued_research": "research_completed",
+        }
+        return mapping.get(artifact_key, "research_completed")
 
     def _suggest_focus(self, artifact_key: str) -> str:
         focus_map = {
