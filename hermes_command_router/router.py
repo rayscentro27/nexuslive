@@ -659,6 +659,132 @@ def _run_platform_analytics() -> tuple[str, list[str], str]:
         return "unknown", [f"Analytics query failed: {e}"], "Check Supabase connectivity."
 
 
+# ── Strategic operating partner handlers ──────────────────────────────────────
+
+def _nexus_ai_root() -> str:
+    return os.path.expanduser("~/nexus-ai")
+
+
+def _latest_nexus_file(glob_pattern: str) -> str | None:
+    import glob as _glob
+    files = _glob.glob(os.path.join(_nexus_ai_root(), glob_pattern))
+    return max(files, key=os.path.getmtime) if files else None
+
+
+def _read_nexus_artifact(glob_pattern: str, max_chars: int = 600) -> str:
+    path = _latest_nexus_file(glob_pattern)
+    if not path or not os.path.exists(path):
+        return "artifact_missing"
+    try:
+        text = open(path).read()
+        return text[:max_chars] + ("…[truncated]" if len(text) > max_chars else "")
+    except Exception as e:
+        return f"artifact_read_error: {e}"
+
+
+def _run_nexus_status() -> tuple[str, list[str], str]:
+    text = _read_nexus_artifact("docs/reports/ceo_review/NEXUS_MONETIZATION_CEO_PACKET_*.md")
+    if "artifact_missing" in text:
+        return "unknown", ["No CEO packet found in nexus-ai"], (
+            "Run: python scripts/run_nexus_monetization_operating_cycle.py "
+            "--mode validation --cost free --require-artifacts true"
+        )
+    lines = [l.strip() for l in text.splitlines() if l.strip() and not l.startswith("#")][:8]
+    return "healthy", lines, "See full packet at nexus-ai/docs/reports/ceo_review/"
+
+
+def _run_handoff_check() -> tuple[str, list[str], str]:
+    import json, glob as _glob
+    pattern = os.path.join(_nexus_ai_root(), "docs/reports/hermes_handoffs/handoff_*.json")
+    files = sorted(_glob.glob(pattern), key=os.path.getmtime)
+    pending = []
+    for f in files:
+        try:
+            data = json.loads(open(f).read())
+            if data.get("status") == "pending_ray":
+                pending.append(f"• {data.get('title','?')} — {data.get('action_required','')[:70]}")
+        except Exception:
+            pass
+    if not pending:
+        return "healthy", ["No pending handoffs."], "Nothing waiting for your approval."
+    return "warning", pending[:5], f"{len(pending)} handoff(s) need your approval. Check nexus-ai/docs/reports/hermes_handoffs/"
+
+
+def _run_decision_log() -> tuple[str, list[str], str]:
+    import json
+    log_path = os.path.join(_nexus_ai_root(), "docs/reports/hermes_decisions/hermes_decision_log.jsonl")
+    if not os.path.exists(log_path):
+        return "unknown", ["No decision log found."], "Decision log is created when Hermes classifies actions."
+    lines = open(log_path).read().strip().splitlines()
+    recent = []
+    for line in lines[-5:]:
+        try:
+            r = json.loads(line)
+            recent.append(f"[{r.get('logged_at','')[:16]}] {r.get('action','?')} → {r.get('decision','?')}")
+        except Exception:
+            pass
+    return "healthy", recent or ["No recent decisions."], "Full log at nexus-ai/docs/reports/hermes_decisions/"
+
+
+def _run_demo_broker_status() -> tuple[str, list[str], str]:
+    import json, glob as _glob
+    from datetime import date
+    reports_dir = os.path.join(_nexus_ai_root(), "integrations/oanda_demo/reports")
+    enabled = os.getenv("OANDA_DEMO_ENABLED", "false")
+    env = os.getenv("OANDA_ENVIRONMENT", "practice")
+    packet = _latest_nexus_file("integrations/oanda_demo/reports/demo_execution_packet_*.json")
+    evidence = [f"Environment: {env} | DEMO_ENABLED: {enabled}"]
+    if packet and os.path.exists(packet):
+        try:
+            data = json.loads(open(packet).read())
+            ev = data.get("evaluation", {})
+            evidence.append(f"Last evaluation: pass={ev.get('pass')} | {ev.get('reason','')[:60]}")
+            order = data.get("order_result") or {}
+            if order:
+                evidence.append(f"Last order: {'✅ filled' if order.get('ok') else '❌ ' + order.get('error','failed')}")
+        except Exception:
+            pass
+    else:
+        evidence.append("No demo execution packet found — run with --include-demo-broker-test")
+    return "healthy", evidence, "OANDA practice adapter is practice-only. Set OANDA_DEMO_ENABLED=true (Ray approval) to place orders."
+
+
+def _run_premium_blocker_resolver() -> tuple[str, list[str], str]:
+    text = _read_nexus_artifact("docs/reports/premium_blockers/blocker_resolution_beehiiv_*.md")
+    if "artifact_missing" in text:
+        return "unknown", ["No premium blocker resolution found."], (
+            "Run: python scripts/run_nexus_monetization_operating_cycle.py "
+            "--mode validation --resolve-premium-blockers"
+        )
+    lines = [l.strip() for l in text.splitlines() if l.strip()][:8]
+    return "healthy", lines, "See full resolution at nexus-ai/docs/reports/premium_blockers/"
+
+
+def _run_save_ray_feedback() -> tuple[str, list[str], str]:
+    return "healthy", [
+        "To save feedback, send: 'record lesson: [your lesson]'",
+        "Or: 'remember this: [text]'",
+        "Saved to: nexus-ai/docs/reports/ray_feedback/",
+    ], "Feedback is saved and used to improve Hermes behavior in future cycles."
+
+
+def _run_notification_log() -> tuple[str, list[str], str]:
+    import json
+    log_path = os.path.join(_nexus_ai_root(), "docs/reports/hermes_proactive_notifications.jsonl")
+    if not os.path.exists(log_path):
+        return "unknown", ["No notifications logged yet."], "Notifications are sent via --notify-ray flag on operating cycle."
+    lines = open(log_path).read().strip().splitlines()
+    recent = []
+    for line in lines[-5:]:
+        try:
+            r = json.loads(line)
+            status = "✅" if r.get("sent") else "⛔ suppressed"
+            recent.append(f"[{r.get('sent_at','')[:16]}] {r.get('event_type','?')} {status}")
+        except Exception:
+            pass
+    return "healthy", recent or ["No recent notifications."], "Full log at nexus-ai/docs/reports/hermes_proactive_notifications.jsonl"
+
+
 # ── Routing table ──────────────────────────────────────────────────────────────
 
 def _run_ceo_digest() -> tuple[str, list[str], str]:
@@ -686,6 +812,14 @@ _INTENT_HANDLERS = {
     "platform_analytics":        _run_platform_analytics,
     "ceo_digest":                _run_ceo_digest,
     "user_intelligence_status":  _run_platform_analytics,
+    # ── Strategic operating partner ─────────────────────────────────────────
+    "nexus_status":              _run_nexus_status,
+    "handoff_check":             _run_handoff_check,
+    "decision_log":              _run_decision_log,
+    "demo_broker_status":        _run_demo_broker_status,
+    "premium_blocker_resolver":  _run_premium_blocker_resolver,
+    "save_ray_feedback":         _run_save_ray_feedback,
+    "notification_log":          _run_notification_log,
 }
 
 _SCRIPT_ROUTES = {
@@ -817,7 +951,12 @@ def run_command(raw_text: str, source: str = "cli", sender: str = "raymond") -> 
             "  • Trading        — 'trading status'\n"
             "  • Pilot ready?   — 'are we ready for pilot'\n"
             "  • Next move      — 'next best move'\n"
-            "  • Comm check     — 'can you hear me'"
+            "  • Comm check     — 'can you hear me'\n"
+            "  • Nexus status   — 'catch me up'\n"
+            "  • Handoffs       — 'show pending handoffs'\n"
+            "  • Decision log   — 'what did Hermes decide'\n"
+            "  • Demo broker    — 'oanda demo status'\n"
+            "  • Tool blocker   — 'beehiiv alternative'"
         ),
         action_needed="reply with one of the options above",
         command=raw_text,

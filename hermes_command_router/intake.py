@@ -74,6 +74,32 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "what is the next step", "what do you recommend", "recommend",
       "best move", "next move", "what now"],               "next_best_move",            "high",   False),
 
+    # ── Strategic operating partner (must be BEFORE generic keyword catches) ────
+    (["catch me up", "where are we", "are we on track",
+      "what did nexus produce", "what happened since",
+      "nexus status", "what's the nexus status"],                   "nexus_status",              "high",   False),
+
+    (["pending handoff", "what needs my approval",
+      "waiting on me", "show handoffs", "what do you need",
+      "need my sign", "approval required"],                         "handoff_check",             "high",   False),
+
+    (["hermes decided", "decision log", "what did hermes decide",
+      "autonomous decision", "hermes own decision"],                "decision_log",              "medium", False),
+
+    (["demo order", "oanda demo", "demo broker",
+      "demo trade", "last trade demo", "practice order"],           "demo_broker_status",        "medium", False),
+
+    (["beehiiv alternative", "premium blocker",
+      "free alternative", "replace beehiiv",
+      "cheap alternative", "tool blocker"],                         "premium_blocker_resolver",  "low",    False),
+
+    (["record lesson", "remember this", "save feedback",
+      "save lesson", "note this", "log lesson"],                    "save_ray_feedback",         "low",    False),
+
+    (["notification log", "telegram notification",
+      "what did hermes send", "hermes notification",
+      "notification sent", "proactive notification"],               "notification_log",          "low",    False),
+
     (["can you hear me", "test communication", "hello hermes",
       "are you there", "is this working", "comm check", "comms check",
       "communication test", "ping"],                       "communication_health",      "medium", False),
@@ -112,6 +138,7 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "user profile", "user readiness", "who are my users"],       "user_intelligence_status",  "medium", False),
     (["platform analytics", "usage stats",
       "how many users", "user count", "active users"],             "platform_analytics",        "medium", False),
+
 ]
 
 
