@@ -45,7 +45,7 @@ def test_load_returns_provider_policy():
 def test_statuses_include_all_known_providers():
     p = load_provider_policy()
     provider_names = {s.provider for s in p.statuses}
-    required = {"chatgpt_auth", "codex_auth", "openclaw_chatgpt_auth", "local_ollama", "openrouter"}
+    required = {"openai_api", "codex_auth", "openclaw_chatgpt_auth", "local_ollama", "openrouter"}
     missing = required - provider_names
     if not missing:
         ok("statuses_include_all_known_providers")
@@ -78,7 +78,7 @@ def test_openrouter_enabled_when_flag_set():
 def test_best_for_strategic_returns_valid_type():
     p = load_provider_policy()
     s = p.best_for_strategic()
-    valid = {"chatgpt_auth", "codex_auth", "openclaw_chatgpt_auth", "local_ollama", "openrouter", "evidence_only"}
+    valid = {"openai_api", "codex_auth", "openclaw_chatgpt_auth", "local_ollama", "openrouter", "evidence_only"}
     if s in valid:
         ok(f"best_for_strategic_returns_valid_type — got={s}")
     else:
@@ -88,7 +88,7 @@ def test_best_for_strategic_returns_valid_type():
 def test_best_for_summary_returns_valid_type():
     p = load_provider_policy()
     s = p.best_for_summary()
-    valid = {"chatgpt_auth", "codex_auth", "openclaw_chatgpt_auth", "local_ollama", "openrouter", "evidence_only"}
+    valid = {"openai_api", "codex_auth", "openclaw_chatgpt_auth", "local_ollama", "openrouter", "evidence_only"}
     if s in valid:
         ok(f"best_for_summary_returns_valid_type — got={s}")
     else:
@@ -126,15 +126,15 @@ def test_priority_override_via_env():
             fail("priority_override_via_env", f"priority[0]={p.priority[0]}")
 
 
-def test_chatgpt_auth_available_when_key_set():
+def test_openai_api_available_when_key_set():
     with patch.dict("os.environ", {"OPENAI_API_KEY": "sk-test-key-1234567890abcdef"}, clear=False):
         p = load_provider_policy()
-        chatgpt = next((s for s in p.statuses if s.provider == "chatgpt_auth"), None)
+        chatgpt = next((s for s in p.statuses if s.provider == "openai_api"), None)
         if chatgpt and chatgpt.available:
-            ok("chatgpt_auth_available_when_key_set")
+            ok("openai_api_available_when_key_set")
         else:
             reason = chatgpt.reason if chatgpt else "status not found"
-            fail("chatgpt_auth_available_when_key_set", reason)
+            fail("openai_api_available_when_key_set", reason)
 
 
 def test_get_policy_singleton():
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     test_summary_dict_has_required_keys()
     test_telegram_report_is_string()
     test_priority_override_via_env()
-    test_chatgpt_auth_available_when_key_set()
+    test_openai_api_available_when_key_set()
     test_get_policy_singleton()
 
     total = PASS + FAIL

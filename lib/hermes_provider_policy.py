@@ -4,7 +4,9 @@ hermes_provider_policy.py
 Provider selection for Hermes strategic reasoning and conversation.
 
 Priority (highest to lowest):
-  1. chatgpt_auth    — ChatGPT/OpenAI via API key or auth token
+  1. openai_api      — OpenAI REST API via OPENAI_API_KEY (standard paid API, not auth-login)
+                       NOTE: this is an API-backed bridge, NOT a browser session or auth-login route.
+                       A true auth-login route would use CHATGPT_ACCESS_TOKEN or browser cookies.
   2. codex_auth      — OpenAI Codex / Codex CLI auth
   3. openclaw_chatgpt_auth — OpenClaw ChatGPT auth wrapper
   4. local_ollama    — local Ollama (qwen3/llama) — safe for low-risk summarization
@@ -16,9 +18,9 @@ Environment variables:
   HERMES_REQUIRE_APPROVAL_FOR_PAID_LLM — "true" to require Ray approval for paid providers
   HERMES_STRATEGIC_PROVIDER          — force a specific provider for strategic conversation
   HERMES_ROUTING_PROVIDER            — provider for routing/classification (default: rules)
-  HERMES_SUMMARY_PROVIDER            — provider for summarization (default: chatgpt_auth)
-  OPENAI_API_KEY                     — enables chatgpt_auth
-  CHATGPT_ACCESS_TOKEN               — enables chatgpt_auth via token path
+  HERMES_SUMMARY_PROVIDER            — provider for summarization (default: openai_api)
+  OPENAI_API_KEY                     — enables openai_api (standard REST API key, paid)
+  CHATGPT_ACCESS_TOKEN               — enables openai_api via access token path
   OPENCLAW_CHATGPT_AUTH              — "true" enables openclaw_chatgpt_auth
   OLLAMA_HOST                        — Ollama host (default: http://localhost:11434)
   OPENROUTER_API_KEY                 — enables openrouter ONLY if fallback allowed
@@ -41,7 +43,7 @@ from pathlib import Path
 from typing import Literal
 
 ProviderType = Literal[
-    "chatgpt_auth",
+    "openai_api",
     "codex_auth",
     "openclaw_chatgpt_auth",
     "local_ollama",
@@ -51,7 +53,7 @@ ProviderType = Literal[
 ]
 
 DEFAULT_PRIORITY: list[ProviderType] = [
-    "chatgpt_auth",
+    "openai_api",
     "codex_auth",
     "openclaw_chatgpt_auth",
     "local_ollama",
@@ -60,13 +62,13 @@ DEFAULT_PRIORITY: list[ProviderType] = [
 
 # Provider use cases
 STRATEGIC_PROVIDERS: tuple[ProviderType, ...] = (
-    "chatgpt_auth", "codex_auth", "openclaw_chatgpt_auth",
+    "openai_api", "codex_auth", "openclaw_chatgpt_auth",
 )
 SUMMARY_PROVIDERS: tuple[ProviderType, ...] = (
-    "chatgpt_auth", "codex_auth", "openclaw_chatgpt_auth", "local_ollama",
+    "openai_api", "codex_auth", "openclaw_chatgpt_auth", "local_ollama",
 )
 ROUTING_PROVIDERS: tuple[ProviderType, ...] = (
-    "local_ollama", "chatgpt_auth",
+    "local_ollama", "openai_api",
 )
 
 
@@ -168,24 +170,24 @@ class ProviderPolicy:
 
 # ── Detection functions ────────────────────────────────────────────────────────
 
-def _detect_chatgpt_auth() -> ProviderStatus:
-    """Detect ChatGPT/OpenAI auth availability."""
+def _detect_openai_api() -> ProviderStatus:
+    """Detect OpenAI REST API availability (standard API key, not auth-login)."""
     openai_key = os.getenv("OPENAI_API_KEY", "").strip()
     chatgpt_token = os.getenv("CHATGPT_ACCESS_TOKEN", "").strip()
 
     if openai_key and len(openai_key) > 20:
         return ProviderStatus(
-            "chatgpt_auth", True,
-            reason="OPENAI_API_KEY configured",
+            "openai_api", True,
+            reason="OPENAI_API_KEY configured (REST API bridge — not auth-login)",
             model_hint=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
             is_paid=True,
             requires_approval=_approval_required(),
         )
     if chatgpt_token and len(chatgpt_token) > 20:
         return ProviderStatus(
-            "chatgpt_auth", True,
-            reason="CHATGPT_ACCESS_TOKEN configured",
-            model_hint="chatgpt-4o",
+            "openai_api", True,
+            reason="CHATGPT_ACCESS_TOKEN configured (access token path)",
+            model_hint="gpt-4o",
             is_paid=True,
             requires_approval=_approval_required(),
         )
@@ -193,13 +195,13 @@ def _detect_chatgpt_auth() -> ProviderStatus:
     token_file = Path.home() / ".openai" / "token"
     if token_file.exists() and token_file.stat().st_size > 10:
         return ProviderStatus(
-            "chatgpt_auth", True,
-            reason=f"token file: {token_file}",
+            "openai_api", True,
+            reason=f"~/.openai/token file present (REST API bridge)",
             model_hint="gpt-4o",
             is_paid=True,
             requires_approval=_approval_required(),
         )
-    return ProviderStatus("chatgpt_auth", False, reason="OPENAI_API_KEY not set")
+    return ProviderStatus("openai_api", False, reason="OPENAI_API_KEY not set")
 
 
 def _detect_codex_auth() -> ProviderStatus:
@@ -246,7 +248,7 @@ def _detect_openclaw_chatgpt_auth() -> ProviderStatus:
     if openclaw_cfg.exists():
         try:
             cfg = json.loads(openclaw_cfg.read_text())
-            if cfg.get("chatgpt_auth") or cfg.get("provider") == "chatgpt":
+            if cfg.get("openai_api") or cfg.get("provider") == "chatgpt":
                 return ProviderStatus(
                     "openclaw_chatgpt_auth", True,
                     reason=f"openclaw config at {openclaw_cfg}",
@@ -318,7 +320,7 @@ def _parse_priority() -> list[ProviderType]:
         return list(DEFAULT_PRIORITY)
     parts = [p.strip().lower() for p in raw.split(",") if p.strip()]
     valid: list[ProviderType] = []
-    allowed = {"chatgpt_auth", "codex_auth", "openclaw_chatgpt_auth",
+    allowed = {"openai_api", "codex_auth", "openclaw_chatgpt_auth",
                "local_ollama", "openrouter"}
     for p in parts:
         if p in allowed:
@@ -335,10 +337,10 @@ def load_provider_policy() -> ProviderPolicy:
     req_approval = _approval_required()
     strategic   = os.getenv("HERMES_STRATEGIC_PROVIDER", "").strip().lower() or None
     routing     = os.getenv("HERMES_ROUTING_PROVIDER", "local_or_rules").strip()
-    summary     = os.getenv("HERMES_SUMMARY_PROVIDER", "chatgpt_auth").strip()
+    summary     = os.getenv("HERMES_SUMMARY_PROVIDER", "openai_api").strip()
 
     statuses = [
-        _detect_chatgpt_auth(),
+        _detect_openai_api(),
         _detect_codex_auth(),
         _detect_openclaw_chatgpt_auth(),
         _detect_local_ollama(),
@@ -397,3 +399,34 @@ def get_policy(refresh: bool = False) -> ProviderPolicy:
     if _policy is None or refresh:
         _policy = load_provider_policy()
     return _policy
+
+
+def get_provider_status(redact: bool = True) -> str:
+    """
+    Return a human-readable provider status string.
+    With redact=True (default), no secrets or key values are printed.
+    """
+    policy = get_policy(refresh=True)
+    lines = [
+        "Hermes Provider Status",
+        "======================",
+        f"NOTE: openai_api = standard OpenAI REST API (API-backed bridge, NOT auth-login)",
+        "",
+        f"Strategic provider : {policy.best_for_strategic()}",
+        f"Summary provider   : {policy.best_for_summary()}",
+        f"Best available     : {policy.best_available()}",
+        f"Priority order     : {', '.join(policy.priority)}",
+        f"OpenRouter allowed : {policy.openrouter_allowed}",
+        "",
+        "Provider availability:",
+    ]
+    for s in policy.statuses:
+        icon = "available  " if s.available else "unavailable"
+        lines.append(f"  [{icon}] {s.provider}")
+        if s.reason:
+            lines.append(f"              reason: {s.reason}")
+        if s.model_hint and s.available:
+            lines.append(f"              model:  {s.model_hint}")
+        if s.is_paid and s.available:
+            lines.append(f"              paid:   yes — requires approval: {s.requires_approval}")
+    return "\n".join(lines)

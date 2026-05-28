@@ -65,7 +65,7 @@ def test_evidence_only_fallback_when_no_llm():
                 pp._policy = None
                 result = reason("what is the status?", evidence_text="[verified_file] test artifact")
                 pp._policy = None
-    if result.provider_used in {"evidence_only", "local_ollama", "chatgpt_auth"}:
+    if result.provider_used in {"evidence_only", "local_ollama", "openai_api"}:
         ok(f"evidence_only_fallback_when_no_llm — got={result.provider_used}")
     else:
         ok(f"evidence_only_fallback_when_no_llm — provider={result.provider_used} (may have a real provider)")

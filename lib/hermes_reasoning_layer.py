@@ -176,8 +176,8 @@ def reason(
 
     evidence_count = len([ln for ln in evidence_text.splitlines() if ln.strip().startswith("[verified")])
 
-    # ── chatgpt_auth ──────────────────────────────────────────────────────────
-    if provider == "chatgpt_auth":
+    # ── openai_api (REST API bridge — OPENAI_API_KEY required) ──────────────
+    if provider == "openai_api":
         openai_key = os.getenv("OPENAI_API_KEY", "").strip()
         model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         if not openai_key:
@@ -190,7 +190,7 @@ def reason(
                 reply = _call_openai(messages, model, openai_key)
                 return ReasoningResult(
                     reply=reply,
-                    provider_used="chatgpt_auth",
+                    provider_used="openai_api",
                     model_used=model,
                     evidence_refs=evidence_count,
                     provider_disclosed=True,
