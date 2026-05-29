@@ -1,0 +1,186 @@
+# config/opportunity_intake_sources.yaml
+# Daily Opportunity Intake — source and keyword configuration
+# Managed by: Hermes / daily_opportunity_intake_engine.py
+# Ray can add channels and keywords here at any time.
+# Do NOT add paid API keys here.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# YOUTUBE CHANNELS
+# Channels watched by com.nexus.youtube-channel-poller or registered manually.
+# daily_opportunity_intake_engine will read outputs from existing registry.
+# ─────────────────────────────────────────────────────────────────────────────
+youtube_channels:
+  - channel_id: existing_registry        # read from config/nexus_sources.yaml
+    note: "Import from existing nexus_sources.yaml source registry"
+  - channel_id: UCsBjURj34Te81laFIjQFzRQ  # Starter Story / business ideas
+    name: "Starter Story"
+    niche: [business_ideas, online_income, case_studies]
+    tier: A
+  - channel_id: UCMGn-T2X4-5QX9uz3PoAJDw  # Graham Stephan / personal finance
+    name: "Graham Stephan"
+    niche: [personal_finance, investing, credit]
+    tier: B
+  - channel_id: UC295-Dw4tzbAFfjklBo2AEQ  # Andrei Jikh / investing
+    name: "Andrei Jikh"
+    niche: [investing, credit_cards, passive_income]
+    tier: B
+  - channel_id: UCtinbF-Q-fVthA0qrFQTgXQ  # Business Credit Workshop / business credit
+    name: "Business Credit Workshop"
+    niche: [business_credit, funding, net30]
+    tier: A
+  - channel_id: placeholder_add_more
+    note: "Ray: add more YouTube channel IDs here"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# YOUTUBE KEYWORDS
+# Used for keyword-based source registration in validation/daily mode.
+# ─────────────────────────────────────────────────────────────────────────────
+youtube_keywords:
+  credit_funding:
+    - "credit repair strategy 2026"
+    - "business funding how to get approved"
+    - "business credit net 30 vendors"
+    - "grant funding for small business 2026"
+    - "business credit cards for startups"
+    - "startup funding sources 2026"
+    - "OANDA forex strategy 2026"
+    - "backtesting forex strategy python"
+  content_monetization:
+    - "faceless YouTube monetization 2026"
+    - "AI content engine make money"
+    - "affiliate marketing automation 2026"
+    - "newsletter monetization strategy"
+    - "AI automation business ideas"
+    - "make money with AI tools 2026"
+  ai_tools:
+    - "AI content pipeline open source"
+    - "local LLM automation"
+    - "AI agent automation business"
+    - "browser automation AI 2026"
+  trading_education:
+    - "paper trading strategy tutorial"
+    - "backtesting trading strategy beginner"
+    - "forex trading education 2026"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GOOGLE / WEB KEYWORD SEARCHES
+# Requires a free search API (SerpAPI, Brave Search, DuckDuckGo, etc.).
+# If no API is available, daily engine creates structured fallback tasks.
+# ─────────────────────────────────────────────────────────────────────────────
+google_keywords:
+  affiliate:
+    - "best business funding affiliate programs 2026"
+    - "credit repair affiliate programs high commission"
+    - "newsletter monetization affiliate programs"
+  strategy:
+    - "credit repair affiliate programs"
+    - "business credit building strategies"
+    - "small business grant deadlines 2026"
+    - "high intent SMB funding keywords"
+    - "funding readiness checklist 2026"
+    - "business loan readiness checklist"
+  content:
+    - "faceless content niches 2026"
+    - "AI tools for lead generation"
+    - "business credit net 30 vendors list"
+  monetization:
+    - "how to monetize AI agents"
+    - "local business automation services 2026"
+    - "newsletter monetization strategy"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SOCIAL / TREND SOURCES
+# Note: Direct scraping is NOT available without approved paid APIs.
+# Daily engine creates structured manual research tasks (fallback artifacts).
+# ─────────────────────────────────────────────────────────────────────────────
+social_keywords:
+  - "business funding"
+  - "credit repair"
+  - "side hustle"
+  - "AI automation"
+  - "faceless content"
+  - "grant money"
+  - "business credit"
+  - "make money online"
+  - "trading strategy"
+  - "funding denied"
+  - "LLC funding"
+  - "build business credit"
+
+social_platforms:
+  - platform: tiktok
+    method: manual_fallback
+    note: "No API available — creates structured manual research task"
+  - platform: instagram_reels
+    method: manual_fallback
+    note: "No API available — creates structured manual research task"
+  - platform: youtube_shorts
+    method: existing_poller
+    note: "Use com.nexus.youtube-channel-poller outputs"
+  - platform: reddit
+    method: manual_fallback
+    note: "No API available — creates structured manual research task"
+  - platform: linkedin
+    method: manual_fallback
+    note: "No API available — creates structured manual research task"
+  - platform: twitter_x
+    method: manual_fallback
+    note: "No API available — creates structured manual research task"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GITHUB KEYWORDS
+# Reuses scripts/run_weekly_github_trend_research.py
+# ─────────────────────────────────────────────────────────────────────────────
+github_keywords:
+  - "ai agent"
+  - "browser automation"
+  - "local llm"
+  - "content automation"
+  - "supabase"
+  - "backtesting"
+  - "newsletter"
+  - "scraping"
+  - "agent orchestration"
+  - "mcp server"
+  - "autonomous agents"
+  - "content engine"
+  - "lead generation"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MONETIZATION CATEGORIES
+# Used to classify opportunities during scoring.
+# ─────────────────────────────────────────────────────────────────────────────
+monetization_categories:
+  - affiliate
+  - lead_magnet
+  - paid_template
+  - newsletter_premium
+  - landing_page
+  - audit_offer
+  - education_product
+  - content_funnel
+  - sponsorship
+  - demo_trading_education
+  - client_readiness_report
+  - consulting_upsell
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SCORING WEIGHTS
+# Adjust how opportunity scores are weighted.
+# ─────────────────────────────────────────────────────────────────────────────
+scoring_weights:
+  revenue_potential: 0.25
+  speed_to_revenue: 0.20
+  goal_alignment: 0.20
+  automation_potential: 0.15
+  cost_to_execute: 0.10
+  risk_score: 0.10
+
+# ─────────────────────────────────────────────────────────────────────────────
+# THRESHOLDS
+# ─────────────────────────────────────────────────────────────────────────────
+thresholds:
+  reject_below_monetization_score: 25
+  watch_below_monetization_score: 50
+  high_value_above_monetization_score: 70
+  notify_ray_above_monetization_score: 75

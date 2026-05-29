@@ -207,12 +207,59 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         pass  # Never block the pipeline if analyzer fails
 
     # ── Phase 2: Operational keyword routing ─────────────────────────────────
-    rules = _parse_json_env("HERMES_INTERNAL_FIRST_KEYWORDS", _default_rules())
+    # Priority pre-check: new daily-intake topics use longer phrases that would
+    # otherwise be shadowed by older single-word topics like "monetization" or "scouts".
+    _PRIORITY_TOPICS: dict[str, list[str]] = {
+        "monetization_actions": [
+            "show top monetization actions", "top monetization actions",
+            "what can make money this week", "best money moves",
+            "top opportunities", "best opportunities",
+            "what opportunities did you find", "show top actions",
+        ],
+        "rejected_opportunities": [
+            "show rejected opportunities", "what did you reject",
+            "why did you reject", "show rejected sources",
+            "what was rejected and why", "what was rejected", "show rejected",
+        ],
+        "scouts_working": [
+            "what scouts are working", "scouts working",
+            "scout status", "who is assigned",
+            "show scout assignments", "scout dispatch status",
+        ],
+        "daily_intake": [
+            "run daily opportunity intake", "run daily intake",
+            "what did you find today", "what did nexus find",
+            "what sources did you find", "what sources are pending",
+            "show pending sources",
+        ],
+        "daily_review": [
+            "show daily research review", "show daily review",
+            "daily research review", "what should i review first",
+            "show research review",
+        ],
+        "needs_approval": [
+            "what needs my approval", "show approval needed",
+            "what requires approval", "pending approvals",
+            "what needs ray approval",
+        ],
+        "build_content_from_opportunity": [
+            "build content from the best opportunity",
+            "build content from opportunity",
+            "create content from top opportunity",
+        ],
+    }
     topic = ""
-    for key, phrases in rules.items():
+    for priority_topic, phrases in _PRIORITY_TOPICS.items():
         if any(p in text for p in phrases):
-            topic = key
+            topic = priority_topic
             break
+
+    if not topic:
+        rules = _parse_json_env("HERMES_INTERNAL_FIRST_KEYWORDS", _default_rules())
+        for key, phrases in rules.items():
+            if any(p in text for p in phrases):
+                topic = key
+                break
     if not topic:
         return None
 
@@ -1444,5 +1491,260 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
             source="communication_rules",
             matched_topic=topic,
         )
+
+    # ── Daily Opportunity Intake commands ─────────────────────────────────────
+
+    if topic == "daily_intake":
+        try:
+            from lib.daily_opportunity_intake_engine import load_latest_intake
+            from lib.hermes_monetization_decision_engine import load_latest_decisions
+            records = load_latest_intake(limit=20)
+            decisions = load_latest_decisions(limit=10)
+            if records:
+                fallbacks = sum(1 for r in records if r.get("fallback"))
+                real_sources = len(records) - fallbacks
+                by_type: dict[str, int] = {}
+                for r in records:
+                    by_type[r.get("source_type", "other")] = by_type.get(r.get("source_type", "other"), 0) + 1
+                breakdown = "  ".join(f"{k}: {v}" for k, v in sorted(by_type.items()))
+                lines = [
+                    f"Latest intake: {len(records)} sources registered ({real_sources} real, {fallbacks} fallback tasks).",
+                    f"By type — {breakdown}",
+                ]
+                if decisions:
+                    actionable = [d for d in decisions if d.get("status") not in ("reject", "watch")]
+                    lines.append(f"Scored {len(decisions)} sources — {len(actionable)} actionable.")
+                    if actionable:
+                        best = actionable[0]
+                        lines.append(f"Best opportunity: {best.get('title','')[:70]} (score {best.get('monetization_score',0)})")
+                lines.append("\nRun 'show top monetization actions' or 'show daily review' for details.")
+                lines.append("To collect new sources: Hermes, run daily opportunity intake.")
+            else:
+                lines = [
+                    "No intake records found yet.",
+                    "Run: python3 scripts/run_daily_opportunity_intake.py --mode validation",
+                    "Or say: 'Hermes, run daily opportunity intake.'",
+                ]
+            return InternalFirstReply(
+                text="\n".join(lines),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="daily_opportunity_intake_engine",
+                matched_topic=topic,
+            )
+        except Exception:
+            return InternalFirstReply(
+                text=(
+                    "Daily intake engine is ready but no data collected yet.\n"
+                    "Run: python3 scripts/run_daily_opportunity_intake.py --mode validation\n"
+                    "Or say: 'Hermes, run daily opportunity intake.'"
+                ),
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="daily_opportunity_intake_engine",
+                matched_topic=topic,
+            )
+
+    if topic == "monetization_actions":
+        try:
+            from lib.hermes_monetization_decision_engine import load_latest_decisions
+            decisions = load_latest_decisions(limit=20)
+            if decisions:
+                actionable = [d for d in decisions if d.get("status") not in ("reject", "watch")]
+                lines = [f"Top monetization opportunities ({len(actionable)} actionable):"]
+                for i, d in enumerate(actionable[:5], 1):
+                    title = d.get("title", "")[:60]
+                    score = d.get("monetization_score", 0)
+                    status = d.get("status", "")
+                    rec = d.get("recommended_action", "")[:60]
+                    approval = " ⏳ needs approval" if d.get("requires_ray_approval") else ""
+                    lines.append(f"\n{i}. {title}{approval}")
+                    lines.append(f"   Score: {score} | {status}")
+                    if rec:
+                        lines.append(f"   Next: {rec}")
+                lines.append("\nSay 'show rejected' to see what was filtered out.")
+                lines.append("Say 'build content from best opportunity' to create a draft.")
+            else:
+                lines = [
+                    "No monetization decisions found yet.",
+                    "Run daily intake first: Hermes, run daily opportunity intake.",
+                ]
+            return InternalFirstReply(
+                text="\n".join(lines),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_monetization_decision_engine",
+                matched_topic=topic,
+            )
+        except Exception:
+            return InternalFirstReply(
+                text="Monetization decision engine ready — no data yet. Run daily intake first.",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_monetization_decision_engine",
+                matched_topic=topic,
+            )
+
+    if topic == "rejected_opportunities":
+        try:
+            from lib.hermes_monetization_decision_engine import DECISION_DIR
+            import json as _json
+            files = sorted(DECISION_DIR.glob("rejected_opportunities_*.json"), reverse=True)
+            if files:
+                rejected = _json.loads(files[0].read_text())
+                if rejected:
+                    lines = [f"Rejected in last cycle ({len(rejected)} sources):"]
+                    for r in rejected[:8]:
+                        reason = r.get("why_rejected", "Low score")[:60]
+                        score = r.get("monetization_score", 0)
+                        title = r.get("title", "")[:55]
+                        lines.append(f"  ❌ {title} (score {score}) — {reason}")
+                else:
+                    lines = ["No sources were rejected in the last cycle."]
+            else:
+                lines = ["No rejection data yet. Run daily intake to score sources."]
+            return InternalFirstReply(
+                text="\n".join(lines),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_monetization_decision_engine",
+                matched_topic=topic,
+            )
+        except Exception:
+            return InternalFirstReply(
+                text="No rejection data yet. Run: python3 scripts/run_daily_opportunity_intake.py --mode validation",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_monetization_decision_engine",
+                matched_topic=topic,
+            )
+
+    if topic == "scouts_working":
+        try:
+            from lib.hermes_action_queue import get_open_actions
+            from lib.hermes_tool_scout_registry import get_scouts
+            open_actions = get_open_actions()
+            assigned = [a for a in open_actions if a.assigned_scout]
+            scouts_active = list({a.assigned_scout for a in assigned if a.assigned_scout})
+            scouts_info = get_scouts()[:5]
+            lines = [f"Scouts dispatched: {len(scouts_active)} active assignments."]
+            if scouts_active:
+                lines.append("Working:")
+                for s in scouts_active[:5]:
+                    lines.append(f"  🔄 {s}")
+            if scouts_info:
+                lines.append(f"\nAvailable scouts: {len(scouts_info)} registered.")
+            lines.append("\nSay 'what scouts are available' for full registry.")
+            return InternalFirstReply(
+                text="\n".join(lines),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_action_queue + hermes_tool_scout_registry",
+                matched_topic=topic,
+            )
+        except Exception:
+            return InternalFirstReply(
+                text="Scout status unavailable. Check action queue and scout registry.",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_tool_scout_registry",
+                matched_topic=topic,
+            )
+
+    if topic == "daily_review":
+        try:
+            from lib.hermes_daily_monetization_digest import digest_plain_english, load_latest_digest_path
+            review_path = load_latest_digest_path()
+            summary = digest_plain_english(limit_ops=5)
+            text = summary
+            if review_path:
+                text += f"\n\nFull review: {review_path}"
+            else:
+                text += "\n\nNo full review yet. Run daily intake to generate one."
+            return InternalFirstReply(
+                text=text,
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_daily_monetization_digest",
+                matched_topic=topic,
+            )
+        except Exception:
+            return InternalFirstReply(
+                text=(
+                    "No daily review yet.\n"
+                    "Run: python3 scripts/run_daily_opportunity_intake.py --mode validation\n"
+                    "Or say: Hermes, run daily opportunity intake."
+                ),
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_daily_monetization_digest",
+                matched_topic=topic,
+            )
+
+    if topic == "build_content_from_opportunity":
+        try:
+            from lib.hermes_monetization_decision_engine import load_latest_decisions
+            decisions = load_latest_decisions(limit=10)
+            content_candidates = [
+                d for d in decisions
+                if d.get("status") in ("content_candidate", "client_education_candidate", "product_candidate")
+            ]
+            if content_candidates:
+                best = content_candidates[0]
+                title = best.get("title", "")[:70]
+                rec = best.get("recommended_action", "")
+                goal = best.get("goal_supported", "")
+                lines = [
+                    f"Best content candidate: {title}",
+                    f"Why: {best.get('why_selected','')[:80]}",
+                    f"Goal: {goal}",
+                    f"Next: {rec}",
+                    "",
+                    "To create the content brief: run_content_pipeline.py with this topic.",
+                    "⏳ Content publishing requires Ray approval before going public.",
+                ]
+            else:
+                lines = [
+                    "No content candidates scored yet.",
+                    "Run daily intake first, then I can identify the best content opportunity.",
+                    "Say: Hermes, run daily opportunity intake.",
+                ]
+            return InternalFirstReply(
+                text="\n".join(lines),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_monetization_decision_engine",
+                matched_topic=topic,
+            )
+        except Exception:
+            return InternalFirstReply(
+                text="No content opportunities scored yet. Run daily intake first.",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_monetization_decision_engine",
+                matched_topic=topic,
+            )
+
+    if topic == "needs_approval":
+        try:
+            from lib.hermes_action_queue import get_pending_approval_actions
+            from lib.hermes_monetization_decision_engine import load_latest_decisions
+            pending = get_pending_approval_actions()
+            decisions = load_latest_decisions(limit=20)
+            approval_ops = [d for d in decisions if d.get("requires_ray_approval")]
+            lines = []
+            if pending:
+                lines.append(f"Action queue — {len(pending)} items waiting for approval:")
+                for a in pending[:5]:
+                    lines.append(f"  ⏳ {a.title[:60]} — {a.approval_reason[:50]}")
+            if approval_ops:
+                if lines:
+                    lines.append("")
+                lines.append(f"Scored opportunities — {len(approval_ops)} need approval:")
+                for op in approval_ops[:5]:
+                    lines.append(f"  ⏳ {op.get('title','')[:60]} — {op.get('approval_reason','')[:50]}")
+            if not lines:
+                lines = ["Nothing requires your approval right now. All current actions are autonomous."]
+            return InternalFirstReply(
+                text="\n".join(lines),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_action_queue + hermes_monetization_decision_engine",
+                matched_topic=topic,
+            )
+        except Exception:
+            return InternalFirstReply(
+                text="Approval queue unavailable. Check action queue for pending items.",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_action_queue",
+                matched_topic=topic,
+            )
 
     return None
