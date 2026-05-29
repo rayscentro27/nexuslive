@@ -220,7 +220,7 @@ def reason(
         gw_model = os.getenv("HERMES_GATEWAY_MODEL", "hermes-agent")
         if gw_key:
             try:
-                reply = _call_hermes_gateway(messages, gw_url, gw_key, gw_model)
+                reply = _call_hermes_gateway(messages, gw_url, gw_key, gw_model, timeout=20)
                 return ReasoningResult(
                     reply=reply,
                     provider_used="hermes_gateway",

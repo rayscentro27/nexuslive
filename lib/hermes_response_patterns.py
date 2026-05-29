@@ -28,7 +28,7 @@ _DEFAULT_PATTERNS: list[dict[str, Any]] = [
         "trigger_examples": ["good morning", "morning hermes", "morning", "hey hermes", "hi hermes", "hello hermes", "gm"],
         "intent": "morning_greeting",
         "desired_tone": "operational_warm_brief",
-        "response_template": "Morning, Ray. Nexus is running — watching roadmap, providers, and task queue. {operational_context}",
+        "response_template": "Morning, Ray. I'm online. {operational_context}",
         "next_action_rule": "check_operational_context_then_next_best_action",
         "priority": 10,
     },
