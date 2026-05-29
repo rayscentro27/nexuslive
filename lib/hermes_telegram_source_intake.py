@@ -101,13 +101,26 @@ class IntakeRecord:
         st = self.source_type.replace("_", " ").title()
         scout = self.assigned_scout or "triage_scout"
         url_line = f"\nURL: {self.url}" if self.url else ""
+        intent = self._data.get("attached_intent", "").strip()
+        intent_line = f"\nRay's question: \"{intent}\"" if intent else ""
+        artifact_id = self._data.get("artifact_registry_id", "")
+        artifact_line = f"\nArtifact: {artifact_id}" if artifact_id else ""
+        intake_path = f"docs/reports/intake/telegram_source_intake.jsonl"
+        pending = self._data.get("next_action", "run_nexus_operating_cycle")
         return (
-            f"NEXUS SOURCE RECEIVED\n\n"
-            f"Type: {st}{url_line}\n"
-            f"Registered: intake_id={self.intake_id[:16]}\n"
-            f"Assigned to: {scout}\n"
-            f"Status: {self.status}\n\n"
-            f"I'll notify you when the first artifact is ready."
+            f"NEXUS SOURCE RECEIVED\n"
+            f"\nType: {st}{url_line}{intent_line}"
+            f"\nStatus: {self.status}"
+            f"\nAssigned scout: {scout}"
+            f"\nIntake ID: {self.intake_id[:20]}"
+            f"{artifact_line}"
+            f"\n\nArtifacts pending:"
+            f"\n  - transcript / content extraction"
+            f"\n  - quality review"
+            f"\n  - recommendation packet"
+            f"\nNext action: {pending}"
+            f"\nEvidence: {intake_path}"
+            f"\n\nI will process this source or create a handoff if direct processing is unavailable."
         )
 
 
@@ -117,15 +130,27 @@ class HermesTelegramSourceIntake:
     Classifies, registers, dispatches, and replies.
     """
 
-    def process(self, raw_message: str, submitted_by: str = "raymond") -> IntakeRecord:
+    def process(
+        self,
+        raw_message: str,
+        submitted_by: str = "raymond",
+        attached_intent: str = "",
+    ) -> "IntakeRecord":
         """
         Main entry point. Process any incoming Telegram message.
         Returns an IntakeRecord (always — never raises).
+
+        attached_intent: the user's question when a URL arrived in a larger message.
         """
         url         = self._extract_url(raw_message)
         source_type = self._classify(raw_message, url)
         priority    = self._priority(source_type)
         scout       = self._assign_scout(source_type, raw_message)
+
+        # Strip the URL from the message to isolate the question
+        intent = attached_intent or raw_message
+        import re as _re
+        intent_text = _re.sub(r'https?://\S+', '', intent).strip(" ,.-")
 
         record = {
             "intake_id":              "src_" + uuid.uuid4().hex[:16],
@@ -145,6 +170,7 @@ class HermesTelegramSourceIntake:
             "workflow_output_id":     "",
             "next_action":            self._next_action(source_type),
             "requires_ray_approval":  self._requires_approval(source_type),
+            "attached_intent":        intent_text[:200],
             "error":                  "",
         }
 

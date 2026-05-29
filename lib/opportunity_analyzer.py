@@ -41,10 +41,33 @@ OPPORTUNITY_TRIGGER_RE = re.compile(
     '|'.join(OPPORTUNITY_TRIGGERS), re.IGNORECASE
 )
 
+# YouTube and GitHub URLs always go to source intake, never the opportunity scorer.
+_YT_URL_RE = re.compile(
+    r'https?://(?:www\.)?(?:youtube\.com/(?:watch\?v=|@|channel/|c/)|youtu\.be/)',
+    re.IGNORECASE,
+)
+_GH_URL_RE = re.compile(r'https?://github\.com/', re.IGNORECASE)
+
+# System/operational questions — skip the analyzer even when a URL is present.
+_SYSTEM_CONTEXT_RE = re.compile(
+    r'\b(hermes|gateway|auth|login|update|upgrade|restart|failed|error|token|'
+    r'provider|model|connection|timeout|status|config|reconnect|fix|broken|'
+    r'openrouter|groq|codex|ollama|fallback|install|version|release)\b',
+    re.IGNORECASE,
+)
+
 
 def is_opportunity_input(text: str) -> bool:
     """Return True if the input looks like an opportunity analysis request."""
-    return bool(OPPORTUNITY_TRIGGER_RE.search(text))
+    if not OPPORTUNITY_TRIGGER_RE.search(text):
+        return False
+    # YouTube and GitHub URLs always go to source intake, never the scorer
+    if _YT_URL_RE.search(text) or _GH_URL_RE.search(text):
+        return False
+    # System/operational questions bypass the scorer even if they contain a URL
+    if _SYSTEM_CONTEXT_RE.search(text):
+        return False
+    return True
 
 
 # ─── Opportunity Scoring ──────────────────────────────────────────────────────

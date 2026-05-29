@@ -80,6 +80,19 @@ def _build_system_prompt(evidence_text: str, ops_context: str = "") -> str:
 
 # ── Provider-specific callers ─────────────────────────────────────────────────
 
+def _call_hermes_gateway(
+    messages: list[dict],
+    url: str,
+    key: str,
+    model: str = "hermes-agent",
+    timeout: int = 60,
+) -> str:
+    base = url.rstrip("/")
+    if not base.endswith("/v1"):
+        base = f"{base}/v1"
+    return _call_openai(messages, model, key, base_url=base, timeout=timeout)
+
+
 def _call_openai(
     messages: list[dict],
     model: str,
@@ -142,6 +155,30 @@ def _call_openrouter(
     return _call_openai(messages, model, api_key, base_url=base_url, timeout=timeout)
 
 
+# ── Gateway failure artifact ──────────────────────────────────────────────────
+
+def _write_gateway_failure_artifact(gw_url: str, error: str) -> None:
+    try:
+        from pathlib import Path
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        out = Path(__file__).resolve().parent.parent / "docs" / "reports" / "evidence"
+        out.mkdir(parents=True, exist_ok=True)
+        path = out / f"hermes_gateway_failure_{ts}.md"
+        path.write_text(
+            f"# Hermes Gateway Failure\n"
+            f"timestamp: {datetime.now(timezone.utc).isoformat()}\n"
+            f"gateway_url: [REDACTED — see HERMES_GATEWAY_URL env]\n"
+            f"error: {error}\n"
+            f"retry_count: 1\n"
+            f"fallback_used: next_provider\n"
+            f"source_intake_preserved: see telegram_source_intake.jsonl\n"
+            f"next_action: check gateway health at {gw_url.split(':')[0]}://{gw_url.split('://')[1].split('/')[0]}/health\n"
+        )
+    except Exception:
+        pass
+
+
 # ── Reasoning entry point ─────────────────────────────────────────────────────
 
 def reason(
@@ -175,6 +212,25 @@ def reason(
     messages.append({"role": "user", "content": question})
 
     evidence_count = len([ln for ln in evidence_text.splitlines() if ln.strip().startswith("[verified")])
+
+    # ── hermes_gateway — route through local Hermes at :8642 ─────────────────
+    if provider == "hermes_gateway":
+        gw_url = os.getenv("HERMES_GATEWAY_URL", "http://127.0.0.1:8642").rstrip("/")
+        gw_key = os.getenv("HERMES_GATEWAY_KEY", os.getenv("HERMES_GATEWAY_TOKEN", "")).strip()
+        gw_model = os.getenv("HERMES_GATEWAY_MODEL", "hermes-agent")
+        if gw_key:
+            try:
+                reply = _call_hermes_gateway(messages, gw_url, gw_key, gw_model)
+                return ReasoningResult(
+                    reply=reply,
+                    provider_used="hermes_gateway",
+                    model_used=gw_model,
+                    evidence_refs=evidence_count,
+                    provider_disclosed=True,
+                )
+            except Exception as _gw_err:
+                _write_gateway_failure_artifact(gw_url, str(_gw_err))
+                # fall through to next provider
 
     # ── openai_api (REST API bridge — OPENAI_API_KEY required) ──────────────
     if provider == "openai_api":

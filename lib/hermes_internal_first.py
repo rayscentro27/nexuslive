@@ -138,17 +138,38 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
     except Exception:
         pass  # Never block on pattern matching failure
 
-    # ── Phase 1.5: Opportunity Intelligence ──────────────────────────────────
-    # Intercept URLs, business ideas, SaaS tools, affiliate programs, niche ideas
-    # before keyword routing so they receive full scored analysis, not a stub reply.
+    # ── Phase 1.5: Source Intake → Opportunity Intelligence ──────────────────
+    # Priority order:
+    #   1. YouTube URL  → hermes_telegram_source_intake (always)
+    #   2. GitHub URL   → hermes_telegram_source_intake
+    #   3. Other URL + business context → opportunity_analyzer (only if not system question)
+    #   4. Pure business text → opportunity_analyzer
     try:
-        from lib.opportunity_analyzer import is_opportunity_input, score_opportunity, generate_opportunity_report
+        import re as _re
+        _YT_RE = _re.compile(
+            r'https?://(?:www\.)?(?:youtube\.com/(?:watch\?v=|@|channel/|c/)|youtu\.be/)',
+            _re.I,
+        )
+        _GH_RE = _re.compile(r'https?://github\.com/', _re.I)
+
+        if _YT_RE.search(raw) or _GH_RE.search(raw):
+            # Always route known source URLs to intake — never to opportunity scorer
+            from lib.hermes_telegram_source_intake import HermesTelegramSourceIntake
+            intake = HermesTelegramSourceIntake()
+            record = intake.process(raw, attached_intent=raw)
+            return InternalFirstReply(
+                text=record.telegram_reply(),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="telegram_source_intake",
+                matched_topic="source_intake",
+            )
+    except Exception:
+        pass  # Never block the pipeline if intake fails
+
+    try:
+        from lib.opportunity_analyzer import is_opportunity_input, generate_opportunity_report
         if is_opportunity_input(raw):
-            scored = score_opportunity(raw)
-            score = scored.get("score", 0)
-            category = scored.get("category", "Unknown")
             full_report = generate_opportunity_report(raw)
-            # Truncate to ~3800 chars to stay within Telegram/response limits
             reply_text = full_report[:3800] + ("\n…[truncated]" if len(full_report) > 3800 else "")
             return InternalFirstReply(
                 text=reply_text,

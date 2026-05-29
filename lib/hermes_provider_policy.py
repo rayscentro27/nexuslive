@@ -43,6 +43,7 @@ from pathlib import Path
 from typing import Literal
 
 ProviderType = Literal[
+    "hermes_gateway",  # Hermes API at localhost:8642 — highest priority
     "openai_api",
     "codex_auth",
     "openclaw_chatgpt_auth",
@@ -53,6 +54,7 @@ ProviderType = Literal[
 ]
 
 DEFAULT_PRIORITY: list[ProviderType] = [
+    "hermes_gateway",  # route through running Hermes gateway first
     "openai_api",
     "codex_auth",
     "openclaw_chatgpt_auth",
@@ -62,7 +64,7 @@ DEFAULT_PRIORITY: list[ProviderType] = [
 
 # Provider use cases
 STRATEGIC_PROVIDERS: tuple[ProviderType, ...] = (
-    "openai_api", "codex_auth", "openclaw_chatgpt_auth",
+    "hermes_gateway", "openai_api", "codex_auth", "openclaw_chatgpt_auth",
 )
 SUMMARY_PROVIDERS: tuple[ProviderType, ...] = (
     "openai_api", "codex_auth", "openclaw_chatgpt_auth", "local_ollama",
@@ -169,6 +171,28 @@ class ProviderPolicy:
 
 
 # ── Detection functions ────────────────────────────────────────────────────────
+
+def _detect_hermes_gateway() -> ProviderStatus:
+    """Detect the local Hermes gateway API at HERMES_GATEWAY_URL."""
+    url = os.getenv("HERMES_GATEWAY_URL", "http://127.0.0.1:8642").rstrip("/")
+    key = os.getenv("HERMES_GATEWAY_KEY", os.getenv("HERMES_GATEWAY_TOKEN", "")).strip()
+    if not key:
+        return ProviderStatus("hermes_gateway", False, reason="HERMES_GATEWAY_KEY not set")
+    try:
+        host, port_str = url.replace("http://", "").replace("https://", "").split(":")
+        port = int(port_str.split("/")[0])
+        s = socket.create_connection((host, port), timeout=1)
+        s.close()
+        model = os.getenv("HERMES_GATEWAY_MODEL", "hermes-agent")
+        return ProviderStatus(
+            "hermes_gateway", True,
+            reason=f"Hermes gateway reachable at {url}",
+            model_hint=model,
+            is_paid=False,
+        )
+    except Exception as e:
+        return ProviderStatus("hermes_gateway", False, reason=f"Hermes gateway unreachable: {e}")
+
 
 def _detect_openai_api() -> ProviderStatus:
     """Detect OpenAI REST API availability (standard API key, not auth-login)."""
@@ -340,6 +364,7 @@ def load_provider_policy() -> ProviderPolicy:
     summary     = os.getenv("HERMES_SUMMARY_PROVIDER", "openai_api").strip()
 
     statuses = [
+        _detect_hermes_gateway(),
         _detect_openai_api(),
         _detect_codex_auth(),
         _detect_openclaw_chatgpt_auth(),
