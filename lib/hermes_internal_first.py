@@ -1010,39 +1010,25 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
             )
 
     if topic == "information_sources":
-        from pathlib import Path as _Path
-        root = _Path(__file__).resolve().parent.parent
-        source_paths = [
-            ("docs/reports/evidence/", "Gateway failure artifacts and evidence files"),
-            ("docs/reports/handoffs/", "Claude Code session handoffs"),
-            ("docs/reports/intake/", "Telegram source intake registry (JSONL)"),
-            ("docs/reports/monetization/", "Revenue plans and monetization documents"),
-            ("docs/reports/core/", "Core Nexus project briefs"),
-            ("artifacts/", "Scout outputs, intelligence artifacts"),
-            ("reports/knowledge_intake/", "NotebookLM intake queue"),
-        ]
-        found = []
-        for rel, desc in source_paths:
-            p = root / rel
-            if p.exists():
-                count = len(list(p.iterdir()))
-                found.append(f"  • {rel} ({count} items) — {desc}")
-            else:
-                found.append(f"  • {rel} (not yet created) — {desc}")
-        lines = [
-            "**Hermes Information Sources**",
-            "Hermes reads evidence-only. No LLM invention when sources are available.",
-            "",
-            "Artifact directories scanned at runtime:",
-        ] + found + [
-            "",
-            "To add new data: send a YouTube URL, GitHub link, or knowledge email.",
-            "Hermes never invents data — if a source is missing, it says so.",
-        ]
+        try:
+            from lib.hermes_daily_cycle_state import format_information_sources_common_language
+            text = format_information_sources_common_language()
+        except Exception:
+            text = (
+                "Hermes reads from verified sources only — no invented data.\n\n"
+                "Where information comes from:\n"
+                "  • YouTube channels and keyword searches\n"
+                "  • GitHub trending tools (weekly research outputs)\n"
+                "  • Keyword-based web research (when free API is available)\n"
+                "  • Monetization category scoring (7-dimension engine)\n"
+                "  • Nexus operating memory (Supabase-backed system events)\n"
+                "  • Knowledge emails forwarded via Telegram\n\n"
+                "To see raw artifact paths, say: 'show technical details'."
+            )
         return InternalFirstReply(
-            text="\n".join(lines),
+            text=text,
             confidence=CONF_INTERNAL_CONFIRMED,
-            source="filesystem_scan",
+            source="hermes_daily_cycle_state",
             matched_topic=topic,
         )
 
@@ -1495,40 +1481,28 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
     # ── Daily Opportunity Intake commands ─────────────────────────────────────
 
     if topic == "daily_intake":
-        try:
-            from lib.daily_opportunity_intake_engine import load_latest_intake
-            from lib.hermes_monetization_decision_engine import load_latest_decisions
-            records = load_latest_intake(limit=20)
-            decisions = load_latest_decisions(limit=10)
-            if records:
-                fallbacks = sum(1 for r in records if r.get("fallback"))
-                real_sources = len(records) - fallbacks
-                by_type: dict[str, int] = {}
-                for r in records:
-                    by_type[r.get("source_type", "other")] = by_type.get(r.get("source_type", "other"), 0) + 1
-                breakdown = "  ".join(f"{k}: {v}" for k, v in sorted(by_type.items()))
-                lines = [
-                    f"Latest intake: {len(records)} sources registered ({real_sources} real, {fallbacks} fallback tasks).",
-                    f"By type — {breakdown}",
-                ]
-                if decisions:
-                    actionable = [d for d in decisions if d.get("status") not in ("reject", "watch")]
-                    lines.append(f"Scored {len(decisions)} sources — {len(actionable)} actionable.")
-                    if actionable:
-                        best = actionable[0]
-                        lines.append(f"Best opportunity: {best.get('title','')[:70]} (score {best.get('monetization_score',0)})")
-                lines.append("\nRun 'show top monetization actions' or 'show daily review' for details.")
-                lines.append("To collect new sources: Hermes, run daily opportunity intake.")
-            else:
-                lines = [
-                    "No intake records found yet.",
-                    "Run: python3 scripts/run_daily_opportunity_intake.py --mode validation",
-                    "Or say: 'Hermes, run daily opportunity intake.'",
-                ]
+        # "run daily intake" → immediate acknowledgement (intake runs as separate CLI, not inline)
+        if "run" in text and ("intake" in text or "daily opportunity" in text):
             return InternalFirstReply(
-                text="\n".join(lines),
+                text=(
+                    "Daily opportunity intake queued.\n\n"
+                    "Collecting sources from YouTube, keywords, GitHub, and monetization categories.\n"
+                    "This takes 1-2 minutes. I'll include a digest with results.\n\n"
+                    "To run now:\n"
+                    "  python3 scripts/run_daily_opportunity_intake.py --mode validation\n\n"
+                    "When done, say 'what did you find today' to see the results."
+                ),
                 confidence=CONF_INTERNAL_CONFIRMED,
                 source="daily_opportunity_intake_engine",
+                matched_topic=topic,
+            )
+        try:
+            from lib.hermes_daily_cycle_state import format_daily_cycle_status_common_language
+            summary = format_daily_cycle_status_common_language()
+            return InternalFirstReply(
+                text=summary,
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_daily_cycle_state",
                 matched_topic=topic,
             )
         except Exception:
@@ -1583,33 +1557,28 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
 
     if topic == "rejected_opportunities":
         try:
-            from lib.hermes_monetization_decision_engine import DECISION_DIR
-            import json as _json
-            files = sorted(DECISION_DIR.glob("rejected_opportunities_*.json"), reverse=True)
-            if files:
-                rejected = _json.loads(files[0].read_text())
-                if rejected:
-                    lines = [f"Rejected in last cycle ({len(rejected)} sources):"]
-                    for r in rejected[:8]:
-                        reason = r.get("why_rejected", "Low score")[:60]
-                        score = r.get("monetization_score", 0)
-                        title = r.get("title", "")[:55]
-                        lines.append(f"  ❌ {title} (score {score}) — {reason}")
-                else:
-                    lines = ["No sources were rejected in the last cycle."]
+            from lib.hermes_daily_cycle_state import load_rejected_sources
+            rejected = load_rejected_sources(limit=8)
+            if rejected:
+                lines = [f"Rejected in last cycle ({len(rejected)} sources):"]
+                for r in rejected[:8]:
+                    reason = (r.get("why_rejected") or r.get("why_collected") or "Low score")[:60]
+                    score = r.get("monetization_score", 0)
+                    title = (r.get("title") or r.get("keyword") or "")[:55]
+                    lines.append(f"  ❌ {title} (score {score}) — {reason}")
             else:
-                lines = ["No rejection data yet. Run daily intake to score sources."]
+                lines = ["No sources were rejected in the last cycle."]
             return InternalFirstReply(
                 text="\n".join(lines),
                 confidence=CONF_INTERNAL_CONFIRMED,
-                source="hermes_monetization_decision_engine",
+                source="hermes_daily_cycle_state",
                 matched_topic=topic,
             )
         except Exception:
             return InternalFirstReply(
                 text="No rejection data yet. Run: python3 scripts/run_daily_opportunity_intake.py --mode validation",
                 confidence=CONF_INTERNAL_PARTIAL,
-                source="hermes_monetization_decision_engine",
+                source="hermes_daily_cycle_state",
                 matched_topic=topic,
             )
 
@@ -1645,18 +1614,41 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
 
     if topic == "daily_review":
         try:
-            from lib.hermes_daily_monetization_digest import digest_plain_english, load_latest_digest_path
-            review_path = load_latest_digest_path()
-            summary = digest_plain_english(limit_ops=5)
-            text = summary
-            if review_path:
-                text += f"\n\nFull review: {review_path}"
+            from lib.hermes_daily_cycle_state import find_latest_daily_cycle, load_daily_cycle_summary
+            cycle = find_latest_daily_cycle()
+            summary = load_daily_cycle_summary()
+            if summary["has_data"]:
+                ts = summary.get("cycle_ts") or "recent"
+                lines = [
+                    f"Daily research review — {ts}",
+                    f"Sources: {summary['total_sources']} collected, "
+                    f"{summary['actionable']} actionable, {summary['rejected']} filtered out.",
+                ]
+                if summary["high_value"]:
+                    lines.append(f"High-value signals: {summary['high_value']}.")
+                top = summary.get("top_opportunity")
+                if top:
+                    title = (top.get("title") or "")[:65]
+                    score = top.get("monetization_score", 0)
+                    rec = (top.get("recommended_action") or "")[:70]
+                    lines.append(f"\nTop pick: {title} (score {score})")
+                    if rec:
+                        lines.append(f"Next: {rec}")
+                if summary["pending_approval"]:
+                    lines.append(f"\n⏳ {summary['pending_approval']} item(s) need your approval.")
+                if cycle["review"]:
+                    lines.append(f"\nFull review: {cycle['review']}")
+                text = "\n".join(lines)
             else:
-                text += "\n\nNo full review yet. Run daily intake to generate one."
+                text = (
+                    "No daily review yet.\n"
+                    "Run: python3 scripts/run_daily_opportunity_intake.py --mode validation\n"
+                    "Or say: Hermes, run daily opportunity intake."
+                )
             return InternalFirstReply(
                 text=text,
                 confidence=CONF_INTERNAL_CONFIRMED,
-                source="hermes_daily_monetization_digest",
+                source="hermes_daily_cycle_state",
                 matched_topic=topic,
             )
         except Exception:
@@ -1667,7 +1659,7 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
                     "Or say: Hermes, run daily opportunity intake."
                 ),
                 confidence=CONF_INTERNAL_PARTIAL,
-                source="hermes_daily_monetization_digest",
+                source="hermes_daily_cycle_state",
                 matched_topic=topic,
             )
 

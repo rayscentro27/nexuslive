@@ -197,6 +197,8 @@ def default_runtime_config() -> dict[str, Any]:
                 "how do you know that", "where did you get that", "what is your source",
                 "how do you get your data", "what files do you read", "what do you read",
                 "where do you read from", "hermes data sources",
+                "what did you get your information from", "where did you get your information",
+                "what information did you use", "where did that come from",
             ],
             "nexus_project": [
                 "what is nexus", "what is the nexus project", "nexus overview",

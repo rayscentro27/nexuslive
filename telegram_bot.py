@@ -253,7 +253,7 @@ class NexusTelegramBot:
         self.max_response_chars = int(os.getenv("TELEGRAM_MAX_RESPONSE_CHARS", "1800"))
         self.max_inbound_chars = int(os.getenv("TELEGRAM_MAX_INBOUND_CHARS", "280"))
         self.command_timeout_seconds = float(os.getenv("TELEGRAM_COMMAND_TIMEOUT_SECONDS", "30"))
-        self.cooldown_seconds = float(os.getenv("TELEGRAM_COMMAND_COOLDOWN_SECONDS", "3"))
+        self.cooldown_seconds = float(os.getenv("TELEGRAM_COMMAND_COOLDOWN_SECONDS", "1"))
         self.circuit_breaker_window_seconds = float(os.getenv("TELEGRAM_CIRCUIT_BREAKER_WINDOW_SECONDS", "60"))
         self.circuit_breaker_error_threshold = int(os.getenv("TELEGRAM_CIRCUIT_BREAKER_ERROR_THRESHOLD", "5"))
         self.circuit_breaker_open_seconds = float(os.getenv("TELEGRAM_CIRCUIT_BREAKER_OPEN_SECONDS", "60"))
@@ -519,7 +519,17 @@ class NexusTelegramBot:
             "hi", "hello", "hey", "good morning", "good afternoon", "good evening", "yo",
         }:
             hermes_conversation_memory.clear_session(chat_id)
-            return "Good morning, Ray. I'm online and ready."
+            from datetime import datetime as _dt
+            _hour = _dt.now().hour
+            if 5 <= _hour < 12:
+                _greeting = "Good morning"
+            elif 12 <= _hour < 17:
+                _greeting = "Good afternoon"
+            elif 17 <= _hour < 21:
+                _greeting = "Good evening"
+            else:
+                _greeting = "Hey Ray"
+            return f"{_greeting}, Ray. I'm online and ready."
 
         # Internal-first routing — bypass LLM for known Nexus ops topics
         internal = try_internal_first(raw)
