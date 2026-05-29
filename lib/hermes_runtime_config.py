@@ -236,6 +236,15 @@ def default_runtime_config() -> dict[str, Any]:
                 "what strategy should we run",
                 "recommend a strategy",
             ],
+            "provider_mode": [
+                "show provider mode", "what brain are you using", "what brain",
+                "use reliable mode", "use gateway mode", "test hermes gateway",
+                "disable gateway", "enable gateway", "use local mode",
+                "what provider", "provider mode", "which model are you using",
+                "what model are you using", "what llm", "which llm",
+                "hermes gateway status", "test gateway", "switch to reliable",
+                "switch to gateway", "current provider", "current brain",
+            ],
         },
         "hermes_project_aliases": {
             "opencode": ["dev-agent bridge", "mac mini operational sessions", "ai ops dashboard"],

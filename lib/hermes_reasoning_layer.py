@@ -213,8 +213,9 @@ def reason(
 
     evidence_count = len([ln for ln in evidence_text.splitlines() if ln.strip().startswith("[verified")])
 
-    # ── hermes_gateway — route through local Hermes at :8642 ─────────────────
-    if provider == "hermes_gateway":
+    # ── hermes_gateway — only if HERMES_ALLOW_HERMES_GATEWAY=true ───────────────
+    gw_enabled = os.getenv("HERMES_ALLOW_HERMES_GATEWAY", "false").strip().lower() == "true"
+    if provider == "hermes_gateway" and gw_enabled:
         gw_url = os.getenv("HERMES_GATEWAY_URL", "http://127.0.0.1:8642").rstrip("/")
         gw_key = os.getenv("HERMES_GATEWAY_KEY", os.getenv("HERMES_GATEWAY_TOKEN", "")).strip()
         gw_model = os.getenv("HERMES_GATEWAY_MODEL", "hermes-agent")
@@ -302,13 +303,28 @@ def reason(
         except Exception:
             pass
 
-    # ── local_ollama ──────────────────────────────────────────────────────────
+    # ── local_ollama — use compact context pack to stay within token budget ──
     if provider == "local_ollama":
         host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
         model = os.getenv("HERMES_OLLAMA_MODEL",
                           os.getenv("HERMES_REASONING_MODEL", "qwen3:8b"))
         try:
-            reply = _call_ollama(messages, model, host)
+            # Build compact context pack to stay within local model token budget
+            try:
+                from lib.hermes_context_pack_builder import build_context_pack, TOKEN_BUDGET
+                pack = build_context_pack(question, max_tokens=TOKEN_BUDGET["local_ollama"])
+                compact_evidence = pack.as_prompt_text()
+                compact_system = _build_system_prompt(compact_evidence, ops_context)
+                compact_messages: list[dict] = [{"role": "system", "content": compact_system}]
+                if history:
+                    turns = history[-4:] if is_followup else history[-2:]
+                    compact_messages.extend(turns)
+                compact_messages.append({"role": "user", "content": question})
+                ollama_messages = compact_messages
+            except Exception:
+                ollama_messages = messages  # fallback to full messages if pack build fails
+
+            reply = _call_ollama(ollama_messages, model, host)
             return ReasoningResult(
                 reply=reply,
                 provider_used="local_ollama",
@@ -337,17 +353,24 @@ def reason(
             except Exception:
                 pass
 
-    # ── evidence_only fallback ─────────────────────────────────────────────────
-    if evidence_text:
-        reply = (
-            "No conversational LLM is available right now. "
-            "Here is what I have verified:\n" + evidence_text[:800]
-        )
-    else:
-        reply = (
-            "No conversational LLM is available and no verified evidence was found. "
-            "Run a status check: /status or 'show source intake'."
-        )
+    # ── evidence_only fallback — clean, never "Command timed out" ─────────────
+    try:
+        from lib.hermes_context_pack_builder import build_context_pack, classify_question
+        from lib.hermes_evidence_summary_formatter import format_provider_fallback_response
+        intent = classify_question(question)
+        pack = build_context_pack(question, intent)
+        reply = format_provider_fallback_response(question, "evidence_only", pack)
+    except Exception:
+        if evidence_text:
+            reply = (
+                "I can answer from verified artifacts.\n\n"
+                "Evidence available:\n" + evidence_text[:800]
+            )
+        else:
+            reply = (
+                "No providers available and no verified evidence found.\n"
+                "Run: 'show source intake' or 'show provider status' to diagnose."
+            )
     return ReasoningResult(
         reply=reply,
         provider_used="evidence_only",

@@ -1103,6 +1103,55 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
             matched_topic=topic,
         )
 
+    if topic == "provider_mode":
+        gateway_allowed = os.getenv("HERMES_ALLOW_HERMES_GATEWAY", "false").strip().lower() == "true"
+
+        if any(k in text for k in ("enable gateway", "use gateway mode", "switch to gateway")):
+            return InternalFirstReply(
+                text=(
+                    "To enable Hermes Gateway (experimental):\n"
+                    "  export HERMES_ALLOW_HERMES_GATEWAY=true\n"
+                    "  Then restart the bot.\n\n"
+                    "Note: Gateway is experimental. Only enable if Codex/ChatGPT auth is stable.\n"
+                    "Default is reliable mode (local Ollama → evidence_only)."
+                ),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_provider_policy",
+                matched_topic=topic,
+            )
+
+        if any(k in text for k in ("disable gateway", "use reliable mode", "switch to reliable")):
+            return InternalFirstReply(
+                text=(
+                    "To use reliable mode (no gateway):\n"
+                    "  unset HERMES_ALLOW_HERMES_GATEWAY  (or set to false)\n"
+                    "  Then restart the bot.\n\n"
+                    "Reliable mode: local Ollama → evidence_only\n"
+                    "  — never times out from gateway failures."
+                ),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_provider_policy",
+                matched_topic=topic,
+            )
+
+        try:
+            from lib.hermes_provider_policy import get_policy
+            policy = get_policy(refresh=True)
+            mode = "gateway (HERMES_ALLOW_HERMES_GATEWAY=true)" if gateway_allowed else "reliable (default — gateway disabled)"
+            return InternalFirstReply(
+                text=f"Active mode: {mode}\n\n{policy.telegram_report()}",
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_provider_policy (live detection)",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=f"Provider status unavailable: {exc}",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_provider_policy",
+                matched_topic=topic,
+            )
+
     if topic == "trading_recommendation":
         from pathlib import Path as _Path
         import json as _json

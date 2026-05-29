@@ -36,11 +36,16 @@ from __future__ import annotations
 import json
 import os
 import socket
+import time
 import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
+
+# Cache gateway failures for 10 minutes to avoid repeated socket probes
+_GATEWAY_FAILURE_CACHE: dict[str, float] = {}
+_GATEWAY_FAILURE_TTL = 600  # seconds
 
 ProviderType = Literal[
     "hermes_gateway",  # Hermes API at localhost:8642 — highest priority
@@ -103,11 +108,17 @@ class ProviderPolicy:
     routing_provider: str
     summary_provider: str
     statuses: list[ProviderStatus] = field(default_factory=list)
+    gateway_allowed: bool = False  # HERMES_ALLOW_HERMES_GATEWAY gate
 
     def best_for_strategic(self) -> ProviderType:
         if self.strategic_provider and self._is_available(self.strategic_provider):
-            return self.strategic_provider
+            if self.strategic_provider == "hermes_gateway" and not self.gateway_allowed:
+                pass  # skip — gateway not enabled
+            else:
+                return self.strategic_provider
         for p in self.priority:
+            if p == "hermes_gateway" and not self.gateway_allowed:
+                continue  # gateway disabled by policy
             if p in STRATEGIC_PROVIDERS and self._is_available(p):
                 return p
         if self.openrouter_allowed and self._is_available("openrouter"):
@@ -155,10 +166,13 @@ class ProviderPolicy:
         }
 
     def telegram_report(self) -> str:
+        active_mode = "gateway" if self.gateway_allowed else "reliable"
         lines = [
             "🧠 *Hermes Provider Status*",
+            f"Active mode: `{active_mode}`",
             f"Strategic: `{self.best_for_strategic()}`",
             f"Summary:   `{self.best_for_summary()}`",
+            f"Gateway enabled: {'✅ yes (HERMES_ALLOW_HERMES_GATEWAY=true)' if self.gateway_allowed else '🚫 no (experimental — disabled by default)'}",
             f"OpenRouter fallback: {'✅ enabled' if self.openrouter_allowed else '🚫 disabled'}",
             "",
             "*Provider availability:*",
@@ -173,11 +187,28 @@ class ProviderPolicy:
 # ── Detection functions ────────────────────────────────────────────────────────
 
 def _detect_hermes_gateway() -> ProviderStatus:
-    """Detect the local Hermes gateway API at HERMES_GATEWAY_URL."""
+    """Detect the local Hermes gateway API at HERMES_GATEWAY_URL.
+
+    Disabled by default — requires HERMES_ALLOW_HERMES_GATEWAY=true.
+    Gateway failures are cached for 10 minutes to avoid repeated socket probes.
+    """
+    # Policy gate — experimental, must be explicitly opted in
+    if os.getenv("HERMES_ALLOW_HERMES_GATEWAY", "false").strip().lower() != "true":
+        return ProviderStatus(
+            "hermes_gateway", False,
+            reason="HERMES_ALLOW_HERMES_GATEWAY not enabled (experimental — set to true to use)",
+        )
+
     url = os.getenv("HERMES_GATEWAY_URL", "http://127.0.0.1:8642").rstrip("/")
     key = os.getenv("HERMES_GATEWAY_KEY", os.getenv("HERMES_GATEWAY_TOKEN", "")).strip()
     if not key:
         return ProviderStatus("hermes_gateway", False, reason="HERMES_GATEWAY_KEY not set")
+
+    # Check 10-minute failure cache
+    cache_key = f"gw_fail_{url}"
+    if _GATEWAY_FAILURE_CACHE.get(cache_key, 0) > time.time():
+        return ProviderStatus("hermes_gateway", False, reason="gateway cached as failed (10-min cooldown)")
+
     try:
         host, port_str = url.replace("http://", "").replace("https://", "").split(":")
         port = int(port_str.split("/")[0])
@@ -191,6 +222,7 @@ def _detect_hermes_gateway() -> ProviderStatus:
             is_paid=False,
         )
     except Exception as e:
+        _GATEWAY_FAILURE_CACHE[cache_key] = time.time() + _GATEWAY_FAILURE_TTL
         return ProviderStatus("hermes_gateway", False, reason=f"Hermes gateway unreachable: {e}")
 
 
@@ -358,6 +390,7 @@ def load_provider_policy() -> ProviderPolicy:
     """Build and return the current provider policy with live availability checks."""
     priority    = _parse_priority()
     or_allowed  = os.getenv("HERMES_ALLOW_OPENROUTER_FALLBACK", "false").lower() == "true"
+    gw_allowed  = os.getenv("HERMES_ALLOW_HERMES_GATEWAY", "false").strip().lower() == "true"
     req_approval = _approval_required()
     strategic   = os.getenv("HERMES_STRATEGIC_PROVIDER", "").strip().lower() or None
     routing     = os.getenv("HERMES_ROUTING_PROVIDER", "local_or_rules").strip()
@@ -375,6 +408,7 @@ def load_provider_policy() -> ProviderPolicy:
     return ProviderPolicy(
         priority=priority,
         openrouter_allowed=or_allowed,
+        gateway_allowed=gw_allowed,
         require_approval_for_paid=req_approval,
         strategic_provider=strategic,  # type: ignore[arg-type]
         routing_provider=routing,
