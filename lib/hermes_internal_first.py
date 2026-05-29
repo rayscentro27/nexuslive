@@ -130,7 +130,7 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
             # the full operational keyword path for richer data.
             conversational_intents = {
                 "morning_greeting", "status_check_personal",
-                "completion_acknowledgement", "blocker_triage",
+                "completion_acknowledgement",
             }
             if intent in conversational_intents:
                 # morning_greeting: bypass Supabase template entirely — build from evidence
@@ -1281,6 +1281,167 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
             text="\n".join(lines),
             confidence=CONF_INTERNAL_CONFIRMED,
             source=f"vibe_trading/reports/{backtest_source or '(none)'} + oanda_demo/reports/{oanda_source or '(none)'}",
+            matched_topic=topic,
+        )
+
+    if topic == "goals":
+        try:
+            from lib.hermes_goal_registry import goals_summary_plain_english, initialize_registry
+            initialize_registry()
+            return InternalFirstReply(
+                text=goals_summary_plain_english(),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_goal_registry",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=(
+                    "Goal registry not initialized yet.\n\n"
+                    "Nexus has 6 core goals:\n"
+                    "  • 30-Day Revenue Goal (priority 95)\n"
+                    "  • Nexus Reliability Goal (priority 90)\n"
+                    "  • Content Engine Goal (priority 80)\n"
+                    "  • Monetization Intelligence Goal (priority 75)\n"
+                    "  • Credit/Funding Education Goal (priority 70)\n"
+                    "  • Trading Education / Demo Strategy Goal (priority 65)\n\n"
+                    "Run: python scripts/run_hermes_operating_loop.py --mode validation"
+                ),
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_goal_registry (defaults)",
+                matched_topic=topic,
+            )
+
+    if topic == "tools_scouts":
+        try:
+            from lib.hermes_tool_scout_registry import registry_summary_plain_english, initialize_registry
+            initialize_registry()
+            return InternalFirstReply(
+                text=registry_summary_plain_english(),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_tool_scout_registry",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=(
+                    "Tool/scout registry:\n\n"
+                    "Hermes has 15 scouts available including:\n"
+                    "  • youtube_research_scout — analyzes YouTube videos\n"
+                    "  • monetization_scout — scores opportunities\n"
+                    "  • vibe_trading_backtest — runs strategy backtests\n"
+                    "  • content_intelligence_scout — creates draft content\n"
+                    "  • funding_readiness_scout — tracks grant/funding intelligence\n\n"
+                    "Plus agents: Claude Code, local Ollama, evidence_only mode.\n"
+                    f"Error: {exc}"
+                ),
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_tool_scout_registry (defaults)",
+                matched_topic=topic,
+            )
+
+    if topic == "action_queue":
+        try:
+            from lib.hermes_action_queue import action_queue_plain_english
+            return InternalFirstReply(
+                text=action_queue_plain_english(),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_action_queue",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=(
+                    "Action queue is empty or not yet started.\n\n"
+                    "Hermes creates actions when you:\n"
+                    "  • Assign a task or send a link\n"
+                    "  • Ask 'run the operating loop'\n"
+                    "  • Ask 'what should we work on today'\n\n"
+                    "Try: 'Hermes, run the operating loop' to see the first batch of proposed actions."
+                ),
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_action_queue",
+                matched_topic=topic,
+            )
+
+    if topic == "decision_log":
+        try:
+            from lib.hermes_decision_log import decision_log_plain_english
+            return InternalFirstReply(
+                text=decision_log_plain_english(),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_decision_log",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=(
+                    "Decision log is empty — Hermes has not made logged decisions yet.\n\n"
+                    "Decisions are logged when Hermes:\n"
+                    "  • Selects an action from the operating loop\n"
+                    "  • Routes a question to a scout\n"
+                    "  • Chooses a provider or fallback\n\n"
+                    "Run: 'Hermes, run the operating loop' to generate the first decisions."
+                ),
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_decision_log",
+                matched_topic=topic,
+            )
+
+    if topic == "operating_loop":
+        try:
+            from lib.hermes_operating_loop import run_operating_loop
+            result_loop = run_operating_loop(mode="validation", max_actions=3, dry_run=True)
+            reply = result_loop.digest
+            if result_loop.artifact_path:
+                reply += f"\n\nFull report: {result_loop.artifact_path}"
+            return InternalFirstReply(
+                text=reply,
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_operating_loop",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=(
+                    f"Operating loop check: {exc}\n\n"
+                    "Hermes is ready to run the operating loop.\n"
+                    "This will: load goals, check intake, propose next actions, assign scouts.\n\n"
+                    "Run manually: python scripts/run_hermes_operating_loop.py --mode validation"
+                ),
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_operating_loop",
+                matched_topic=topic,
+            )
+
+    if topic == "plain_english":
+        return InternalFirstReply(
+            text=(
+                "I'll explain in plain language.\n\n"
+                "Ask me about anything — goals, actions, scouts, trading results, intake status — "
+                "and I'll give you the plain-English version first.\n\n"
+                "By default, I skip the technical jargon. If you want the raw technical output, "
+                "just say 'show technical details' or 'show raw evidence'."
+            ),
+            confidence=CONF_INTERNAL_CONFIRMED,
+            source="communication_rules",
+            matched_topic=topic,
+        )
+
+    if topic == "technical_details":
+        return InternalFirstReply(
+            text=(
+                "Technical details mode active.\n\n"
+                "What would you like to see?\n"
+                "  • 'show raw evidence' — artifact files and paths\n"
+                "  • 'show provider status' — full provider availability check\n"
+                "  • 'show debug details' — env config, provider chain\n"
+                "  • 'show logs' — last gateway failure artifacts\n"
+                "  • 'show decision log' — full decision records\n"
+                "  • 'show action queue' — full action records"
+            ),
+            confidence=CONF_INTERNAL_CONFIRMED,
+            source="communication_rules",
             matched_topic=topic,
         )
 
