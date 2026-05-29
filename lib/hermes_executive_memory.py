@@ -148,12 +148,7 @@ def _default_memory() -> dict:
             "Paper trading only — 6-month verified performance minimum before live",
             "No guaranteed income claims or financial guarantees in any output",
         ],
-        "execution_priorities": [
-            "Get content engine running with real LLM (fix Ollama or add OpenRouter route)",
-            "Complete Beehiiv and YouTube Studio setup manually",
-            "Remediate 7 false completions via nexus hermes audit",
-            "Route daily content through OpenRouter deepseek/deepseek-chat",
-        ],
+        "execution_priorities": [],
         "updated_at": _now_iso(),
         "version": 1,
     }

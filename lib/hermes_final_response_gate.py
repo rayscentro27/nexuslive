@@ -73,6 +73,13 @@ _BLOCKED_PATTERNS: list[tuple[re.Pattern, str]] = [
     # Specific dollar amounts in funding claims (not in evidence)
     (re.compile(r"\$[\d,]+k?\s+(grant|funded|approved|available)\b", re.IGNORECASE),
      "fabricated_dollar_amount"),
+
+    # Raw tool call syntax leaking from gateway LLM
+    (re.compile(r"\b\w+\s*\(\s*(pattern|query|path|file|name|topic|keyword)\s*=", re.IGNORECASE),
+     "raw_tool_call_leak"),
+
+    (re.compile(r"\b(search_files|read_file|list_files|get_file|run_command|execute|call_tool)\s*\(", re.IGNORECASE),
+     "raw_tool_call_leak"),
 ]
 
 # Safe phrases that override blocked patterns

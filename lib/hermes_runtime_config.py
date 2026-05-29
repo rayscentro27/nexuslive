@@ -53,7 +53,17 @@ def default_runtime_config() -> dict[str, Any]:
             "long_output_channel": "email_report",
         },
         "hermes_internal_first_keywords": {
-            "opencode": ["opencode", "codex", "what did codex finish"],
+            "opencode": [
+                "opencode", "codex", "what did codex finish",
+                "what did claude code finish", "what did claude code complete",
+            ],
+            "claude_code_work": [
+                "what did claude code work on", "what did claude work on",
+                "what did claude code do", "claude code session", "claude code work",
+                "what was built yesterday", "what happened yesterday", "yesterday's progress",
+                "what was completed yesterday", "show handoffs", "claude handoffs",
+                "recent handoffs", "latest handoff", "what did claude build",
+            ],
             "funding": ["funding blocker", "funding blockers", "funding"],
             "today": [
                 "what should i work on today", "what should we work on today",
@@ -179,6 +189,36 @@ def default_runtime_config() -> dict[str, Any]:
                 "what intelligence is available", "channel intelligence",
                 "jj simon", "the one lance b", "cal barton", "koerner office",
                 "codeglitch", "ai rush minutes", "luuk alleman", "stedman waiters",
+            ],
+            "information_sources": [
+                "where do you get your information", "what are your sources",
+                "information sources", "where does this data come from",
+                "what data sources do you use", "where does your information come from",
+                "how do you know that", "where did you get that", "what is your source",
+                "how do you get your data", "what files do you read", "what do you read",
+                "where do you read from", "hermes data sources",
+            ],
+            "nexus_project": [
+                "what is nexus", "what is the nexus project", "nexus overview",
+                "tell me about nexus", "nexus mission", "what does nexus do",
+                "describe nexus", "nexus platform", "nexus project brief",
+                "what is nexus trying to do", "nexus goals", "what is nexus building",
+            ],
+            "goals_30_day": [
+                "30 day goals", "30 day plan", "30-day goals", "30-day plan",
+                "what is the 30 day plan", "monthly goals", "month goals",
+                "what are the 30 day goals", "show the 30 day plan",
+                "this month's plan", "monthly revenue plan", "revenue plan",
+                "30 day revenue", "what's the plan for this month",
+                "what is the monthly target", "monthly target",
+            ],
+            "youtube_status": [
+                "youtube status", "youtube intake", "youtube sources",
+                "what youtube sources", "source intake status", "intake status",
+                "what videos are registered", "youtube registry",
+                "what youtube videos", "registered videos", "show youtube intake",
+                "last youtube channel that was processed", "what youtube channel",
+                "youtube channels registered",
             ],
         },
         "hermes_project_aliases": {

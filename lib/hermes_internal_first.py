@@ -234,7 +234,7 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         pending = mem.get("pending_approval_refs") or []
         first = (recs[0].get("summary") if recs else "Review pending approvals and clear blockers.")
         focus = top_focus_summary()
-        pending_note = f" ({len(pending)} pending approval{'s' if len(pending) != 1 else ''} to clear first)" if pending else ""
+        pending_note = " (clear queued approvals first)" if pending else ""
         return InternalFirstReply(
             text=f"Today I'd focus on: {first}{pending_note}.\n{focus}",
             confidence=confidence_default,
@@ -901,5 +901,180 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
                 source="nexus_watcher_loop",
                 matched_topic=topic,
             )
+
+    if topic == "claude_code_work":
+        try:
+            from pathlib import Path as _Path
+            handoff_dir = _Path(__file__).resolve().parent.parent / "docs" / "reports" / "handoffs"
+            if not handoff_dir.exists():
+                handoff_dir = _Path(__file__).resolve().parent.parent / "reports" / "handoffs"
+            files = sorted(handoff_dir.glob("claude_code_handoff_*.md"), reverse=True)[:5] if handoff_dir.exists() else []
+            if files:
+                lines = ["**Recent Claude Code Handoffs**"]
+                for f in files[:5]:
+                    content = f.read_text(errors="replace")
+                    first_line = next((l.strip() for l in content.splitlines() if l.strip() and not l.startswith("#")), f.stem)
+                    lines.append(f"  • {f.stem[-15:]} — {first_line[:80]}")
+                lines.append(f"\n{len(files)} handoff file(s) found in {handoff_dir.name}/")
+                return InternalFirstReply(
+                    text="\n".join(lines),
+                    confidence=CONF_INTERNAL_CONFIRMED,
+                    source=str(handoff_dir),
+                    matched_topic=topic,
+                )
+            return InternalFirstReply(
+                text="No Claude Code handoff files found in docs/reports/handoffs/. Handoffs are written after each Claude Code session.",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="docs/reports/handoffs/",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=f"Could not read Claude Code handoffs: {exc}",
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="docs/reports/handoffs/",
+                matched_topic=topic,
+            )
+
+    if topic == "information_sources":
+        from pathlib import Path as _Path
+        root = _Path(__file__).resolve().parent.parent
+        source_paths = [
+            ("docs/reports/evidence/", "Gateway failure artifacts and evidence files"),
+            ("docs/reports/handoffs/", "Claude Code session handoffs"),
+            ("docs/reports/intake/", "Telegram source intake registry (JSONL)"),
+            ("docs/reports/monetization/", "Revenue plans and monetization documents"),
+            ("docs/reports/core/", "Core Nexus project briefs"),
+            ("artifacts/", "Scout outputs, intelligence artifacts"),
+            ("reports/knowledge_intake/", "NotebookLM intake queue"),
+        ]
+        found = []
+        for rel, desc in source_paths:
+            p = root / rel
+            if p.exists():
+                count = len(list(p.iterdir()))
+                found.append(f"  • {rel} ({count} items) — {desc}")
+            else:
+                found.append(f"  • {rel} (not yet created) — {desc}")
+        lines = [
+            "**Hermes Information Sources**",
+            "Hermes reads evidence-only. No LLM invention when sources are available.",
+            "",
+            "Artifact directories scanned at runtime:",
+        ] + found + [
+            "",
+            "To add new data: send a YouTube URL, GitHub link, or knowledge email.",
+            "Hermes never invents data — if a source is missing, it says so.",
+        ]
+        return InternalFirstReply(
+            text="\n".join(lines),
+            confidence=CONF_INTERNAL_CONFIRMED,
+            source="filesystem_scan",
+            matched_topic=topic,
+        )
+
+    if topic == "nexus_project":
+        from pathlib import Path as _Path
+        brief_path = _Path(__file__).resolve().parent.parent / "docs" / "reports" / "core" / "nexus_project_brief.md"
+        if brief_path.exists():
+            content = brief_path.read_text(errors="replace")
+            reply = content[:3600] + ("\n…[truncated — see docs/reports/core/nexus_project_brief.md]" if len(content) > 3600 else "")
+            return InternalFirstReply(
+                text=reply,
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source=str(brief_path),
+                matched_topic=topic,
+            )
+        return InternalFirstReply(
+            text=(
+                "Nexus is an AI-powered business operating system built by Ray Davis.\n\n"
+                "Core mission: reach $1,000/week recurring revenue through autonomous AI workers, "
+                "intelligence scouts, content systems, and grant research — all running under "
+                "human approval gates.\n\n"
+                "Key systems: Hermes (AI chief of staff), 11 intelligence scouts, "
+                "evidence guard, CEO briefing, paper trading platform, source intake.\n\n"
+                "Safety model: NEXUS_DRY_RUN=true always. No publish, bill, or deploy without approval.\n\n"
+                "Full brief: docs/reports/core/nexus_project_brief.md (not yet created — "
+                "run `nexus ceo briefing` to generate)."
+            ),
+            confidence=CONF_INTERNAL_PARTIAL,
+            source="hardcoded_summary (brief file missing)",
+            matched_topic=topic,
+        )
+
+    if topic == "goals_30_day":
+        from pathlib import Path as _Path
+        root = _Path(__file__).resolve().parent.parent
+        mono_dir = root / "docs" / "reports" / "monetization"
+        plan_files = sorted(mono_dir.glob("30_day_revenue_plan_*.md"), reverse=True) if mono_dir.exists() else []
+        if plan_files:
+            content = plan_files[0].read_text(errors="replace")
+            reply = content[:3600] + ("\n…[truncated]" if len(content) > 3600 else "")
+            return InternalFirstReply(
+                text=reply,
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source=str(plan_files[0]),
+                matched_topic=topic,
+            )
+        return InternalFirstReply(
+            text="No 30-day revenue plan file found in docs/reports/monetization/. Run `nexus monetization plan` to generate one.",
+            confidence=CONF_INTERNAL_PARTIAL,
+            source="docs/reports/monetization/",
+            matched_topic=topic,
+        )
+
+    if topic == "youtube_status":
+        try:
+            from lib.hermes_telegram_source_intake import HermesTelegramSourceIntake
+            intake = HermesTelegramSourceIntake()
+            recent = intake.get_recent(limit=5) if hasattr(intake, "get_recent") else []
+            if recent:
+                lines = [f"**YouTube / Source Intake — {len(recent)} recent entries**"]
+                for r in recent:
+                    sid = str(r.get("intake_id", "?"))[:12]
+                    url = str(r.get("url", "?"))[:60]
+                    status = r.get("status", "?")
+                    lines.append(f"  {sid} | {status} | {url}")
+                return InternalFirstReply(
+                    text="\n".join(lines),
+                    confidence=CONF_INTERNAL_CONFIRMED,
+                    source="hermes_telegram_source_intake",
+                    matched_topic=topic,
+                )
+        except Exception:
+            pass
+        # Fallback: read JSONL directly
+        try:
+            from pathlib import Path as _Path
+            import json as _json
+            log_path = _Path(__file__).resolve().parent.parent / "docs" / "reports" / "intake" / "telegram_source_intake.jsonl"
+            if log_path.exists():
+                lines_raw = log_path.read_text().splitlines()[-10:]
+                entries = [_json.loads(l) for l in lines_raw if l.strip()]
+                yt_entries = [e for e in entries if "youtube" in str(e.get("url", "")).lower()]
+                if yt_entries:
+                    lines = [f"**YouTube Source Intake — {len(yt_entries)} recent**"]
+                    for e in yt_entries[-5:]:
+                        lines.append(f"  {str(e.get('intake_id','?'))[:12]} | {e.get('status','?')} | {str(e.get('url','?'))[:60]}")
+                    return InternalFirstReply(
+                        text="\n".join(lines),
+                        confidence=CONF_INTERNAL_CONFIRMED,
+                        source=str(log_path),
+                        matched_topic=topic,
+                    )
+                return InternalFirstReply(
+                    text="No YouTube entries in source intake log yet. Send a YouTube URL to register a source.",
+                    confidence=CONF_INTERNAL_PARTIAL,
+                    source=str(log_path),
+                    matched_topic=topic,
+                )
+        except Exception:
+            pass
+        return InternalFirstReply(
+            text="YouTube source intake log not found. Send a YouTube URL to begin intake.",
+            confidence=CONF_INTERNAL_PARTIAL,
+            source="docs/reports/intake/telegram_source_intake.jsonl",
+            matched_topic=topic,
+        )
 
     return None

@@ -34,7 +34,7 @@ OPPORTUNITY_TRIGGERS = [
     r'https?://',
     r'www\.',
     # Opportunity nouns
-    r'\b(saas|affiliate program|youtube channel|niche|newsletter business|digital product|course|app idea)\b',
+    r'\b(saas|affiliate program|niche|newsletter business|digital product|course|app idea)\b',
 ]
 
 OPPORTUNITY_TRIGGER_RE = re.compile(
