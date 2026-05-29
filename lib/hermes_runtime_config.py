@@ -266,7 +266,7 @@ def default_runtime_config() -> dict[str, Any]:
                 "what is next", "show completed actions", "action queue",
                 "what did you assign", "what actions are open",
                 "what did hermes assign", "hermes what are you doing",
-                "continue while i am out", "what is hermes doing",
+                "what is hermes doing",
                 "any blockers", "show blockers",
             ],
             "decision_log": [
