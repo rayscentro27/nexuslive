@@ -402,8 +402,20 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         ],
         "build_content_from_opportunity": [
             "build content from the best opportunity",
+            "build content from best opportunity",
             "build content from opportunity",
             "create content from top opportunity",
+            "build content packet",
+            "create draft from best opportunity",
+            "create draft from opportunity",
+        ],
+        "approval_policy": [
+            "show approval policy",
+            "what can you do autonomously",
+            "what is blocked",
+            "what requires my approval",
+            "hermes policy",
+            "autonomous policy",
         ],
     }
     topic = ""
@@ -1906,45 +1918,172 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
 
     if topic == "build_content_from_opportunity":
         try:
-            from lib.hermes_monetization_decision_engine import load_latest_decisions
-            decisions = load_latest_decisions(limit=10)
+            from lib.hermes_daily_cycle_state import load_top_opportunities
+            from lib.hermes_action_queue import (
+                create_action, get_open_action_by_title, normalize_action_title
+            )
+            from lib.hermes_decision_log import log_decision
+
+            top_ops = load_top_opportunities(limit=5)
             content_candidates = [
-                d for d in decisions
-                if d.get("status") in ("content_candidate", "client_education_candidate", "product_candidate")
-            ]
-            if content_candidates:
-                best = content_candidates[0]
-                title = best.get("title", "")[:70]
-                rec = best.get("recommended_action", "")
-                goal = best.get("goal_supported", "")
-                lines = [
-                    f"Best content candidate: {title}",
-                    f"Why: {best.get('why_selected','')[:80]}",
-                    f"Goal: {goal}",
-                    f"Next: {rec}",
-                    "",
-                    "To create the content brief: run_content_pipeline.py with this topic.",
-                    "⏳ Content publishing requires Ray approval before going public.",
-                ]
-            else:
-                lines = [
-                    "No content candidates scored yet.",
-                    "Run daily intake first, then I can identify the best content opportunity.",
-                    "Say: Hermes, run daily opportunity intake.",
-                ]
+                op for op in top_ops
+                if op.get("status") in (
+                    "content_candidate", "client_education_candidate", "product_candidate"
+                )
+            ] or top_ops[:1]
+
+            if not content_candidates:
+                return InternalFirstReply(
+                    text=(
+                        "No content opportunities scored yet.\n\n"
+                        "Run daily intake first: Hermes, run daily opportunity intake.\n"
+                        "Then ask again."
+                    ),
+                    confidence=CONF_INTERNAL_PARTIAL,
+                    source="hermes_daily_cycle_state",
+                    matched_topic=topic,
+                )
+
+            best = content_candidates[0]
+            specific = _format_opportunity_specific(best)
+            # Strip scout tag suffix for the action title
+            action_title = specific.split(" — assign to ")[0].split(" [needs approval]")[0].strip()
+            why = (best.get("why_selected") or best.get("why_collected") or
+                   "Fits the 30-day revenue goal and Nexus' credit/funding audience.")
+            goal = best.get("goal_supported", "goal_content_engine")
+            scout = best.get("assigned_scout") or "content_intelligence_scout"
+            requires_approval = bool(best.get("requires_ray_approval"))
+
+            # Deduplicate — if identical action already open, return status instead
+            norm_title = normalize_action_title(action_title)
+            existing = get_open_action_by_title(norm_title)
+            if existing:
+                return InternalFirstReply(
+                    text=(
+                        f"I already created that content task.\n\n"
+                        f"Current status: {existing.status}\n"
+                        f"Action: {existing.action_id}\n"
+                        f"Scout: {existing.assigned_scout or scout}\n\n"
+                        f"Approval: Not needed for internal draft. "
+                        f"Required before publishing, selling, or client use.\n\n"
+                        f"No duplicate created.\n"
+                        f"Evidence: docs/reports/actions/hermes_action_queue.jsonl"
+                    ),
+                    confidence=CONF_INTERNAL_CONFIRMED,
+                    source="hermes_action_queue",
+                    matched_topic=topic,
+                )
+
+            # Create action record
+            action = create_action(
+                title=action_title,
+                description=why[:200],
+                goal_id=goal,
+                assigned_scout=scout,
+                priority=70,
+                autonomous_allowed=True,
+                requires_ray_approval=requires_approval,
+                approval_reason="Required before publishing, selling, or client use." if requires_approval else "",
+                status="assigned",
+            )
+
+            # Create decision log entry
+            dec = log_decision(
+                question_or_trigger="Ray requested: build content from best opportunity",
+                decision=f"Create content action: {action_title[:60]}",
+                why_selected=why[:120],
+                goal_alignment=goal,
+                risk_level="low",
+                autonomous_allowed=True,
+                requires_ray_approval=requires_approval,
+                action_created=action.action_id,
+            )
+
+            # Create handoff artifact
+            _root = Path(__file__).resolve().parent.parent
+            handoff_dir = _root / "docs" / "reports" / "agent_handoffs"
+            handoff_dir.mkdir(parents=True, exist_ok=True)
+            ts_tag = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            handoff_path = handoff_dir / f"content_intelligence_handoff_{ts_tag}.json"
+            handoff_data = {
+                "handoff_type": "content_intelligence",
+                "created_at": _now(),
+                "action_id": action.action_id,
+                "decision_id": dec.decision_id,
+                "assigned_scout": scout,
+                "title": action_title,
+                "why": why,
+                "goal": goal,
+                "requires_ray_approval": requires_approval,
+                "approval_boundary": "Internal draft: autonomous. Publishing/selling: requires approval.",
+                "source_opportunity": best.get("title", ""),
+            }
+            import json as _json
+            handoff_path.write_text(_json.dumps(handoff_data, indent=2))
+
+            approval_note = (
+                "Required before publishing, selling, emailing clients, or activating payments."
+                if requires_approval else
+                "Not needed for internal draft.\nRequired before publishing, selling, or client use."
+            )
+            rel_handoff = handoff_path.relative_to(_root) if handoff_path.is_absolute() else handoff_path
             return InternalFirstReply(
-                text="\n".join(lines),
+                text=(
+                    "CONTENT ACTION CREATED\n\n"
+                    "What I'm building:\n"
+                    f"{action_title}\n\n"
+                    f"Why:\n{why[:120]}\n\n"
+                    f"Assigned to:\n{scout}\n\n"
+                    f"Approval:\n{approval_note}\n\n"
+                    f"Evidence:\n"
+                    f"  Action: {action.action_id}\n"
+                    f"  Handoff: {rel_handoff}\n"
+                    f"  Decision: {dec.decision_id}\n\n"
+                    "Next:\nI'll prepare the draft artifact for Ray review."
+                ),
                 confidence=CONF_INTERNAL_CONFIRMED,
-                source="hermes_monetization_decision_engine",
+                source="hermes_action_queue",
                 matched_topic=topic,
             )
-        except Exception:
+        except Exception as exc:
             return InternalFirstReply(
-                text="No content opportunities scored yet. Run daily intake first.",
+                text=(
+                    f"Could not create content action: {exc}\n\n"
+                    "Run daily intake first to score content candidates:\n"
+                    "Hermes, run daily opportunity intake."
+                ),
                 confidence=CONF_INTERNAL_PARTIAL,
-                source="hermes_monetization_decision_engine",
+                source="hermes_daily_cycle_state",
                 matched_topic=topic,
             )
+
+    if topic == "approval_policy":
+        try:
+            from lib.hermes_ceo_decision_policy import AUTONOMOUS_ALLOWED, APPROVAL_REQUIRED, BLOCKED
+            lines = [
+                "APPROVAL POLICY", "",
+                f"Autonomous (no approval needed) — {len(AUTONOMOUS_ALLOWED)} actions:",
+            ]
+            for r in AUTONOMOUS_ALLOWED[:8]:
+                lines.append(f"  ✅ {r['action']}: {r['description'][:60]}")
+            lines.append("")
+            lines.append(f"Requires Ray approval — {len(APPROVAL_REQUIRED)} actions:")
+            for r in APPROVAL_REQUIRED:
+                lines.append(f"  ⏳ {r['action']}: {r['description'][:60]}")
+            lines.append("")
+            lines.append(f"Always blocked — {len(BLOCKED)} actions:")
+            for r in BLOCKED[:6]:
+                lines.append(f"  🔴 {r['action']}: {r['description'][:60]}")
+            lines.append("")
+            lines.append("Say 'show decision log' to see recent Hermes decisions.")
+        except Exception as exc:
+            lines = [f"Approval policy unavailable: {exc}"]
+        return InternalFirstReply(
+            text="\n".join(lines),
+            confidence=CONF_INTERNAL_CONFIRMED,
+            source="hermes_ceo_decision_policy",
+            matched_topic=topic,
+        )
 
     if topic == "needs_approval":
         try:

@@ -177,36 +177,108 @@ def top_priority_actions(limit: int = 5) -> list[Action]:
     return sorted(ready, key=lambda a: -a.priority)[:limit]
 
 
-def action_queue_plain_english() -> str:
-    open_actions = get_open_actions()
-    blocked = [a for a in open_actions if a.status == "blocked"]
-    approval_needed = [a for a in open_actions if a.status == "needs_ray_approval"]
-    in_progress = [a for a in open_actions if a.status == "in_progress"]
-    ready = [a for a in open_actions if a.status in ("proposed", "queued", "assigned")]
+def normalize_action_title(title: str) -> str:
+    """Normalize a title for deduplication. Strips status prefixes and bracket annotations."""
+    import re
+    t = (title or "").strip()
+    # Remove leading [status] bracket annotations like "[product_candidate] ..."
+    t = re.sub(r"^\[[^\]]+\]\s*", "", t)
+    # Remove leading status labels like "Status: X — "
+    t = re.sub(r"^Status:\s*\w+\s*[—–]\s*", "", t)
+    # Collapse whitespace, lowercase for comparison
+    return " ".join(t.lower().split())
 
-    lines = [f"Action queue: {len(open_actions)} open actions."]
-    if in_progress:
-        lines.append(f"\nIn progress ({len(in_progress)}):")
-        for a in in_progress[:3]:
-            lines.append(f"  🔄 {a.title}")
-    if ready:
-        lines.append(f"\nReady to work ({len(ready)}):")
-        for a in sorted(ready, key=lambda x: -x.priority)[:3]:
-            lines.append(f"  📋 {a.title}")
+
+def action_dedupe_key(action: "Action") -> tuple:
+    """Return a key that identifies duplicate actions (same work, different record)."""
+    return (normalize_action_title(action.title), action.goal_id, action.assigned_scout)
+
+
+def get_unique_open_actions() -> list["Action"]:
+    """Return open actions deduplicated by (normalized_title, goal_id, assigned_scout)."""
+    open_actions = get_open_actions()
+    seen: dict[tuple, "Action"] = {}
+    for a in sorted(open_actions, key=lambda x: -x.priority):
+        key = action_dedupe_key(a)
+        if key not in seen:
+            seen[key] = a
+    return list(seen.values())
+
+
+def format_action_queue_summary_common_language() -> str:
+    """Plain-language action queue with deduplicated unique actions."""
+    all_open = get_open_actions()
+    unique = get_unique_open_actions()
+    dup_count = len(all_open) - len(unique)
+
+    blocked = [a for a in unique if a.status == "blocked"]
+    approval_needed = [a for a in unique if a.status == "needs_ray_approval"]
+    in_progress = [a for a in unique if a.status == "in_progress"]
+    ready = sorted(
+        [a for a in unique if a.status in ("proposed", "queued", "assigned")],
+        key=lambda x: -x.priority,
+    )
+
+    lines = ["ACTION QUEUE", ""]
+    if dup_count > 0:
+        lines.append(
+            f"I have {len(all_open)} open action records, but {dup_count} are duplicates. "
+            f"The top {min(5, len(unique))} unique actions are:"
+        )
+    else:
+        lines.append(f"I have {len(unique)} unique open actions. Top actions:")
+
+    lines.append("")
+    shown = 0
+    for group in [in_progress, ready]:
+        for a in group:
+            if shown >= 5:
+                break
+            shown += 1
+            display_title = normalize_action_title(a.title) or a.title
+            # Title-case for readability
+            display_title = display_title[:80]
+            scout_tag = f"\n   Scout: {a.assigned_scout}" if a.assigned_scout else ""
+            next_tag = f"\n   Next: {a.next_step}" if a.next_step else ""
+            status_label = {
+                "in_progress": "in progress", "queued": "ready",
+                "assigned": "assigned", "proposed": "proposed",
+            }.get(a.status, a.status)
+            lines.append(f"{shown}. {display_title}")
+            lines.append(f"   Status: {status_label}{scout_tag}{next_tag}")
+            lines.append("")
+
     if blocked:
-        lines.append(f"\nBlocked ({len(blocked)}) — need Ray to unblock:")
+        lines.append(f"Blocked ({len(blocked)}) — need Ray to unblock:")
         for a in blocked[:3]:
             lines.append(f"  🔴 {a.title}")
+        lines.append("")
     if approval_needed:
-        lines.append(f"\nWaiting for Ray approval ({len(approval_needed)}):")
+        lines.append(f"Waiting for approval ({len(approval_needed)}):")
         for a in approval_needed[:3]:
-            lines.append(f"  ⏳ {a.title} — {a.approval_reason}")
+            lines.append(f"  ⏳ {a.title}")
+        lines.append("")
+    if dup_count > 0:
+        lines.append(f"Duplicates suppressed: {dup_count} repeated operating-loop actions.")
+        lines.append("")
     try:
         src = _QUEUE_JSONL.relative_to(_ROOT)
     except ValueError:
         src = _QUEUE_JSONL
-    lines.append(f"\nSource: {src}")
+    lines.append(f"Evidence: {src}")
     return "\n".join(lines)
+
+
+def action_queue_plain_english() -> str:
+    return format_action_queue_summary_common_language()
+
+
+def get_open_action_by_title(normalized_title: str) -> "Action | None":
+    """Return existing open action matching a normalized title, or None."""
+    for a in get_unique_open_actions():
+        if normalize_action_title(a.title) == normalized_title:
+            return a
+    return None
 
 
 def write_latest_markdown() -> None:

@@ -120,22 +120,103 @@ def load_recent_decisions(limit: int = 20) -> list[Decision]:
         return []
 
 
+_GENERIC_DECISION_PREFIXES = (
+    "propose action: run operating loop",
+    "propose action: run provider policy",
+    "[dry run] propose action",
+)
+
+
+def _decision_is_meaningful(d: "Decision") -> bool:
+    """Return True if this decision is worth showing (not a generic loop iteration)."""
+    dec_lower = (d.decision or "").lower()
+    return not any(dec_lower.startswith(p) for p in _GENERIC_DECISION_PREFIXES)
+
+
+_STATUS_TO_LABEL = {
+    "content_candidate": "Selected as content candidate",
+    "product_candidate": "Selected as product opportunity",
+    "affiliate_candidate": "Selected for affiliate research",
+    "client_education_candidate": "Selected for client education content",
+    "needs_more_research": "Flagged for deeper research",
+    "rejected": "Rejected",
+    "watch": "Added to watch list",
+    "high_priority": "Marked high priority",
+}
+
+
+def _format_decision_human(d: "Decision", index: int) -> list[str]:
+    """Format one decision as a plain-language item with index."""
+    ts = (d.timestamp or "")[:10]
+    dec = (d.decision or "").strip()
+    trigger = (d.question_or_trigger or "").strip()
+    why = (d.why_selected or "").strip()
+
+    # Strip internal routing instructions
+    for prefix in ("Status: ", "Propose action: "):
+        if dec.startswith(prefix):
+            dec = dec[len(prefix):]
+
+    # Strip trailing routing suffix like " — Route to content_intelligence_scout..."
+    for marker in [" — Route to ", " — Assign to ", " — route to "]:
+        idx = dec.find(marker)
+        if idx > 0:
+            dec = dec[:idx].strip()
+
+    # Convert bare status codes to human labels
+    dec_lower = dec.lower().replace("-", "_").replace(" ", "_")
+    if dec_lower in _STATUS_TO_LABEL:
+        # Try to attach the source name from the trigger
+        if "score intake source:" in trigger.lower():
+            source = trigger[trigger.lower().find("score intake source:") + len("score intake source:"):].strip()
+            dec = f"{_STATUS_TO_LABEL[dec_lower]}: {source[:55]}"
+        else:
+            dec = _STATUS_TO_LABEL[dec_lower]
+
+    # Simplify trigger labels
+    if "score intake source:" in trigger.lower():
+        source = trigger[trigger.lower().find("score intake source:") + len("score intake source:"):].strip()
+        trigger = f"Scored: {source[:55]}"
+    elif trigger.lower().startswith("operating loop"):
+        trigger = "Operating loop run"
+
+    lines = [f"{index}. {dec[:90]}"]
+    lines.append(f"   When: {ts} — {trigger[:65]}")
+    if why:
+        lines.append(f"   Why: {why[:90]}")
+    if d.action_created:
+        lines.append(f"   Action: {d.action_created}")
+    if d.artifact_paths:
+        lines.append(f"   Evidence: {d.artifact_paths[0]}")
+    return lines
+
+
 def decision_log_plain_english(limit: int = 10) -> str:
-    decisions = load_recent_decisions(limit)
-    if not decisions:
+    all_decisions = load_recent_decisions(100)
+    if not all_decisions:
         return (
+            "DECISION LOG\n\n"
             "No decisions recorded yet.\n"
             "Hermes logs a decision every time it selects an action, assigns a scout, "
-            "or routes a request.\n"
+            "or routes a request.\n\n"
+            "Run: 'Hermes, continue research while I am out' to generate the first decisions.\n"
             f"Source: {_LOG_JSONL.relative_to(_ROOT)}"
         )
-    lines = [
-        f"Recent Hermes decisions ({len(decisions)} shown):",
-        "",
-    ]
-    for d in decisions[:limit]:
-        lines.append(d.to_plain_english())
+
+    # Prefer meaningful decisions; fall back to all if too few
+    meaningful = [d for d in all_decisions if _decision_is_meaningful(d)]
+    shown = meaningful[:limit] if len(meaningful) >= 3 else all_decisions[:limit]
+
+    lines = ["DECISION LOG", "", f"Recent Hermes decisions ({len(shown)} shown):", ""]
+    for i, d in enumerate(shown, 1):
+        lines.extend(_format_decision_human(d, i))
         lines.append("")
+
+    if len(all_decisions) > len(shown):
+        lines.append(f"({len(all_decisions) - len(shown)} routine loop decisions not shown.)")
+        lines.append("")
+
+    lines.append("Say 'show approval policy' to see what Hermes can and cannot do autonomously.")
     try:
         src = _LOG_JSONL.relative_to(_ROOT)
     except ValueError:
