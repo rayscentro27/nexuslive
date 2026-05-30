@@ -1876,6 +1876,34 @@ class NexusTelegramBot:
         except Exception as exc:
             return f"Raw evidence lookup failed: {exc}"
 
+    def _cmd_decision_log(self) -> str:
+        from lib.hermes_internal_first import try_internal_first
+        result = try_internal_first("show decision log")
+        if result:
+            return result.text
+        return "Decision log unavailable."
+
+    def _cmd_approval_policy(self) -> str:
+        from lib.hermes_internal_first import try_internal_first
+        result = try_internal_first("show approval policy")
+        if result:
+            return result.text
+        return "Approval policy unavailable."
+
+    def _cmd_action_queue(self) -> str:
+        from lib.hermes_action_queue import format_action_queue_summary_common_language
+        try:
+            return format_action_queue_summary_common_language()
+        except Exception as exc:
+            return f"Action queue unavailable: {exc}"
+
+    def _cmd_review_first(self) -> str:
+        from lib.hermes_internal_first import try_internal_first
+        result = try_internal_first("what should I review first")
+        if result:
+            return result.text
+        return "Review the daily research review first: say 'show daily research review'."
+
     def _cmd_funding_blockers_conversational(self) -> str:
         core = str(self.handle_basic_command("funding_blockers") or "").strip()
         if not core:
@@ -2638,6 +2666,20 @@ class NexusTelegramBot:
             "hermes, show daily research review": self._cmd_daily_review,
             "show raw evidence": self._cmd_raw_evidence,
             "raw evidence": self._cmd_raw_evidence,
+            # Decision log and approval policy — backup routing avoids AI fallback
+            "show decision log": self._cmd_decision_log,
+            "what did hermes decide": self._cmd_decision_log,
+            "hermes decisions": self._cmd_decision_log,
+            "show recent decisions": self._cmd_decision_log,
+            "decision log": self._cmd_decision_log,
+            "show approval policy": self._cmd_approval_policy,
+            "what can you do autonomously": self._cmd_approval_policy,
+            "hermes policy": self._cmd_approval_policy,
+            # Operator commands
+            "show action queue": self._cmd_action_queue,
+            "action queue": self._cmd_action_queue,
+            "what should i review first": self._cmd_review_first,
+            "what is the next thing i should review": self._cmd_review_first,
         }
         # Also check "hermes, X" → strip prefix then match
         _normalized_strip = normalized.lstrip("hermes").lstrip(",").lstrip().rstrip(".")

@@ -386,8 +386,7 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         ],
         "daily_review": [
             "show daily research review", "show daily review",
-            "daily research review", "what should i review first",
-            "show research review", "show latest review",
+            "daily research review", "show research review", "show latest review",
             "show the daily review", "show the research review",
         ],
         "raw_evidence": [
@@ -416,6 +415,13 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
             "what requires my approval",
             "hermes policy",
             "autonomous policy",
+        ],
+        "review_first": [
+            "what should i review first",
+            "what is the next thing i should review",
+            "what should i look at first",
+            "what needs my review",
+            "what should ray review first",
         ],
     }
     topic = ""
@@ -1595,26 +1601,47 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         try:
             from lib.hermes_operating_loop import run_operating_loop
             from lib.hermes_runtime_config import get_internal_action_config
+            from lib.hermes_action_queue import get_unique_open_actions, _is_meta_action
             iac = get_internal_action_config()
             _dry_run = not iac["autonomous_internal_actions"]
             _loop_mode = "continue" if iac["autonomous_internal_actions"] else "validation"
             result_loop = run_operating_loop(mode=_loop_mode, max_actions=5, dry_run=_dry_run)
-            _mode_note = "" if _dry_run else ""
-            reply = result_loop.digest
-            if not _dry_run and result_loop.actions_created:
-                reply += (
-                    f"\n\nCreated {len(result_loop.actions_created)} internal action(s). "
-                    "No publishing, spending, or trading — internal only."
-                )
-            if result_loop.artifact_path:
-                reply += f"\n\nFull report: {result_loop.artifact_path}"
-            if _dry_run:
-                reply += (
-                    "\n\nNote: Running in validation mode. Set HERMES_AUTONOMOUS_INTERNAL_ACTIONS=true "
-                    "to create real action records."
-                )
+
+            # Build operator-language response instead of raw validation-report digest
+            top_unique = [a for a in get_unique_open_actions() if not _is_meta_action(a)][:3]
+            focus_lines = []
+            for i, a in enumerate(top_unique, 1):
+                t = (a.title.split(" — ")[0])[:65].strip()
+                scout_note = f" ({a.assigned_scout})" if a.assigned_scout else ""
+                focus_lines.append(f"  {i}. {t}{scout_note}")
+
+            _root = Path(__file__).resolve().parent.parent
+            aq_path = _root / "docs" / "reports" / "actions" / "hermes_action_queue.jsonl"
+            dl_path = _root / "docs" / "reports" / "decisions" / "hermes_decision_log.jsonl"
+
+            lines = ["I'll continue internal research quietly.", ""]
+            if focus_lines:
+                lines.append("What I'm focusing on:")
+                lines.extend(focus_lines)
+                lines.append("")
+            lines.append("What I can do without approval:")
+            lines.append("  • collect sources, score opportunities, assign scouts")
+            lines.append("  • create internal drafts and research reports")
+            lines.append("  • update action queue and decision log")
+            lines.append("")
+            lines.append("What needs your approval:")
+            lines.append("  • publishing, paid tools, affiliate signup")
+            lines.append("  • client-facing content, live trading")
+            lines.append("")
+            lines.append("I'll only message you for: one digest, a blocker, or approval needed.")
+            lines.append("")
+            if aq_path.exists():
+                try:
+                    lines.append(f"Evidence: {aq_path.relative_to(_root)}")
+                except ValueError:
+                    lines.append(f"Evidence: {aq_path}")
             return InternalFirstReply(
-                text=reply,
+                text="\n".join(lines),
                 confidence=CONF_INTERNAL_CONFIRMED,
                 source="hermes_operating_loop",
                 matched_topic=topic,
@@ -1839,12 +1866,12 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
                 f"{summary['actionable']} are actionable. "
                 f"{summary['rejected']} were rejected."
             )
-            # Best move from top opportunity
+            # Best move from top opportunity — use specific offer text, not routing instruction
             top = summary.get("top_opportunity") or (top_ops[0] if top_ops else None)
             if top:
-                rec = (top.get("recommended_action") or top.get("title") or "")[:90]
-                if rec:
-                    lines.append(f"\nBest move:\n{rec}")
+                best_move = _format_opportunity_specific(top).split(" — assign to ")[0].split(" [needs approval]")[0].strip()
+                if best_move:
+                    lines.append(f"\nBest move:\n{best_move}")
             # Top opportunities list
             if top_ops:
                 lines.append("\nTop opportunities:")
@@ -2051,6 +2078,88 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
                     f"Could not create content action: {exc}\n\n"
                     "Run daily intake first to score content candidates:\n"
                     "Hermes, run daily opportunity intake."
+                ),
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_daily_cycle_state",
+                matched_topic=topic,
+            )
+
+    if topic == "review_first":
+        try:
+            from lib.hermes_daily_cycle_state import load_top_opportunities, find_latest_daily_cycle
+            from lib.hermes_action_queue import get_open_action_by_title, normalize_action_title
+            top_ops = load_top_opportunities(limit=3)
+            cycle = find_latest_daily_cycle()
+
+            # Pick the best content/product candidate
+            best = next(
+                (op for op in top_ops if op.get("status") in (
+                    "content_candidate", "product_candidate", "client_education_candidate"
+                )),
+                top_ops[0] if top_ops else None,
+            )
+            if not best:
+                return InternalFirstReply(
+                    text=(
+                        "I do not have a daily research review yet.\n\n"
+                        "Run daily intake first: Hermes, run daily opportunity intake.\n"
+                        "Then I can tell you exactly what to review."
+                    ),
+                    confidence=CONF_INTERNAL_PARTIAL,
+                    source="hermes_daily_cycle_state",
+                    matched_topic=topic,
+                )
+
+            specific = _format_opportunity_specific(best)
+            asset_name = specific.split(" — assign to ")[0].split(" [needs approval]")[0].strip()
+            why = (best.get("why_selected") or best.get("why_collected") or
+                   "It supports the 30-day revenue goal and fits Nexus' credit/funding audience.")
+            scout = best.get("assigned_scout") or "content_intelligence_scout"
+            requires_approval = bool(best.get("requires_ray_approval"))
+
+            # Check current action status
+            action_status = "not yet queued"
+            existing = get_open_action_by_title(normalize_action_title(asset_name))
+            if existing:
+                action_status = existing.status
+                scout = existing.assigned_scout or scout
+
+            lines = [
+                "Review this first:",
+                asset_name,
+                "",
+                f"Why:",
+                f"{why[:150]}",
+                "",
+                f"Current status:",
+                f"Assigned to {scout}. Status: {action_status}.",
+                "",
+                "What to look for:",
+                "  • Is this useful for a business owner or credit applicant?",
+                "  • Can it lead into the Nexus funding-readiness offer?",
+                "  • Is the scope right for a first internal draft?",
+                "",
+                f"Approval:",
+                "Not needed for internal draft.",
+                "Required before publishing, selling, or client use.",
+            ]
+            if existing:
+                lines.append(f"\nEvidence:")
+                lines.append(f"  Action: {existing.action_id}")
+            if cycle.get("review"):
+                lines.append(f"  Review: {cycle['review']}")
+            return InternalFirstReply(
+                text="\n".join(lines),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_daily_cycle_state",
+                matched_topic=topic,
+            )
+        except Exception as exc:
+            return InternalFirstReply(
+                text=(
+                    "Review the latest daily research review first.\n\n"
+                    "Say: Hermes, show daily research review.\n\n"
+                    f"(review_first error: {exc})"
                 ),
                 confidence=CONF_INTERNAL_PARTIAL,
                 source="hermes_daily_cycle_state",

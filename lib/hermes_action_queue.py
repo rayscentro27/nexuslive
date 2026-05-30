@@ -194,69 +194,121 @@ def action_dedupe_key(action: "Action") -> tuple:
     return (normalize_action_title(action.title), action.goal_id, action.assigned_scout)
 
 
+_META_KEYWORDS = frozenset([
+    "run operating loop", "operating loop", "provider policy check",
+    "intake pipeline", "verify source intake", "run provider policy",
+    "identify top revenue action this week",
+])
+
+_BUSINESS_KEYWORDS = frozenset([
+    "checklist", "newsletter", "affiliate", "credit repair", "credit/funding",
+    "credit score", "lead magnet", "content draft", "youtube", "readiness",
+    "funding", "saas", "template", "product", "content intelligence",
+    "content scout", "process registered", "process intake",
+])
+
+
+def _is_meta_action(action: "Action") -> bool:
+    """Return True if this is a generic system/loop action, not real business work."""
+    t = normalize_action_title(action.title)
+    return any(k in t for k in _META_KEYWORDS)
+
+
+def _action_business_score(action: "Action") -> int:
+    """Score an action by business value. Higher = show first."""
+    t = normalize_action_title(action.title)
+    # Assigned/in-progress always beats proposed/queued
+    status_bonus = 20 if action.status in ("assigned", "in_progress") else 0
+    scout_bonus = 10 if action.assigned_scout else 0
+    if _is_meta_action(action):
+        return 0 + status_bonus  # keep meta actions at the bottom
+    business_bonus = 30 if any(k in t for k in _BUSINESS_KEYWORDS) else 0
+    return action.priority + business_bonus + status_bonus + scout_bonus
+
+
 def get_unique_open_actions() -> list["Action"]:
-    """Return open actions deduplicated by (normalized_title, goal_id, assigned_scout)."""
+    """Return open actions deduplicated and sorted by business value (real work first)."""
     open_actions = get_open_actions()
     seen: dict[tuple, "Action"] = {}
-    for a in sorted(open_actions, key=lambda x: -x.priority):
+    # First pass: keep highest-business-score version per unique key
+    for a in sorted(open_actions, key=lambda x: -_action_business_score(x)):
         key = action_dedupe_key(a)
         if key not in seen:
             seen[key] = a
-    return list(seen.values())
+    return sorted(seen.values(), key=lambda x: -_action_business_score(x))
 
 
 def format_action_queue_summary_common_language() -> str:
-    """Plain-language action queue with deduplicated unique actions."""
+    """Plain-language action queue: real business work first, meta/system work last."""
     all_open = get_open_actions()
     unique = get_unique_open_actions()
     dup_count = len(all_open) - len(unique)
 
+    active = [a for a in unique if a.status not in ("blocked", "needs_ray_approval")]
+    business_actions = [a for a in active if not _is_meta_action(a)]
+    meta_actions = [a for a in active if _is_meta_action(a)]
     blocked = [a for a in unique if a.status == "blocked"]
     approval_needed = [a for a in unique if a.status == "needs_ray_approval"]
-    in_progress = [a for a in unique if a.status == "in_progress"]
-    ready = sorted(
-        [a for a in unique if a.status in ("proposed", "queued", "assigned")],
-        key=lambda x: -x.priority,
-    )
 
     lines = ["ACTION QUEUE", ""]
-    if dup_count > 0:
-        lines.append(
-            f"I have {len(all_open)} open action records, but {dup_count} are duplicates. "
-            f"The top {min(5, len(unique))} unique actions are:"
-        )
-    else:
-        lines.append(f"I have {len(unique)} unique open actions. Top actions:")
-
+    dup_note = f", {dup_count} are duplicates" if dup_count else ""
+    lines.append(
+        f"I have {len(all_open)} open action records{dup_note}. "
+        f"The top work is:"
+    )
     lines.append("")
+
+    _WHY_MAP = {
+        "checklist": "fastest reviewable revenue asset",
+        "newsletter": "recurring revenue with existing audience",
+        "affiliate": "supports monetization without paid ads",
+        "youtube": "feeds the content engine",
+        "credit repair": "core Nexus audience need",
+        "credit/funding": "core Nexus audience need",
+        "funnel": "top-of-funnel lead capture",
+        "process registered": "feeds content and monetization engine",
+        "process intake": "clears pending research backlog",
+    }
+
+    def _why_it_matters(a: "Action") -> str:
+        t = normalize_action_title(a.title)
+        for kw, reason in _WHY_MAP.items():
+            if kw in t:
+                return reason
+        return "supports Nexus revenue goal"
+
     shown = 0
-    for group in [in_progress, ready]:
-        for a in group:
-            if shown >= 5:
-                break
-            shown += 1
-            display_title = normalize_action_title(a.title) or a.title
-            # Title-case for readability
-            display_title = display_title[:80]
-            scout_tag = f"\n   Scout: {a.assigned_scout}" if a.assigned_scout else ""
-            next_tag = f"\n   Next: {a.next_step}" if a.next_step else ""
-            status_label = {
-                "in_progress": "in progress", "queued": "ready",
-                "assigned": "assigned", "proposed": "proposed",
-            }.get(a.status, a.status)
-            lines.append(f"{shown}. {display_title}")
-            lines.append(f"   Status: {status_label}{scout_tag}{next_tag}")
-            lines.append("")
+    for a in business_actions:
+        if shown >= 5:
+            break
+        shown += 1
+        display_title = (normalize_action_title(a.title) or a.title)[:80]
+        scout_tag = f"\n   Scout: {a.assigned_scout}" if a.assigned_scout else ""
+        status_label = {
+            "in_progress": "in progress", "queued": "ready",
+            "assigned": "assigned", "proposed": "proposed",
+        }.get(a.status, a.status)
+        lines.append(f"{shown}. {display_title}")
+        lines.append(f"   Why it matters: {_why_it_matters(a)}.{scout_tag}")
+        lines.append(f"   Status: {status_label}")
+        lines.append("")
+
+    if meta_actions:
+        lines.append("System / background:")
+        for a in meta_actions[:4]:
+            t = (normalize_action_title(a.title) or a.title)[:60]
+            lines.append(f"  • {t}")
+        lines.append("")
 
     if blocked:
-        lines.append(f"Blocked ({len(blocked)}) — need Ray to unblock:")
-        for a in blocked[:3]:
-            lines.append(f"  🔴 {a.title}")
+        lines.append(f"Blocked ({len(blocked)}) — needs Ray to unblock:")
+        for a in blocked[:2]:
+            lines.append(f"  🔴 {(normalize_action_title(a.title) or a.title)[:55]}")
         lines.append("")
     if approval_needed:
         lines.append(f"Waiting for approval ({len(approval_needed)}):")
-        for a in approval_needed[:3]:
-            lines.append(f"  ⏳ {a.title}")
+        for a in approval_needed[:2]:
+            lines.append(f"  ⏳ {(normalize_action_title(a.title) or a.title)[:55]}")
         lines.append("")
     if dup_count > 0:
         lines.append(f"Duplicates suppressed: {dup_count} repeated operating-loop actions.")

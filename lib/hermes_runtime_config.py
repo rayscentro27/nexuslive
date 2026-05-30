@@ -332,8 +332,13 @@ def default_runtime_config() -> dict[str, Any]:
             "daily_review": [
                 "show daily research review", "show daily review",
                 "daily review", "show research review", "show intake review",
-                "what should i review first", "what needs review",
-                "show latest review", "show the daily review",
+                "what needs review", "show latest review", "show the daily review",
+            ],
+            "review_first": [
+                "what should i review first",
+                "what is the next thing i should review",
+                "what should i look at first",
+                "what needs my review",
             ],
             "build_content_from_opportunity": [
                 "build content from the best opportunity",
