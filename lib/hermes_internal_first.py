@@ -411,6 +411,8 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         "approval_policy": [
             "show approval policy",
             "what can you do autonomously",
+            "what can you do without approval",
+            "what can i do without approval",
             "what is blocked",
             "what requires my approval",
             "hermes policy",
@@ -422,6 +424,22 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
             "what should i look at first",
             "what needs my review",
             "what should ray review first",
+        ],
+        "create_content_draft": [
+            "create the first draft for the credit",
+            "create first draft",
+            "build checklist draft",
+            "draft lead magnet",
+            "create credit/funding checklist",
+            "create the checklist draft",
+            "build the checklist",
+            "create a new version of the checklist",
+            "create new version",
+            "revise the checklist",
+            "revise it",
+            "update the draft",
+            "make the draft better",
+            "make it better",
         ],
     }
     topic = ""
@@ -2166,27 +2184,66 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
                 matched_topic=topic,
             )
 
-    if topic == "approval_policy":
+    if topic == "create_content_draft":
+        new_version = any(p in text for p in [
+            "create a new version", "create new version", "revise", "update the draft",
+            "make it better", "make the draft better",
+        ])
         try:
-            from lib.hermes_ceo_decision_policy import AUTONOMOUS_ALLOWED, APPROVAL_REQUIRED, BLOCKED
-            lines = [
-                "APPROVAL POLICY", "",
-                f"Autonomous (no approval needed) — {len(AUTONOMOUS_ALLOWED)} actions:",
-            ]
-            for r in AUTONOMOUS_ALLOWED[:8]:
-                lines.append(f"  ✅ {r['action']}: {r['description'][:60]}")
-            lines.append("")
-            lines.append(f"Requires Ray approval — {len(APPROVAL_REQUIRED)} actions:")
-            for r in APPROVAL_REQUIRED:
-                lines.append(f"  ⏳ {r['action']}: {r['description'][:60]}")
-            lines.append("")
-            lines.append(f"Always blocked — {len(BLOCKED)} actions:")
-            for r in BLOCKED[:6]:
-                lines.append(f"  🔴 {r['action']}: {r['description'][:60]}")
-            lines.append("")
-            lines.append("Say 'show decision log' to see recent Hermes decisions.")
+            from lib.hermes_content_artifact_builder import (
+                create_credit_funding_readiness_checklist_draft,
+                format_content_created_response,
+            )
+            result = create_credit_funding_readiness_checklist_draft(new_version=new_version)
+            reply_text = format_content_created_response(result)
         except Exception as exc:
-            lines = [f"Approval policy unavailable: {exc}"]
+            reply_text = (
+                f"Could not create draft: {exc}\n\n"
+                "Check: docs/reports/content/ for any existing drafts."
+            )
+        return InternalFirstReply(
+            text=reply_text,
+            confidence=CONF_INTERNAL_CONFIRMED,
+            source="hermes_content_artifact_builder",
+            matched_topic=topic,
+        )
+
+    if topic == "approval_policy":
+        lines = [
+            "APPROVAL POLICY", "",
+            "Autonomous allowed:",
+            "  - free research",
+            "  - source intake",
+            "  - scoring opportunities",
+            "  - assigning scouts",
+            "  - internal drafts",
+            "  - internal reports",
+            "  - action queue / decision log updates",
+            "  - demo/paper testing under caps",
+            "",
+            "Ray approval required:",
+            "  - publishing",
+            "  - paid tools or APIs",
+            "  - affiliate signup",
+            "  - Stripe/payment activation",
+            "  - client-facing content",
+            "  - live trading",
+            "  - funded broker",
+            "  - production deployment",
+            "",
+            "Blocked:",
+            "  - fake sources",
+            "  - claiming completion without artifacts",
+            "  - live trading without approval",
+            "  - spending money without approval",
+            "",
+        ]
+        try:
+            from lib.hermes_ceo_decision_policy import AUTONOMOUS_ALLOWED
+            policy_path = "lib/hermes_ceo_decision_policy.py"
+            lines.append(f"Evidence: {policy_path}")
+        except Exception:
+            lines.append("Evidence: lib/hermes_ceo_decision_policy.py")
         return InternalFirstReply(
             text="\n".join(lines),
             confidence=CONF_INTERNAL_CONFIRMED,

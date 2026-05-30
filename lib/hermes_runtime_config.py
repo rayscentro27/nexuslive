@@ -64,7 +64,12 @@ def default_runtime_config() -> dict[str, Any]:
                 "what was completed yesterday", "show handoffs", "claude handoffs",
                 "recent handoffs", "latest handoff", "what did claude build",
             ],
-            "funding": ["funding blocker", "funding blockers", "funding"],
+            "funding": ["funding blocker", "funding blockers", "show funding", "what are my funding blockers"],
+            "create_content_draft": [
+                "create the first draft", "create first draft", "build checklist draft",
+                "draft lead magnet", "create the checklist", "build the checklist",
+                "create a new version of the checklist", "revise the checklist",
+            ],
             "today": [
                 "what should i work on today", "what should we work on today",
                 "next best move", "what do you recommend we work on today",

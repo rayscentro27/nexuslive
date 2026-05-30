@@ -1884,11 +1884,44 @@ class NexusTelegramBot:
         return "Decision log unavailable."
 
     def _cmd_approval_policy(self) -> str:
-        from lib.hermes_internal_first import try_internal_first
-        result = try_internal_first("show approval policy")
-        if result:
-            return result.text
-        return "Approval policy unavailable."
+        return (
+            "APPROVAL POLICY\n\n"
+            "Autonomous allowed:\n"
+            "  - free research\n"
+            "  - source intake\n"
+            "  - scoring opportunities\n"
+            "  - assigning scouts\n"
+            "  - internal drafts\n"
+            "  - internal reports\n"
+            "  - action queue / decision log updates\n"
+            "  - demo/paper testing under caps\n\n"
+            "Ray approval required:\n"
+            "  - publishing\n"
+            "  - paid tools or APIs\n"
+            "  - affiliate signup\n"
+            "  - Stripe/payment activation\n"
+            "  - client-facing content\n"
+            "  - live trading\n"
+            "  - funded broker\n"
+            "  - production deployment\n\n"
+            "Blocked:\n"
+            "  - fake sources\n"
+            "  - claiming completion without artifacts\n"
+            "  - live trading without approval\n"
+            "  - spending money without approval\n\n"
+            "Evidence: lib/hermes_ceo_decision_policy.py"
+        )
+
+    def _cmd_create_content_draft(self, new_version: bool = False) -> str:
+        from lib.hermes_content_artifact_builder import (
+            create_credit_funding_readiness_checklist_draft,
+            format_content_created_response,
+        )
+        try:
+            result = create_credit_funding_readiness_checklist_draft(new_version=new_version)
+            return format_content_created_response(result)
+        except Exception as exc:
+            return f"Could not create draft: {exc}"
 
     def _cmd_action_queue(self) -> str:
         from lib.hermes_action_queue import format_action_queue_summary_common_language
@@ -2680,6 +2713,24 @@ class NexusTelegramBot:
             "action queue": self._cmd_action_queue,
             "what should i review first": self._cmd_review_first,
             "what is the next thing i should review": self._cmd_review_first,
+            # Approval policy — plain language, not swallowed by LLM
+            "what needs my approval": self._cmd_approval_policy,
+            "what can i do without approval": self._cmd_approval_policy,
+            "what can you do without approval": self._cmd_approval_policy,
+            # Content draft creation
+            "create the first draft for the credit/funding readiness checklist": self._cmd_create_content_draft,
+            "create the first draft for the checklist": self._cmd_create_content_draft,
+            "create first draft": self._cmd_create_content_draft,
+            "build checklist draft": self._cmd_create_content_draft,
+            "draft lead magnet": self._cmd_create_content_draft,
+            "create the checklist draft": self._cmd_create_content_draft,
+            "build the checklist": self._cmd_create_content_draft,
+            "create a new version of the checklist draft": lambda: self._cmd_create_content_draft(new_version=True),
+            "create a new version": lambda: self._cmd_create_content_draft(new_version=True),
+            "revise the checklist": lambda: self._cmd_create_content_draft(new_version=True),
+            "revise it": lambda: self._cmd_create_content_draft(new_version=True),
+            "update the draft": lambda: self._cmd_create_content_draft(new_version=True),
+            "make it better": lambda: self._cmd_create_content_draft(new_version=True),
         }
         # Also check "hermes, X" → strip prefix then match
         _normalized_strip = normalized.lstrip("hermes").lstrip(",").lstrip().rstrip(".")
