@@ -245,10 +245,18 @@ def escalate(
 
 def _fallback_data_block(user_message: str, exec_context: str) -> str:
     """Return a structured data block when all LLM attempts fail."""
+    try:
+        from lib.hermes_conversation_context_resolver import (
+            is_followup_phrase,
+            format_unresolved_reference_response,
+        )
+        if is_followup_phrase(user_message):
+            return format_unresolved_reference_response(user_message)
+    except Exception:
+        pass
     return (
         f"[Quality escalation fallback — LLM response was too generic]\n\n"
         f"Your question: {user_message[:200]}\n\n"
-        f"Current operational state:\n{exec_context[:800] if exec_context else '(unavailable)'}\n\n"
         f"Run `nexus ceo briefing` for the full executive briefing."
     )
 

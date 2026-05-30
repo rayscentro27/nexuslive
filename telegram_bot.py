@@ -572,6 +572,13 @@ class NexusTelegramBot:
             text = format_telegram_reply(internal.text)
             hermes_conversation_memory.record_turn(chat_id, "user", raw)
             hermes_conversation_memory.record_turn(chat_id, "assistant", internal.text)
+            try:
+                from lib.hermes_conversation_context_resolver import extract_context_from_response, record_context_event
+                ctx = extract_context_from_response(raw, internal.text)
+                if ctx:
+                    record_context_event(ctx)
+            except Exception:
+                pass
             return text
 
         # Supabase-first knowledge routing — search approved knowledge, research tickets, domain tables
@@ -1937,6 +1944,159 @@ class NexusTelegramBot:
             return result.text
         return "Review the daily research review first: say 'show daily research review'."
 
+    # ── Follow-up context resolution ──────────────────────────────────────────
+
+    def _cmd_view_last_object(self) -> str:
+        """Resolve 'show it' / 'can i view it' to the last mentioned object."""
+        from lib.hermes_conversation_context_resolver import (
+            resolve_reference, format_unresolved_reference_response,
+        )
+        from lib.hermes_artifact_viewer import (
+            find_latest_content_draft, read_artifact_preview,
+            format_artifact_preview_response, format_action_preview_response,
+        )
+        resolution = resolve_reference("show it")
+        if not resolution:
+            return format_unresolved_reference_response("show it")
+
+        ctx = resolution["context"]
+        obj_type = ctx.get("primary_object_type", "")
+
+        if obj_type == "content_draft":
+            path = find_latest_content_draft()
+            if path:
+                content = read_artifact_preview(path)
+                return format_artifact_preview_response(path, content)
+            return "No draft file found. Say 'create first draft' to create one."
+
+        if obj_type in ("opportunity", "review_first"):
+            action_id = ctx.get("related_action_id")
+            draft = find_latest_content_draft()
+            if action_id:
+                try:
+                    from lib.hermes_action_queue import _load_records
+                    seen: dict = {}
+                    for a in _load_records():
+                        seen[a.action_id] = a
+                    action = seen.get(action_id)
+                    if action:
+                        resp = format_action_preview_response(action)
+                        if draft:
+                            try:
+                                rel = str(draft.relative_to(
+                                    __import__("pathlib").Path(__file__).parent
+                                ))
+                            except Exception:
+                                rel = str(draft)
+                            resp += f"\n\nLatest draft: {rel}"
+                        return resp
+                except Exception:
+                    pass
+            if draft:
+                content = read_artifact_preview(draft)
+                return format_artifact_preview_response(draft, content)
+
+        if obj_type == "action":
+            action_id = ctx.get("primary_object_id") or ctx.get("related_action_id")
+            if action_id:
+                try:
+                    from lib.hermes_action_queue import _load_records
+                    seen = {}
+                    for a in _load_records():
+                        seen[a.action_id] = a
+                    action = seen.get(action_id)
+                    if action:
+                        return format_action_preview_response(action)
+                except Exception:
+                    pass
+            return self._cmd_action_queue()
+
+        return format_unresolved_reference_response("show it")
+
+    def _cmd_why_last_recommendation(self) -> str:
+        """Resolve 'why did you pick that' to the last recommendation context."""
+        from lib.hermes_conversation_context_resolver import (
+            get_last_context, format_unresolved_reference_response,
+        )
+        ctx = get_last_context()
+        if not ctx:
+            return format_unresolved_reference_response("why that")
+
+        title = ctx.get("primary_object_title", "the recommended item")
+        obj_type = ctx.get("primary_object_type", "")
+        evidence = ctx.get("evidence_path", "docs/reports/actions/hermes_action_queue.jsonl")
+
+        if obj_type in ("opportunity", "review_first", "content_draft"):
+            return (
+                f"Why I picked: {title[:70]}\n\n"
+                "Reasons:\n"
+                "  - Fastest reviewable revenue asset\n"
+                "  - Free to draft — no approval needed\n"
+                "  - Aligns with 30-day revenue goal\n"
+                "  - Supports the funding-readiness audience\n"
+                "  - Can become lead magnet, paid template, or newsletter opt-in\n\n"
+                f"Evidence: {evidence}"
+            )
+        why = ctx.get("why_selected", "")
+        if why:
+            return f"Why I picked that:\n{why[:300]}\n\nEvidence: {evidence}"
+        return format_unresolved_reference_response("why that")
+
+    def _cmd_status_last_object(self) -> str:
+        """Resolve 'what is its status' to the last mentioned action."""
+        from lib.hermes_conversation_context_resolver import (
+            get_last_context, format_unresolved_reference_response,
+        )
+        ctx = get_last_context()
+        if not ctx:
+            return format_unresolved_reference_response("status")
+
+        action_id = ctx.get("related_action_id") or ctx.get("primary_object_id")
+        title = ctx.get("primary_object_title", "")
+
+        if action_id:
+            try:
+                from lib.hermes_action_queue import _load_records
+                seen: dict = {}
+                for a in _load_records():
+                    seen[a.action_id] = a
+                action = seen.get(action_id)
+                if action:
+                    return (
+                        f"STATUS: {title or action.title}\n\n"
+                        f"Current: {action.status}\n"
+                        f"Scout: {action.assigned_scout or '(unassigned)'}\n"
+                        f"Next: {action.next_step or '(no next step)'}\n\n"
+                        "Evidence: docs/reports/actions/hermes_action_queue.jsonl"
+                    )
+            except Exception:
+                pass
+        return f"Status of: {title or 'last item'}\n\nSay 'show action queue' for full status."
+
+    def _cmd_show_first_action(self) -> str:
+        """Show the first/best open business action from the queue."""
+        from lib.hermes_action_queue import get_unique_open_actions, _is_meta_action
+        from lib.hermes_artifact_viewer import format_action_preview_response
+        actions = [a for a in get_unique_open_actions() if not _is_meta_action(a)]
+        if not actions:
+            return "No open business actions in queue."
+        return format_action_preview_response(actions[0])
+
+    def _dispatch_continuity(self, method, user_text: str) -> str:
+        """Call a continuity-dict method and record context from its response."""
+        result = method()
+        if result:
+            try:
+                from lib.hermes_conversation_context_resolver import (
+                    extract_context_from_response, record_context_event,
+                )
+                ctx = extract_context_from_response(user_text, result)
+                if ctx:
+                    record_context_event(ctx)
+            except Exception:
+                pass
+        return result
+
     def _cmd_funding_blockers_conversational(self) -> str:
         core = str(self.handle_basic_command("funding_blockers") or "").strip()
         if not core:
@@ -2713,6 +2873,28 @@ class NexusTelegramBot:
             "action queue": self._cmd_action_queue,
             "what should i review first": self._cmd_review_first,
             "what is the next thing i should review": self._cmd_review_first,
+            # Follow-up context resolution — must be BEFORE generic LLM fallback
+            "can i view it": self._cmd_view_last_object,
+            "can i see it": self._cmd_view_last_object,
+            "show it": self._cmd_view_last_object,
+            "open it": self._cmd_view_last_object,
+            "let me see it": self._cmd_view_last_object,
+            "view it": self._cmd_view_last_object,
+            "view the draft": self._cmd_view_last_object,
+            "see the draft": self._cmd_view_last_object,
+            "show the draft": self._cmd_view_last_object,
+            "show the first one": self._cmd_show_first_action,
+            "show the best one": self._cmd_view_last_object,
+            "show the top one": self._cmd_view_last_object,
+            "why did you pick that": self._cmd_why_last_recommendation,
+            "why that one": self._cmd_why_last_recommendation,
+            "why that": self._cmd_why_last_recommendation,
+            "why pick that": self._cmd_why_last_recommendation,
+            "why did you choose that": self._cmd_why_last_recommendation,
+            "explain your choice": self._cmd_why_last_recommendation,
+            "what is its status": self._cmd_status_last_object,
+            "what is the status": self._cmd_status_last_object,
+            "what happened with that": self._cmd_status_last_object,
             # Approval policy — plain language, not swallowed by LLM
             "what needs my approval": self._cmd_approval_policy,
             "what can i do without approval": self._cmd_approval_policy,
@@ -2736,10 +2918,10 @@ class NexusTelegramBot:
         _normalized_strip = normalized.lstrip("hermes").lstrip(",").lstrip().rstrip(".")
         if normalized in continuity:
             logger.info("telegram route=chat")
-            return continuity[normalized]()
+            return self._dispatch_continuity(continuity[normalized], normalized)
         if _normalized_strip and _normalized_strip in continuity:
             logger.info("telegram route=chat hermes-prefix-stripped")
-            return continuity[_normalized_strip]()
+            return self._dispatch_continuity(continuity[_normalized_strip], _normalized_strip)
 
         swarm_followup = self._handle_swarm_followup(normalized)
         if swarm_followup:
