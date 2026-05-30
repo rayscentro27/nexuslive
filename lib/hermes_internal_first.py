@@ -113,7 +113,134 @@ def _build_operational_context_brief() -> str:
     )
 
 
+_STATUS_LABELS: dict[str, str] = {
+    "product_candidate": "Build product",
+    "content_candidate": "Create content",
+    "client_education_candidate": "Client education content",
+    "affiliate_candidate": "Set up affiliate",
+    "grant_candidate": "Apply for grant",
+    "needs_more_research": "Research further",
+    "high_priority": "High priority action",
+    "watch": "Monitor",
+    "reject": "Filtered out",
+}
+
+_CATEGORY_ACTIONS: dict[str, str] = {
+    "paid template": "Build a paid template or checklist product (e.g., Credit Readiness Checklist)",
+    "tool product": "Build a simple paid tool or template product for the credit/funding audience",
+    "newsletter": "Launch a premium newsletter tier for existing Nexus audience",
+    "newsletter premium": "Launch a premium newsletter tier with weekly opportunity digest",
+    "affiliate": "Research and sign up for a relevant affiliate program (free, no approval needed for research)",
+    "affiliate program": "Identify the top 1-2 affiliate programs that fit Nexus' credit/funding audience",
+    "content": "Write educational content for the credit/funding audience — top of funnel lead magnet",
+    "credit repair": "Create a credit repair roadmap or guide as a lead magnet",
+    "credit": "Research and document the credit repair workflow for the Nexus content funnel",
+    "funnel": "Design a lead magnet funnel for the credit/funding audience",
+    "grant": "Research and apply for a small business or creator grant",
+    "saas": "Build a lightweight SaaS product or tool serving the credit/funding market",
+}
+
+
+def _format_opportunity_specific(op: dict) -> str:
+    """
+    Convert a generic decision record into a specific recommended action.
+    Returns a one-line specific recommendation, not just a category label.
+    """
+    title = (op.get("title") or op.get("keyword") or "").strip()
+    status = op.get("status", "")
+    rec = (op.get("recommended_action") or "").strip()
+    keyword = (op.get("keyword") or "").lower()
+    score = op.get("monetization_score", 0)
+    approval = op.get("requires_ray_approval", False)
+    scout = op.get("assigned_scout") or op.get("discovered_by") or ""
+
+    generic_labels = {
+        "monetization opportunity", "content opportunity", "affiliate opportunity",
+        "product opportunity", "research opportunity",
+    }
+    title_lower = title.lower()
+
+    # 1. Use specific recommended_action if present and non-generic
+    if rec and not any(label in rec.lower() for label in generic_labels) and len(rec) > 20:
+        specific = rec
+    else:
+        # 2. Try category expansion before falling back to raw title
+        specific = ""
+        for key, action in _CATEGORY_ACTIONS.items():
+            if key in title_lower or key in keyword:
+                specific = action
+                break
+        # 3. If no category match and title is non-generic, use title
+        if not specific and title and not any(label in title_lower for label in generic_labels) and len(title) > 15:
+            specific = title
+        # 4. Final fallback
+        if not specific:
+            action_verb = _STATUS_LABELS.get(status, "Research")
+            specific = f"{action_verb}: {title or keyword or 'unknown opportunity'}"
+
+    approval_tag = " [needs approval]" if approval else ""
+    scout_tag = f" — assign to {scout}" if scout else ""
+    return f"{specific}{approval_tag}{scout_tag}"
+
+
+def _format_opportunity_detail(op: dict, index: int) -> list[str]:
+    """
+    Full multi-line specific opportunity block for top monetization actions.
+    """
+    title = (op.get("title") or op.get("keyword") or "").strip()
+    status = op.get("status", "")
+    rec = (op.get("recommended_action") or "").strip()
+    why = (op.get("why_selected") or op.get("why_collected") or "").strip()
+    goal = (op.get("goal_supported") or "").strip()
+    scout = op.get("assigned_scout") or op.get("discovered_by") or ""
+    approval = op.get("requires_ray_approval", False)
+    score = op.get("monetization_score", 0)
+
+    specific = _format_opportunity_specific(op)
+    lines = [f"{index}. {specific}"]
+    if why:
+        lines.append(f"   Why: {why[:100]}")
+    elif goal:
+        lines.append(f"   Why: Supports {goal} goal.")
+    if rec and rec != specific:
+        lines.append(f"   Next: {rec[:80]}")
+    else:
+        lines.append(f"   Next: Begin research and create internal draft.")
+    if scout:
+        lines.append(f"   Scout: {scout}")
+    lines.append(f"   Approval: {'Required before publishing.' if approval else 'Not needed for internal draft.'}")
+    return lines
+
+
+def _normalize_input(raw: str) -> str:
+    # Strip smart quotes, bullets, em/en dashes + menu suffixes.
+    # Uses string operations to avoid regex character class encoding issues.
+    t = (raw or "").strip()
+    # 1. Strip leading bullet/dash/star
+    LEAD_STRIP = set([
+        "\u2022", "\u2023", "\u25e6", "\u2013", "\u2014", "-", "*"
+    ])
+    while t and t[0] in LEAD_STRIP:
+        t = t[1:].strip()
+    # 2. Strip em dash / en dash and everything after it
+    for dash in ["\u2014", "\u2013"]:
+        idx = t.find(dash)
+        if idx != -1:
+            t = t[:idx].strip()
+    # 3. Strip surrounding quote chars (ASCII and Unicode)
+    QUOTES = set([chr(0x27), chr(0x22), chr(0x2018), chr(0x2019), chr(0x201c), chr(0x201d), chr(0xab), chr(0xbb)])
+    while t and t[0] in QUOTES:
+        t = t[1:]
+    while t and t[-1] in QUOTES:
+        t = t[:-1]
+    # 4. Collapse whitespace
+    return " ".join(t.split())
+
+
+
+
 def try_internal_first(raw: str) -> InternalFirstReply | None:
+    raw = _normalize_input(raw)
     text = (raw or "").strip().lower()
     if not text:
         return None
@@ -235,7 +362,13 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         "daily_review": [
             "show daily research review", "show daily review",
             "daily research review", "what should i review first",
-            "show research review",
+            "show research review", "show latest review",
+            "show the daily review", "show the research review",
+        ],
+        "raw_evidence": [
+            "show raw evidence", "raw evidence",
+            "show artifact paths", "show artifact files",
+            "show evidence paths", "evidence files and paths",
         ],
         "needs_approval": [
             "what needs my approval", "show approval needed",
@@ -1481,16 +1614,16 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
     # ── Daily Opportunity Intake commands ─────────────────────────────────────
 
     if topic == "daily_intake":
-        # "run daily intake" → immediate acknowledgement (intake runs as separate CLI, not inline)
+        # "run daily intake" → clear status: manual_required (Hermes does not run inline)
         if "run" in text and ("intake" in text or "daily opportunity" in text):
             return InternalFirstReply(
                 text=(
-                    "Daily opportunity intake queued.\n\n"
-                    "Collecting sources from YouTube, keywords, GitHub, and monetization categories.\n"
-                    "This takes 1-2 minutes. I'll include a digest with results.\n\n"
-                    "To run now:\n"
+                    "Manual command required.\n\n"
+                    "I have not started the intake — it runs as a separate process.\n\n"
+                    "To run:\n"
                     "  python3 scripts/run_daily_opportunity_intake.py --mode validation\n\n"
-                    "When done, say 'what did you find today' to see the results."
+                    "When complete, say 'what did you find today' to see results.\n"
+                    "I'll send one digest when it finishes — no source-by-source updates."
                 ),
                 confidence=CONF_INTERNAL_CONFIRMED,
                 source="daily_opportunity_intake_engine",
@@ -1519,23 +1652,17 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
 
     if topic == "monetization_actions":
         try:
-            from lib.hermes_monetization_decision_engine import load_latest_decisions
-            decisions = load_latest_decisions(limit=20)
-            if decisions:
-                actionable = [d for d in decisions if d.get("status") not in ("reject", "watch")]
-                lines = [f"Top monetization opportunities ({len(actionable)} actionable):"]
-                for i, d in enumerate(actionable[:5], 1):
-                    title = d.get("title", "")[:60]
-                    score = d.get("monetization_score", 0)
-                    status = d.get("status", "")
-                    rec = d.get("recommended_action", "")[:60]
-                    approval = " ⏳ needs approval" if d.get("requires_ray_approval") else ""
-                    lines.append(f"\n{i}. {title}{approval}")
-                    lines.append(f"   Score: {score} | {status}")
-                    if rec:
-                        lines.append(f"   Next: {rec}")
+            from lib.hermes_daily_cycle_state import load_top_opportunities, load_daily_cycle_summary
+            top_ops = load_top_opportunities(limit=5)
+            summary = load_daily_cycle_summary()
+            if top_ops:
+                lines = [f"Top monetization opportunities ({summary.get('actionable', len(top_ops))} actionable):"]
+                for i, d in enumerate(top_ops, 1):
+                    detail = _format_opportunity_detail(d, i)
+                    lines.append("")
+                    lines.extend(detail)
                 lines.append("\nSay 'show rejected' to see what was filtered out.")
-                lines.append("Say 'build content from best opportunity' to create a draft.")
+                lines.append("Say 'show daily research review' for the full review.")
             else:
                 lines = [
                     "No monetization decisions found yet.",
@@ -1544,14 +1671,14 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
             return InternalFirstReply(
                 text="\n".join(lines),
                 confidence=CONF_INTERNAL_CONFIRMED,
-                source="hermes_monetization_decision_engine",
+                source="hermes_daily_cycle_state",
                 matched_topic=topic,
             )
         except Exception:
             return InternalFirstReply(
                 text="Monetization decision engine ready — no data yet. Run daily intake first.",
                 confidence=CONF_INTERNAL_PARTIAL,
-                source="hermes_monetization_decision_engine",
+                source="hermes_daily_cycle_state",
                 matched_topic=topic,
             )
 
@@ -1614,50 +1741,102 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
 
     if topic == "daily_review":
         try:
-            from lib.hermes_daily_cycle_state import find_latest_daily_cycle, load_daily_cycle_summary
+            from lib.hermes_daily_cycle_state import (
+                find_latest_daily_cycle, load_daily_cycle_summary,
+                load_top_opportunities, load_rejected_sources,
+            )
             cycle = find_latest_daily_cycle()
             summary = load_daily_cycle_summary()
-            if summary["has_data"]:
-                ts = summary.get("cycle_ts") or "recent"
-                lines = [
-                    f"Daily research review — {ts}",
-                    f"Sources: {summary['total_sources']} collected, "
-                    f"{summary['actionable']} actionable, {summary['rejected']} filtered out.",
-                ]
-                if summary["high_value"]:
-                    lines.append(f"High-value signals: {summary['high_value']}.")
-                top = summary.get("top_opportunity")
-                if top:
-                    title = (top.get("title") or "")[:65]
-                    score = top.get("monetization_score", 0)
-                    rec = (top.get("recommended_action") or "")[:70]
-                    lines.append(f"\nTop pick: {title} (score {score})")
-                    if rec:
-                        lines.append(f"Next: {rec}")
-                if summary["pending_approval"]:
-                    lines.append(f"\n⏳ {summary['pending_approval']} item(s) need your approval.")
-                if cycle["review"]:
-                    lines.append(f"\nFull review: {cycle['review']}")
-                text = "\n".join(lines)
-            else:
-                text = (
-                    "No daily review yet.\n"
-                    "Run: python3 scripts/run_daily_opportunity_intake.py --mode validation\n"
-                    "Or say: Hermes, run daily opportunity intake."
+            if not summary["has_data"]:
+                return InternalFirstReply(
+                    text=(
+                        "I do not have a daily research review yet.\n"
+                        "I can run daily opportunity intake first.\n"
+                        "Say: Hermes, run daily opportunity intake."
+                    ),
+                    confidence=CONF_INTERNAL_PARTIAL,
+                    source="hermes_daily_cycle_state",
+                    matched_topic=topic,
                 )
+            top_ops = load_top_opportunities(limit=3)
+            lines = ["DAILY RESEARCH REVIEW", ""]
+            lines.append(
+                f"I reviewed {summary['total_sources']} sources. "
+                f"{summary['actionable']} are actionable. "
+                f"{summary['rejected']} were rejected."
+            )
+            # Best move from top opportunity
+            top = summary.get("top_opportunity") or (top_ops[0] if top_ops else None)
+            if top:
+                rec = (top.get("recommended_action") or top.get("title") or "")[:90]
+                if rec:
+                    lines.append(f"\nBest move:\n{rec}")
+            # Top opportunities list
+            if top_ops:
+                lines.append("\nTop opportunities:")
+                for i, op in enumerate(top_ops, 1):
+                    specific = _format_opportunity_specific(op)
+                    lines.append(f"  {i}. {specific}")
+            # Rejected count
+            lines.append(f"\nRejected: {summary['rejected']} sources filtered out.")
+            # Evidence paths
+            lines.append("\nEvidence:")
+            if cycle["review"]:
+                lines.append(f"  - Review: {cycle['review']}")
+            if cycle["intake"]:
+                lines.append(f"  - Intake: {cycle['intake']}")
+            if cycle["decision"]:
+                lines.append(f"  - Decision report: {cycle['decision']}")
             return InternalFirstReply(
-                text=text,
+                text="\n".join(lines),
                 confidence=CONF_INTERNAL_CONFIRMED,
                 source="hermes_daily_cycle_state",
                 matched_topic=topic,
             )
-        except Exception:
+        except Exception as _exc:
             return InternalFirstReply(
                 text=(
-                    "No daily review yet.\n"
-                    "Run: python3 scripts/run_daily_opportunity_intake.py --mode validation\n"
-                    "Or say: Hermes, run daily opportunity intake."
+                    "I do not have a daily research review yet.\n"
+                    "I can run daily opportunity intake first.\n"
+                    "Say: Hermes, run daily opportunity intake."
                 ),
+                confidence=CONF_INTERNAL_PARTIAL,
+                source="hermes_daily_cycle_state",
+                matched_topic=topic,
+            )
+
+    if topic == "raw_evidence":
+        try:
+            from lib.hermes_daily_cycle_state import find_latest_daily_cycle
+            from pathlib import Path as _Path
+            cycle = find_latest_daily_cycle()
+            root = _Path(__file__).resolve().parent.parent
+            aq_path = root / "docs" / "reports" / "actions" / "hermes_action_queue.jsonl"
+            dl_path = root / "docs" / "reports" / "decisions" / "hermes_decision_log.jsonl"
+            lines = ["Raw evidence — latest artifact paths:"]
+            if cycle["review"]:
+                lines.append(f"  Review:       {cycle['review']}")
+            if cycle["intake"]:
+                lines.append(f"  Intake:       {cycle['intake']}")
+            if cycle["decision"]:
+                lines.append(f"  Decisions:    {cycle['decision']}")
+            if cycle["rejected"]:
+                lines.append(f"  Rejected:     {cycle['rejected']}")
+            if aq_path.exists():
+                lines.append(f"  Action queue: {aq_path}")
+            if dl_path.exists():
+                lines.append(f"  Decision log: {dl_path}")
+            if len(lines) == 1:
+                lines.append("  No artifacts found. Run daily intake to generate them.")
+            return InternalFirstReply(
+                text="\n".join(lines),
+                confidence=CONF_INTERNAL_CONFIRMED,
+                source="hermes_daily_cycle_state",
+                matched_topic=topic,
+            )
+        except Exception as _exc:
+            return InternalFirstReply(
+                text=f"Raw evidence lookup failed: {_exc}",
                 confidence=CONF_INTERNAL_PARTIAL,
                 source="hermes_daily_cycle_state",
                 matched_topic=topic,

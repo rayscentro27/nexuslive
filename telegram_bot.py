@@ -80,6 +80,31 @@ from lib.hermes_supabase_first import nexus_knowledge_reply
 from lib.telegram_router import TelegramRouter
 from lib import hermes_conversation_memory
 
+def _normalize_telegram_command(text: str) -> str:
+    # Strip smart quotes, bullets, em/en dashes + menu suffixes.
+    # Ensures copied menu items route same as typed commands.
+    t = (text or "").strip()
+    # 1. Strip leading bullet/dash/star
+    LEAD_STRIP = set([
+        "\u2022", "\u2023", "\u25e6", "\u2013", "\u2014", "-", "*"
+    ])
+    while t and t[0] in LEAD_STRIP:
+        t = t[1:].strip()
+    # 2. Strip em dash / en dash and everything after it
+    for dash in ["\u2014", "\u2013"]:
+        idx = t.find(dash)
+        if idx != -1:
+            t = t[:idx].strip()
+    # 3. Strip surrounding quote chars (ASCII and Unicode)
+    QUOTES = set([chr(0x27), chr(0x22), chr(0x2018), chr(0x2019), chr(0x201c), chr(0x201d), chr(0xab), chr(0xbb)])
+    while t and t[0] in QUOTES:
+        t = t[1:]
+    while t and t[-1] in QUOTES:
+        t = t[:-1]
+    # 4. Collapse whitespace
+    return " ".join(t.split())
+
+
 DIAGNOSTIC_PHRASES = {
     "status",
     "worker status",
@@ -514,21 +539,31 @@ class NexusTelegramBot:
     def _conversational_reply(self, raw: str) -> str:
         """Natural-language Telegram reply path for conversational mode."""
         chat_id = getattr(self, "_current_chat_id", "")
+        # Normalize before ANY matching: strip smart quotes, bullets, em dash suffixes
+        raw = _normalize_telegram_command(raw) if raw else raw
         normalized = (raw or "").strip().lower()
         if normalized in {
             "hi", "hello", "hey", "good morning", "good afternoon", "good evening", "yo",
         }:
             hermes_conversation_memory.clear_session(chat_id)
-            from datetime import datetime as _dt
-            _hour = _dt.now().hour
-            if 5 <= _hour < 12:
+            # Mirror Ray's explicit greeting; fall back to time-based for generic greetings
+            if "good morning" in normalized:
                 _greeting = "Good morning"
-            elif 12 <= _hour < 17:
+            elif "good afternoon" in normalized:
                 _greeting = "Good afternoon"
-            elif 17 <= _hour < 21:
+            elif "good evening" in normalized:
                 _greeting = "Good evening"
             else:
-                _greeting = "Hey Ray"
+                from datetime import datetime as _dt
+                _hour = _dt.now().hour
+                if 5 <= _hour < 12:
+                    _greeting = "Good morning"
+                elif 12 <= _hour < 17:
+                    _greeting = "Good afternoon"
+                elif 17 <= _hour < 21:
+                    _greeting = "Good evening"
+                else:
+                    _greeting = "Hey Ray"
             return f"{_greeting}, Ray. I'm online and ready."
 
         # Internal-first routing — bypass LLM for known Nexus ops topics
@@ -1762,6 +1797,85 @@ class NexusTelegramBot:
         except Exception as e:
             return f"Opportunity review error: {e}"
 
+    def _cmd_daily_review(self) -> str:
+        """Always returns the latest daily research review summary."""
+        try:
+            from lib.hermes_internal_first import try_internal_first
+            result = try_internal_first("show daily research review")
+            if result and result.text:
+                return result.text
+        except Exception:
+            pass
+        try:
+            from lib.hermes_daily_cycle_state import find_latest_daily_cycle, load_daily_cycle_summary, load_rejected_sources, load_top_opportunities
+            cycle = find_latest_daily_cycle()
+            summary = load_daily_cycle_summary()
+            if not summary["has_data"]:
+                return (
+                    "I do not have a daily research review yet.\n"
+                    "I can run daily opportunity intake first.\n"
+                    "Say: Hermes, run daily opportunity intake."
+                )
+            top = load_top_opportunities(limit=3)
+            rejected = load_rejected_sources(limit=3)
+            ts = (summary.get("cycle_ts") or "")[:19]
+            lines = [
+                "DAILY RESEARCH REVIEW",
+                "",
+                f"I reviewed {summary['total_sources']} sources. "
+                f"{summary['actionable']} are actionable. "
+                f"{summary['rejected']} were rejected.",
+                "",
+                "Top opportunities:",
+            ]
+            for i, op in enumerate(top, 1):
+                title = (op.get("title") or op.get("keyword") or "")[:70]
+                lines.append(f"  {i}. {title}")
+            if not top:
+                lines.append("  None yet — run intake to score sources.")
+            lines.append(f"\nRejected: {summary['rejected']} sources filtered out.")
+            lines.append("\nEvidence:")
+            if cycle["review"]:
+                lines.append(f"  - Review: {cycle['review']}")
+            if cycle["intake"]:
+                lines.append(f"  - Intake: {cycle['intake']}")
+            if cycle["decision"]:
+                lines.append(f"  - Decision report: {cycle['decision']}")
+            return "\n".join(lines)
+        except Exception as exc:
+            return (
+                "I do not have a daily research review yet.\n"
+                "Run: python3 scripts/run_daily_opportunity_intake.py --mode validation"
+            )
+
+    def _cmd_raw_evidence(self) -> str:
+        """Return latest artifact file paths concisely."""
+        try:
+            from lib.hermes_daily_cycle_state import find_latest_daily_cycle
+            from pathlib import Path
+            cycle = find_latest_daily_cycle()
+            root = Path(__file__).resolve().parent
+            aq_path = root / "docs" / "reports" / "actions" / "hermes_action_queue.jsonl"
+            dl_path = root / "docs" / "reports" / "decisions" / "hermes_decision_log.jsonl"
+            lines = ["Raw evidence — latest artifact paths:"]
+            if cycle["review"]:
+                lines.append(f"  Review:       {cycle['review']}")
+            if cycle["intake"]:
+                lines.append(f"  Intake:       {cycle['intake']}")
+            if cycle["decision"]:
+                lines.append(f"  Decisions:    {cycle['decision']}")
+            if cycle["rejected"]:
+                lines.append(f"  Rejected:     {cycle['rejected']}")
+            if aq_path.exists():
+                lines.append(f"  Action queue: {aq_path}")
+            if dl_path.exists():
+                lines.append(f"  Decision log: {dl_path}")
+            if len(lines) == 1:
+                lines.append("  No artifacts found yet. Run daily intake to generate them.")
+            return "\n".join(lines)
+        except Exception as exc:
+            return f"Raw evidence lookup failed: {exc}"
+
     def _cmd_funding_blockers_conversational(self) -> str:
         core = str(self.handle_basic_command("funding_blockers") or "").strip()
         if not core:
@@ -2444,6 +2558,8 @@ class NexusTelegramBot:
         return self.safe_help_text()
 
     def handle_inbound_message(self, text: str) -> str:
+        # Normalize before routing: strip smart quotes, bullets, em dash suffixes
+        text = _normalize_telegram_command(text) if text else text
         normalized = (text or "").strip().lower()
         if normalized:
             self.ops_memory["last_user_instruction"] = normalized[:300]
@@ -2512,10 +2628,25 @@ class NexusTelegramBot:
             "funding next step": lambda: self._run_controlled_agent("funding_strategy"),
             "review credit workflow": lambda: self._run_controlled_agent("credit_workflow"),
             "credit next step": lambda: self._run_controlled_agent("credit_workflow"),
+            # Daily opportunity commands — direct routing guarantees response
+            "show daily research review": self._cmd_daily_review,
+            "show daily review": self._cmd_daily_review,
+            "daily research review": self._cmd_daily_review,
+            "show research review": self._cmd_daily_review,
+            "show latest review": self._cmd_daily_review,
+            "hermes show daily research review": self._cmd_daily_review,
+            "hermes, show daily research review": self._cmd_daily_review,
+            "show raw evidence": self._cmd_raw_evidence,
+            "raw evidence": self._cmd_raw_evidence,
         }
+        # Also check "hermes, X" → strip prefix then match
+        _normalized_strip = normalized.lstrip("hermes").lstrip(",").lstrip().rstrip(".")
         if normalized in continuity:
             logger.info("telegram route=chat")
             return continuity[normalized]()
+        if _normalized_strip and _normalized_strip in continuity:
+            logger.info("telegram route=chat hermes-prefix-stripped")
+            return continuity[_normalized_strip]()
 
         swarm_followup = self._handle_swarm_followup(normalized)
         if swarm_followup:
