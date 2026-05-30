@@ -39,6 +39,11 @@ FOLLOWUP_WHY_PHRASES: frozenset[str] = frozenset([
 FOLLOWUP_STATUS_PHRASES: frozenset[str] = frozenset([
     "what is its status", "what happened with that", "status of that",
     "what is the status", "current status",
+    "status",
+    "where are we with it", "what happened with it",
+    "is it done", "is it assigned",
+    "who has it",
+    "what is next for it", "what is next",
 ])
 
 FOLLOWUP_ACTION_PHRASES: frozenset[str] = frozenset([
@@ -134,6 +139,30 @@ def extract_context_from_response(user_message: str, response_text: str) -> Opti
                 "fastest reviewable revenue asset; aligns with 30-day revenue goal; "
                 "free to draft; supports funding-readiness audience"
             ),
+        }
+
+    # Single action preview — triggered by "ACTION: ..." (format_action_preview_response output)
+    single_action_match = re.match(r"ACTION:\s+(.+?)(?:\n|$)", text.strip())
+    if single_action_match and not text.strip().upper().startswith("ACTION QUEUE"):
+        title = single_action_match.group(1).strip()[:100]
+        action_match = re.search(r"act_[a-f0-9]+", text)
+        action_id = action_match.group(0) if action_match else ""
+        scout_match = re.search(r"Scout:\s*(.+?)(?:\n|$)", text)
+        scout = scout_match.group(1).strip() if scout_match else ""
+        status_match = re.search(r"Status:\s*(.+?)(?:\n|$)", text)
+        status = status_match.group(1).strip() if status_match else ""
+        return {
+            "user_message": user_message,
+            "hermes_response_type": "action_preview",
+            "primary_object_type": "action",
+            "primary_object_id": action_id,
+            "primary_object_title": title,
+            "primary_object_path": "docs/reports/actions/hermes_action_queue.jsonl",
+            "related_action_id": action_id,
+            "related_scout": scout,
+            "status": status,
+            "allowed_followups": ["what is its status", "who has it", "what is next for it"],
+            "evidence_path": "docs/reports/actions/hermes_action_queue.jsonl",
         }
 
     # Action queue — triggered by "ACTION QUEUE" header

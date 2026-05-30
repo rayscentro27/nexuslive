@@ -2043,35 +2043,92 @@ class NexusTelegramBot:
         return format_unresolved_reference_response("why that")
 
     def _cmd_status_last_object(self) -> str:
-        """Resolve 'what is its status' to the last mentioned action."""
+        """Resolve status follow-ups to the last mentioned action, draft, or object."""
         from lib.hermes_conversation_context_resolver import (
             get_last_context, format_unresolved_reference_response,
         )
         ctx = get_last_context()
         if not ctx:
-            return format_unresolved_reference_response("status")
+            return (
+                "I don't have a recent item in context.\n\n"
+                "Say 'show action queue', 'show the first one', or 'create first draft' "
+                "and I'll give you a status update on that."
+            )
 
-        action_id = ctx.get("related_action_id") or ctx.get("primary_object_id")
+        obj_type = ctx.get("primary_object_type", "")
+        action_id = ctx.get("related_action_id") or ctx.get("primary_object_id") or ""
         title = ctx.get("primary_object_title", "")
 
+        # Content draft — no action lookup needed
+        if obj_type == "content_draft":
+            draft_path = ctx.get("primary_object_path") or ctx.get("evidence_path") or ""
+            return (
+                "DRAFT STATUS\n\n"
+                f"Draft:\n{title or 'Credit/Funding Readiness Checklist'}\n\n"
+                "Status:\nInternal draft only.\n\n"
+                "What this means:\n"
+                "The draft exists and is ready for your review. "
+                "Not approved for publishing, selling, or client use.\n\n"
+                "Next step:\nReview the draft and tell me what to improve, or say 'can i view it'.\n\n"
+                f"Evidence:\n- Draft: {draft_path}\n- Action: {action_id}"
+            )
+
+        # Action — look up live status
         if action_id:
             try:
                 from lib.hermes_action_queue import _load_records
+                from lib.hermes_artifact_viewer import find_latest_content_draft
                 seen: dict = {}
                 for a in _load_records():
                     seen[a.action_id] = a
                 action = seen.get(action_id)
                 if action:
+                    scout = (action.assigned_scout or ctx.get("related_scout") or "(unassigned)").strip()
+                    next_step = (action.next_step or "Review the latest draft and tell Hermes what to improve.").strip()
+                    status_label = action.status or "unknown"
+
+                    status_meaning = {
+                        "open": "This action is queued and waiting to be started.",
+                        "assigned": "The internal draft task exists and is assigned.",
+                        "in_progress": "Work is actively underway on this action.",
+                        "completed_with_artifact": "A draft artifact has been created and is ready for review.",
+                        "completed": "This action is complete.",
+                    }.get(status_label, f"Current status: {status_label}.")
+
+                    draft = find_latest_content_draft()
+                    draft_line = ""
+                    try:
+                        from pathlib import Path
+                        _root = Path(__file__).resolve().parent
+                        draft_line = f"\n- Latest draft: {draft.relative_to(_root)}" if draft else ""
+                    except Exception:
+                        pass
+
                     return (
-                        f"STATUS: {title or action.title}\n\n"
-                        f"Current: {action.status}\n"
-                        f"Scout: {action.assigned_scout or '(unassigned)'}\n"
-                        f"Next: {action.next_step or '(no next step)'}\n\n"
-                        "Evidence: docs/reports/actions/hermes_action_queue.jsonl"
+                        "ACTION STATUS\n\n"
+                        f"Action:\n{title or action.title}\n\n"
+                        f"Status:\n{status_label}\n\n"
+                        f"Assigned to:\n{scout}\n\n"
+                        f"What this means:\n{status_meaning} "
+                        "It is not approved for publishing, selling, or client use.\n\n"
+                        f"Next step:\n{next_step}\n\n"
+                        f"Evidence:\n- Action: {action_id}\n"
+                        f"- Queue: docs/reports/actions/hermes_action_queue.jsonl"
+                        f"{draft_line}"
                     )
             except Exception:
                 pass
-        return f"Status of: {title or 'last item'}\n\nSay 'show action queue' for full status."
+
+        # Opportunity / recommendation
+        if obj_type in ("opportunity", "review_first"):
+            return (
+                f"STATUS: {title or 'last recommendation'}\n\n"
+                "This item is queued for your review. No action has been taken yet.\n\n"
+                "Next step:\nSay 'create first draft' to build the artifact, "
+                "or 'show action queue' for the full list."
+            )
+
+        return format_unresolved_reference_response("status")
 
     def _cmd_show_first_action(self) -> str:
         """Show the first/best open business action from the queue."""
@@ -2080,7 +2137,25 @@ class NexusTelegramBot:
         actions = [a for a in get_unique_open_actions() if not _is_meta_action(a)]
         if not actions:
             return "No open business actions in queue."
-        return format_action_preview_response(actions[0])
+        action = actions[0]
+        result = format_action_preview_response(action)
+        # Record context directly — extract_context_from_response won't match "ACTION: ..." reliably
+        try:
+            from lib.hermes_conversation_context_resolver import record_context_event
+            record_context_event({
+                "primary_object_type": "action",
+                "primary_object_id": action.action_id or "",
+                "primary_object_title": action.title or "",
+                "primary_object_path": "docs/reports/actions/hermes_action_queue.jsonl",
+                "related_action_id": action.action_id or "",
+                "related_scout": (getattr(action, "assigned_scout", "") or "").strip(),
+                "status": action.status or "",
+                "allowed_followups": ["what is its status", "who has it", "what is next for it"],
+                "evidence_path": "docs/reports/actions/hermes_action_queue.jsonl",
+            })
+        except Exception:
+            pass
+        return result
 
     def _dispatch_continuity(self, method, user_text: str) -> str:
         """Call a continuity-dict method and record context from its response."""
@@ -2895,6 +2970,14 @@ class NexusTelegramBot:
             "what is its status": self._cmd_status_last_object,
             "what is the status": self._cmd_status_last_object,
             "what happened with that": self._cmd_status_last_object,
+            "status": self._cmd_status_last_object,
+            "where are we with it": self._cmd_status_last_object,
+            "what happened with it": self._cmd_status_last_object,
+            "is it done": self._cmd_status_last_object,
+            "is it assigned": self._cmd_status_last_object,
+            "who has it": self._cmd_status_last_object,
+            "what is next for it": self._cmd_status_last_object,
+            "what is next": self._cmd_status_last_object,
             # Approval policy — plain language, not swallowed by LLM
             "what needs my approval": self._cmd_approval_policy,
             "what can i do without approval": self._cmd_approval_policy,
@@ -2915,7 +2998,7 @@ class NexusTelegramBot:
             "make it better": lambda: self._cmd_create_content_draft(new_version=True),
         }
         # Also check "hermes, X" → strip prefix then match
-        _normalized_strip = normalized.lstrip("hermes").lstrip(",").lstrip().rstrip(".")
+        _normalized_strip = normalized.lstrip("hermes").lstrip(",").lstrip().rstrip(".?")
         if normalized in continuity:
             logger.info("telegram route=chat")
             return self._dispatch_continuity(continuity[normalized], normalized)
