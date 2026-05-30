@@ -420,6 +420,18 @@ def get_internal_first_keywords() -> dict[str, list[str]]:
     return out
 
 
+def get_internal_action_config() -> dict[str, bool]:
+    """Return internal action mode flags from environment variables."""
+    return {
+        "internal_action_mode": _env_truthy("HERMES_INTERNAL_ACTION_MODE", "true"),
+        "daily_intake_allow_telegram_run": _env_truthy("HERMES_DAILY_INTAKE_ALLOW_TELEGRAM_RUN", "true"),
+        "autonomous_internal_actions": _env_truthy("HERMES_AUTONOMOUS_INTERNAL_ACTIONS", "true"),
+        "public_actions_require_approval": _env_truthy("HERMES_PUBLIC_ACTIONS_REQUIRE_APPROVAL", "true"),
+        "paid_actions_require_approval": _env_truthy("HERMES_PAID_ACTIONS_REQUIRE_APPROVAL", "true"),
+        "live_trading_require_approval": _env_truthy("HERMES_LIVE_TRADING_REQUIRE_APPROVAL", "true"),
+    }
+
+
 def format_telegram_reply(text: str) -> str:
     raw = str(text or "").strip()
     mode = get_telegram_mode()

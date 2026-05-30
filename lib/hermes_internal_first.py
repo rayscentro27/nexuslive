@@ -126,19 +126,31 @@ _STATUS_LABELS: dict[str, str] = {
 }
 
 _CATEGORY_ACTIONS: dict[str, str] = {
-    "paid template": "Build a paid template or checklist product (e.g., Credit Readiness Checklist)",
-    "tool product": "Build a simple paid tool or template product for the credit/funding audience",
-    "newsletter": "Launch a premium newsletter tier for existing Nexus audience",
-    "newsletter premium": "Launch a premium newsletter tier with weekly opportunity digest",
-    "affiliate": "Research and sign up for a relevant affiliate program (free, no approval needed for research)",
-    "affiliate program": "Identify the top 1-2 affiliate programs that fit Nexus' credit/funding audience",
-    "content": "Write educational content for the credit/funding audience — top of funnel lead magnet",
-    "credit repair": "Create a credit repair roadmap or guide as a lead magnet",
-    "credit": "Research and document the credit repair workflow for the Nexus content funnel",
-    "funnel": "Design a lead magnet funnel for the credit/funding audience",
-    "grant": "Research and apply for a small business or creator grant",
-    "saas": "Build a lightweight SaaS product or tool serving the credit/funding market",
+    "paid template": "Build a Credit/Funding Readiness Checklist lead magnet (free to draft, no approval needed)",
+    "tool product": "Build a paid checklist or audit tool for the credit/funding audience",
+    "newsletter premium": "Launch a premium Nexus newsletter tier — weekly funding/credit opportunity digest",
+    "newsletter": "Create a weekly newsletter for the Nexus funding audience — draft internally first",
+    "affiliate program": "Identify and document the top 2-3 affiliate programs fitting Nexus' credit/funding audience",
+    "affiliate": "Research free affiliate programs for credit repair and business funding tools",
+    "credit repair": "Create a step-by-step credit repair roadmap as a free Nexus lead magnet",
+    "credit score": "Build a Credit Score Improvement Roadmap guide — free lead magnet for the Nexus funnel",
+    "credit": "Build a credit repair guide or score roadmap for the Nexus content funnel",
+    "funding readiness": "Create a Business Funding Readiness Checklist for Nexus' credit audience",
+    "funding": "Write a business funding guide for the Nexus audience — internal draft, no approval needed",
+    "funnel": "Design a lead magnet funnel for the credit/funding audience — opt-in to email list",
+    "grant": "Research free small business or creator grants — draft application internally, no cost",
+    "saas": "Design a lightweight SaaS tool or dashboard for the credit/funding market",
+    "youtube": "Research and document the top YouTube content angles for the credit/funding audience",
+    "content": "Write a free educational credit/funding guide — top-of-funnel lead magnet",
+    "research": "Conduct and document internal research — create a Nexus internal artifact",
 }
+
+# Patterns that identify a workflow routing instruction, not a product recommendation.
+# These get skipped in favour of _CATEGORY_ACTIONS expansion.
+_ROUTING_PATTERNS = frozenset([
+    "route to", "assign to", "build draft for", "send to scout",
+    "send to ", "forward to", "hand off", "hand to",
+])
 
 
 def _format_opportunity_specific(op: dict) -> str:
@@ -159,9 +171,11 @@ def _format_opportunity_specific(op: dict) -> str:
         "product opportunity", "research opportunity",
     }
     title_lower = title.lower()
+    rec_lower = rec.lower()
 
-    # 1. Use specific recommended_action if present and non-generic
-    if rec and not any(label in rec.lower() for label in generic_labels) and len(rec) > 20:
+    # 1. Use recommended_action only if it is specific (not a generic label, not a routing instruction)
+    rec_is_routing = any(p in rec_lower for p in _ROUTING_PATTERNS)
+    if rec and not any(label in rec_lower for label in generic_labels) and len(rec) > 20 and not rec_is_routing:
         specific = rec
     else:
         # 2. Try category expansion before falling back to raw title
@@ -198,17 +212,28 @@ def _format_opportunity_detail(op: dict, index: int) -> list[str]:
 
     specific = _format_opportunity_specific(op)
     lines = [f"{index}. {specific}"]
+    # Derive "Why" from explicit field, goal, or status/score
     if why:
-        lines.append(f"   Why: {why[:100]}")
+        lines.append(f"   Why: {why[:120]}")
     elif goal:
-        lines.append(f"   Why: Supports {goal} goal.")
-    if rec and rec != specific:
-        lines.append(f"   Next: {rec[:80]}")
+        lines.append(f"   Why: Supports the {goal} goal — fits Nexus' credit/funding audience.")
+    elif status in ("product_candidate", "content_candidate"):
+        lines.append(f"   Why: Fits the 30-day revenue goal and Nexus' credit/funding audience (score {score}).")
+    elif status == "affiliate_candidate":
+        lines.append(f"   Why: Free to set up — no cost or approval needed for research phase (score {score}).")
     else:
-        lines.append(f"   Next: Begin research and create internal draft.")
+        lines.append(f"   Why: Identified as actionable opportunity (score {score}).")
+    # "Next" — use the scout assignment if rec is a routing instruction, otherwise use rec
+    rec_is_routing = any(p in rec.lower() for p in _ROUTING_PATTERNS)
+    if rec and not rec_is_routing and rec != specific:
+        lines.append(f"   Next: {rec[:100]}")
+    elif scout:
+        lines.append(f"   Next: Assign {scout} to draft this internally.")
+    else:
+        lines.append(f"   Next: Create internal draft — no cost or approval needed.")
     if scout:
         lines.append(f"   Scout: {scout}")
-    lines.append(f"   Approval: {'Required before publishing.' if approval else 'Not needed for internal draft.'}")
+    lines.append(f"   Approval: {'Required before publishing or selling.' if approval else 'Not needed for internal draft. Required before publishing.'}")
     return lines
 
 
@@ -1557,10 +1582,25 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
     if topic == "operating_loop":
         try:
             from lib.hermes_operating_loop import run_operating_loop
-            result_loop = run_operating_loop(mode="validation", max_actions=3, dry_run=True)
+            from lib.hermes_runtime_config import get_internal_action_config
+            iac = get_internal_action_config()
+            _dry_run = not iac["autonomous_internal_actions"]
+            _loop_mode = "continue" if iac["autonomous_internal_actions"] else "validation"
+            result_loop = run_operating_loop(mode=_loop_mode, max_actions=5, dry_run=_dry_run)
+            _mode_note = "" if _dry_run else ""
             reply = result_loop.digest
+            if not _dry_run and result_loop.actions_created:
+                reply += (
+                    f"\n\nCreated {len(result_loop.actions_created)} internal action(s). "
+                    "No publishing, spending, or trading — internal only."
+                )
             if result_loop.artifact_path:
                 reply += f"\n\nFull report: {result_loop.artifact_path}"
+            if _dry_run:
+                reply += (
+                    "\n\nNote: Running in validation mode. Set HERMES_AUTONOMOUS_INTERNAL_ACTIONS=true "
+                    "to create real action records."
+                )
             return InternalFirstReply(
                 text=reply,
                 confidence=CONF_INTERNAL_CONFIRMED,
@@ -1570,10 +1610,10 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         except Exception as exc:
             return InternalFirstReply(
                 text=(
-                    f"Operating loop check: {exc}\n\n"
-                    "Hermes is ready to run the operating loop.\n"
-                    "This will: load goals, check intake, propose next actions, assign scouts.\n\n"
-                    "Run manually: python scripts/run_hermes_operating_loop.py --mode validation"
+                    "I'll continue internal research quietly.\n\n"
+                    "I can collect sources, score opportunities, assign scouts, and create drafts.\n"
+                    "I will only message you for one digest, a blocker, or an approval request.\n\n"
+                    f"(Operating loop not available: {exc})"
                 ),
                 confidence=CONF_INTERNAL_PARTIAL,
                 source="hermes_operating_loop",
@@ -1614,21 +1654,43 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
     # ── Daily Opportunity Intake commands ─────────────────────────────────────
 
     if topic == "daily_intake":
-        # "run daily intake" → clear status: manual_required (Hermes does not run inline)
         if "run" in text and ("intake" in text or "daily opportunity" in text):
-            return InternalFirstReply(
-                text=(
-                    "Manual command required.\n\n"
-                    "I have not started the intake — it runs as a separate process.\n\n"
-                    "To run:\n"
-                    "  python3 scripts/run_daily_opportunity_intake.py --mode validation\n\n"
-                    "When complete, say 'what did you find today' to see results.\n"
-                    "I'll send one digest when it finishes — no source-by-source updates."
-                ),
-                confidence=CONF_INTERNAL_CONFIRMED,
-                source="daily_opportunity_intake_engine",
-                matched_topic=topic,
-            )
+            from lib.hermes_runtime_config import get_internal_action_config
+            iac = get_internal_action_config()
+            if iac["daily_intake_allow_telegram_run"]:
+                import subprocess, sys as _sys
+                _root = Path(__file__).resolve().parent.parent
+                _script = _root / "scripts" / "run_daily_opportunity_intake.py"
+                subprocess.Popen(
+                    [_sys.executable, str(_script), "--mode", "validation"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    cwd=str(_root),
+                )
+                return InternalFirstReply(
+                    text=(
+                        "Daily opportunity intake is running.\n\n"
+                        "I'll send one digest when complete — no source-by-source updates.\n\n"
+                        "Say 'what did you find today' to check status."
+                    ),
+                    confidence=CONF_INTERNAL_CONFIRMED,
+                    source="daily_opportunity_intake_engine",
+                    matched_topic=topic,
+                )
+            else:
+                return InternalFirstReply(
+                    text=(
+                        "Manual command required.\n\n"
+                        "I have not started the intake — it runs as a separate process.\n\n"
+                        "To run:\n"
+                        "  python3 scripts/run_daily_opportunity_intake.py --mode validation\n\n"
+                        "When complete, say 'what did you find today' to see results.\n"
+                        "I'll send one digest when it finishes — no source-by-source updates."
+                    ),
+                    confidence=CONF_INTERNAL_CONFIRMED,
+                    source="daily_opportunity_intake_engine",
+                    matched_topic=topic,
+                )
         try:
             from lib.hermes_daily_cycle_state import format_daily_cycle_status_common_language
             summary = format_daily_cycle_status_common_language()
