@@ -2159,6 +2159,20 @@ class NexusTelegramBot:
 
     def _cmd_revise_draft(self, revision_type: str) -> str:
         """Apply a named revision transformation to the latest checklist draft."""
+        try:
+            return self._cmd_revise_draft_inner(revision_type)
+        except Exception as exc:
+            import traceback, datetime
+            from pathlib import Path as _Path
+            _log_dir = _Path(__file__).resolve().parent / "docs" / "reports" / "errors"
+            _log_dir.mkdir(parents=True, exist_ok=True)
+            _ts = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            (_log_dir / f"revision_error_{_ts}.txt").write_text(
+                f"revision_type={revision_type}\n{traceback.format_exc()}"
+            )
+            return "I hit an internal error while creating the revised draft. I logged the error for review."
+
+    def _cmd_revise_draft_inner(self, revision_type: str) -> str:
         from lib.hermes_content_revision_engine import (
             revise_content_draft, format_revision_created_response,
         )
@@ -2182,8 +2196,8 @@ class NexusTelegramBot:
 
         if previous_path is None:
             return (
-                f"I can create a {revision_type} version, but I need a draft to revise first.\n\n"
-                "Say 'create first draft' and I'll build one, then say the revision again."
+                f"I could not find a checklist draft to revise yet. "
+                "Ask me to create the first draft first."
             )
 
         result = revise_content_draft(previous_path, revision_type)

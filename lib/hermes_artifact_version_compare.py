@@ -36,6 +36,18 @@ def find_two_latest_drafts() -> tuple[Optional[Path], Optional[Path]]:
     return latest, previous
 
 
+def find_latest_checklist_draft() -> Optional[Path]:
+    """Return the single newest checklist draft path, or None."""
+    latest, _ = find_two_latest_drafts()
+    return latest
+
+
+def find_latest_checklist_draft_pair() -> tuple[Optional[Path], Optional[Path]]:
+    """Return (previous, latest) for comparison. Either may be None."""
+    latest, previous = find_two_latest_drafts()
+    return previous, latest
+
+
 def _extract_sections(text: str) -> dict[str, str]:
     """Return {section_title: section_body} for all ## sections."""
     sections: dict[str, str] = {}
