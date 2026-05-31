@@ -2157,6 +2157,65 @@ class NexusTelegramBot:
             pass
         return result
 
+    def _cmd_recommend(self) -> str:
+        """Recommend next step for the latest context object."""
+        try:
+            from lib.hermes_conversation_context_resolver import get_last_context
+            from lib.hermes_artifact_version_compare import find_latest_checklist_draft
+            from lib.hermes_draft_recommendation_engine import (
+                recommend_next_step_for_draft,
+                format_draft_recommendation_response,
+                format_action_recommendation_response,
+                format_opportunity_recommendation_response,
+            )
+            from pathlib import Path as _Path
+
+            ctx = get_last_context()
+            obj_type = ctx.get("primary_object_type", "") if ctx else ""
+
+            # Resolve draft path from context or latest on disk
+            if obj_type == "content_draft":
+                ctx_path_str = ctx.get("primary_object_path", "")
+                draft_path = None
+                if ctx_path_str:
+                    candidate = _Path(__file__).resolve().parent / ctx_path_str
+                    if candidate.exists():
+                        draft_path = candidate
+                if draft_path is None:
+                    draft_path = find_latest_checklist_draft()
+                if draft_path is None:
+                    return (
+                        "I could not find a checklist draft to evaluate. "
+                        "Say 'create first draft' to start one."
+                    )
+                result = recommend_next_step_for_draft(draft_path)
+                return format_draft_recommendation_response(result)
+
+            if obj_type == "action":
+                return format_action_recommendation_response(ctx)
+
+            if obj_type in ("opportunity", "review_first"):
+                return format_opportunity_recommendation_response(ctx)
+
+            # Fall back: try latest draft on disk
+            draft_path = find_latest_checklist_draft()
+            if draft_path:
+                result = recommend_next_step_for_draft(draft_path)
+                return format_draft_recommendation_response(result)
+
+            return (
+                "Do you mean the latest draft, the top opportunity, or the current action? "
+                "Say which one and I'll give you a specific recommendation."
+            )
+        except Exception as exc:
+            import traceback, datetime
+            from pathlib import Path as _Path
+            _log_dir = _Path(__file__).resolve().parent / "docs" / "reports" / "errors"
+            _log_dir.mkdir(parents=True, exist_ok=True)
+            _ts = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            (_log_dir / f"recommend_error_{_ts}.txt").write_text(traceback.format_exc())
+            return "I hit an internal error while generating the recommendation. I logged it for review."
+
     def _cmd_revise_draft(self, revision_type: str) -> str:
         """Apply a named revision transformation to the latest checklist draft."""
         try:
@@ -3117,6 +3176,20 @@ class NexusTelegramBot:
             "fix duplicate sections": lambda: self._cmd_revise_draft("cleaned"),
             "clean up the draft": lambda: self._cmd_revise_draft("cleaned"),
             "deduplicate it": lambda: self._cmd_revise_draft("cleaned"),
+            # Recommendation follow-ups
+            "what do you recommend": self._cmd_recommend,
+            "what do you recommend next": self._cmd_recommend,
+            "what should i do next": self._cmd_recommend,
+            "what is your recommendation": self._cmd_recommend,
+            "should we keep this": self._cmd_recommend,
+            "is this good": self._cmd_recommend,
+            "what would you improve": self._cmd_recommend,
+            "what is the next best move": self._cmd_recommend,
+            "what should we do with it": self._cmd_recommend,
+            "what should i do with it": self._cmd_recommend,
+            "what is next for this": self._cmd_recommend,
+            "is it ready": self._cmd_recommend,
+            "is it ready to publish": self._cmd_recommend,
             # Draft version comparison
             "what changed": self._cmd_compare_draft_versions,
             "what did you change": self._cmd_compare_draft_versions,

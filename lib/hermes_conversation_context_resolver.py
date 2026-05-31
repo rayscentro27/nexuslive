@@ -71,6 +71,22 @@ FOLLOWUP_REVISE_PHRASES: frozenset[str] = frozenset([
     "clean up the draft", "deduplicate it",
 ])
 
+FOLLOWUP_RECOMMEND_PHRASES: frozenset[str] = frozenset([
+    "what do you recommend",
+    "what do you recommend next",
+    "what should i do next",
+    "what is your recommendation",
+    "should we keep this",
+    "is this good",
+    "what would you improve",
+    "what is the next best move",
+    "what should we do with it",
+    "what should i do with it",
+    "what is next for this",
+    "is it ready",
+    "is it ready to publish",
+])
+
 ALL_FOLLOWUP_PHRASES: frozenset[str] = (
     FOLLOWUP_VIEW_PHRASES
     | FOLLOWUP_WHY_PHRASES
@@ -78,6 +94,7 @@ ALL_FOLLOWUP_PHRASES: frozenset[str] = (
     | FOLLOWUP_ACTION_PHRASES
     | FOLLOWUP_COMPARE_PHRASES
     | FOLLOWUP_REVISE_PHRASES
+    | FOLLOWUP_RECOMMEND_PHRASES
 )
 
 
@@ -265,6 +282,8 @@ def resolve_reference(user_message: str) -> Optional[dict]:
         return {"action": "compare", "context": ctx}
     if t in FOLLOWUP_REVISE_PHRASES:
         return {"action": "revise", "context": ctx}
+    if t in FOLLOWUP_RECOMMEND_PHRASES:
+        return {"action": "recommend", "context": ctx}
     return None
 
 
