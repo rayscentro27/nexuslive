@@ -60,12 +60,22 @@ FOLLOWUP_COMPARE_PHRASES: frozenset[str] = frozenset([
     "how is it different", "what did you improve",
 ])
 
+FOLLOWUP_REVISE_PHRASES: frozenset[str] = frozenset([
+    "make it simpler", "simplify it", "make this simpler", "make it shorter", "make it clearer",
+    "make it more professional", "make it more persuasive",
+    "make it better", "improve it", "revise it", "update it",
+    "turn it into a lead magnet", "turn this into a lead magnet",
+    "create a short video script from this", "create a tiktok script from this",
+    "create a newsletter from this", "create an email from this",
+])
+
 ALL_FOLLOWUP_PHRASES: frozenset[str] = (
     FOLLOWUP_VIEW_PHRASES
     | FOLLOWUP_WHY_PHRASES
     | FOLLOWUP_STATUS_PHRASES
     | FOLLOWUP_ACTION_PHRASES
     | FOLLOWUP_COMPARE_PHRASES
+    | FOLLOWUP_REVISE_PHRASES
 )
 
 
@@ -251,6 +261,8 @@ def resolve_reference(user_message: str) -> Optional[dict]:
         return {"action": "act", "context": ctx}
     if t in FOLLOWUP_COMPARE_PHRASES:
         return {"action": "compare", "context": ctx}
+    if t in FOLLOWUP_REVISE_PHRASES:
+        return {"action": "revise", "context": ctx}
     return None
 
 

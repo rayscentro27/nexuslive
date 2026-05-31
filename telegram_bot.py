@@ -2157,6 +2157,38 @@ class NexusTelegramBot:
             pass
         return result
 
+    def _cmd_revise_draft(self, revision_type: str) -> str:
+        """Apply a named revision transformation to the latest checklist draft."""
+        from lib.hermes_content_revision_engine import (
+            revise_content_draft, format_revision_created_response,
+        )
+        from lib.hermes_conversation_context_resolver import get_last_context
+        from lib.hermes_artifact_version_compare import find_latest_checklist_draft as _find_latest
+
+        # Resolve previous draft: prefer context path, fall back to latest on disk
+        ctx = get_last_context()
+        previous_path = None
+        if ctx and ctx.get("primary_object_type") == "content_draft":
+            ctx_path_str = ctx.get("primary_object_path", "")
+            if ctx_path_str:
+                from pathlib import Path as _Path
+                _root = _Path(__file__).resolve().parent
+                candidate = _root / ctx_path_str
+                if candidate.exists():
+                    previous_path = candidate
+
+        if previous_path is None:
+            previous_path = _find_latest()
+
+        if previous_path is None:
+            return (
+                f"I can create a {revision_type} version, but I need a draft to revise first.\n\n"
+                "Say 'create first draft' and I'll build one, then say the revision again."
+            )
+
+        result = revise_content_draft(previous_path, revision_type)
+        return format_revision_created_response(result)
+
     def _cmd_compare_draft_versions(self) -> str:
         """Compare the latest checklist draft with the previous version."""
         from lib.hermes_artifact_version_compare import (
@@ -3046,10 +3078,26 @@ class NexusTelegramBot:
             "create a new version of the checklist draft": lambda: self._cmd_create_content_draft(new_version=True),
             "create a new version": lambda: self._cmd_create_content_draft(new_version=True),
             "revise the checklist": lambda: self._cmd_create_content_draft(new_version=True),
-            "revise it": lambda: self._cmd_create_content_draft(new_version=True),
-            "update the draft": lambda: self._cmd_create_content_draft(new_version=True),
-            "make it better": lambda: self._cmd_create_content_draft(new_version=True),
             "create version 2": lambda: self._cmd_create_content_draft(new_version=True),
+            # Targeted revision instructions — each creates a specific artifact type
+            "make it simpler": lambda: self._cmd_revise_draft("simplified"),
+            "simplify it": lambda: self._cmd_revise_draft("simplified"),
+            "make this simpler": lambda: self._cmd_revise_draft("simplified"),
+            "make it shorter": lambda: self._cmd_revise_draft("simplified"),
+            "make it clearer": lambda: self._cmd_revise_draft("simplified"),
+            "make it more professional": lambda: self._cmd_revise_draft("professional"),
+            "make it more persuasive": lambda: self._cmd_revise_draft("professional"),
+            "make it better": lambda: self._cmd_revise_draft("improved"),
+            "improve it": lambda: self._cmd_revise_draft("improved"),
+            "revise it": lambda: self._cmd_revise_draft("improved"),
+            "update it": lambda: self._cmd_revise_draft("improved"),
+            "update the draft": lambda: self._cmd_revise_draft("improved"),
+            "turn it into a lead magnet": lambda: self._cmd_revise_draft("lead_magnet"),
+            "turn this into a lead magnet": lambda: self._cmd_revise_draft("lead_magnet"),
+            "create a short video script from this": lambda: self._cmd_revise_draft("short_video_script"),
+            "create a tiktok script from this": lambda: self._cmd_revise_draft("short_video_script"),
+            "create a newsletter from this": lambda: self._cmd_revise_draft("newsletter"),
+            "create an email from this": lambda: self._cmd_revise_draft("email_draft"),
             # Draft version comparison
             "what changed": self._cmd_compare_draft_versions,
             "what did you change": self._cmd_compare_draft_versions,
