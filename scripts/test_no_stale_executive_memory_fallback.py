@@ -38,11 +38,11 @@ def test_followup_why_that_returns_clarification():
     assert "OFFLINE" not in result
 
 
-def test_non_followup_still_works():
+def test_non_followup_returns_clean_clarification():
     result = rq._fallback_data_block("something totally random", STALE_EXEC_MEMORY)
-    assert "Quality escalation fallback" in result
-    assert "nexus ceo briefing" in result.lower()
+    assert "specific question" in result.lower() or "nexus ceo briefing" in result.lower()
     assert "OFFLINE" not in result, "Stale exec context must not be dumped in fallback"
+    assert "Quality escalation fallback" not in result
 
 
 if __name__ == "__main__":

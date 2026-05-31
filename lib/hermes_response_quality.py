@@ -212,7 +212,7 @@ def escalate(
 ) -> str:
     """Attempt escalated retry with enriched context and higher-reasoning provider."""
     try:
-        from lib.hermes_executive_memory import build_context_block
+        from lib.hermes_active_memory_reader import build_context_block
         exec_context = build_context_block(max_items_per_category=3)
     except Exception:
         exec_context = ""
@@ -244,7 +244,10 @@ def escalate(
 
 
 def _fallback_data_block(user_message: str, exec_context: str) -> str:
-    """Return a structured data block when all LLM attempts fail."""
+    """Return a clean clarification message when all LLM attempts fail.
+
+    Per Memory Safety Contract Rule 4: never dump stale/hardcoded data here.
+    """
     try:
         from lib.hermes_conversation_context_resolver import (
             is_followup_phrase,
@@ -255,9 +258,11 @@ def _fallback_data_block(user_message: str, exec_context: str) -> str:
     except Exception:
         pass
     return (
-        f"[Quality escalation fallback — LLM response was too generic]\n\n"
-        f"Your question: {user_message[:200]}\n\n"
-        f"Run `nexus ceo briefing` for the full executive briefing."
+        "I wasn't able to generate a quality response right now. "
+        "Try a more specific question, or run:\n"
+        "  `nexus ceo briefing` — full executive view\n"
+        "  `next best move` — prioritised recommendations\n"
+        "  `system health` — live operational status"
     )
 
 

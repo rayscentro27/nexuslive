@@ -166,6 +166,12 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
     (["show artifact registry", "artifact registry", "show all artifacts",
       "what artifacts exist"],                                     "artifact_registry_status",   "low",    False),
 
+    # ── Archived (stale) executive memory commands ──────────────────────────
+    (["archived memory", "stale defaults", "load archived defaults",
+      "show archived defaults", "archived executive memory",
+      "what were the old defaults", "original defaults",
+      "what was in the old executive memory"],                       "archived_executive_memory", "low",    False),
+
     # ── Provider / brain status ──────────────────────────────────────────────
     (["what brain are you using", "which brain",
       "are you using chatgpt", "chatgpt auth", "are you using openai",

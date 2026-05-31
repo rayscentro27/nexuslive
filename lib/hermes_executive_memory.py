@@ -99,9 +99,15 @@ def _sb_select(path: str, timeout: int = 8) -> list[dict]:
         return []
 
 
-# ── Default memory ────────────────────────────────────────────────────────────
+# ── Archived defaults (reference only — NOT injected into live Telegram) ─────
 
-def _default_memory() -> dict:
+def load_archived_executive_memory_defaults() -> dict:
+    """Return the original hardcoded defaults for reference / migration tooling.
+
+    Per Memory Safety Contract Rule 2: this function is NOT reachable from
+    load_memory(), build_context_block(), or build_telegram_context().
+    Use it only for seeding, debugging, or comparing against live data.
+    """
     return {
         "monetization_priorities": [
             "Launch Nexus AI affiliate program via Beehiiv newsletter CTAs",
@@ -151,43 +157,63 @@ def _default_memory() -> dict:
         "execution_priorities": [],
         "updated_at": _now_iso(),
         "version": 1,
+        "source": "archived_defaults",
+    }
+
+
+def _empty_safe_memory() -> dict:
+    """Return neutral memory with empty categories — no stale live-state impersonation.
+
+    Per Memory Safety Contract Rule 1.  Used when Supabase is unreachable
+    or contains no data.
+
+    NOTE: operational_philosophy is kept as standing safety directives
+    (DRY_RUN, evidence-first, paper trading only).  These are NOT stale
+    live-state impersonation; they are permanent operating rules.
+    """
+    return {cat: [] for cat in CATEGORIES} | {
+        "operational_philosophy": [
+            "NEXUS_DRY_RUN=true always — never publish, bill, or deploy without approval",
+            "Evidence-first: no task marked complete without evidence_ref",
+            "Safe autonomous mode: workers generate drafts, human approves publication",
+            "Paper trading only — 6-month verified performance minimum before live",
+            "No guaranteed income claims or financial guarantees in any output",
+        ],
+        "updated_at": _now_iso(),
+        "version": 1,
+        "source": "empty_safe_fallback",
     }
 
 
 # ── Load / save ───────────────────────────────────────────────────────────────
 
 def load_memory(force_refresh: bool = False) -> dict:
+    """Load memory from Supabase or local fallback.
+
+    SAFETY: Returns empty/neutral memory when no live data exists.
+    Archived hardcoded defaults are NOT injected into live Telegram paths.
+    """
     global _CACHE, _CACHE_TS
 
     if not force_refresh and _CACHE and (time.monotonic() - _CACHE_TS < _CACHE_TTL):
         return _CACHE
 
-    # Try Supabase first
     rows = _sb_select(
         "hermes_executive_memory?select=category,items,updated_at&order=category.asc&limit=20"
     )
     if rows:
-        defaults = _default_memory()
-        mem = defaults.copy()
-        all_empty = True
+        mem = _empty_safe_memory()
+        has_content = False
         for row in rows:
             cat = row.get("category")
             items = row.get("items")
-            if cat in CATEGORIES and isinstance(items, list):
-                # Use DB row only if it has content; otherwise keep defaults
-                if items:
-                    mem[cat] = items
-                    all_empty = False
+            if cat in CATEGORIES and isinstance(items, list) and items:
+                mem[cat] = items
+                has_content = True
         mem["updated_at"] = max(
             (r.get("updated_at", "") for r in rows), default=_now_iso()
         )
-        # Seed Supabase with defaults if all categories were empty
-        if all_empty:
-            for cat in CATEGORIES:
-                _sb_upsert(
-                    "hermes_executive_memory",
-                    {"category": cat, "items": defaults.get(cat, []), "updated_by": "seed"},
-                )
+        # Do NOT seed Supabase with stale defaults anymore
         _CACHE = mem
         _CACHE_TS = time.monotonic()
         _save_local(mem)
@@ -197,13 +223,21 @@ def load_memory(force_refresh: bool = False) -> dict:
     if LOCAL_FILE.exists():
         try:
             mem = json.loads(LOCAL_FILE.read_text())
-            _CACHE = mem
-            _CACHE_TS = time.monotonic()
-            return mem
+            # Safety check: filter out stale markers that impersonate live state
+            stale_markers = ["Ollama", "Beehiiv", "OpenRouter", "YouTube Studio"]
+            has_stale = any(
+                any(marker in str(item) for item in mem.get(cat, []))
+                for cat in CATEGORIES
+                for marker in stale_markers
+            )
+            if not has_stale:
+                _CACHE = mem
+                _CACHE_TS = time.monotonic()
+                return mem
         except Exception:
             pass
 
-    mem = _default_memory()
+    mem = _empty_safe_memory()
     _CACHE = mem
     _CACHE_TS = time.monotonic()
     _save_local(mem)

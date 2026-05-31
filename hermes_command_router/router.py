@@ -952,6 +952,44 @@ def _run_provider_status() -> tuple[str, list[str], str]:
         return "unknown", [f"provider_policy error: {e}"], "Check lib/hermes_provider_policy.py"
 
 
+# ── Archived (stale) memory handler ───────────────────────────────────────────
+
+def _run_archived_executive_memory() -> tuple[str, list[str], str]:
+    """Show the archived (original hardcoded) executive memory defaults.
+
+    These are NOT live — they're the stale defaults that were previously
+    injected into Telegram before the Phase 2 memory safety contract.
+    """
+    try:
+        from lib.hermes_executive_memory import load_archived_executive_memory_defaults
+        archived = load_archived_executive_memory_defaults()
+        evidence = [
+            "These are the ORIGINAL hardcoded defaults (archived in Phase 2).",
+            "They are NO LONGER injected into live Telegram responses.",
+            "",
+        ]
+        for cat, items in archived.items():
+            if cat in ("updated_at", "version", "source"):
+                continue
+            label = cat.replace("_", " ").title()
+            if items:
+                evidence.append(f"[{label}] ({len(items)} items)")
+                for item in items[:3]:
+                    evidence.append(f"  * {item}")
+                if len(items) > 3:
+                    evidence.append(f"  ... +{len(items) - 3} more")
+            else:
+                evidence.append(f"[{label}] (empty)")
+        return "healthy", evidence, (
+            "These are the archived original defaults. "
+            "Run `nexus executive status` to see live active memory."
+        )
+    except Exception as e:
+        return "unknown", [f"Archived memory load error: {e}"], (
+            "Check lib/hermes_executive_memory.load_archived_executive_memory_defaults"
+        )
+
+
 # ── Routing table ──────────────────────────────────────────────────────────────
 
 def _run_ceo_digest() -> tuple[str, list[str], str]:
@@ -992,6 +1030,8 @@ _INTENT_HANDLERS = {
     # ── Source intake / artifact registry ────────────────────────────────────
     "source_intake_status":      _run_source_intake_status,
     "artifact_registry_status":  _run_artifact_registry_status,
+    # ── Archived (stale) executive memory ────────────────────────────────────
+    "archived_executive_memory": _run_archived_executive_memory,
     # ── Provider / brain status ───────────────────────────────────────────────
     "provider_status":           _run_provider_status,
 }

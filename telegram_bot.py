@@ -235,8 +235,9 @@ def _build_ops_context_snippet() -> str:
         pass
 
     # Executive memory — top priorities and infrastructure issues
+    # NOTE: Uses active memory reader per Memory Safety Contract Rule 3
     try:
-        from lib.hermes_executive_memory import build_telegram_context
+        from lib.hermes_active_memory_reader import build_telegram_context
         exec_ctx = build_telegram_context(max_chars=400)
         if exec_ctx:
             parts.append(f"- Executive context: {exec_ctx}")
