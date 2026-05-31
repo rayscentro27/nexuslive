@@ -74,7 +74,8 @@ def create_credit_funding_readiness_checklist_draft(new_version: bool = False) -
         }
 
     _CONTENT_DIR.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    _now = datetime.now(timezone.utc)
+    ts = _now.strftime("%Y%m%d_%H%M%S") + f"_{_now.microsecond // 1000:03d}"
     path = build_content_artifact_path(_CHECKLIST_SLUG, ts)
     path.write_text(_build_checklist_markdown(ts))
 
@@ -92,11 +93,15 @@ def create_credit_funding_readiness_checklist_draft(new_version: bool = False) -
     _update_action(path)
     _log_decision(path)
 
+    previous_path_str = str(existing.relative_to(_ROOT)) if (new_version and existing) else ""
+
     return {
         "created": True,
         "path": str(path.relative_to(_ROOT)),
         "action_id": _CHECKLIST_ACTION_ID,
         "is_duplicate": False,
+        "is_new_version": new_version and existing is not None,
+        "previous_path": previous_path_str,
     }
 
 
@@ -172,6 +177,31 @@ def format_content_created_response(result: dict) -> str:
 
     if not result.get("created"):
         return f"Could not create draft: {result.get('error', 'unknown error')}"
+
+    is_new_version = result.get("is_new_version", False)
+    previous_path = result.get("previous_path", "")
+
+    if is_new_version:
+        evidence = (
+            f"- New draft: {path}\n"
+            + (f"- Previous draft: {previous_path}\n" if previous_path else "")
+            + f"- Action: {action_id}\n"
+            f"- Decision log: {decision_log}"
+        )
+        return (
+            "CONTENT DRAFT VERSION CREATED\n\n"
+            "I created a new internal version for review.\n\n"
+            "Draft:\n"
+            f"{_CHECKLIST_TITLE} — New Version\n\n"
+            "Status:\n"
+            "Internal draft only.\n\n"
+            "Approval:\n"
+            "No approval needed for internal draft.\n"
+            "Approval required before publishing, selling, emailing clients, or adding to the website.\n\n"
+            f"Evidence:\n{evidence}\n\n"
+            "Next:\n"
+            "Ask 'what changed?' to compare this version with the previous draft."
+        )
 
     return (
         "CONTENT DRAFT CREATED\n\n"

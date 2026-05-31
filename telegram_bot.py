@@ -2157,6 +2157,54 @@ class NexusTelegramBot:
             pass
         return result
 
+    def _cmd_compare_draft_versions(self) -> str:
+        """Compare the latest checklist draft with the previous version."""
+        from lib.hermes_artifact_version_compare import (
+            find_two_latest_drafts,
+            compare_text_artifacts,
+            format_version_comparison_response,
+        )
+        from lib.hermes_conversation_context_resolver import get_last_context
+
+        ctx = get_last_context()
+        latest, previous = find_two_latest_drafts()
+
+        # If context carries explicit previous_object_path, prefer that
+        if ctx and ctx.get("primary_object_type") == "content_draft":
+            prev_str = ctx.get("previous_object_path", "")
+            if prev_str:
+                from pathlib import Path as _Path
+                _root = _Path(__file__).resolve().parent
+                candidate = _root / prev_str
+                if candidate.exists():
+                    previous = candidate
+            curr_str = ctx.get("primary_object_path", "")
+            if curr_str:
+                from pathlib import Path as _Path
+                _root = _Path(__file__).resolve().parent
+                candidate = _root / curr_str
+                if candidate.exists():
+                    latest = candidate
+
+        return format_version_comparison_response(previous, latest)
+
+    def _handle_multiline_message(self, lines: list[str]) -> str:
+        """Process up to 3 lines as sequential commands; return one combined response."""
+        _UNSAFE_KEYWORDS = {"delete", "reset", "wipe", "nuke", "drop", "purge"}
+        parts: list[str] = []
+        for line in lines:
+            if any(k in line.lower() for k in _UNSAFE_KEYWORDS):
+                parts.append(f"[Skipped: '{line[:50]}' — unsafe keyword]")
+                continue
+            result = self.handle_inbound_message(line)
+            if result and result.strip():
+                parts.append(result.strip())
+        if not parts:
+            return ""
+        if len(parts) == 1:
+            return parts[0]
+        return "\n\n---\n\n".join(parts)
+
     def _dispatch_continuity(self, method, user_text: str) -> str:
         """Call a continuity-dict method and record context from its response."""
         result = method()
@@ -2854,6 +2902,11 @@ class NexusTelegramBot:
         return self.safe_help_text()
 
     def handle_inbound_message(self, text: str) -> str:
+        # Multi-line command detection — process up to 3 lines as sequential commands
+        _raw_lines = [l.strip() for l in (text or "").splitlines() if l.strip()]
+        if len(_raw_lines) > 1:
+            return self._handle_multiline_message(_raw_lines[:3])
+
         # Normalize before routing: strip smart quotes, bullets, em dash suffixes
         text = _normalize_telegram_command(text) if text else text
         normalized = (text or "").strip().lower()
@@ -2996,6 +3049,16 @@ class NexusTelegramBot:
             "revise it": lambda: self._cmd_create_content_draft(new_version=True),
             "update the draft": lambda: self._cmd_create_content_draft(new_version=True),
             "make it better": lambda: self._cmd_create_content_draft(new_version=True),
+            "create version 2": lambda: self._cmd_create_content_draft(new_version=True),
+            # Draft version comparison
+            "what changed": self._cmd_compare_draft_versions,
+            "what did you change": self._cmd_compare_draft_versions,
+            "what is different": self._cmd_compare_draft_versions,
+            "compare it": self._cmd_compare_draft_versions,
+            "compare versions": self._cmd_compare_draft_versions,
+            "show differences": self._cmd_compare_draft_versions,
+            "what improved": self._cmd_compare_draft_versions,
+            "show changes": self._cmd_compare_draft_versions,
         }
         # Also check "hermes, X" → strip prefix then match
         _normalized_strip = normalized.lstrip("hermes").lstrip(",").lstrip().rstrip(".?")

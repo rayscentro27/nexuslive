@@ -53,11 +53,19 @@ FOLLOWUP_ACTION_PHRASES: frozenset[str] = frozenset([
     "build it", "draft it",
 ])
 
+FOLLOWUP_COMPARE_PHRASES: frozenset[str] = frozenset([
+    "what changed", "what did you change", "what is different",
+    "compare it", "compare versions", "show differences",
+    "what improved", "show changes", "what was different",
+    "how is it different", "what did you improve",
+])
+
 ALL_FOLLOWUP_PHRASES: frozenset[str] = (
     FOLLOWUP_VIEW_PHRASES
     | FOLLOWUP_WHY_PHRASES
     | FOLLOWUP_STATUS_PHRASES
     | FOLLOWUP_ACTION_PHRASES
+    | FOLLOWUP_COMPARE_PHRASES
 )
 
 
@@ -98,12 +106,14 @@ def extract_context_from_response(user_message: str, response_text: str) -> Opti
     """
     text = response_text or ""
 
-    # Content draft — path present
-    draft_match = re.search(r"docs/reports/content/([^\s\n\"']+\.md)", text)
-    if draft_match:
-        path = "docs/reports/content/" + draft_match.group(1)
+    # Content draft — path present (handles both first-draft and new-version responses)
+    all_draft_paths = re.findall(r"docs/reports/content/([^\s\n\"']+\.md)", text)
+    if all_draft_paths:
+        path = "docs/reports/content/" + all_draft_paths[0]
+        previous_path = ("docs/reports/content/" + all_draft_paths[1]) if len(all_draft_paths) >= 2 else ""
         action_match = re.search(r"act_[a-f0-9]+", text)
         action_id = action_match.group(0) if action_match else "act_aa99698ef8"
+        is_new_version = "CONTENT DRAFT VERSION CREATED" in text or "New Version" in text
         return {
             "user_message": user_message,
             "hermes_response_type": "content_draft",
@@ -111,9 +121,11 @@ def extract_context_from_response(user_message: str, response_text: str) -> Opti
             "primary_object_id": action_id,
             "primary_object_title": "Credit/Funding Readiness Checklist",
             "primary_object_path": path,
+            "previous_object_path": previous_path,
+            "is_new_version": is_new_version,
             "related_action_id": action_id,
             "related_scout": "content_intelligence_scout",
-            "allowed_followups": ["can i view it", "show it", "make it better", "create a new version"],
+            "allowed_followups": ["can i view it", "show it", "what changed", "make it better", "create a new version"],
             "evidence_path": path,
         }
 
@@ -237,6 +249,8 @@ def resolve_reference(user_message: str) -> Optional[dict]:
         return {"action": "status", "context": ctx}
     if t in FOLLOWUP_ACTION_PHRASES:
         return {"action": "act", "context": ctx}
+    if t in FOLLOWUP_COMPARE_PHRASES:
+        return {"action": "compare", "context": ctx}
     return None
 
 
