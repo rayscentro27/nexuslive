@@ -3112,6 +3112,11 @@ class NexusTelegramBot:
             "create a tiktok script from this": lambda: self._cmd_revise_draft("short_video_script"),
             "create a newsletter from this": lambda: self._cmd_revise_draft("newsletter"),
             "create an email from this": lambda: self._cmd_revise_draft("email_draft"),
+            "clean it up": lambda: self._cmd_revise_draft("cleaned"),
+            "remove duplicates": lambda: self._cmd_revise_draft("cleaned"),
+            "fix duplicate sections": lambda: self._cmd_revise_draft("cleaned"),
+            "clean up the draft": lambda: self._cmd_revise_draft("cleaned"),
+            "deduplicate it": lambda: self._cmd_revise_draft("cleaned"),
             # Draft version comparison
             "what changed": self._cmd_compare_draft_versions,
             "what did you change": self._cmd_compare_draft_versions,

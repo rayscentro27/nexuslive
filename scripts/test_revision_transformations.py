@@ -113,7 +113,7 @@ def test_all_artifacts_are_internal_only():
 def test_revision_instruction_map_coverage():
     """All phrases in REVISION_INSTRUCTION_MAP must map to a valid revision type."""
     valid_types = {"simplified", "professional", "improved", "lead_magnet",
-                   "short_video_script", "newsletter", "email_draft"}
+                   "short_video_script", "newsletter", "email_draft", "cleaned"}
     for phrase, rev_type in engine.REVISION_INSTRUCTION_MAP.items():
         assert rev_type in valid_types, f"Unknown revision type '{rev_type}' for phrase '{phrase}'"
 

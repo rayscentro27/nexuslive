@@ -67,6 +67,12 @@ def _extract_sections(text: str) -> dict[str, str]:
     return sections
 
 
+def _count_duplicate_headings(text: str) -> list[str]:
+    """Return list of ## headings that appear more than once."""
+    headings = re.findall(r"^## .+", text, re.MULTILINE)
+    return [h for h in set(headings) if headings.count(h) > 1]
+
+
 def summarize_markdown_changes(previous_text: str, current_text: str) -> dict:
     """Return a structured summary of section-level changes between two markdown docs."""
     prev_sections = _extract_sections(previous_text)
@@ -89,6 +95,19 @@ def summarize_markdown_changes(previous_text: str, current_text: str) -> dict:
     prev_items = len(re.findall(r"- \[[ x]\]", previous_text, re.IGNORECASE))
     curr_items = len(re.findall(r"- \[[ x]\]", current_text, re.IGNORECASE))
 
+    prev_words = len(previous_text.split())
+    curr_words = len(current_text.split())
+
+    prev_simplified = "Simplified — Plain English Edition" in previous_text
+    curr_simplified = "Simplified — Plain English Edition" in current_text
+    prev_start_here = bool(re.search(r"^## Start Here", previous_text, re.MULTILINE))
+    curr_start_here = bool(re.search(r"^## Start Here", current_text, re.MULTILINE))
+
+    prev_dup_headings = _count_duplicate_headings(previous_text)
+    curr_dup_headings = _count_duplicate_headings(current_text)
+    prev_dup_subtitle = previous_text.count("Simplified — Plain English Edition") > 1
+    curr_dup_subtitle = current_text.count("Simplified — Plain English Edition") > 1
+
     return {
         "added": added,
         "removed": removed,
@@ -100,6 +119,16 @@ def summarize_markdown_changes(previous_text: str, current_text: str) -> dict:
         "curr_item_count": curr_items,
         "total_sections_prev": len(prev_sections),
         "total_sections_curr": len(curr_sections),
+        "prev_word_count": prev_words,
+        "curr_word_count": curr_words,
+        "prev_simplified": prev_simplified,
+        "curr_simplified": curr_simplified,
+        "prev_start_here": prev_start_here,
+        "curr_start_here": curr_start_here,
+        "prev_dup_headings": prev_dup_headings,
+        "curr_dup_headings": curr_dup_headings,
+        "prev_dup_subtitle": prev_dup_subtitle,
+        "curr_dup_subtitle": curr_dup_subtitle,
     }
 
 
@@ -149,6 +178,91 @@ def format_version_comparison_response(
     except ValueError:
         curr_rel = str(current_path)
 
+    change_items: list[str] = []
+
+    # Simplified marker
+    if changes.get("curr_simplified") and not changes.get("prev_simplified"):
+        change_items.append("Simplified edition marker: added")
+    elif changes.get("curr_simplified") and changes.get("prev_simplified"):
+        change_items.append("Simplified edition marker: already present, unchanged")
+
+    # Start Here section
+    added_sections = changes.get("added", [])
+    changed_sections = changes.get("changed", [])
+    if changes.get("curr_start_here") and not changes.get("prev_start_here"):
+        change_items.append("Start Here section: added")
+    elif "Start Here" in changed_sections:
+        change_items.append("Start Here section: updated")
+    elif changes.get("curr_start_here") and changes.get("prev_start_here"):
+        change_items.append("Start Here section: already present, unchanged")
+
+    # Other added/changed/removed sections (skip Start Here and Compliance Note — handled separately)
+    skip_in_lists = {"Start Here"}
+    for t in added_sections:
+        if t not in skip_in_lists:
+            change_items.append(f"Added section: {t}")
+    for t in changed_sections:
+        if t not in skip_in_lists and "compliance" not in t.lower():
+            change_items.append(f"Updated section: {t}")
+    for t in changes.get("removed", []):
+        change_items.append(f"Removed section: {t}")
+
+    # Checklist item count
+    prev_items = changes.get("prev_item_count", 0)
+    curr_items = changes.get("curr_item_count", 0)
+    if curr_items != prev_items:
+        delta = abs(curr_items - prev_items)
+        direction = "added" if curr_items > prev_items else "reduced"
+        change_items.append(f"Checklist items: {prev_items} → {curr_items} ({direction} {delta})")
+    else:
+        change_items.append(f"Checklist items: {curr_items} (unchanged)")
+
+    # Word count
+    prev_words = changes.get("prev_word_count", 0)
+    curr_words = changes.get("curr_word_count", 0)
+    if prev_words and curr_words:
+        diff = abs(curr_words - prev_words)
+        if diff > 10:
+            direction = "increased" if curr_words > prev_words else "reduced"
+            change_items.append(f"Word count: {prev_words} → {curr_words} ({direction} by {diff})")
+        else:
+            change_items.append(f"Word count: {curr_words} (roughly unchanged)")
+
+    # Compliance note
+    if changes.get("compliance_changed"):
+        change_items.append("Compliance note: updated")
+    elif changes.get("compliance_unchanged"):
+        change_items.append("Compliance note: unchanged")
+
+    # Duplicate warnings
+    for h in changes.get("curr_dup_headings", []):
+        change_items.append(f"Warning: duplicate section — {h.lstrip('# ').strip()}")
+    if changes.get("curr_dup_subtitle"):
+        change_items.append("Warning: duplicate simplified subtitle detected")
+
+    if not change_items:
+        change_items.append("No structural changes detected between versions.")
+
+    # My read — context-aware
+    has_dups = bool(changes.get("curr_dup_headings") or changes.get("curr_dup_subtitle"))
+    if has_dups:
+        my_read = (
+            "Warning: I detected duplicate sections in the latest draft. "
+            "Say 'clean it up' to create a deduplicated version."
+        )
+    elif changes.get("curr_simplified") and not changes.get("prev_simplified"):
+        my_read = (
+            "This version is cleaner and easier to read. "
+            "It keeps the same structure but uses simpler language for beginner business owners."
+        )
+    elif not change_items or change_items == ["No structural changes detected between versions."]:
+        my_read = "The structure is identical to the previous version."
+    else:
+        my_read = (
+            "This version preserves the same structure. "
+            "Say 'make it simpler' or 'make it more professional' to push it further."
+        )
+
     lines = [
         "DRAFT VERSION CHANGES",
         "",
@@ -157,38 +271,12 @@ def format_version_comparison_response(
         "Main changes:",
         "",
     ]
-
-    change_items: list[str] = []
-    for t in changes.get("added", []):
-        change_items.append(f"Added: {t}")
-    for t in changes.get("changed", []):
-        change_items.append(f"Updated: {t}")
-    for t in changes.get("removed", []):
-        change_items.append(f"Removed: {t}")
-
-    prev_items = changes.get("prev_item_count", 0)
-    curr_items = changes.get("curr_item_count", 0)
-    if curr_items != prev_items:
-        delta = abs(curr_items - prev_items)
-        direction = "added" if curr_items > prev_items else "reduced"
-        change_items.append(f"Checklist items: {prev_items} → {curr_items} ({direction} {delta})")
-
-    if changes.get("compliance_changed"):
-        change_items.append("Compliance note: updated")
-    elif changes.get("compliance_unchanged"):
-        change_items.append("Compliance note: unchanged")
-
-    if not change_items:
-        change_items.append("No structural changes detected between versions.")
-
     for i, item in enumerate(change_items, 1):
         lines.append(f"{i}. {item}")
-
     lines += [
         "",
         "My read:",
-        "This version preserves the same structure. "
-        "Say 'make it simpler' or 'make it more professional' to push it further.",
+        my_read,
         "",
         "Evidence:",
         f"- Previous: {prev_rel}",
@@ -199,6 +287,7 @@ def format_version_comparison_response(
         "  show it",
         "  make it simpler",
         "  make it more professional",
+        "  clean it up",
         "  turn it into a lead magnet",
         "  create a short video script from this",
     ]

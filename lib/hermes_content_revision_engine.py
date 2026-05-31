@@ -36,6 +36,11 @@ REVISION_INSTRUCTION_MAP: dict[str, str] = {
     "create a tiktok script from this": "short_video_script",
     "create a newsletter from this": "newsletter",
     "create an email from this": "email_draft",
+    "clean it up": "cleaned",
+    "remove duplicates": "cleaned",
+    "fix duplicate sections": "cleaned",
+    "clean up the draft": "cleaned",
+    "deduplicate it": "cleaned",
 }
 
 REVISION_LABELS: dict[str, str] = {
@@ -46,6 +51,7 @@ REVISION_LABELS: dict[str, str] = {
     "short_video_script": "short video script",
     "newsletter": "newsletter",
     "email_draft": "email draft",
+    "cleaned": "cleaned-up",
 }
 
 REVISION_CHANGE_SUMMARIES: dict[str, list[str]] = {
@@ -88,6 +94,13 @@ REVISION_CHANGE_SUMMARIES: dict[str, list[str]] = {
         "Added subject line",
         "Actionable CTA added",
     ],
+    "cleaned": [
+        "Removed duplicate section headings",
+        "Removed duplicate subtitle lines",
+        "Preserved compliance note",
+        "Preserved internal draft notice",
+        "Preserved checklist structure",
+    ],
 }
 
 
@@ -121,6 +134,7 @@ def revise_content_draft(previous_path: Path, revision_type: str) -> dict:
         "simplified": simplify_checklist_draft,
         "professional": professionalize_checklist_draft,
         "improved": improve_checklist_draft,
+        "cleaned": cleanup_draft,
         "lead_magnet": convert_to_lead_magnet,
         "short_video_script": convert_to_short_video_script,
         "newsletter": convert_to_newsletter,
@@ -244,6 +258,79 @@ def _apply_simplify_replacements(text: str) -> str:
     return text
 
 
+# ── Idempotency / dedup helpers ───────────────────────────────────────────────
+
+def has_simplified_marker(text: str) -> bool:
+    return "Simplified — Plain English Edition" in text
+
+
+def has_start_here_section(text: str) -> bool:
+    return bool(re.search(r"^## Start Here", text, re.MULTILINE))
+
+
+def _remove_duplicate_lines(text: str) -> str:
+    """Remove consecutive duplicate non-blank lines (e.g. doubled subtitle)."""
+    lines = text.splitlines(keepends=True)
+    result: list[str] = []
+    prev_non_blank: Optional[str] = None
+    for line in lines:
+        stripped = line.rstrip("\n").rstrip()
+        if stripped:
+            if stripped == prev_non_blank:
+                continue
+            prev_non_blank = stripped
+        else:
+            prev_non_blank = None
+        result.append(line)
+    return "".join(result)
+
+
+def dedupe_repeated_sections(text: str) -> str:
+    """Remove duplicate ## sections; keep the first occurrence of each heading."""
+    lines = text.splitlines(keepends=True)
+    preamble: list[str] = []
+    sections: list[tuple[str, list[str]]] = []
+    current_heading: Optional[str] = None
+    current_body: list[str] = []
+
+    for line in lines:
+        stripped = line.rstrip("\n").rstrip()
+        if stripped.startswith("## "):
+            if current_heading is None:
+                preamble = list(current_body)
+            else:
+                sections.append((current_heading, current_body))
+            current_heading = stripped
+            current_body = []
+        else:
+            current_body.append(line)
+
+    if current_heading is not None:
+        sections.append((current_heading, current_body))
+    elif current_body:
+        preamble = list(current_body)
+
+    seen: set[str] = set()
+    unique_sections: list[tuple[str, list[str]]] = []
+    for heading, body in sections:
+        if heading not in seen:
+            seen.add(heading)
+            unique_sections.append((heading, body))
+
+    result = "".join(preamble)
+    for heading, body in unique_sections:
+        result += heading + "\n"
+        result += "".join(body)
+    return result
+
+
+def normalize_revision_output(text: str) -> str:
+    """Remove duplicate consecutive lines and duplicate ## sections."""
+    text = _remove_duplicate_lines(text)
+    text = dedupe_repeated_sections(text)
+    return text
+
+
 # ── Transformation functions ──────────────────────────────────────────────────
 
 _INTERNAL_NOTE = "*Internal Draft — Not for publication*"
@@ -251,50 +338,56 @@ _INTERNAL_NOTE = "*Internal Draft — Not for publication*"
 
 def simplify_checklist_draft(text: str, ts: str) -> str:
     """Create a plain-English, beginner-friendly version of the checklist."""
-    # Replace title line
-    text = re.sub(
-        r"^# Credit/Funding Readiness Checklist",
-        "# Credit/Funding Readiness Checklist\n*(Simplified — Plain English Edition)*",
-        text, count=1, flags=re.MULTILINE,
-    )
+    # Only add Simplified marker if not already present (idempotent)
+    if not has_simplified_marker(text):
+        text = re.sub(
+            r"^# Credit/Funding Readiness Checklist",
+            "# Credit/Funding Readiness Checklist\n*(Simplified — Plain English Edition)*",
+            text, count=1, flags=re.MULTILINE,
+        )
 
     # Apply jargon replacements
     text = _apply_simplify_replacements(text)
 
-    # Insert "Start Here" section after the intro block (before the first ## section)
-    start_here = (
-        "\n## Start Here\n\n"
-        "If you're new to business funding, work through these in order:\n\n"
-        "1. **Register your business** — An LLC is the most common choice\n"
-        "2. **Get your EIN** — Free at irs.gov, takes 5 minutes\n"
-        "3. **Open a business bank account** — Keep business and personal money separate\n"
-        "4. **Check your personal credit score** — You need at least 600 to get started\n"
-        "5. **Track 6 months of revenue** — Consistent deposits are what lenders look for\n\n"
-        "Once these are in place, come back to this checklist to prep for an actual application.\n"
-    )
-    text = re.sub(r"(\n## Who This Checklist Is For)", start_here + r"\1", text, count=1)
+    # Only insert "Start Here" section if not already present (idempotent)
+    if not has_start_here_section(text):
+        start_here = (
+            "\n## Start Here\n\n"
+            "If you're new to business funding, work through these in order:\n\n"
+            "1. **Register your business** — An LLC is the most common choice\n"
+            "2. **Get your EIN** — Free at irs.gov, takes 5 minutes\n"
+            "3. **Open a business bank account** — Keep business and personal money separate\n"
+            "4. **Check your personal credit score** — You need at least 600 to get started\n"
+            "5. **Track 6 months of revenue** — Consistent deposits are what lenders look for\n\n"
+            "Once these are in place, come back to this checklist to prep for an actual application.\n"
+        )
+        text = re.sub(r"(\n## Who This Checklist Is For)", start_here + r"\1", text, count=1)
 
     # Update the internal draft note
     text = re.sub(
-        r"\*Internal Draft — [\d_]+ UTC — Not for publication\*",
+        r"\*Internal Draft — [\d_]+ UTC — (?:Simplified Edition — )?Not for publication\*",
         f"*Internal Draft — {ts} UTC — Simplified Edition — Not for publication*",
         text,
     )
     text = re.sub(
-        r"\*Internal draft — [\d_]+ UTC — Pending Ray's review.*?\*",
+        r"\*Internal draft — [\d_]+ UTC — (?:[^—]+— )?Pending Ray's review.*?\*",
         f"*Internal draft — {ts} UTC — Simplified Edition — Pending Ray's review and approval before any use.*",
         text,
     )
+
+    # Final safety: remove any remaining duplicate lines or sections
+    text = normalize_revision_output(text)
     return text
 
 
 def professionalize_checklist_draft(text: str, ts: str) -> str:
     """Create a polished, executive-tone version of the checklist."""
-    text = re.sub(
-        r"^# Credit/Funding Readiness Checklist",
-        "# Credit & Funding Readiness Checklist\n*(Professional Edition)*",
-        text, count=1, flags=re.MULTILINE,
-    )
+    if "Professional Edition" not in text:
+        text = re.sub(
+            r"^# Credit(?:/Funding|& Funding) Readiness Checklist",
+            "# Credit & Funding Readiness Checklist\n*(Professional Edition)*",
+            text, count=1, flags=re.MULTILINE,
+        )
 
     # Add professional intro section
     professional_intro = (
@@ -345,11 +438,12 @@ def professionalize_checklist_draft(text: str, ts: str) -> str:
 
 def improve_checklist_draft(text: str, ts: str) -> str:
     """Create an improved version with additional items and better descriptions."""
-    text = re.sub(
-        r"^# Credit/Funding Readiness Checklist",
-        "# Credit/Funding Readiness Checklist\n*(Improved Edition)*",
-        text, count=1, flags=re.MULTILINE,
-    )
+    if "Improved Edition" not in text:
+        text = re.sub(
+            r"^# Credit/Funding Readiness Checklist",
+            "# Credit/Funding Readiness Checklist\n*(Improved Edition)*",
+            text, count=1, flags=re.MULTILINE,
+        )
 
     # Add items to Business Setup section
     text = text.replace(
@@ -380,8 +474,24 @@ def improve_checklist_draft(text: str, ts: str) -> str:
         text,
     )
     text = re.sub(
-        r"\*Internal draft — [\d_]+ UTC — Pending Ray's review.*?\*",
+        r"\*Internal draft — [\d_]+ UTC — (?:[^—]+— )?Pending Ray's review.*?\*",
         f"*Internal draft — {ts} UTC — Improved Edition — Pending Ray's review and approval before any use.*",
+        text,
+    )
+    return text
+
+
+def cleanup_draft(text: str, ts: str) -> str:
+    """Remove duplicate headings, duplicate subtitles, and redundant sections."""
+    text = normalize_revision_output(text)
+    text = re.sub(
+        r"\*Internal Draft — [\d_]+ UTC — (?:[^—\n]+— )?Not for publication\*",
+        f"*Internal Draft — {ts} UTC — Cleaned Edition — Not for publication*",
+        text,
+    )
+    text = re.sub(
+        r"\*Internal draft — [\d_]+ UTC — (?:[^—\n]+— )?Pending Ray's review.*?\*",
+        f"*Internal draft — {ts} UTC — Cleaned Edition — Pending Ray's review and approval before any use.*",
         text,
     )
     return text

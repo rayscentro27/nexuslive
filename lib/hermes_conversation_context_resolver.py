@@ -67,6 +67,8 @@ FOLLOWUP_REVISE_PHRASES: frozenset[str] = frozenset([
     "turn it into a lead magnet", "turn this into a lead magnet",
     "create a short video script from this", "create a tiktok script from this",
     "create a newsletter from this", "create an email from this",
+    "clean it up", "remove duplicates", "fix duplicate sections",
+    "clean up the draft", "deduplicate it",
 ])
 
 ALL_FOLLOWUP_PHRASES: frozenset[str] = (
