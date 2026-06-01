@@ -511,39 +511,87 @@ def _run_ceo_report() -> tuple[str, list[str], str]:
 
 
 def _run_business_opportunities() -> tuple[str, list[str], str]:
-    """Query top business opportunities from Supabase."""
-    try:
-        import json, urllib.request
-        _env_path = os.path.join(ROOT, '.env')
-        if os.path.exists(_env_path):
-            with open(_env_path) as f:
-                for line in f:
-                    line = line.strip()
-                    if line and not line.startswith('#') and '=' in line:
-                        k, _, v = line.partition('=')
-                        os.environ.setdefault(k.strip(), v.strip())
+    """Monetization recommendation: local content artifacts first, then Supabase."""
+    evidence: list[str] = []
+    recommendations: list[str] = []
 
-        url = os.getenv('SUPABASE_URL', '')
-        key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY', '')
-        req = urllib.request.Request(
-            f"{url}/rest/v1/business_opportunities"
-            "?select=title,opportunity_type,score,urgency,monetization_hint"
-            "&status=eq.active&order=score.desc&limit=5",
-            headers={'apikey': key, 'Authorization': f'Bearer {key}'},
-        )
-        with urllib.request.urlopen(req, timeout=8) as r:
-            rows = json.loads(r.read())
+    # 1. Check local content draft artifacts
+    checklist = _read_nexus_artifact("docs/content_drafts/credit_funding_checklist*.md", max_chars=200)
+    lead_magnet = _read_nexus_artifact("docs/content_drafts/lead_magnet*.md", max_chars=200)
+    video_script = _read_nexus_artifact("docs/content_drafts/video_script*.md", max_chars=200)
+    newsletter = _read_nexus_artifact("docs/content_drafts/newsletter*.md", max_chars=200)
 
-        if not rows:
-            return "unknown", ["No active business opportunities found"], "Run the business opportunities seed."
+    has_checklist   = "artifact_missing" not in checklist   and "artifact_read_error" not in checklist
+    has_lead_magnet = "artifact_missing" not in lead_magnet and "artifact_read_error" not in lead_magnet
+    has_video       = "artifact_missing" not in video_script and "artifact_read_error" not in video_script
+    has_newsletter  = "artifact_missing" not in newsletter   and "artifact_read_error" not in newsletter
 
+    if has_checklist:
+        evidence.append("Content asset ready: Credit/Funding Checklist (distribute as lead magnet)")
+        recommendations.append("Publish credit/funding checklist as free lead magnet to build email list")
+    if has_lead_magnet:
+        evidence.append("Content asset ready: Lead Magnet (ready for opt-in page)")
+        recommendations.append("Wire lead magnet to an opt-in landing page for email capture")
+    if has_video:
+        evidence.append("Content asset ready: Video Script (record short-form content)")
+        recommendations.append("Record a 60-second video from the script and post to social")
+    if has_newsletter:
+        evidence.append("Content asset ready: Newsletter draft (send to existing list)")
+        recommendations.append("Send newsletter to existing contacts this week")
+
+    # 2. Check action queue for monetization items
+    action_queue = _read_nexus_artifact("docs/reports/action_queue*.md", max_chars=300)
+    if "artifact_missing" not in action_queue and "artifact_read_error" not in action_queue:
+        evidence.append("Action queue: see docs/reports/ for pending monetization tasks")
+
+    # 3. Fall back to Supabase if no local artifacts
+    if not evidence:
+        try:
+            import json, urllib.request
+            _env_path = os.path.join(ROOT, '.env')
+            if os.path.exists(_env_path):
+                with open(_env_path) as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith('#') and '=' in line:
+                            k, _, v = line.partition('=')
+                            os.environ.setdefault(k.strip(), v.strip())
+
+            url = os.getenv('SUPABASE_URL', '')
+            key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY', '')
+            req = urllib.request.Request(
+                f"{url}/rest/v1/business_opportunities"
+                "?select=title,opportunity_type,score,urgency,monetization_hint"
+                "&status=eq.active&order=score.desc&limit=3",
+                headers={'apikey': key, 'Authorization': f'Bearer {key}'},
+            )
+            with urllib.request.urlopen(req, timeout=8) as r:
+                rows = json.loads(r.read())
+            if rows:
+                for i, r in enumerate(rows):
+                    evidence.append(
+                        f"#{i+1} [{r.get('score',0)}/10] {r.get('title','?')} — {r.get('monetization_hint','')[:60]}"
+                    )
+                recommendations.append(f"Top: {rows[0].get('title','?')} (score {rows[0].get('score',0)}/10)")
+        except Exception:
+            pass
+
+    if not evidence:
         evidence = [
-            f"#{i+1} [{r.get('score',0)}/10] {r.get('title','?')} — {r.get('monetization_hint','')[:60]}"
-            for i, r in enumerate(rows)
+            "No content assets or active opportunities found in local artifacts yet.",
+            "Next step: create your first content draft to enable monetization tracking.",
         ]
-        return "healthy", evidence, f"Top opportunity: {rows[0].get('title','?')} (score {rows[0].get('score',0)}/10). View full list at https://goclearonline.cc"
-    except Exception as e:
-        return "unknown", [f"Business opportunities query failed: {e}"], "Check Supabase connectivity."
+        return "unknown", evidence, (
+            "Start with: 'create first draft' to build a credit/funding checklist. "
+            "Publishing or emailing requires your approval."
+        )
+
+    top_rec = recommendations[0] if recommendations else "Review the assets listed above and pick one to activate."
+    top_rec += " (Internal use OK. Publishing, selling, or emailing requires your approval.)"
+    evidence.append("")
+    evidence.append("To run a broader audit: ask 'nexus monetization audit'")
+
+    return "healthy", evidence, top_rec
 
 
 def _run_app_url() -> tuple[str, list[str], str]:
@@ -970,7 +1018,7 @@ def _run_memory_sources() -> tuple[str, list[str], str]:
         "- Active operating rules",
         "- Live provider policy",
         "",
-        "Historical/debug sources:",
+        "Historical sources:",
         "Available only when explicitly requested:",
         "- archived executive memory",
         "- stale memory debug",
@@ -1112,25 +1160,52 @@ def _run_ceo_digest() -> tuple[str, list[str], str]:
 # ── Knowledge gap handlers ─────────────────────────────────────────────────────
 
 def _run_knowledge_gap_review() -> tuple[str, list[str], str]:
-    """Show recent unanswered questions."""
+    """Show deduplicated knowledge gaps grouped by question."""
     try:
         from lib.hermes_knowledge_gap_logger import load_recent_knowledge_gaps
-        gaps = load_recent_knowledge_gaps(limit=10)
+        gaps = load_recent_knowledge_gaps(limit=100)
         open_gaps = [g for g in gaps if g.get("status") == "open"]
         if not open_gaps:
             return "healthy", ["No open knowledge gaps on record."], (
                 "Hermes answered all recent questions from active memory."
             )
-        evidence = ["Recent unanswered questions:\n"]
-        for i, g in enumerate(open_gaps[:8], 1):
+
+        # Group by normalized_message
+        groups: dict[str, dict] = {}
+        counts: dict[str, int] = {}
+        for g in open_gaps:
+            key = g.get("normalized_message") or g.get("user_message", "?")
+            key = key[:80]
+            if key not in groups:
+                groups[key] = g
+                counts[key] = 1
+            else:
+                counts[key] += 1
+
+        # Resolved candidates: phrases now handled by conversational router
+        _RESOLVED_PHRASES = {
+            "help", "/help", "what can you do", "what can you answer",
+            "how are you", "good morning", "weather", "news",
+        }
+        def _is_resolved_candidate(msg: str) -> bool:
+            t = msg.lower()
+            return any(p in t for p in _RESOLVED_PHRASES)
+
+        evidence = [f"Knowledge gaps — {len(groups)} unique question(s):\n"]
+        for i, (key, g) in enumerate(sorted(groups.items(), key=lambda x: -counts[x[0]])[:10], 1):
+            count_note = f" (asked {counts[key]}×)" if counts[key] > 1 else ""
+            resolved = " [resolved candidate — now routed]" if _is_resolved_candidate(key) else ""
             evidence.append(
-                f"{i}. {g.get('user_message', '?')[:70]}\n"
+                f"{i}. {key[:70]}{count_note}{resolved}\n"
                 f"   Reason: {g.get('reason', '?')}\n"
-                f"   Suggested fix: {g.get('suggested_handler', '?')}"
+                f"   Fix: {g.get('suggested_handler', '?')}"
             )
+
+        resolved_count = sum(1 for k in groups if _is_resolved_candidate(k))
         return "warning", evidence, (
-            f"{len(open_gaps)} gap(s) logged. "
-            "Ask 'create better answers for gaps' to generate improvement proposals."
+            f"{len(groups)} unique gap(s) ({len(open_gaps)} total entries). "
+            + (f"{resolved_count} are resolved candidates. " if resolved_count else "")
+            + "Ask 'create better answers for gaps' to generate improvement proposals."
         )
     except Exception as e:
         return "unknown", [f"Gap review error: {e}"], "Check lib/hermes_knowledge_gap_logger.py"

@@ -3054,9 +3054,11 @@ class NexusTelegramBot:
             intent, _, _ = classify_intent(text)
             if intent in MEMORY_INTENTS:
                 logger.info("telegram route=memory_command intent=%s", intent)
-                return run_command(text, source="telegram")
-        except Exception:
-            pass
+                result = run_command(text, source="telegram")
+                if result:
+                    return result
+        except Exception as exc:
+            logger.warning("telegram _try_memory_command failed text=%r exc=%s", text[:60], exc)
         return None
 
     def handle_inbound_message(self, text: str) -> str:

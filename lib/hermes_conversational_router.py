@@ -141,14 +141,42 @@ def route_conversational_intent(user_message: str) -> str | None:
         logger.info("conversational_router route=capability")
         return format_capability_response()
 
-    # ── 3. Memory source — delegate to memory command handler ─────────────
+    # ── 3. Memory source — inline static response (avoids dedup collision with
+    #       _try_memory_command path which fires first in handle_inbound_message)
     if intent == CATEGORY_MEMORY_SOURCE:
-        logger.info("conversational_router route=memory_source")
+        logger.info("conversational_router route=memory_source_inline")
         try:
-            from hermes_command_router.router import run_command
-            return run_command("show memory sources", source="telegram")
+            from hermes_command_router.router import _run_memory_sources
+            from hermes_command_router.report import build as build_report
+            status, evidence, rec = _run_memory_sources()
+            return build_report(
+                status=status,
+                what_happened="Ran memory sources check.",
+                evidence=evidence,
+                recommendation=rec,
+                action_needed="none",
+                command="show memory sources",
+            )
         except Exception:
-            return UNKNOWN_FALLBACK_RESPONSE
+            return (
+                "HERMES MEMORY SOURCES\n\n"
+                "Live answer sources:\n"
+                "- Current conversation context\n"
+                "- Latest content artifact\n"
+                "- Action queue\n"
+                "- Decision log\n"
+                "- Source intake registry\n"
+                "- Daily research review\n"
+                "- Active operating rules\n"
+                "- Live provider policy\n\n"
+                "Historical sources (explicit request only):\n"
+                "- archived executive memory\n"
+                "- stale memory debug\n\n"
+                "Blocked from live answers:\n"
+                "- old Executive Memory defaults\n"
+                "- stale provider status\n\n"
+                "Evidence: docs/HERMES_MEMORY_SAFETY_CONTRACT.md"
+            )
 
     # ── 4. System health — route to existing health handler ───────────────
     if intent == CATEGORY_SYSTEM_HEALTH:
