@@ -354,6 +354,38 @@ def reason(
                 pass
 
     # ── evidence_only fallback — clean, never "Command timed out" ─────────────
+    # Guard: monetization/revenue questions must never hit the generic evidence dump.
+    _monetization_keywords = ("monetiz", "money", "revenue", "affiliate", "make money",
+                               "monetization audit", "revenue plan", "money path")
+    _q_lower = question.lower()
+    if any(kw in _q_lower for kw in _monetization_keywords):
+        try:
+            from lib.hermes_monetization_today import (
+                build_today_monetization_plan,
+                format_nexus_monetization_audit_response,
+                format_today_monetization_response,
+                is_monetization_audit_phrase,
+            )
+            plan = build_today_monetization_plan()
+            if is_monetization_audit_phrase(_q_lower):
+                reply = format_nexus_monetization_audit_response(plan)
+            else:
+                reply = format_today_monetization_response(plan)
+        except Exception as _me:
+            reply = (
+                "TODAY'S MONEY PLAN\n\n"
+                "Monetization plan unavailable right now.\n"
+                f"Error: {_me}\n\n"
+                "Say 'show opportunities' to see current business opportunities."
+            )
+        return ReasoningResult(
+            reply=reply,
+            provider_used="hermes_monetization_today",
+            evidence_refs=0,
+            is_evidence_only=True,
+            provider_disclosed=True,
+        )
+
     try:
         from lib.hermes_context_pack_builder import build_context_pack, classify_question
         from lib.hermes_evidence_summary_formatter import format_provider_fallback_response

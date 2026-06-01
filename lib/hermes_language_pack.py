@@ -77,6 +77,11 @@ MONETIZATION_PHRASES = frozenset([
     "what should we focus on for revenue", "what is the top revenue move",
     "monetization strategy", "money move", "revenue move",
     "what can generate revenue", "how to make money today",
+    "nexus monetization audit", "run nexus monetization audit",
+    "show monetization audit", "monetization audit",
+    "monetization plan", "monetization priorities",
+    "revenue plan for today", "fastest money path",
+    "what is our fastest money path",
 ])
 
 MONETIZATION_COMMAND = "what opportunities should we review"

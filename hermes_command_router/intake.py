@@ -137,6 +137,10 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
     (["archive resolved gaps", "clear resolved gaps",
       "archive old gaps", "mark gaps resolved"],                      "knowledge_gap_archive",       "low",    True),
 
+    # "fastest" contains substring "test" — must be before run_tests entry
+    (["fastest money", "fastest revenue", "fastest path to money",
+      "fastest money path"],                                       "business_opportunities",    "medium", False),
+
     # ── Standard commands ───────────────────────────────────────────────────────
     (["health", "backend", "system check", "check system"],      "health_check",              "medium", False),
     (["worker", "heartbeat", "workers"],                          "worker_status",             "medium", False),
@@ -161,7 +165,19 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
     (["business opportunity", "business opportunities", "what opportunities",
       "show opportunities", "best opportunity", "top opportunity",
       "side hustle", "ai content agency", "credit repair consulting",
-      "funding broker", "opportunities ready"],                     "business_opportunities",    "medium", False),
+      "funding broker", "opportunities ready",
+      # monetization natural language phrases
+      "how do we make money", "how can we make money",
+      "how to make money today", "best money making opportunity",
+      "what can make money", "money making opportunity",
+      "best revenue move", "next best money move",
+      "what should we monetize", "make money right now",
+      # monetization audit and plan commands
+      "nexus monetization audit", "run nexus monetization audit",
+      "show monetization audit", "monetization audit",
+      "monetization plan", "monetization priorities",
+      "revenue plan for today", "fastest money path",
+      "what is our fastest money path"],                            "business_opportunities",    "medium", False),
     (["app url", "website url", "what is the url", "what's the url",
       "app link", "platform url", "nexus url", "goclear",
       "what is the app", "where is the app", "how do i access"],   "app_url",                   "low",    False),

@@ -511,87 +511,37 @@ def _run_ceo_report() -> tuple[str, list[str], str]:
 
 
 def _run_business_opportunities() -> tuple[str, list[str], str]:
-    """Monetization recommendation: local content artifacts first, then Supabase."""
-    evidence: list[str] = []
-    recommendations: list[str] = []
-
-    # 1. Check local content draft artifacts
-    checklist = _read_nexus_artifact("docs/content_drafts/credit_funding_checklist*.md", max_chars=200)
-    lead_magnet = _read_nexus_artifact("docs/content_drafts/lead_magnet*.md", max_chars=200)
-    video_script = _read_nexus_artifact("docs/content_drafts/video_script*.md", max_chars=200)
-    newsletter = _read_nexus_artifact("docs/content_drafts/newsletter*.md", max_chars=200)
-
-    has_checklist   = "artifact_missing" not in checklist   and "artifact_read_error" not in checklist
-    has_lead_magnet = "artifact_missing" not in lead_magnet and "artifact_read_error" not in lead_magnet
-    has_video       = "artifact_missing" not in video_script and "artifact_read_error" not in video_script
-    has_newsletter  = "artifact_missing" not in newsletter   and "artifact_read_error" not in newsletter
-
-    if has_checklist:
-        evidence.append("Content asset ready: Credit/Funding Checklist (distribute as lead magnet)")
-        recommendations.append("Publish credit/funding checklist as free lead magnet to build email list")
-    if has_lead_magnet:
-        evidence.append("Content asset ready: Lead Magnet (ready for opt-in page)")
-        recommendations.append("Wire lead magnet to an opt-in landing page for email capture")
-    if has_video:
-        evidence.append("Content asset ready: Video Script (record short-form content)")
-        recommendations.append("Record a 60-second video from the script and post to social")
-    if has_newsletter:
-        evidence.append("Content asset ready: Newsletter draft (send to existing list)")
-        recommendations.append("Send newsletter to existing contacts this week")
-
-    # 2. Check action queue for monetization items
-    action_queue = _read_nexus_artifact("docs/reports/action_queue*.md", max_chars=300)
-    if "artifact_missing" not in action_queue and "artifact_read_error" not in action_queue:
-        evidence.append("Action queue: see docs/reports/ for pending monetization tasks")
-
-    # 3. Fall back to Supabase if no local artifacts
-    if not evidence:
-        try:
-            import json, urllib.request
-            _env_path = os.path.join(ROOT, '.env')
-            if os.path.exists(_env_path):
-                with open(_env_path) as f:
-                    for line in f:
-                        line = line.strip()
-                        if line and not line.startswith('#') and '=' in line:
-                            k, _, v = line.partition('=')
-                            os.environ.setdefault(k.strip(), v.strip())
-
-            url = os.getenv('SUPABASE_URL', '')
-            key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY', '')
-            req = urllib.request.Request(
-                f"{url}/rest/v1/business_opportunities"
-                "?select=title,opportunity_type,score,urgency,monetization_hint"
-                "&status=eq.active&order=score.desc&limit=3",
-                headers={'apikey': key, 'Authorization': f'Bearer {key}'},
-            )
-            with urllib.request.urlopen(req, timeout=8) as r:
-                rows = json.loads(r.read())
-            if rows:
-                for i, r in enumerate(rows):
-                    evidence.append(
-                        f"#{i+1} [{r.get('score',0)}/10] {r.get('title','?')} — {r.get('monetization_hint','')[:60]}"
-                    )
-                recommendations.append(f"Top: {rows[0].get('title','?')} (score {rows[0].get('score',0)}/10)")
-        except Exception:
-            pass
-
-    if not evidence:
-        evidence = [
-            "No content assets or active opportunities found in local artifacts yet.",
-            "Next step: create your first content draft to enable monetization tracking.",
-        ]
-        return "unknown", evidence, (
-            "Start with: 'create first draft' to build a credit/funding checklist. "
-            "Publishing or emailing requires your approval."
+    """Content-first monetization: reads real local artifacts via hermes_monetization_today."""
+    try:
+        from lib.hermes_monetization_today import (
+            build_today_monetization_plan,
+            format_today_monetization_response,
         )
+        plan = build_today_monetization_plan()
+        if plan["asset_count"] == 0:
+            return "unknown", [
+                "No content assets found in local artifact store.",
+                "Run a content pipeline cycle to generate monetizable assets.",
+            ], "Start with: 'create first draft' to build a credit/funding checklist."
 
-    top_rec = recommendations[0] if recommendations else "Review the assets listed above and pick one to activate."
-    top_rec += " (Internal use OK. Publishing, selling, or emailing requires your approval.)"
-    evidence.append("")
-    evidence.append("To run a broader audit: ask 'nexus monetization audit'")
+        evidence: list[str] = []
+        for a in plan["assets"][:6]:
+            label = a["asset_type"].replace("_", " ").title()
+            evidence.append(f"  {label}: {a['name'][:55]} (score: {a['score']})")
+        if plan["top_actions"]:
+            evidence.append("")
+            for ln in plan["top_actions"].splitlines()[:3]:
+                if ln.strip():
+                    evidence.append(f"  {ln.strip()}")
+        evidence.append("")
+        evidence.append("Approval boundary: publishing, spending, sending require Ray sign-off.")
 
-    return "healthy", evidence, top_rec
+        rec = format_today_monetization_response(plan)
+        return "healthy", evidence, rec
+    except Exception as exc:
+        return "unknown", [f"Monetization handler error: {exc}"], (
+            "Run 'show opportunities' again — if this persists, check lib/hermes_monetization_today.py"
+        )
 
 
 def _run_app_url() -> tuple[str, list[str], str]:

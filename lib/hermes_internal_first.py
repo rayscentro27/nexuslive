@@ -1052,33 +1052,28 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
 
     if topic == "monetization":
         try:
-            exec_mem = _exec_mem.load_memory()
-            mono = exec_mem.get("monetization_priorities", [])
-            affiliates = exec_mem.get("affiliate_campaigns", [])
-            goals = exec_mem.get("business_goals", [])
-            lines = ["**Monetization Priorities**"]
-            for m in mono[:5]:
-                lines.append(f"  • {m}")
-            if affiliates:
-                lines.append("\n**Active Affiliate Campaigns**")
-                for a in affiliates[:4]:
-                    lines.append(f"  • {a}")
-            if goals:
-                lines.append("\n**Business Goals**")
-                for g in goals[:3]:
-                    lines.append(f"  • {g}")
-            lines.append("\nRun `nexus monetization audit` for live affiliate scoring.")
+            from lib.hermes_monetization_today import (
+                build_today_monetization_plan,
+                format_today_monetization_response,
+                format_nexus_monetization_audit_response,
+                is_monetization_audit_phrase,
+            )
+            plan = build_today_monetization_plan()
+            if is_monetization_audit_phrase(raw):
+                text = format_nexus_monetization_audit_response(plan)
+            else:
+                text = format_today_monetization_response(plan)
             return InternalFirstReply(
-                text="\n".join(lines),
+                text=text,
                 confidence=CONF_INTERNAL_CONFIRMED,
-                source="hermes_executive_memory.monetization",
+                source="hermes_monetization_today",
                 matched_topic=topic,
             )
         except Exception as exc:
             return InternalFirstReply(
-                text=f"Monetization data unavailable: {exc}",
+                text=f"Monetization plan unavailable: {exc}",
                 confidence=CONF_INTERNAL_PARTIAL,
-                source="hermes_executive_memory",
+                source="hermes_monetization_today",
                 matched_topic=topic,
             )
 
