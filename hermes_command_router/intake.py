@@ -121,6 +121,22 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "are you there", "is this working", "comm check", "comms check",
       "communication test", "ping"],                       "communication_health",      "medium", False),
 
+    # ── Knowledge gap review commands (before generic research entry) ──────────
+    (["show knowledge gaps", "show unanswered questions",
+      "what could you not answer", "show gaps",
+      "what questions were unanswered", "show unanswered",
+      "what did you not know", "what gaps do you have",
+      "hermes show knowledge gaps"],                                   "knowledge_gap_review",        "low",    False),
+
+    (["research unanswered", "create better answers for gaps",
+      "research knowledge gaps", "improve gap answers",
+      "fix knowledge gaps", "resolve knowledge gaps",
+      "create gap research tasks", "improve hermes answers",
+      "unanswered questions research"],                               "knowledge_gap_research",      "low",    True),
+
+    (["archive resolved gaps", "clear resolved gaps",
+      "archive old gaps", "mark gaps resolved"],                      "knowledge_gap_archive",       "low",    True),
+
     # ── Standard commands ───────────────────────────────────────────────────────
     (["health", "backend", "system check", "check system"],      "health_check",              "medium", False),
     (["worker", "heartbeat", "workers"],                          "worker_status",             "medium", False),
@@ -199,6 +215,7 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "disable openrouter", "disable open router",
       "show evidence mode status", "evidence mode status",
       "what provider", "which provider"],                          "provider_status",             "low",    False),
+
 ]
 
 

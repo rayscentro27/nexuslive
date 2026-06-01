@@ -1109,6 +1109,58 @@ def _run_ceo_digest() -> tuple[str, list[str], str]:
         return f"CEO digest error: {e}", [], "Check lib/ceo_grouped_digest.py"
 
 
+# ── Knowledge gap handlers ─────────────────────────────────────────────────────
+
+def _run_knowledge_gap_review() -> tuple[str, list[str], str]:
+    """Show recent unanswered questions."""
+    try:
+        from lib.hermes_knowledge_gap_logger import load_recent_knowledge_gaps
+        gaps = load_recent_knowledge_gaps(limit=10)
+        open_gaps = [g for g in gaps if g.get("status") == "open"]
+        if not open_gaps:
+            return "healthy", ["No open knowledge gaps on record."], (
+                "Hermes answered all recent questions from active memory."
+            )
+        evidence = ["Recent unanswered questions:\n"]
+        for i, g in enumerate(open_gaps[:8], 1):
+            evidence.append(
+                f"{i}. {g.get('user_message', '?')[:70]}\n"
+                f"   Reason: {g.get('reason', '?')}\n"
+                f"   Suggested fix: {g.get('suggested_handler', '?')}"
+            )
+        return "warning", evidence, (
+            f"{len(open_gaps)} gap(s) logged. "
+            "Ask 'create better answers for gaps' to generate improvement proposals."
+        )
+    except Exception as e:
+        return "unknown", [f"Gap review error: {e}"], "Check lib/hermes_knowledge_gap_logger.py"
+
+
+def _run_knowledge_gap_research() -> tuple[str, list[str], str]:
+    """Create internal improvement report for open gaps."""
+    try:
+        from lib.hermes_response_improvement_loop import create_response_improvement_report
+        report_path = create_response_improvement_report()
+        return "healthy", [
+            "Response improvement report created.",
+            f"Report: {report_path}",
+            "Ray approval required before applying any proposed changes.",
+        ], (
+            f"Review the report and approve changes at: {report_path}"
+        )
+    except Exception as e:
+        return "unknown", [f"Gap research error: {e}"], "Check lib/hermes_response_improvement_loop.py"
+
+
+def _run_knowledge_gap_archive() -> tuple[str, list[str], str]:
+    """Archive (mark resolved) gaps that have been handled."""
+    return "healthy", [
+        "Gap archival is a manual step — mark gaps as resolved in:",
+        "docs/reports/knowledge_gaps/hermes_knowledge_gaps.jsonl",
+        "Set status: 'resolved' for gaps that have been fixed.",
+    ], "Update the JSONL file to mark gaps resolved."
+
+
 _INTENT_HANDLERS = {
     "health_check":              _run_monitoring_check,
     "worker_status":             _run_worker_check,
@@ -1144,6 +1196,10 @@ _INTENT_HANDLERS = {
     "stale_memory_debug":        _run_stale_memory_debug,
     # ── Provider / brain status ───────────────────────────────────────────────
     "provider_status":           _run_provider_status,
+    # ── Knowledge gap review ─────────────────────────────────────────────────
+    "knowledge_gap_review":      _run_knowledge_gap_review,
+    "knowledge_gap_research":    _run_knowledge_gap_research,
+    "knowledge_gap_archive":     _run_knowledge_gap_archive,
 }
 
 _SCRIPT_ROUTES = {

@@ -582,6 +582,27 @@ class NexusTelegramBot:
                 pass
             return text
 
+        # ── Conversational language router ─────────────────────────────────────
+        # Handles small-talk, capability questions, external-info gaps,
+        # system-health shortcuts, and monetization routing before LLM.
+        try:
+            from lib.hermes_conversational_router import (
+                classify_conversational_intent,
+                route_conversational_intent,
+            )
+            from lib.hermes_language_pack import CATEGORY_UNKNOWN
+            conv_intent = classify_conversational_intent(raw)
+            # Only intercept non-unknown categories here; unknown falls through to LLM
+            if conv_intent != CATEGORY_UNKNOWN:
+                conv_reply = route_conversational_intent(raw)
+                if conv_reply is not None:
+                    logger.info("telegram route=conversational_router intent=%s", conv_intent)
+                    hermes_conversation_memory.record_turn(chat_id, "user", raw)
+                    hermes_conversation_memory.record_turn(chat_id, "assistant", conv_reply)
+                    return format_telegram_reply(conv_reply)
+        except Exception:
+            pass
+
         # Supabase-first knowledge routing — search approved knowledge, research tickets, domain tables
         # Intercepts Nexus-relevant questions before they reach the generic LLM
         supabase_reply = nexus_knowledge_reply(raw)
@@ -646,6 +667,13 @@ class NexusTelegramBot:
             )
             return format_telegram_reply(reply)
         except Exception:
+            # Log as knowledge gap when LLM path fails entirely
+            try:
+                from lib.hermes_knowledge_gap_logger import log_knowledge_gap
+                from lib.hermes_language_pack import CATEGORY_UNKNOWN, GAP_MISSING_ROUTE
+                log_knowledge_gap(raw, CATEGORY_UNKNOWN, GAP_MISSING_ROUTE)
+            except Exception:
+                pass
             return "Hermes is online — conversational model unavailable right now. Try /status, /models, or ask a specific operational question."
 
     def send_message(self, message: str, parse_mode: str = "HTML") -> bool:
@@ -3019,6 +3047,9 @@ class NexusTelegramBot:
                 "answer_source",
                 "archived_executive_memory",
                 "stale_memory_debug",
+                "knowledge_gap_review",
+                "knowledge_gap_research",
+                "knowledge_gap_archive",
             }
             intent, _, _ = classify_intent(text)
             if intent in MEMORY_INTENTS:
