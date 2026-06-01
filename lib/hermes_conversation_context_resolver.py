@@ -117,7 +117,31 @@ def record_context_event(event: dict) -> None:
 
 
 def get_last_context() -> Optional[dict]:
-    """Return the last recorded context event, or None if none exists."""
+    """Return the last recorded context event if fresh (<=24h), else None.
+
+    Stale context (>24h) must not drive follow-up phrase resolution — callers
+    should ask clarification via stale_context_clarification() instead.
+    """
+    if not _CONTEXT_FILE.exists():
+        return None
+    try:
+        ctx = json.loads(_CONTEXT_FILE.read_text())
+    except Exception:
+        return None
+
+    # Age gate — do not use context older than 24 hours for follow-up resolution
+    try:
+        from lib.hermes_memory_freshness import is_context_fresh
+        if not is_context_fresh(ctx):
+            return None
+    except Exception:
+        pass  # freshness check unavailable — return context as-is to avoid regression
+
+    return ctx
+
+
+def get_last_context_any_age() -> Optional[dict]:
+    """Return the last recorded context event regardless of age (debug/history only)."""
     if not _CONTEXT_FILE.exists():
         return None
     try:

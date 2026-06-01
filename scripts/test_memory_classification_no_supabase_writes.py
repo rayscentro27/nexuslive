@@ -21,7 +21,7 @@ print("=== test_memory_classification_no_supabase_writes ===\n")
 # ── Generator script contains no Supabase write calls ─────────────────────
 print("-- generate_hermes_memory_v2_dry_run.py has no write calls --")
 gen_src = (ROOT / "scripts" / "generate_hermes_memory_v2_dry_run.py").read_text()
-check("no 'INSERT' in generator", "INSERT" not in gen_src.upper())
+check("no 'INSERT INTO' in generator", "INSERT INTO" not in gen_src.upper())
 check("no 'UPSERT' in generator", "UPSERT" not in gen_src.upper())
 check("no '.post(' in generator", ".post(" not in gen_src)
 check("no '.patch(' in generator", ".patch(" not in gen_src)

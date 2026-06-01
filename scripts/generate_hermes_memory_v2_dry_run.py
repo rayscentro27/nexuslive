@@ -1,12 +1,17 @@
 """
 generate_hermes_memory_v2_dry_run.py
-Phase 3 — Hermes Memory v2 dry-run record generator.
+Phase 3 / 3B — Hermes Memory v2 dry-run record generator.
 
 Reads the Phase 3 audit/classification reports and produces proposed
 hermes_memory_v2 records WITHOUT writing to Supabase.
 
+Phase 3B: freshness rules from hermes_memory_freshness.py are applied to
+annotate records for provider_health, executive_briefings, ai_task_queue,
+nexus_skills, and agent_dispatch_tasks.
+
 Usage:
   python scripts/generate_hermes_memory_v2_dry_run.py --write-report true
+  python scripts/generate_hermes_memory_v2_dry_run.py --write-report true --phase3b true
 """
 from __future__ import annotations
 
@@ -19,6 +24,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MEMORY_DIR = ROOT / "docs" / "reports" / "memory"
+sys.path.insert(0, str(ROOT))
 
 _SCOPE_MAP = {
     "active_live_answer": "live_answer",
@@ -40,6 +46,53 @@ _STATUS_MAP = {
 
 # Do not write to Supabase — dry-run only
 _SUPABASE_WRITE_ATTEMPTED = False
+
+# Phase 3B: freshness windows (mirrors hermes_memory_freshness constants)
+_PHASE3B_FRESHNESS_RULES: dict[str, dict] = {
+    "provider_health": {
+        "max_age_minutes": 15,
+        "stale_values": ["OFFLINE", "offline", "Ollama OFFLINE", "Beehiiv pending",
+                         "YouTube Studio pending", "OpenRouter not configured"],
+        "stale_classification": "blocked_from_live",
+        "description": "Records >15min old or with OFFLINE values must not reach Telegram",
+    },
+    "executive_briefings": {
+        "max_age_hours": 48,
+        "stale_classification": "historical_only",
+        "description": "Briefings older than 48h are historical_only — not live answers",
+    },
+    "hermes_conversation_context": {
+        "max_age_hours": 24,
+        "stale_classification": "historical_only",
+        "description": "Context >24h must not drive follow-up resolution",
+    },
+    "ai_task_queue": {
+        "max_age_hours": 24,
+        "active_statuses": ["queued", "running", "assigned", "pending", "in_progress"],
+        "completed_statuses": ["completed", "done", "succeeded", "cancelled", "failed", "error"],
+        "description": "Active status + fresh (<24h) → active; completed or stale → historical",
+    },
+    "agent_dispatch_tasks": {
+        "max_age_hours": 24,
+        "active_statuses": ["active", "pending", "running", "assigned", "in_progress"],
+        "completed_statuses": ["completed", "done", "succeeded", "cancelled", "failed", "error"],
+        "description": "Active status + fresh (<24h) → active; completed or stale → historical",
+    },
+    "nexus_skills": {
+        "active_statuses": ["enabled", "active", "installed"],
+        "inactive_statuses": ["disabled", "deprecated", "removed"],
+        "description": "enabled/active/installed → active; disabled/deprecated → historical",
+    },
+}
+
+# Tables affected by Phase 3B freshness rules
+_PHASE3B_TABLES = frozenset(_PHASE3B_FRESHNESS_RULES.keys())
+
+try:
+    from lib.hermes_memory_freshness import classify_record as _freshness_classify_record
+    _FRESHNESS_MODULE_AVAILABLE = True
+except Exception:
+    _FRESHNESS_MODULE_AVAILABLE = False
 
 
 def _now_iso() -> str:
@@ -87,9 +140,14 @@ def _make_record(
     tags: list[str] | None = None,
     deprecated_reason: str = "",
     evidence_path: str = "",
+    phase3b_rule: dict | None = None,
 ) -> dict:
     status = _STATUS_MAP.get(classification, "needs_review")
     scope = _SCOPE_MAP.get(classification, "historical")
+    migration_note = "Phase 3 dry-run. No Supabase writes. Proposed status: {}.".format(status)
+    if phase3b_rule:
+        migration_note += " Phase 3B freshness rule applied: {}.".format(
+            phase3b_rule.get("description", "freshness check"))
     return {
         "memory_id":             f"mv2-{source_id.lower()}-{uuid.uuid4().hex[:8]}",
         "title":                 title,
@@ -101,7 +159,7 @@ def _make_record(
         "source_table":          source_table,
         "source_path":           source_path,
         "source_record_id":      "",
-        "evidence_path":         evidence_path or f"docs/reports/memory/hermes_memory_source_map_*.json",
+        "evidence_path":         evidence_path or "docs/reports/memory/hermes_memory_source_map_*.json",
         "related_action_id":     "",
         "related_decision_id":   "",
         "related_goal_id":       "",
@@ -111,9 +169,10 @@ def _make_record(
         "confidence":            0.9 if status == "active" else 0.7,
         "priority":              "high" if risk == "critical" else "medium" if risk == "high" else "low",
         "tags":                  tags or [classification, risk],
-        "payload":               {"classification": classification, "risk": risk},
+        "payload":               {"classification": classification, "risk": risk,
+                                  "phase3b_freshness_rule": phase3b_rule or {}},
         "migration_status":      "dry_run",
-        "migration_notes":       f"Phase 3 dry-run. No Supabase writes. Proposed status: {status}.",
+        "migration_notes":       migration_note,
         "deprecated_reason":     deprecated_reason,
         "replacement_memory_id": "",
         "created_at":            _now_iso(),
@@ -134,6 +193,8 @@ def generate_records() -> list[dict]:
         table = tbl.get("table", "?")
         cls = tbl.get("classification", "needs_review")
         risk = tbl.get("risk", "low")
+        # Phase 3B: attach freshness rule metadata for affected tables
+        phase3b_rule = _PHASE3B_FRESHNESS_RULES.get(table)
         records.append(_make_record(
             source_id=sid,
             title=f"Supabase: {table}",
@@ -143,8 +204,9 @@ def generate_records() -> list[dict]:
             source="supabase",
             source_table=table,
             risk=risk,
-            tags=["supabase", cls, risk],
+            tags=["supabase", cls, risk] + (["phase3b_freshness"] if phase3b_rule else []),
             evidence_path="docs/reports/memory/supabase_table_memory_classification_*.json",
+            phase3b_rule=phase3b_rule,
         ))
 
     # ── Local files ──────────────────────────────────────────────────────────
@@ -228,9 +290,66 @@ def write_reports(records: list[dict], ts: str) -> tuple[Path, Path]:
     return jsonl_path, md_path
 
 
+def write_phase3b_reports(records: list[dict], ts: str) -> tuple[Path, Path]:
+    """Generate Phase 3B stale safety refinement reports."""
+    phase3b_records = [r for r in records if r.get("payload", {}).get("phase3b_freshness_rule")]
+    affected_tables = list(_PHASE3B_TABLES)
+
+    json_path = MEMORY_DIR / f"phase3b_stale_safety_refinement_{ts}.json"
+    md_path   = MEMORY_DIR / f"phase3b_stale_safety_refinement_{ts}.md"
+
+    report = {
+        "phase": "3B",
+        "generated_at": _now_iso(),
+        "description": "Stale-record safety rules applied to Phase 3 dry-run classification",
+        "supabase_write_attempted": False,
+        "freshness_module_available": _FRESHNESS_MODULE_AVAILABLE,
+        "affected_tables": affected_tables,
+        "rules": _PHASE3B_FRESHNESS_RULES,
+        "annotated_records_count": len(phase3b_records),
+        "total_records_count": len(records),
+        "annotated_records": [
+            {
+                "memory_id": r["memory_id"],
+                "title": r["title"],
+                "status": r["status"],
+                "source_table": r["source_table"],
+                "freshness_rule": r["payload"]["phase3b_freshness_rule"],
+            }
+            for r in phase3b_records
+        ],
+    }
+    json_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    with md_path.open("w", encoding="utf-8") as f:
+        f.write("# Phase 3B — Stale Safety Refinement Report\n\n")
+        f.write(f"*Generated: {_now_iso()}*\n\n")
+        f.write("**No Supabase writes. Classification and annotation only.**\n\n")
+        f.write(f"Freshness module loaded: {'YES' if _FRESHNESS_MODULE_AVAILABLE else 'NO (rules embedded)'}\n\n")
+        f.write("## Freshness Rules Applied\n\n")
+        for table, rule in _PHASE3B_FRESHNESS_RULES.items():
+            f.write(f"### {table}\n")
+            f.write(f"{rule.get('description', '')}\n\n")
+            if "max_age_minutes" in rule:
+                f.write(f"- Max age: {rule['max_age_minutes']} minutes\n")
+            if "max_age_hours" in rule:
+                f.write(f"- Max age: {rule['max_age_hours']} hours\n")
+            if "stale_values" in rule:
+                f.write(f"- Stale values: {', '.join(rule['stale_values'])}\n")
+            if "active_statuses" in rule:
+                f.write(f"- Active statuses: {', '.join(rule['active_statuses'])}\n")
+            f.write(f"- Stale classification: {rule.get('stale_classification', 'historical_only')}\n\n")
+        f.write(f"## Annotated Records ({len(phase3b_records)} of {len(records)})\n\n")
+        for r in phase3b_records:
+            f.write(f"- **[{r['status']}]** {r['title']} ({r['source_table']})\n")
+
+    return json_path, md_path
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--write-report", default="false")
+    parser.add_argument("--phase3b", default="false")
     args = parser.parse_args()
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -239,7 +358,10 @@ def main():
     records = generate_records()
     print(f"Generated {len(records)} proposed hermes_memory_v2 records (dry-run)")
 
-    if args.write_report.lower() in ("true", "1", "yes"):
+    do_write = args.write_report.lower() in ("true", "1", "yes")
+    do_phase3b = args.phase3b.lower() in ("true", "1", "yes")
+
+    if do_write:
         jsonl_path, md_path = write_reports(records, ts)
         print(f"Written: {jsonl_path.relative_to(ROOT)}")
         print(f"Written: {md_path.relative_to(ROOT)}")
@@ -248,6 +370,14 @@ def main():
             print(f"  [{r['status']}] {r['title']}")
         if len(records) > 5:
             print(f"  ... and {len(records) - 5} more")
+
+    if do_phase3b or do_write:
+        json_path, md_path2 = write_phase3b_reports(records, ts)
+        print(f"Written: {json_path.relative_to(ROOT)}")
+        print(f"Written: {md_path2.relative_to(ROOT)}")
+        phase3b_count = sum(1 for r in records if r.get("payload", {}).get("phase3b_freshness_rule"))
+        print(f"Phase 3B: {phase3b_count} records annotated with freshness rules")
+        print(f"Phase 3B: affected tables: {', '.join(sorted(_PHASE3B_TABLES))}")
 
     print("Supabase write attempted: NO")
     print("Data changed: NO")
