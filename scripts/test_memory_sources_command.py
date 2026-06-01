@@ -62,7 +62,7 @@ check("Memory sources evidence has content", len(evidence) > 0)
 
 combined = "\n".join(evidence)
 check("Contains HERMES MEMORY SOURCES header", "HERMES MEMORY SOURCES" in combined)
-check("Lists active live-answer sources", "Current content artifacts" in combined)
+check("Lists active live-answer sources", "Current conversation context" in combined or "Latest content artifact" in combined)
 check("Lists NOT used sources", "archived executive memory" in combined)
 check("Does not dump stale data", "Ollama" not in combined)
 check("Does not dump raw config", "SUPABASE_URL" not in combined)

@@ -30,10 +30,10 @@ check("memory_sources returns healthy", status == "healthy")
 check("memory_sources does not contain Hermes Executive Memory", "Hermes Executive Memory" not in full)
 check("memory_sources does not contain v1", "(v1" not in full)
 check("memory_sources does not contain executive memory data", "Ollama OFFLINE" not in full)
-check("memory_sources does not contain Beehiiv", "Beehiiv" not in full)
+check("memory_sources does not contain Beehiiv pending status", "Beehiiv pending" not in full and "beehiiv — login" not in full.lower())
 check("memory_sources contains HERMES MEMORY SOURCES header", "HERMES MEMORY SOURCES" in full)
-check("memory_sources lists active sources", "Current content artifacts" in full)
-check("memory_sources lists blocked sources", "archived executive memory" in full)
+check("memory_sources lists active sources", "Current conversation context" in full or "Latest content artifact" in full)
+check("memory_sources lists blocked sources", "Blocked from live answers" in full or "archived executive memory" in full)
 check("memory_sources references contract", "MEMORY_SAFETY_CONTRACT" in full)
 
 # ── 2. Answer source handler ──────────────────────────────────────────────

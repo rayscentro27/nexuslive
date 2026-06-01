@@ -166,6 +166,12 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
     (["show artifact registry", "artifact registry", "show all artifacts",
       "what artifacts exist"],                                     "artifact_registry_status",   "low",    False),
 
+    # ── Memory sources / debug commands (must be BEFORE archived_executive_memory) ──
+    (["show memory sources", "memory sources", "what memory sources",
+      "what are your memory sources", "where does your memory come from",
+      "where do you get memory from", "what memory do you use",
+      "what sources do you use", "show your memory sources"],         "memory_sources",             "low",    False),
+
     # ── Archived (stale) executive memory commands ──────────────────────────
     (["archived memory", "stale defaults", "load archived defaults",
       "show archived defaults", "archived executive memory",
@@ -173,10 +179,6 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "what was in the old executive memory",
       "show old executive memory", "show historical executive memory",
       "old executive memory", "historical executive memory"],        "archived_executive_memory", "low",    False),
-
-    # ── Memory sources / debug commands ──────────────────────────────────────
-    (["show memory sources", "memory sources", "what memory sources",
-      "what are your memory sources", "where does your memory come from"], "memory_sources", "low",  False),
 
     (["where did that answer come from", "where does that come from",
       "where does your answer come from", "cite that answer",
