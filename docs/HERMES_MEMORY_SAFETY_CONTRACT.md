@@ -9,6 +9,53 @@
 Prevent stale, hardcoded, or default memory values from reaching Telegram
 users as if they were live operational state.
 
+---
+
+## Memory Categories
+
+### 1. Live Answer Memory
+Allowed for normal Telegram answers:
+- Current artifact registry
+- Current action queue
+- Current decision log
+- Current source intake
+- Current content artifacts
+- Active goals
+- Active operating rules
+- Live provider policy
+
+### 2. Historical Memory
+Allowed only when Ray explicitly asks for history:
+- Old executive memory
+- Old handoffs
+- Old provider status snapshots
+- Old planning notes
+- Archived reports
+
+### 3. Deprecated Memory
+Never allowed for live answers:
+- Stale "Ollama OFFLINE" default
+- Beehiiv pending default
+- YouTube Studio pending default
+- OpenRouter not configured default
+- Old demo response examples
+- Fake approval counts
+- Fake operational claims
+- Old NitroTrades-style fabricated task details
+
+### 4. Debug Memory
+Allowed only when Ray explicitly asks:
+- "show debug memory"
+- "show archived executive memory"
+- "show stale memory debug"
+
+---
+
+## Core Rule
+
+**Normal Telegram answers must not use hardcoded stale executive memory
+or stale fallback blocks.**
+
 ## Rules
 
 ### Rule 1 — No stale defaults in live paths
@@ -18,7 +65,7 @@ data when the canonical source (Supabase) is unreachable or empty. They MUST
 NOT fall back to hardcoded defaults that impersonate live state.
 
 ```
-GOOD:  "Executive memory unavailable — run `nexus executive status`"
+GOOD:  "I could not resolve that from active memory."
 BAD:   "Ollama OFFLINE, Beehiiv pending, OpenRouter not configured"
 ```
 
@@ -40,19 +87,28 @@ The quality-guard fallback (`_fallback_data_block`) MUST return a clean
 clarification message, not a data block containing stale or hardcoded
 executive memory values.
 
-### Rule 5 — Every memory write logs source
+### Rule 5 — Historical and debug memory require explicit opt-in
+
+Archived executive memory, stale defaults, and debug memory dumps MUST
+only be shown when Ray explicitly requests them with dedicated commands.
+Every such response MUST include a "NOT CURRENT TRUTH" or "DEBUG ONLY"
+warning label.
+
+### Rule 6 — Every memory write logs source
 
 All writes to Supabase memory tables must include an `updated_by` field
 identifying the calling component.
 
 ## Enforcement
 
-- `test_no_stale_executive_memory_fallback.py` — verifies Rule 4
-- `test_active_memory_reader_smoke.py` — verifies Rule 3
-- `test_executive_memory_no_stale_defaults.py` — verifies Rule 1
-- `test_telegram_memory_isolation.py` — verifies Rule 2
-- `test_archived_memory_commands.py` — verifies archive route works
-- CI gate: all six Phase 2 tests must pass before merge
+- `test_memory_safety_contract_exists.py` — contract document exists
+- `test_stale_executive_defaults_blocked.py` — Rules 1, 2
+- `test_quality_fallback_no_stale_memory.py` — Rule 4
+- `test_active_memory_reader.py` — Rule 3
+- `test_telegram_no_stale_memory_fallback.py` — core rule
+- `test_archived_memory_explicit_only.py` — Rule 5
+- `test_memory_sources_command.py` — source transparency
+- CI gate: all seven Phase 2 tests must pass before merge
 
 ## Violation Procedure
 

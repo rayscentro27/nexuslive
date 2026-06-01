@@ -3007,7 +3007,33 @@ class NexusTelegramBot:
             return self._conversational_reply(raw)
         return self.safe_help_text()
 
+    def _try_memory_command(self, text: str) -> str | None:
+        """Check if text is a memory-safety command and route through the command router.
+        Returns the formatted response or None to continue normal routing."""
+        try:
+            from hermes_command_router.intake import classify_intent
+            from hermes_command_router.router import run_command
+
+            MEMORY_INTENTS = {
+                "memory_sources",
+                "answer_source",
+                "archived_executive_memory",
+                "stale_memory_debug",
+            }
+            intent, _, _ = classify_intent(text)
+            if intent in MEMORY_INTENTS:
+                logger.info("telegram route=memory_command intent=%s", intent)
+                return run_command(text, source="telegram")
+        except Exception:
+            pass
+        return None
+
     def handle_inbound_message(self, text: str) -> str:
+        # ── Memory command pre-check: route before TelegramRouter / LLM ──────
+        memory_reply = self._try_memory_command(text)
+        if memory_reply is not None:
+            return memory_reply
+
         # Multi-line command detection — process up to 3 lines as sequential commands
         _raw_lines = [l.strip() for l in (text or "").splitlines() if l.strip()]
         if len(_raw_lines) > 1:

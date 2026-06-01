@@ -952,6 +952,105 @@ def _run_provider_status() -> tuple[str, list[str], str]:
         return "unknown", [f"provider_policy error: {e}"], "Check lib/hermes_provider_policy.py"
 
 
+# ── Memory sources handler ───────────────────────────────────────────────────
+
+def _run_memory_sources() -> tuple[str, list[str], str]:
+    """Explain where Hermes gets its answer data — plain language, no raw dumps.
+    Never calls executive memory."""
+    evidence = [
+        "HERMES MEMORY SOURCES",
+        "",
+        "For normal Telegram answers, I use active memory only.",
+        "",
+        "Active live-answer sources:",
+        "* Current content artifacts",
+        "* Action queue",
+        "* Decision log",
+        "* Source intake records",
+        "* Daily research reviews",
+        "* Active operating rules",
+        "* Live provider policy",
+        "",
+        "Not used for normal answers:",
+        "* archived executive memory",
+        "* stale provider snapshots",
+        "* old demo response templates",
+        "* deprecated fallback blocks",
+        "",
+        "Evidence:",
+        "docs/HERMES_MEMORY_SAFETY_CONTRACT.md",
+    ]
+    return "healthy", evidence, "I answered from the current active context only."
+
+
+# ── Answer source handler ────────────────────────────────────────────────────
+
+def _run_answer_source() -> tuple[str, list[str], str]:
+    """Explain the source of the last answer — no raw data dumps."""
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    evidence = [
+        "ANSWER SOURCE",
+        "",
+        "I answered from the current active context.",
+        "",
+        "Most recent evidence:",
+    ]
+    # Try to resolve latest artifact / action / decision log paths
+    try:
+        from lib.hermes_daily_cycle_state import find_latest_daily_cycle
+        cycle = find_latest_daily_cycle()
+        if cycle.get("review"):
+            evidence.append(f"* Latest content artifact: {cycle['review']}")
+        if cycle.get("intake"):
+            evidence.append(f"* Latest action: {cycle['intake']}")
+    except Exception:
+        pass
+    dl_path = root / "docs" / "reports" / "decisions" / "hermes_decision_log.jsonl"
+    decision_path = str(dl_path.relative_to(root)) if dl_path.exists() else "docs/reports/decisions/hermes_decision_log.jsonl"
+    evidence.append(f"* Latest decision log: {decision_path}")
+    evidence.append("* Memory policy: docs/HERMES_MEMORY_SAFETY_CONTRACT.md")
+    evidence.append("")
+    evidence.append("I did not use archived executive memory for that answer.")
+    return "healthy", evidence, "Sources resolve to current active context only."
+
+
+# ── Stale memory debug handler ────────────────────────────────────────────────
+
+def _run_stale_memory_debug() -> tuple[str, list[str], str]:
+    """Show the stale/hardcoded defaults that are BLOCKED from live Telegram answers."""
+    try:
+        from lib.hermes_executive_memory import load_archived_executive_memory_defaults
+        archived = load_archived_executive_memory_defaults()
+        evidence = [
+            "STALE MEMORY DEBUG — DEBUG ONLY — BLOCKED FROM LIVE ANSWERS",
+            "",
+            "These records are shown only because you explicitly requested debug memory.",
+            "",
+            "These stale defaults are NEVER injected into normal Telegram replies.",
+            "They are kept for reference and debugging only.",
+            "",
+        ]
+        for cat, items in archived.items():
+            if cat in ("updated_at", "version", "source"):
+                continue
+            label = cat.replace("_", " ").title()
+            evidence.append(f"[{label}]")
+            if items:
+                for item in items[:3]:
+                    evidence.append(f"  (BLOCKED) {item}")
+                if len(items) > 3:
+                    evidence.append(f"  ... +{len(items) - 3} more")
+            else:
+                evidence.append("  (empty)")
+        return "healthy", evidence, (
+            "⚠️  These are ARCHIVED / STATIC defaults. "
+            "They do NOT reflect current system state."
+        )
+    except Exception as e:
+        return "unknown", [f"Stale memory debug error: {e}"], "Check load_archived_executive_memory_defaults"
+
+
 # ── Archived (stale) memory handler ───────────────────────────────────────────
 
 def _run_archived_executive_memory() -> tuple[str, list[str], str]:
@@ -964,6 +1063,10 @@ def _run_archived_executive_memory() -> tuple[str, list[str], str]:
         from lib.hermes_executive_memory import load_archived_executive_memory_defaults
         archived = load_archived_executive_memory_defaults()
         evidence = [
+            "ARCHIVED EXECUTIVE MEMORY — NOT CURRENT TRUTH",
+            "",
+            "This is historical/debug context only. It is blocked from normal Telegram answers.",
+            "",
             "These are the ORIGINAL hardcoded defaults (archived in Phase 2).",
             "They are NO LONGER injected into live Telegram responses.",
             "",
@@ -1032,6 +1135,9 @@ _INTENT_HANDLERS = {
     "artifact_registry_status":  _run_artifact_registry_status,
     # ── Archived (stale) executive memory ────────────────────────────────────
     "archived_executive_memory": _run_archived_executive_memory,
+    "memory_sources":            _run_memory_sources,
+    "answer_source":             _run_answer_source,
+    "stale_memory_debug":        _run_stale_memory_debug,
     # ── Provider / brain status ───────────────────────────────────────────────
     "provider_status":           _run_provider_status,
 }

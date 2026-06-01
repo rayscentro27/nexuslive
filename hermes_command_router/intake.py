@@ -170,7 +170,23 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
     (["archived memory", "stale defaults", "load archived defaults",
       "show archived defaults", "archived executive memory",
       "what were the old defaults", "original defaults",
-      "what was in the old executive memory"],                       "archived_executive_memory", "low",    False),
+      "what was in the old executive memory",
+      "show old executive memory", "show historical executive memory",
+      "old executive memory", "historical executive memory"],        "archived_executive_memory", "low",    False),
+
+    # ── Memory sources / debug commands ──────────────────────────────────────
+    (["show memory sources", "memory sources", "what memory sources",
+      "what are your memory sources", "where does your memory come from"], "memory_sources", "low",  False),
+
+    (["where did that answer come from", "where does that come from",
+      "where does your answer come from", "cite that answer",
+      "cite source", "answer source", "what source did you use",
+      "why did you answer that"],                   "answer_source",               "low",    False),
+
+    (["show stale memory debug", "stale memory debug", "stale debug",
+      "debug memory", "show debug memory",
+      "show blocked memory debug", "show deprecated memory debug",
+      "blocked memory debug", "deprecated memory debug"],            "stale_memory_debug",        "low",    False),
 
     # ── Provider / brain status ──────────────────────────────────────────────
     (["what brain are you using", "which brain",
