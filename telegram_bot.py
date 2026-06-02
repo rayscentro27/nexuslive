@@ -3095,6 +3095,7 @@ class NexusTelegramBot:
         "memory_v2_status",
         "memory_v2_shadow_status",
         "memory_v2_live_check",
+        "memory_v2_primary_status",
     })
 
     def _try_memory_command(self, text: str) -> str | None:
@@ -3395,13 +3396,14 @@ class NexusTelegramBot:
             logger.info("email report_sent=true")
             logger.info("telegram full_report_suppressed=true")
 
-        # ── Shadow memory comparison (fire-and-forget, never changes response) ──
+        # ── Shadow/primary memory comparison (fire-and-forget, never changes response) ──
         try:
             from lib.hermes_memory_v2_shadow import (
                 is_shadow_mode_enabled,
+                is_primary_mode_active,
                 trigger_shadow_comparison_async,
             )
-            if is_shadow_mode_enabled():
+            if is_shadow_mode_enabled() or is_primary_mode_active():
                 trigger_shadow_comparison_async(
                     user_message=text,
                     current_response=response,

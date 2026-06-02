@@ -219,6 +219,10 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
     (["show memory v2 status", "memory v2 status", "v2 reader status",
       "is v2 reader active", "v2 status"],                          "memory_v2_status",           "low",    False),
 
+    (["show memory v2 primary status", "memory v2 primary status",
+      "is memory v2 primary active", "primary mode status",
+      "v2 primary status"],                                         "memory_v2_primary_status",   "low",    False),
+
     (["show memory v2 shadow status", "memory v2 shadow status",
       "show shadow memory status", "shadow memory status",
       "v2 shadow status"],                                          "memory_v2_shadow_status",    "low",    False),

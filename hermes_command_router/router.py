@@ -995,7 +995,17 @@ def _plain_memory_sources() -> str:
             lines.append("- Current rows: unavailable (env not set)")
     except Exception:
         lines.append("- Current rows: unavailable")
-    lines.append("- Live Telegram reader: preview only / not primary yet")
+    try:
+        from lib.hermes_memory_v2_shadow import is_primary_mode_active, get_memory_v2_mode as _gmode
+        _mode = _gmode()
+        if _mode == "primary":
+            lines.append("- Live Telegram reader: PRIMARY for structured memory")
+        elif _mode == "shadow":
+            lines.append("- Live Telegram reader: shadow only (comparison, no live impact)")
+        else:
+            lines.append("- Live Telegram reader: preview only / not primary yet")
+    except Exception:
+        lines.append("- Live Telegram reader: preview only / not primary yet")
     lines.append("- Preview command: 'show memory v2 preview'")
     lines += ["", "Evidence:", "- docs/HERMES_MEMORY_SAFETY_CONTRACT.md"]
     return "\n".join(lines)
@@ -1397,6 +1407,12 @@ def _plain_memory_v2_status() -> str:
     return explain_v2_reader_status()
 
 
+def _plain_memory_v2_primary_status() -> str:
+    """'show memory v2 primary status' — primary mode guards and active state."""
+    from lib.hermes_memory_v2_shadow import format_primary_status
+    return format_primary_status()
+
+
 def _plain_memory_v2_shadow_status() -> str:
     """'show memory v2 shadow status' — shadow mode config and last comparison."""
     from lib.hermes_memory_v2_shadow import format_shadow_status
@@ -1420,6 +1436,7 @@ _PLAIN_INTENTS: dict[str, object] = {
     "memory_v2_compare":           _plain_memory_v2_compare,
     "memory_v2_rules":             _plain_memory_v2_rules,
     "memory_v2_status":            _plain_memory_v2_status,
+    "memory_v2_primary_status":    _plain_memory_v2_primary_status,
     "memory_v2_shadow_status":     _plain_memory_v2_shadow_status,
     "memory_v2_live_check":        _plain_memory_v2_live_check,
 }
@@ -1436,6 +1453,8 @@ _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
     "show memory v2 shadow status", "memory v2 shadow status",
     "show shadow memory status", "is memory v2 live",
     "is memory v2 primary", "is memory v2 shadow only",
+    "show memory v2 primary status", "memory v2 primary status",
+    "is memory v2 primary active", "primary mode status",
 ])
 
 _INTENT_HANDLERS = {

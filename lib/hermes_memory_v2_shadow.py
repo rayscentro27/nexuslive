@@ -1,16 +1,24 @@
 """
 hermes_memory_v2_shadow.py
-Phase 4E: Shadow reader mode for hermes_memory_v2.
-
-Shadow mode loads v2 memory context alongside the current active reader,
-logs a comparison, but NEVER changes the live Telegram response and NEVER
-switches the primary reader.
+Phase 4E/4F: Shadow + primary reader mode for hermes_memory_v2.
 
 Mode config via HERMES_MEMORY_V2_MODE env var:
   off      — do not load v2 at all
   preview  — only explicit preview commands read v2 (default)
   shadow   — v2 loads in background for comparison/logging only
-  primary  — BLOCKED in this phase; requires explicit Ray approval later
+  primary  — structured memory primary; requires approval file + all guards
+
+Primary mode requires ALL of:
+  1. HERMES_MEMORY_V2_MODE=primary
+  2. docs/reports/memory/hermes_memory_v2_primary_approval.json exists
+  3. approval phrase matches exactly
+  4. hermes_memory_v2 has all 8 planned safe types
+  5. active/live_answer row count >= 26
+  6. no risk flags from v2 reader
+  7. stale/blocked strings check passes
+  8. shadow log exists and last entries have live_response_changed=False
+
+If any condition fails: fall back to shadow, log warning, do not crash.
 
 _SUPABASE_WRITE_ATTEMPTED = False  — sentinel, must remain False at all times.
 """
@@ -33,15 +41,24 @@ _SUPABASE_WRITE_ATTEMPTED = False  # MUST remain False — no writes in this mod
 MODE_OFF     = "off"
 MODE_PREVIEW = "preview"
 MODE_SHADOW  = "shadow"
-MODE_PRIMARY = "primary"   # blocked in this phase
+MODE_PRIMARY = "primary"
 
-_VALID_MODES = {MODE_OFF, MODE_PREVIEW, MODE_SHADOW}   # primary excluded from valid set
+# primary is now in _VALID_MODES but requires approval guards to activate
+_VALID_MODES = {MODE_OFF, MODE_PREVIEW, MODE_SHADOW, MODE_PRIMARY}
 
-# ── Planned Batch 1/2 type coverage ───────────────────────────────────────────
-PLANNED_BATCH_TYPES: tuple[str, ...] = (
+# ── Approval config ────────────────────────────────────────────────────────────
+REQUIRED_APPROVAL_PHRASE = "I APPROVE HERMES MEMORY V2 PRIMARY MODE SWITCH"
+PRIMARY_MIN_ROWS          = 26
+PRIMARY_REQUIRED_TYPES    = (
     "operating_rule", "ray_preference", "approval_policy", "project_context",
     "lesson", "goal", "tool_registry", "scout_registry",
 )
+
+_ROOT            = Path(__file__).resolve().parent.parent
+APPROVAL_FILE    = _ROOT / "docs" / "reports" / "memory" / "hermes_memory_v2_primary_approval.json"
+
+# ── Planned Batch 1/2 type coverage ───────────────────────────────────────────
+PLANNED_BATCH_TYPES: tuple[str, ...] = PRIMARY_REQUIRED_TYPES
 
 # ── Types always excluded from current-truth reads ────────────────────────────
 EXCLUDED_FROM_CURRENT_TRUTH: tuple[str, ...] = (
@@ -52,7 +69,6 @@ EXCLUDED_FROM_CURRENT_TRUTH: tuple[str, ...] = (
 )
 
 # ── Shadow log path ────────────────────────────────────────────────────────────
-_ROOT = Path(__file__).resolve().parent.parent
 SHADOW_LOG_DIR  = _ROOT / "docs" / "reports" / "memory" / "shadow"
 SHADOW_LOG_PATH = SHADOW_LOG_DIR / "hermes_memory_v2_shadow_log.jsonl"
 
@@ -60,38 +76,205 @@ SHADOW_LOG_PATH = SHADOW_LOG_DIR / "hermes_memory_v2_shadow_log.jsonl"
 _last_shadow_result: dict = {}
 _shadow_lock = threading.Lock()
 
+# ── In-memory primary mode state (set after guard check) ──────────────────────
+_primary_active: bool = False
+_primary_active_lock = threading.Lock()
+_primary_guard_failures: list[str] = []
+
+
+# ── Primary mode approval guard ────────────────────────────────────────────────
+
+def _check_primary_approval_guards() -> tuple[bool, list[str]]:
+    """Run all guards for primary mode activation.
+
+    Returns (ok, failures). If ok=False, failures lists what blocked it.
+    Does not raise.
+    """
+    failures: list[str] = []
+
+    # Guard 1: approval file exists
+    if not APPROVAL_FILE.exists():
+        failures.append(f"approval file missing: {APPROVAL_FILE.name}")
+
+    # Guard 2: approval phrase matches
+    else:
+        try:
+            doc = json.loads(APPROVAL_FILE.read_text(encoding="utf-8"))
+            phrase = doc.get("approval_phrase", "")
+            if phrase != REQUIRED_APPROVAL_PHRASE:
+                failures.append(
+                    f"approval_phrase mismatch in {APPROVAL_FILE.name}"
+                )
+            if doc.get("mode") != "primary":
+                failures.append("approval file mode != 'primary'")
+        except Exception as exc:
+            failures.append(f"approval file unreadable: {exc}")
+
+    # Guards 3-6: live Supabase check
+    try:
+        from lib.hermes_memory_v2_reader import (
+            build_v2_memory_context_pack,
+            _env_available,
+            _STALE_MARKERS,
+        )
+        if not _env_available():
+            failures.append("Supabase credentials not available")
+        else:
+            pack = build_v2_memory_context_pack(limit=50)
+            total = pack.get("total", 0)
+            by_type = pack.get("by_type", {})
+
+            # Guard 3: row count
+            if total < PRIMARY_MIN_ROWS:
+                failures.append(
+                    f"row count {total} < required {PRIMARY_MIN_ROWS}"
+                )
+
+            # Guard 4: all 8 types present
+            missing = [t for t in PRIMARY_REQUIRED_TYPES if by_type.get(t, 0) == 0]
+            if missing:
+                failures.append(f"planned types missing: {missing}")
+
+            # Guard 5: no risk flags (missing_from_v2 = [])
+            from lib.hermes_memory_v2_reader import compare_v2_with_current_memory
+            cmp = compare_v2_with_current_memory()
+            if cmp.get("missing_from_v2"):
+                failures.append(
+                    f"missing_from_v2 non-empty: {cmp['missing_from_v2']}"
+                )
+
+            # Guard 6: stale check on titles
+            records = pack.get("records", [])
+            from lib.hermes_memory_v2_reader import _has_stale
+            for r in records[:20]:
+                title = r.get("title", "")
+                if _has_stale(title):
+                    failures.append(f"stale marker in record title: {title[:50]}")
+                    break
+
+    except Exception as exc:
+        failures.append(f"v2 reader guard error: {exc}")
+
+    # Guard 7: shadow log sanity check
+    if SHADOW_LOG_PATH.exists():
+        try:
+            lines = [
+                json.loads(l)
+                for l in SHADOW_LOG_PATH.read_text().strip().splitlines()[-10:]
+                if l.strip()
+            ]
+            bad = [l for l in lines if l.get("live_response_changed") is not False]
+            if bad:
+                failures.append(
+                    f"shadow log has {len(bad)} entries with live_response_changed != False"
+                )
+        except Exception as exc:
+            failures.append(f"shadow log unreadable: {exc}")
+    else:
+        failures.append("shadow log does not exist — run shadow mode first")
+
+    return (len(failures) == 0), failures
+
+
+def is_primary_approved() -> tuple[bool, list[str]]:
+    """Return (approved, failures) for primary mode activation."""
+    return _check_primary_approval_guards()
+
 
 # ── Mode helpers ───────────────────────────────────────────────────────────────
 
 def get_memory_v2_mode() -> str:
-    """Return current HERMES_MEMORY_V2_MODE.
+    """Return the effective HERMES_MEMORY_V2_MODE.
 
-    Defaults to 'preview'. Blocks 'primary' — logs warning and falls back to
-    'shadow' if someone accidentally sets it.
+    For 'primary': runs all approval guards. Falls back to shadow if any fail.
+    For invalid values: falls back to preview.
     """
+    global _primary_active, _primary_guard_failures
     raw = os.environ.get("HERMES_MEMORY_V2_MODE", MODE_PREVIEW).strip().lower()
-    if raw == MODE_PRIMARY:
-        logger.warning(
-            "HERMES_MEMORY_V2_MODE=primary is blocked in Phase 4E — "
-            "falling back to shadow. Ray approval required for primary."
-        )
-        return MODE_SHADOW
+
     if raw not in _VALID_MODES:
         logger.warning(
             "HERMES_MEMORY_V2_MODE=%r is invalid — falling back to preview.", raw
         )
         return MODE_PREVIEW
+
+    if raw == MODE_PRIMARY:
+        ok, failures = _check_primary_approval_guards()
+        with _primary_active_lock:
+            _primary_active = ok
+            _primary_guard_failures = failures
+        if not ok:
+            logger.warning(
+                "HERMES_MEMORY_V2_MODE=primary blocked — guard failures: %s — "
+                "falling back to shadow.", failures
+            )
+            return MODE_SHADOW
+        logger.info("HERMES_MEMORY_V2_MODE=primary: all guards passed, primary active.")
+        return MODE_PRIMARY
+
+    with _primary_active_lock:
+        _primary_active = False
+        _primary_guard_failures = []
     return raw
 
 
-def is_shadow_mode_enabled() -> bool:
-    """Return True if shadow mode is active."""
-    return get_memory_v2_mode() == MODE_SHADOW
+def is_primary_mode_active() -> bool:
+    """Return True only if primary mode is fully guarded and active."""
+    return get_memory_v2_mode() == MODE_PRIMARY
 
 
 def is_primary_mode_requested() -> bool:
-    """Return True if someone set the env var to 'primary' (which is blocked)."""
+    """Return True if env var is set to 'primary' (regardless of guard status)."""
     return os.environ.get("HERMES_MEMORY_V2_MODE", "").strip().lower() == MODE_PRIMARY
+
+
+def is_shadow_mode_enabled() -> bool:
+    """Return True if the effective mode is shadow."""
+    return get_memory_v2_mode() == MODE_SHADOW
+
+
+def get_primary_guard_failures() -> list[str]:
+    """Return the list of guard failures from the last primary mode attempt."""
+    with _primary_active_lock:
+        return list(_primary_guard_failures)
+
+
+# ── Primary memory context loader ──────────────────────────────────────────────
+
+def load_primary_memory_context() -> dict:
+    """Load hermes_memory_v2 as primary structured memory source.
+
+    Priority contract (primary mode only):
+      1. Current conversation context / fresh artifacts override everything
+      2. hermes_memory_v2 active/live_answer records (structured memory)
+      3. Live provider policy stays separate
+      4. Archived/debug/stale records are excluded
+
+    Returns a safe context dict — no payloads, no secrets.
+    """
+    assert _SUPABASE_WRITE_ATTEMPTED is False
+    try:
+        from lib.hermes_memory_v2_reader import build_v2_memory_context_pack
+        pack = build_v2_memory_context_pack(limit=50)
+        return {
+            "source":       "hermes_memory_v2_primary",
+            "available":    pack.get("available", False),
+            "total":        pack.get("total", 0),
+            "by_type":      pack.get("by_type", {}),
+            "records":      pack.get("records", []),
+            "excluded":     list(EXCLUDED_FROM_CURRENT_TRUTH),
+            "priority_note": (
+                "Current conversation context and fresh artifacts "
+                "override this structured memory."
+            ),
+        }
+    except Exception as exc:
+        logger.warning("load_primary_memory_context error: %s", exc)
+        return {
+            "source": "hermes_memory_v2_primary",
+            "available": False,
+            "error": str(exc),
+        }
 
 
 # ── Shadow context builder ─────────────────────────────────────────────────────
@@ -109,10 +292,7 @@ def _build_v2_context() -> dict:
 # ── Comparison ─────────────────────────────────────────────────────────────────
 
 def compare_shadow_contexts(current_context: dict, v2_context: dict) -> dict:
-    """Compare current reader context with v2 context.
-
-    Returns safe metadata only — no payloads, no secrets.
-    """
+    """Compare current reader context with v2 context. Returns safe metadata only."""
     v2_available  = v2_context.get("available", False)
     v2_total      = v2_context.get("total", 0)
     v2_by_type    = v2_context.get("by_type", {})
@@ -126,11 +306,9 @@ def compare_shadow_contexts(current_context: dict, v2_context: dict) -> dict:
         "active_operating_rules",
     ])
 
-    # Coverage check: which planned types are present in v2?
     present = [t for t in PLANNED_BATCH_TYPES if v2_by_type.get(t, 0) > 0]
     missing = [t for t in PLANNED_BATCH_TYPES if v2_by_type.get(t, 0) == 0]
 
-    # Risk flags
     risk_flags: list[str] = []
     if not v2_available:
         risk_flags.append("v2_unavailable")
@@ -141,7 +319,7 @@ def compare_shadow_contexts(current_context: dict, v2_context: dict) -> dict:
 
     if missing:
         recommendation = (
-            f"v2 is missing planned types: {missing}. Keep in preview/shadow until resolved."
+            f"v2 is missing planned types: {missing}. Keep in preview/shadow."
         )
     else:
         recommendation = (
@@ -150,16 +328,16 @@ def compare_shadow_contexts(current_context: dict, v2_context: dict) -> dict:
         )
 
     return {
-        "v2_available":        v2_available,
-        "v2_total":            v2_total,
-        "v2_by_type":          v2_by_type,
-        "current_sources":     current_sources,
-        "planned_types_count": len(PLANNED_BATCH_TYPES),
-        "present_count":       len(present),
-        "missing_types":       missing,
-        "coverage_pct":        coverage_pct,
-        "risk_flags":          risk_flags,
-        "recommendation":      recommendation,
+        "v2_available":          v2_available,
+        "v2_total":              v2_total,
+        "v2_by_type":            v2_by_type,
+        "current_sources":       current_sources,
+        "planned_types_count":   len(PLANNED_BATCH_TYPES),
+        "present_count":         len(present),
+        "missing_types":         missing,
+        "coverage_pct":          coverage_pct,
+        "risk_flags":            risk_flags,
+        "recommendation":        recommendation,
         "live_response_changed": False,
     }
 
@@ -171,13 +349,7 @@ def run_shadow_memory_comparison(
     current_context: dict | None = None,
     current_response: str | None = None,
 ) -> dict:
-    """Run a shadow comparison and log result.
-
-    Does NOT change current_response.
-    Does NOT call any LLM.
-    Does NOT block or slow the Telegram response path.
-    Returns the comparison result dict.
-    """
+    """Run a shadow comparison and log result. Never modifies current_response."""
     assert _SUPABASE_WRITE_ATTEMPTED is False
 
     ts = datetime.now(timezone.utc).isoformat()
@@ -213,10 +385,7 @@ def run_shadow_memory_comparison(
 # ── Logging ────────────────────────────────────────────────────────────────────
 
 def log_shadow_memory_result(result: dict) -> None:
-    """Append a shadow comparison result to the JSONL log.
-
-    Writes only safe metadata — no user secrets, no raw payloads.
-    """
+    """Append a shadow comparison result to the JSONL log. Safe metadata only."""
     assert _SUPABASE_WRITE_ATTEMPTED is False
     try:
         SHADOW_LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -234,10 +403,7 @@ def trigger_shadow_comparison_async(
     current_context: dict | None = None,
     current_response: str | None = None,
 ) -> None:
-    """Fire-and-forget shadow comparison in a daemon thread.
-
-    Does NOT block the caller. Failures are logged and silently swallowed.
-    """
+    """Fire-and-forget shadow comparison in a daemon thread. Never blocks caller."""
     def _run():
         try:
             run_shadow_memory_comparison(user_message, current_context, current_response)
@@ -248,31 +414,92 @@ def trigger_shadow_comparison_async(
     t.start()
 
 
-# ── Status formatter ───────────────────────────────────────────────────────────
+# ── Status formatters ──────────────────────────────────────────────────────────
+
+def format_primary_status() -> str:
+    """Format status block for 'show memory v2 primary status'."""
+    mode = get_memory_v2_mode()
+    failures = get_primary_guard_failures()
+
+    lines = ["HERMES MEMORY V2 PRIMARY STATUS", ""]
+
+    if mode == MODE_PRIMARY:
+        lines += ["Mode: primary", "", "Status: active for structured memory", ""]
+    else:
+        lines += [
+            f"Mode: {mode} (primary not active)",
+            "",
+        ]
+        if failures:
+            lines.append("Guard failures:")
+            for f in failures:
+                lines.append(f"  - {f}")
+            lines.append("")
+
+    # Row counts from live Supabase
+    try:
+        from lib.hermes_memory_v2_reader import _total_count, _count_by_type, _env_available
+        if _env_available():
+            total = _total_count()
+            lines.append(f"Rows: {total} active/live_answer")
+            lines.append("")
+            lines.append("Loaded types:")
+            for mt in PLANNED_BATCH_TYPES:
+                cnt = _count_by_type(mt)
+                if cnt > 0:
+                    lines.append(f"  {mt}: {cnt}")
+        else:
+            lines.append("Rows: unavailable (credentials not in this env)")
+    except Exception:
+        lines.append("Rows: unavailable")
+
+    lines += [
+        "",
+        "Safety:",
+        "  archived/deprecated/blocked/debug records excluded",
+        "  stale strings excluded",
+        "  provider snapshots not used as current truth",
+        "  live provider policy remains separate",
+        "  artifacts/actions/decisions/source intake still have priority",
+        "",
+        "Rollback:",
+        "  Set HERMES_MEMORY_V2_MODE=shadow and restart Telegram bot.",
+        "  Or run: python scripts/rollback_hermes_memory_v2_primary.py --apply",
+    ]
+    return "\n".join(lines)
+
 
 def format_shadow_status() -> str:
-    """Format a human-readable status block for 'show memory v2 shadow status'."""
+    """Format status block for 'show memory v2 shadow status'."""
     mode = get_memory_v2_mode()
-    primary_blocked = is_primary_mode_requested()
+    primary_blocked = is_primary_mode_requested() and mode != MODE_PRIMARY
 
     lines = ["HERMES MEMORY V2 SHADOW STATUS", ""]
 
     if primary_blocked:
+        failures = get_primary_guard_failures()
         lines += [
-            "WARNING: Primary mode requested but BLOCKED.",
+            "WARNING: Primary mode requested but guards failed.",
             "Primary requested but blocked. Ray approval phase required.",
-            "",
         ]
+        if failures:
+            for f in failures:
+                lines.append(f"  - {f}")
+        lines.append("")
 
     lines += [
         f"Mode: {mode}",
         "",
         "Live Telegram reader: current active reader",
-        "Memory v2: loaded in shadow only" if mode == MODE_SHADOW else f"Memory v2: {mode} mode",
-        "",
     ]
+    if mode == MODE_PRIMARY:
+        lines.append("Memory v2: PRIMARY for structured memory")
+    elif mode == MODE_SHADOW:
+        lines.append("Memory v2: loaded in shadow only")
+    else:
+        lines.append(f"Memory v2: {mode} mode")
+    lines.append("")
 
-    # Try to get live v2 counts
     try:
         from lib.hermes_memory_v2_reader import _total_count, _count_by_type, _env_available
         if _env_available():
@@ -289,7 +516,6 @@ def format_shadow_status() -> str:
 
     lines.append("")
 
-    # Last shadow comparison
     with _shadow_lock:
         last = dict(_last_shadow_result)
 
@@ -309,20 +535,24 @@ def format_shadow_status() -> str:
         "Important: Shadow mode does not change Hermes answers.",
         "Primary mode requires Ray approval.",
     ]
-
     return "\n".join(lines)
 
 
 def format_v2_live_status() -> str:
     """Short status for 'is memory v2 live / primary / shadow only' queries."""
     mode = get_memory_v2_mode()
-    primary_blocked = is_primary_mode_requested()
 
-    if primary_blocked:
+    if mode == MODE_PRIMARY:
         return (
-            "Primary mode is not enabled and requires Ray approval.\n"
-            "Current mode: shadow (primary blocked).\n"
-            "Live answers still use current active reader."
+            "Memory v2 is PRIMARY for structured memory. "
+            "Current artifacts/actions/decisions still override stale memory."
+        )
+    if is_primary_mode_requested() and mode != MODE_PRIMARY:
+        failures = get_primary_guard_failures()
+        failure_summary = "; ".join(failures[:2]) if failures else "unknown"
+        return (
+            f"Primary mode requested but blocked ({failure_summary}). "
+            "Current mode: shadow. Live answers still use current reader."
         )
     if mode == MODE_SHADOW:
         return (
