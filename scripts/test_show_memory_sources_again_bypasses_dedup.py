@@ -53,11 +53,11 @@ for phrase in ["show memory sources", "memory sources", "what are your memory so
     intent, _, _ = classify_intent(phrase)
     check(f"'{phrase}' → memory_sources (not again)", intent == "memory_sources")
 
-print("\n-- 'show memory sources again' in MEMORY_INTENTS of _try_memory_command --")
-import inspect
+print("\n-- 'show memory sources again' in SAFE_REPEATABLE_MEMORY_INTENTS --")
 import telegram_bot as tb_mod
-tb_src = inspect.getsource(tb_mod.NexusTelegramBot._try_memory_command)
-check("memory_sources_again in MEMORY_INTENTS set", "memory_sources_again" in tb_src)
+safe_intents = tb_mod.NexusTelegramBot.SAFE_REPEATABLE_MEMORY_INTENTS
+check("memory_sources_again in SAFE_REPEATABLE_MEMORY_INTENTS", "memory_sources_again" in safe_intents)
+check("memory_sources in SAFE_REPEATABLE_MEMORY_INTENTS", "memory_sources" in safe_intents)
 
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(FAIL)

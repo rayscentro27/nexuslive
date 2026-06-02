@@ -102,12 +102,14 @@ _EMPTY_PATTERNS = [
 
 # Content patterns that must never reach Telegram automatically.
 # These are auto-report artifacts that should only go to email/file.
+# IMPORTANT: keep patterns specific. 'sources:' was too broad — it matched
+# "Live answer sources:" in user-facing memory command responses and silently
+# blocked them. Rely on the emoji header and key findings to catch research reports.
 _FORBIDDEN_CONTENT_PATTERNS = [
     '🏛️ nexus research',
     '🏛️ nexus intelligence brief',
     '🏛️ nexus research run complete',
     'key findings:',
-    'sources:',
     'research artifacts saved',
     'intelligence brief',
     'nexus research run complete',
@@ -425,6 +427,7 @@ def send_direct_response(
     chat_id: str    = '',
     parse_mode: str = 'HTML',
     bypass_dedup: bool = False,
+    bypass_content_filter: bool = False,
 ) -> bool:
     """
     Reply directly to a user command.
@@ -437,6 +440,10 @@ def send_direct_response(
 
     bypass_dedup=True skips the 60-second Supabase check. Use for memory diagnostic
     commands where identical content must always produce a visible response.
+
+    bypass_content_filter=True skips _contains_forbidden_content. Use for safe,
+    user-requested status commands whose responses legitimately contain words like
+    "sources:" that would otherwise match the auto-report content filter.
 
     Use this for all replies to /commands and user messages.
     Use send() for automated system alerts.
@@ -464,8 +471,10 @@ def send_direct_response(
         logger.info(f"telegram_policy denied=true message_type={event_type} source=direct reason={reason}")
         return False
 
-    # Belt-and-suspenders: never send forbidden auto-report content even in direct replies
-    if _contains_forbidden_content(text):
+    # Belt-and-suspenders: never send forbidden auto-report content even in direct replies.
+    # bypass_content_filter=True exempts safe user-requested status commands (e.g., memory
+    # diagnostic responses that legitimately contain section headers like "sources:").
+    if not bypass_content_filter and _contains_forbidden_content(text):
         logger.info(f"send_direct_response suppressed [{event_type}]: forbidden_content_pattern")
         return False
 

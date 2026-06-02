@@ -75,14 +75,16 @@ import telegram_bot as tb_mod
 import inspect as inspect_mod
 
 tb_src = inspect_mod.getsource(tb_mod.NexusTelegramBot._try_memory_command)
+# Safe intents now defined in SAFE_REPEATABLE_MEMORY_INTENTS class attribute
+safe_intents = tb_mod.NexusTelegramBot.SAFE_REPEATABLE_MEMORY_INTENTS
 check("_try_memory_command has exception handler (except Exception)",
       "except Exception" in tb_src)
 check("_try_memory_command returns None on exception (not empty string)",
       "return None" in tb_src)
-check("active_operating_rules in MEMORY_INTENTS",
-      "active_operating_rules" in tb_src)
-check("memory_sources in MEMORY_INTENTS", "memory_sources" in tb_src)
-check("answer_source in MEMORY_INTENTS", "answer_source" in tb_src)
+check("active_operating_rules in SAFE_REPEATABLE_MEMORY_INTENTS",
+      "active_operating_rules" in safe_intents)
+check("memory_sources in SAFE_REPEATABLE_MEMORY_INTENTS", "memory_sources" in safe_intents)
+check("answer_source in SAFE_REPEATABLE_MEMORY_INTENTS", "answer_source" in safe_intents)
 
 print("\n-- _PLAIN_INTENTS handlers return strings, not tuples --")
 from hermes_command_router.router import _PLAIN_INTENTS

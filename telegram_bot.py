@@ -300,6 +300,7 @@ class NexusTelegramBot:
         self._last_reply_ts: float = 0.0
         self._current_chat_id: str = ""
         self._memory_command_pending: bool = False
+        self._memory_command_intent: str = ""
         self.ops_memory: dict[str, Any] = self._load_operational_memory()
         self.last_plan_items = list(self.ops_memory.get("latest_daily_plan", []))
         self.task_lifecycle = dict(self.ops_memory.get("task_lifecycle", {}))
@@ -538,13 +539,18 @@ class NexusTelegramBot:
             self._last_reply_ts = now
         return sent
 
-    def _send_memory_command_response(self, message: str, parse_mode: str = "HTML") -> bool:
-        """Send a memory diagnostic command response, bypassing the 60-second Supabase dedup.
+    def _send_memory_command_response(self, message: str, parse_mode: str = "HTML",
+                                        intent: str = "memory_command") -> bool:
+        """Send a memory status command response, bypassing all safe dedup layers.
 
-        Memory commands ('show memory sources', 'show active operating rules', etc.) produce
-        identical content across calls. The normal send_direct_response 60-second dedup would
-        silently suppress every send after the first. bypass_dedup=True ensures the user always
-        gets a visible response regardless of how recently the same content was sent.
+        Safe repeatable memory status commands (memory_sources, active_operating_rules,
+        answer_source, etc.) must ALWAYS produce a visible response. Two layers previously
+        blocked them silently:
+          1. _contains_forbidden_content matched 'sources:' inside "Live answer sources:"
+          2. 60-second Supabase dedup in send_direct_response collapsed identical content
+
+        bypass_content_filter=True and bypass_dedup=True together guarantee delivery.
+        Safety/approval gates are still respected (policy check, TELEGRAM_ENABLED check).
         """
         text = self._truncate_response(message or "")
         if not text:
@@ -554,6 +560,11 @@ class NexusTelegramBot:
             text = gate(text)
         except Exception:
             pass
+        repeat_override = intent in {"memory_sources_again"} or "again" in intent or "repeat" in intent
+        logger.info(
+            "telegram route=memory_command intent=%s repeat_override=%s dedup_bypassed=true",
+            intent, str(repeat_override).lower(),
+        )
         sent = hermes_gate.send_direct_response(
             text,
             event_type='direct_chat_reply',
@@ -561,15 +572,12 @@ class NexusTelegramBot:
             chat_id=self.chat_id,
             parse_mode=parse_mode,
             bypass_dedup=True,
+            bypass_content_filter=True,
         )
         if not sent:
-            # Policy or forbidden-content blocked even with bypass_dedup — send a plain notice.
-            hermes_gate.send_direct_response(
-                "Memory sources command already answered recently. Say 'show memory sources again' to repeat.",
-                event_type='direct_chat_reply',
-                bot_token=self.bot_token,
-                chat_id=self.chat_id,
-                bypass_dedup=True,
+            logger.warning(
+                "telegram memory_command send_failed intent=%s — policy or token issue, not dedup",
+                intent,
             )
         return sent
 
@@ -3071,36 +3079,44 @@ class NexusTelegramBot:
             return self._conversational_reply(raw)
         return self.safe_help_text()
 
+    # Safe memory status intents: always deliver full response, bypass all dedup layers.
+    # These commands return identical content on every call by design (live status snapshots).
+    # They must NEVER be silently suppressed by content-filter, Supabase dedup, or in-memory dedup.
+    SAFE_REPEATABLE_MEMORY_INTENTS: frozenset[str] = frozenset({
+        "memory_sources",
+        "memory_sources_again",
+        "active_operating_rules",
+        "answer_source",
+        "archived_executive_memory",
+        "stale_memory_debug",
+    })
+
     def _try_memory_command(self, text: str) -> str | None:
         """Check if text is a memory-safety command and route through the command router.
         Returns the formatted response or None to continue normal routing.
 
-        Sets self._memory_command_pending=True so the caller routes through
-        _send_memory_command_response (bypass_dedup=True) instead of _send_message_once.
-        This prevents the 60-second Supabase dedup in send_direct_response from silently
-        swallowing memory diagnostic responses whose content never changes.
+        Sets self._memory_command_pending=True and self._memory_command_intent so the
+        caller routes through _send_memory_command_response which bypasses:
+          1. _contains_forbidden_content (matched 'sources:' in 'Live answer sources:')
+          2. 60-second Supabase dedup in send_direct_response
+          3. 4-second in-memory dedup in _send_message_once
+        Safety gates (policy check, TELEGRAM_ENABLED, approval rules) are still respected.
         """
         try:
             from hermes_command_router.intake import classify_intent
             from hermes_command_router.router import run_command
 
-            MEMORY_INTENTS = {
-                "memory_sources",
-                "memory_sources_again",
-                "active_operating_rules",
-                "answer_source",
-                "archived_executive_memory",
-                "stale_memory_debug",
+            MEMORY_INTENTS = self.SAFE_REPEATABLE_MEMORY_INTENTS | {
                 "knowledge_gap_review",
                 "knowledge_gap_research",
                 "knowledge_gap_archive",
             }
             intent, _, _ = classify_intent(text)
             if intent in MEMORY_INTENTS:
-                logger.info("telegram route=memory_command intent=%s", intent)
                 result = run_command(text, source="telegram")
                 if result:
                     self._memory_command_pending = True
+                    self._memory_command_intent = intent
                     return result
         except Exception as exc:
             logger.warning("telegram _try_memory_command failed text=%r exc=%s", text[:60], exc)
@@ -3593,8 +3609,10 @@ class NexusTelegramBot:
                 rendered = self._fallback_response_for_command(command)
             logger.info("telegram inbound=%r response_preview=%r", text[:120], rendered[:200])
             if self._memory_command_pending:
+                _intent = self._memory_command_intent
                 self._memory_command_pending = False
-                self._send_memory_command_response(rendered)
+                self._memory_command_intent = ""
+                self._send_memory_command_response(rendered, intent=_intent)
             else:
                 self._send_message_once(rendered)
             emit_metric(
