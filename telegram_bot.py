@@ -3103,6 +3103,16 @@ class NexusTelegramBot:
         "memory_v2_shadow_status",
         "memory_v2_live_check",
         "memory_v2_primary_status",
+        # ── Learning loop ─────────────────────────────────────────────────────
+        "lesson_record",
+        "lesson_pending",
+        "lesson_active",
+        "lesson_approve",
+        "lesson_reject",
+        "lesson_deprecate",
+        "lesson_learned",
+        "lesson_source",
+        "lesson_gap_generate",
     })
 
     def _try_memory_command(self, text: str) -> str | None:

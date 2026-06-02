@@ -1597,6 +1597,308 @@ def _plain_memory_v2_primary_status() -> str:
     return format_primary_status()
 
 
+# ── Learning loop plain-text handlers ─────────────────────────────────────────
+
+def _plain_lesson_record(cmd: str = "") -> str:
+    """Handle 'record this lesson: <text>' commands."""
+    from lib.hermes_learning_loop import create_lesson_proposal, detect_lesson_intent
+    if not detect_lesson_intent(cmd):
+        return (
+            "LESSON RECORD\n\n"
+            "To record a lesson, say:\n"
+            "  record this lesson: <lesson text>\n"
+            "  remember this lesson: <lesson text>\n"
+            "  learn this: <lesson text>\n\n"
+            "The lesson will be stored as a pending proposal for your review.\n"
+            "Use 'show pending lessons' to review, then 'approve lesson <id>' to make it active."
+        )
+    try:
+        proposal = create_lesson_proposal(cmd)
+        lid    = proposal.get("lesson_id", "?")
+        status = proposal.get("proposed_status", "?")
+        title  = proposal.get("title", "?")[:60]
+        flags  = proposal.get("safety_flags", [])
+        if status == "blocked":
+            return (
+                "LESSON BLOCKED\n\n"
+                "Your lesson was blocked by safety validation.\n\n"
+                f"Reason(s): {', '.join(flags)}\n\n"
+                "Lessons cannot bypass safety policies, enable live trading, "
+                "publishing, payments, or contain secrets."
+            )
+        return (
+            f"LESSON PROPOSAL CREATED\n\n"
+            f"ID:     {lid}\n"
+            f"Title:  {title}\n"
+            f"Status: pending_review\n\n"
+            "The lesson is saved locally for your review.\n"
+            "Use 'show pending lessons' to see all pending proposals.\n"
+            f"Use 'approve lesson {lid}' to write it to active memory."
+        )
+    except Exception as exc:
+        return f"LESSON RECORD\n\nFailed to create lesson proposal: {exc}"
+
+
+def _plain_lesson_pending() -> str:
+    """Show pending lesson proposals."""
+    from lib.hermes_learning_loop import list_pending_lessons
+    pending = list_pending_lessons(limit=10)
+    if not pending:
+        return (
+            "PENDING LESSONS\n\n"
+            "No lesson proposals pending review.\n\n"
+            "To create a lesson, say: 'record this lesson: <lesson text>'"
+        )
+    lines = ["PENDING LESSONS", "", f"{len(pending)} proposal(s) awaiting review:", ""]
+    for p in pending:
+        lid     = p.get("lesson_id", "?")
+        title   = p.get("title", "?")[:60]
+        created = p.get("created_at", "?")[:10]
+        lines += [
+            f"ID:      {lid}",
+            f"Title:   {title}",
+            f"Created: {created}",
+            f"Action:  approve lesson {lid}",
+            "",
+        ]
+    lines += [
+        "Safety: Pending lessons are stored locally only.",
+        "They write to memory only after Ray approval.",
+    ]
+    return "\n".join(lines)
+
+
+def _plain_lesson_active() -> str:
+    """Show active lessons from hermes_memory_v2."""
+    from lib.hermes_learning_loop import list_active_lessons
+    active = list_active_lessons(limit=10)
+    if not active:
+        return (
+            "ACTIVE LESSONS\n\n"
+            "No active lessons in hermes_memory_v2 yet.\n\n"
+            "To add a lesson: 'record this lesson: <text>'\n"
+            "Then: 'approve lesson <id>'"
+        )
+    lines = ["ACTIVE LESSONS", "", f"{len(active)} active lesson(s) in hermes_memory_v2:", ""]
+    for r in active:
+        mid         = r.get("memory_id", "?")
+        title       = r.get("title", "?")[:60]
+        payload     = r.get("payload") or {}
+        approved_by = payload.get("approved_by", "Ray Davis")
+        approved_at = (payload.get("approved_at") or r.get("updated_at") or "?")[:10]
+        lines += [
+            f"ID:          {mid}",
+            f"Title:       {title}",
+            f"Approved by: {approved_by}  on {approved_at}",
+            "",
+        ]
+    lines += [
+        "Use 'deprecate lesson <memory_id>' to remove a lesson.",
+        "Use 'where did that lesson come from?' for traceability.",
+    ]
+    return "\n".join(lines)
+
+
+def _plain_lesson_approve(cmd: str = "") -> str:
+    """Approve a lesson proposal: 'approve lesson <lesson_id>'."""
+    from lib.hermes_learning_loop import approve_lesson
+    lower     = cmd.lower()
+    lesson_id = ""
+    for marker in ("approve lesson ", "i approve lesson "):
+        idx = lower.find(marker)
+        if idx != -1:
+            lesson_id = cmd[idx + len(marker):].strip()
+            break
+    if not lesson_id:
+        return (
+            "LESSON APPROVE\n\n"
+            "Usage: approve lesson <lesson_id>\n\n"
+            "Use 'show pending lessons' to see lesson IDs."
+        )
+    result = approve_lesson(lesson_id)
+    if result.get("ok"):
+        status = result.get("status", "approved")
+        mid    = result.get("memory_id", lesson_id)
+        if status in ("already_approved", "already_in_supabase"):
+            return f"LESSON APPROVE\n\nLesson {mid} is already active in hermes_memory_v2."
+        return (
+            f"LESSON APPROVED\n\n"
+            f"ID:          {mid}\n"
+            f"Approved by: Ray Davis\n"
+            f"Written to:  hermes_memory_v2\n"
+            f"Status:      active / live_answer\n\n"
+            "The lesson is now part of Hermes active memory."
+        )
+    flags = result.get("safety_flags", [])
+    error = result.get("error", "unknown error")
+    if flags:
+        return (
+            f"LESSON BLOCKED\n\n"
+            f"Cannot approve lesson {lesson_id}.\n"
+            f"Reason: {error}\n"
+            f"Safety flags: {', '.join(flags)}"
+        )
+    return f"LESSON APPROVE\n\nFailed: {error}"
+
+
+def _plain_lesson_reject(cmd: str = "") -> str:
+    """Reject a lesson proposal: 'reject lesson <lesson_id>'."""
+    from lib.hermes_learning_loop import reject_lesson
+    lower     = cmd.lower()
+    lesson_id = ""
+    for marker in ("reject lesson ", "i reject lesson "):
+        idx = lower.find(marker)
+        if idx != -1:
+            lesson_id = cmd[idx + len(marker):].strip()
+            break
+    if not lesson_id:
+        return (
+            "LESSON REJECT\n\n"
+            "Usage: reject lesson <lesson_id>\n\n"
+            "Use 'show pending lessons' to see lesson IDs."
+        )
+    result = reject_lesson(lesson_id)
+    if result.get("ok"):
+        return f"LESSON REJECTED\n\nLesson {lesson_id} has been rejected. No changes to hermes_memory_v2."
+    return f"LESSON REJECT\n\nFailed: lesson {lesson_id} not found."
+
+
+def _plain_lesson_deprecate(cmd: str = "") -> str:
+    """Deprecate an active lesson: 'deprecate lesson <memory_id>'."""
+    from lib.hermes_learning_loop import deprecate_lesson
+    lower     = cmd.lower()
+    memory_id = ""
+    for marker in ("deprecate lesson ", "remove lesson "):
+        idx = lower.find(marker)
+        if idx != -1:
+            memory_id = cmd[idx + len(marker):].strip()
+            break
+    if not memory_id:
+        return (
+            "LESSON DEPRECATE\n\n"
+            "Usage: deprecate lesson <memory_id>\n\n"
+            "Use 'show active lessons' to see memory IDs."
+        )
+    result = deprecate_lesson(memory_id)
+    if result.get("ok"):
+        return (
+            f"LESSON DEPRECATED\n\n"
+            f"Memory ID: {memory_id}\n"
+            f"Status:    deprecated\n\n"
+            "The lesson has been deprecated in hermes_memory_v2. "
+            "It will no longer be used in live answers."
+        )
+    return f"LESSON DEPRECATE\n\nFailed: {result.get('error', 'unknown error')}"
+
+
+def _plain_lesson_learned() -> str:
+    """Show the most recent lesson proposal."""
+    from lib.hermes_learning_loop import get_last_lesson_proposal
+    proposal = get_last_lesson_proposal()
+    if not proposal:
+        return (
+            "LAST LESSON\n\n"
+            "No lesson proposals created yet.\n\n"
+            "To teach Hermes a lesson, say:\n"
+            "  record this lesson: <lesson text>"
+        )
+    lid         = proposal.get("lesson_id", "?")
+    title       = proposal.get("title", "?")[:60]
+    status      = proposal.get("proposed_status", "?")
+    created     = proposal.get("created_at", "?")[:10]
+    lesson_text = proposal.get("lesson_text", "?")[:200]
+    lines = [
+        "LAST LESSON PROPOSAL",
+        "",
+        f"ID:      {lid}",
+        f"Title:   {title}",
+        f"Status:  {status}",
+        f"Created: {created}",
+        "",
+        "Lesson:",
+        lesson_text,
+        "",
+    ]
+    if status == "pending_review":
+        lines += [f"Action:  approve lesson {lid}", f"Or:      reject lesson {lid}"]
+    elif status == "approved":
+        lines += ["Already approved and written to hermes_memory_v2."]
+    elif status == "blocked":
+        flags = proposal.get("safety_flags", [])
+        lines += [f"Blocked by: {', '.join(flags)}"]
+    return "\n".join(lines)
+
+
+def _plain_lesson_source(cmd: str = "") -> str:
+    """Show lesson traceability: 'where did that lesson come from?'"""
+    from lib.hermes_learning_loop import explain_lesson_source, get_last_lesson_proposal
+    lower     = cmd.lower()
+    memory_id = ""
+    for marker in ("explain lesson ", "lesson source ", "where did lesson "):
+        idx = lower.find(marker)
+        if idx != -1:
+            rest = cmd[idx + len(marker):].strip()
+            memory_id = rest.split()[0] if rest else ""
+            break
+    if not memory_id:
+        proposal = get_last_lesson_proposal()
+        if not proposal:
+            return (
+                "LESSON SOURCE\n\n"
+                "No lesson proposals found.\n\n"
+                "All lessons taught through Telegram are stored in:\n"
+                "docs/reports/memory/learning/hermes_lesson_proposals.jsonl\n\n"
+                "Active lessons trace to: hermes_memory_v2 (memory_type=lesson)"
+            )
+        memory_id = proposal.get("lesson_id", "")
+    info   = explain_lesson_source(memory_id)
+    lines = [
+        "LESSON SOURCE",
+        "",
+        f"Memory ID: {memory_id}",
+        f"Title:     {info.get('title', '?')[:60]}",
+        f"Status:    {info.get('status', '?')}",
+        f"Source:    {info.get('source', '?')}",
+    ]
+    if info.get("created_at"):
+        lines.append(f"Created:   {info['created_at'][:10]}")
+    if info.get("approved_at"):
+        lines.append(f"Approved:  {info['approved_at'][:10]}")
+    if info.get("approved_by"):
+        lines.append(f"By:        {info['approved_by']}")
+    lines += [
+        "",
+        "All lessons originate from Ray's Telegram instructions.",
+        "They are never auto-approved.",
+        "Proposal file: docs/reports/memory/learning/hermes_lesson_proposals.jsonl",
+    ]
+    return "\n".join(lines)
+
+
+def _plain_lesson_gap_generate() -> str:
+    """Generate lesson proposals from open knowledge gaps."""
+    from lib.hermes_learning_loop import generate_gap_lesson_proposals
+    created = generate_gap_lesson_proposals(limit=5)
+    if not created:
+        return (
+            "LESSON GAP GENERATION\n\n"
+            "No open knowledge gaps matched lesson templates.\n\n"
+            "Use 'show knowledge gaps' to review open gaps.\n"
+            "Use 'record this lesson: <text>' to manually create a lesson."
+        )
+    lines = ["LESSON GAP GENERATION", "", f"{len(created)} lesson proposal(s) created from gaps:", ""]
+    for p in created:
+        lid    = p.get("lesson_id", "?")
+        title  = p.get("title", "?")[:60]
+        status = p.get("proposed_status", "?")
+        lines += [f"ID:     {lid}", f"Title:  {title}", f"Status: {status}", ""]
+    lines += [
+        "Use 'show pending lessons' to review.",
+        "Use 'approve lesson <id>' to write to active memory.",
+    ]
+    return "\n".join(lines)
+
+
 def _plain_memory_v2_shadow_status() -> str:
     """'show memory v2 shadow status' — shadow mode config and last comparison."""
     from lib.hermes_memory_v2_shadow import format_shadow_status
@@ -1630,7 +1932,27 @@ _PLAIN_INTENTS: dict[str, object] = {
     "memory_v2_primary_status":    _plain_memory_v2_primary_status,
     "memory_v2_shadow_status":     _plain_memory_v2_shadow_status,
     "memory_v2_live_check":        _plain_memory_v2_live_check,
+    # ── Learning loop ─────────────────────────────────────────────────────────
+    "lesson_record":               _plain_lesson_record,
+    "lesson_pending":              _plain_lesson_pending,
+    "lesson_active":               _plain_lesson_active,
+    "lesson_approve":              _plain_lesson_approve,
+    "lesson_reject":               _plain_lesson_reject,
+    "lesson_deprecate":            _plain_lesson_deprecate,
+    "lesson_learned":              _plain_lesson_learned,
+    "lesson_source":               _plain_lesson_source,
+    "lesson_gap_generate":         _plain_lesson_gap_generate,
 }
+
+# Intents whose handlers need raw_text to extract IDs or lesson content
+_PLAIN_INTENTS_WITH_CMD = frozenset({
+    "small_talk",
+    "lesson_record",
+    "lesson_approve",
+    "lesson_reject",
+    "lesson_deprecate",
+    "lesson_source",
+})
 
 # ── Phrases that must NEVER produce a generic evidence dump ───────────────────
 _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
@@ -1746,8 +2068,7 @@ def run_command(raw_text: str, source: str = "cli", sender: str = "raymond") -> 
     if intent in _PLAIN_INTENTS:
         try:
             fn = _PLAIN_INTENTS[intent]
-            # small_talk uses raw_text to pick the right greeting variant
-            return fn(raw_text) if intent == "small_talk" else fn()
+            return fn(raw_text) if intent in _PLAIN_INTENTS_WITH_CMD else fn()
         except Exception as e:
             return f"I ran into an issue: {e}\n\nCheck logs or ask 'check backend health'."
 

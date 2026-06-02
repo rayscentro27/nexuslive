@@ -142,8 +142,40 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "free alternative", "replace beehiiv",
       "cheap alternative", "tool blocker"],                         "premium_blocker_resolver",  "low",    False),
 
+    # ── Learning loop commands (must be BEFORE save_ray_feedback) ──────────────
+    (["record this lesson:", "remember this lesson:", "learn this:",
+      "use this lesson next time:", "save this as a lesson:",
+      "add lesson:", "note this lesson:", "store this lesson:",
+      "lesson:"],                                                     "lesson_record",             "low",    False),
+
+    (["show pending lessons", "list pending lessons",
+      "what lessons are pending", "pending lesson proposals",
+      "show lesson proposals", "lessons pending review"],             "lesson_pending",            "low",    False),
+
+    (["show active lessons", "list active lessons",
+      "what lessons are active", "active lessons in memory",
+      "show lessons in memory", "what lessons did hermes learn"],     "lesson_active",             "low",    False),
+
+    (["approve lesson", "i approve lesson"],                          "lesson_approve",            "low",    False),
+
+    (["reject lesson", "i reject lesson"],                            "lesson_reject",             "low",    False),
+
+    (["deprecate lesson", "remove lesson"],                           "lesson_deprecate",          "low",    False),
+
+    (["what did you learn from that", "what lesson did you learn",
+      "what did hermes learn", "what lesson came from that",
+      "show last lesson proposal", "last lesson"],                    "lesson_learned",            "low",    False),
+
+    (["where did that lesson come from", "why did you use that memory",
+      "lesson source", "explain lesson", "lesson traceability",
+      "where does that lesson come from",
+      "what is the source of that lesson"],                           "lesson_source",             "low",    False),
+
+    (["generate gap lessons", "create lessons from gaps",
+      "turn gaps into lessons", "convert gaps to lessons"],           "lesson_gap_generate",       "low",    False),
+
     (["record lesson", "remember this", "save feedback",
-      "save lesson", "note this", "log lesson"],                    "save_ray_feedback",         "low",    False),
+      "save lesson", "note this", "log lesson"],                      "save_ray_feedback",         "low",    False),
 
     (["notification log", "telegram notification",
       "what did hermes send", "hermes notification",
