@@ -329,13 +329,14 @@ def compare_v2_with_current_memory() -> dict:
 
     if missing_from_v2:
         recommendation = (
-            "Keep v2 in preview mode until Batch 2 dry run and reader comparison pass."
+            "Keep v2 in preview/shadow mode until missing types are backfilled."
             " Switch to v2 as primary only after Ray approval."
         )
     else:
         recommendation = (
             "Batch 2 applied — all lesson/goal/tool_registry/scout_registry types present in v2."
-            " v2 remains in preview until Ray approves switching the live Telegram reader."
+            " Memory v2 is ready for shadow-reader testing, but not primary live Telegram yet."
+            " Enable shadow mode with HERMES_MEMORY_V2_MODE=shadow. Primary requires Ray approval."
         )
 
     return {

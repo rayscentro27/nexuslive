@@ -60,7 +60,8 @@ print("\n-- compare_v2_with_current_memory recommendation does not say 'switch n
 cmp = v2.compare_v2_with_current_memory()
 rec = cmp.get("recommendation", "")
 check("recommendation exists", bool(rec))
-check("recommendation mentions 'preview'", "preview" in rec.lower())
+check("recommendation mentions 'preview' or 'shadow'",
+      "preview" in rec.lower() or "shadow" in rec.lower())
 check("recommendation does NOT instruct to switch to v2 now unconditionally",
       "switch to v2" not in rec.lower() or
       ("after" in rec.lower() and "approval" in rec.lower()))

@@ -219,6 +219,15 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
     (["show memory v2 status", "memory v2 status", "v2 reader status",
       "is v2 reader active", "v2 status"],                          "memory_v2_status",           "low",    False),
 
+    (["show memory v2 shadow status", "memory v2 shadow status",
+      "show shadow memory status", "shadow memory status",
+      "v2 shadow status"],                                          "memory_v2_shadow_status",    "low",    False),
+
+    (["is memory v2 live", "is memory v2 primary",
+      "is memory v2 shadow only", "is v2 primary",
+      "is v2 live", "is v2 the live reader",
+      "has v2 switched", "did v2 switch"],                         "memory_v2_live_check",       "low",    False),
+
     # ── Memory sources / debug commands (must be BEFORE archived_executive_memory) ──
     # "again" variants force a fresh send even if content is identical to prior response
     (["show memory sources again", "memory sources again",

@@ -1311,6 +1311,7 @@ def _plain_memory_v2_preview() -> str:
 def _plain_memory_v2_compare() -> str:
     """'compare memory v2' — side-by-side current vs v2 preview comparison."""
     from lib.hermes_memory_v2_reader import compare_v2_with_current_memory
+    from lib.hermes_memory_v2_shadow import PLANNED_BATCH_TYPES, EXCLUDED_FROM_CURRENT_TRUTH
     try:
         cmp = compare_v2_with_current_memory()
     except Exception as exc:
@@ -1331,30 +1332,35 @@ def _plain_memory_v2_compare() -> str:
             lines.append(f"- {mt}: {cnt}")
         lines.append("- not primary yet")
     else:
-        lines.append("- unavailable (credentials not set)")
+        lines.append("- unavailable (credentials not set in this environment)")
 
-    overlap = cmp.get("overlap", [])
-    if overlap:
-        lines += ["", "Overlap (v2 covers):"]
-        for o in overlap:
-            lines.append(f"- {o}")
+    # Planned Batch 1/2 coverage — show present/absent for each planned type
+    v2_by_type = cmp.get("v2_by_type", {})
+    lines += ["", "Planned Batch 1/2 coverage:"]
+    for mt in PLANNED_BATCH_TYPES:
+        status = "present" if v2_by_type.get(mt, 0) > 0 else "missing"
+        lines.append(f"- {mt}: {status}")
 
     missing = cmp.get("missing_from_v2", [])
+    lines += ["", "Missing from planned Batch 1/2:"]
     if missing:
-        lines += ["", "Missing from v2 (Batch 2 targets):"]
         for m in missing:
             lines.append(f"- {m}")
+    else:
+        lines.append("- none")
 
-    extra = cmp.get("extra_in_v2", [])
-    if extra:
-        lines += ["", "Extra in v2 (not in current reader):"]
-        for e in extra:
-            lines.append(f"- {e}")
+    lines += ["", "Still excluded from current-truth memory:"]
+    for et in EXCLUDED_FROM_CURRENT_TRUTH:
+        lines.append(f"- {et}")
+    # Also note legacy table exclusions
+    for legacy in ("old provider status", "old executive memory"):
+        lines.append(f"- {legacy}")
 
     lines += [
         "",
         "Recommendation:",
-        cmp.get("recommendation", "Keep v2 in preview mode pending Batch 2 dry run."),
+        cmp.get("recommendation",
+                "Memory v2 is ready for shadow-reader testing, but not primary live Telegram yet."),
     ]
     return "\n".join(lines)
 
@@ -1391,17 +1397,31 @@ def _plain_memory_v2_status() -> str:
     return explain_v2_reader_status()
 
 
+def _plain_memory_v2_shadow_status() -> str:
+    """'show memory v2 shadow status' — shadow mode config and last comparison."""
+    from lib.hermes_memory_v2_shadow import format_shadow_status
+    return format_shadow_status()
+
+
+def _plain_memory_v2_live_check() -> str:
+    """'is memory v2 live / primary / shadow only' queries."""
+    from lib.hermes_memory_v2_shadow import format_v2_live_status
+    return format_v2_live_status()
+
+
 # ── Plain-text intent routing (memory commands bypass build_report) ───────────
 # Handlers return str directly — no HERMES REPORT wrapper.
 _PLAIN_INTENTS: dict[str, object] = {
-    "memory_sources":         _plain_memory_sources,
-    "memory_sources_again":   _plain_memory_sources,
-    "answer_source":          _plain_answer_source,
-    "active_operating_rules": _plain_active_operating_rules,
-    "memory_v2_preview":      _plain_memory_v2_preview,
-    "memory_v2_compare":      _plain_memory_v2_compare,
-    "memory_v2_rules":        _plain_memory_v2_rules,
-    "memory_v2_status":       _plain_memory_v2_status,
+    "memory_sources":              _plain_memory_sources,
+    "memory_sources_again":        _plain_memory_sources,
+    "answer_source":               _plain_answer_source,
+    "active_operating_rules":      _plain_active_operating_rules,
+    "memory_v2_preview":           _plain_memory_v2_preview,
+    "memory_v2_compare":           _plain_memory_v2_compare,
+    "memory_v2_rules":             _plain_memory_v2_rules,
+    "memory_v2_status":            _plain_memory_v2_status,
+    "memory_v2_shadow_status":     _plain_memory_v2_shadow_status,
+    "memory_v2_live_check":        _plain_memory_v2_live_check,
 }
 
 # ── Phrases that must NEVER produce a generic evidence dump ───────────────────
@@ -1413,6 +1433,9 @@ _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
     "show live answer rules",
     "show memory v2 preview", "preview memory v2", "compare memory v2",
     "show memory v2 status", "show memory v2 rules",
+    "show memory v2 shadow status", "memory v2 shadow status",
+    "show shadow memory status", "is memory v2 live",
+    "is memory v2 primary", "is memory v2 shadow only",
 ])
 
 _INTENT_HANDLERS = {
