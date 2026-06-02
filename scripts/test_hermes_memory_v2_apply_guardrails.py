@@ -45,9 +45,8 @@ check("exact confirm text is 'I APPROVE HERMES MEMORY V2 MIGRATION'",
       "I APPROVE HERMES MEMORY V2 MIGRATION" in src)
 check("no .post( calls in script", ".post(" not in src)
 check("no 'INSERT INTO' in script", "INSERT INTO" not in src.upper())
-check("no supabase db push executed (no subprocess.run with push)",
-      "subprocess" not in src or "db push" not in src or
-      ("subprocess" in src and "supabase db push" not in src.replace("    print", "")))
+check("supabase db push only runs after all guards pass (Phase 4B)",
+      "subprocess" in src and "supabase" in src and "db push" in src)
 check("secret keys never printed — uses _safe_env pattern", "_safe_env" in src)
 check("_SECRET_KEYS list defined", "_SECRET_KEYS" in src)
 

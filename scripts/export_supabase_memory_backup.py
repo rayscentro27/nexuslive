@@ -134,6 +134,29 @@ def cmd_dry_run(args) -> int:
     return 0
 
 
+def _export_table(client, table: str, output_dir: Path) -> dict:
+    """Export all rows from a Supabase table to a JSON file. Returns status dict."""
+    try:
+        response = client.table(table).select("*").execute()
+        rows = response.data or []
+        out_path = output_dir / f"{table}.json"
+        out_path.write_text(json.dumps({
+            "table": table,
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "row_count": len(rows),
+            "rows": rows,
+        }, indent=2, default=str), encoding="utf-8")
+        return {"table": table, "file": f"{table}.json", "exported": True,
+                "row_count": len(rows), "error": None}
+    except Exception as exc:
+        msg = str(exc)
+        # Never include key values in error output
+        if "eyJ" in msg:
+            msg = "[error message redacted — contained token-like string]"
+        return {"table": table, "file": f"{table}.json", "exported": False,
+                "row_count": None, "error": msg}
+
+
 def cmd_export(args) -> int:
     if not args.confirm_text or args.confirm_text.strip() != REQUIRED_CONFIRM_TEXT:
         print("ERROR: --export requires --confirm-text exactly:")
@@ -157,33 +180,84 @@ def cmd_export(args) -> int:
     ts = _ts()
     output_dir = (Path(args.output_dir) if args.output_dir
                   else ROOT / "backups" / f"supabase_memory_migration_{ts}")
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"=== Backup Export ===\n")
+    print("=== Backup Export — Phase 4B ===\n")
     print(f"Output directory: {output_dir}")
     print(f"Tables to export: {len(tables)}")
     print()
-    print("NOTE: Phase 4A.5 — export not yet wired to live Supabase client.")
-    print("      This script validates guardrails only.")
-    print("      Actual row export requires Phase 4B Ray approval.")
-    print()
 
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Connect to Supabase — read-only selects only, no writes
+    try:
+        from supabase import create_client
+        url = os.environ["SUPABASE_URL"]
+        key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+        client = create_client(url, key)
+        print("Supabase client: connected (read-only selects)")
+    except Exception as exc:
+        msg = str(exc)
+        if "eyJ" in msg:
+            msg = "[redacted — contained token-like string]"
+        print(f"ERROR: Could not connect to Supabase: {msg}")
+        return 1
 
-    manifest = _build_manifest(output_dir, tables, args.include_local_files, "export", False)
+    table_results = []
+    for t in tables:
+        result = _export_table(client, t, output_dir)
+        status = f"OK ({result['row_count']} rows)" if result["exported"] else f"SKIP — {result['error']}"
+        print(f"  {t}: {status}")
+        table_results.append(result)
+
+    exported_count = sum(1 for r in table_results if r["exported"])
+    skipped_count = len(table_results) - exported_count
+    print(f"\nExported: {exported_count}/{len(tables)} tables ({skipped_count} skipped/missing)")
+
+    # Snapshot local files
+    local_snapshots = []
+    if args.include_local_files:
+        print(f"\nSnapshotting {len(LOCAL_FILES)} local files:")
+        for rel in LOCAL_FILES:
+            p = ROOT / rel
+            if p.exists():
+                dest = output_dir / "local_files" / Path(rel).name
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(p.read_bytes())
+                local_snapshots.append({"path": rel, "exists": True, "size_bytes": p.stat().st_size})
+                print(f"  {rel}: copied")
+            else:
+                local_snapshots.append({"path": rel, "exists": False, "size_bytes": None})
+                print(f"  {rel}: MISSING (skipped)")
+
+    # Build manifest
+    manifest = {
+        "manifest_version": "1.0",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "mode": "export",
+        "exported": exported_count > 0,
+        "ready_for_phase4b": exported_count > 0,
+        "output_dir": str(output_dir),
+        "tables": table_results,
+        "local_file_snapshots": local_snapshots,
+        "gitignore_check": _check_gitignore()[0],
+        "supabase_write_attempted": False,
+        "tables_exported": exported_count,
+        "tables_skipped": skipped_count,
+    }
     manifest_path = output_dir / "backup_manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    print(f"Manifest written: {manifest_path}")
+    manifest_path.write_text(json.dumps(manifest, indent=2, default=str), encoding="utf-8")
+    print(f"\nManifest written: {manifest_path}")
 
     if args.write_manifest:
         report_dir = ROOT / "docs" / "reports" / "memory"
         report_dir.mkdir(parents=True, exist_ok=True)
         report_path = report_dir / f"backup_manifest_{ts}.json"
-        report_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        report_path.write_text(json.dumps(manifest, indent=2, default=str), encoding="utf-8")
         print(f"Report copy written: {report_path}")
 
     print(f"\nsupabase_write_attempted: {manifest['supabase_write_attempted']}")
-    print("Export guardrails verified. No live Supabase rows exported yet (Phase 4B required).")
-    return 0
+    print(f"ready_for_phase4b: {manifest['ready_for_phase4b']}")
+    print("Export complete. Backups are in gitignored backups/ directory.")
+    return 0 if manifest["ready_for_phase4b"] else 1
 
 
 def cmd_verify_only(args) -> int:

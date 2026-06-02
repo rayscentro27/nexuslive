@@ -238,19 +238,49 @@ def run_apply(args: argparse.Namespace, migration_file: Path) -> int:
         print("  Migration applied: NO")
         return 1
 
-    # All guards passed — print the command that WOULD be run, but do not execute
+    # All guards passed — execute the migration via Supabase CLI
     print("  All pre-apply checks passed.")
     print()
-    print("  PHASE 4A RESTRICTION: Migration apply is not executed in Phase 4A.")
-    print("  Phase 4A only creates the schema plan. Apply occurs in Phase 4B.")
+    print("  Applying migration: supabase/migrations/20260602004443_create_hermes_memory_v2.sql")
+    print("  This creates public.hermes_memory_v2 only. No records backfilled.")
     print()
-    print("  Command that would be run in Phase 4B:")
+
+    import subprocess
+    cmd = ["supabase", "db", "push", "--linked"]
+    print(f"  Running: {' '.join(cmd)}")
     print()
-    print("    supabase db push --db-url $SUPABASE_DB_URL")
-    print()
-    print("  Supabase data changed: NO")
-    print("  Migration applied: NO (Phase 4A restriction)")
-    return 0
+    result = subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT))
+    stdout = result.stdout.strip()
+    stderr = result.stderr.strip()
+
+    # Redact any token-like strings from output before printing
+    def _redact(s: str) -> str:
+        import re
+        return re.sub(r"eyJ[A-Za-z0-9_\-\.]+", "[REDACTED]", s)
+
+    if stdout:
+        print(_redact(stdout))
+    if stderr:
+        filtered = "\n".join(
+            line for line in stderr.splitlines()
+            if not any(skip in line for skip in ["A new version", "recommend updating"])
+        )
+        if filtered:
+            print(_redact(filtered))
+
+    if result.returncode == 0:
+        print()
+        print("  Migration applied successfully.")
+        print("  Table created: public.hermes_memory_v2")
+        print("  Records backfilled: NO (Phase 4C required)")
+        print("  Old tables modified: NO")
+        print("  Supabase data deleted: NO")
+        return 0
+    else:
+        print()
+        print(f"  ERROR: supabase db push exited with code {result.returncode}")
+        print("  Migration may not have been applied. Check Supabase dashboard.")
+        return 1
 
 
 def main() -> int:
