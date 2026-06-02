@@ -156,6 +156,10 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "what lessons are active", "active lessons in memory",
       "show lessons in memory", "what lessons did hermes learn"],     "lesson_active",             "low",    False),
 
+    # ── Bulk lesson approval (must be BEFORE lesson_approve) ────────────────────
+    (["approve all", "approve these lessons", "approve pending lessons",
+      "approve the pending lessons"],                                  "lesson_approve_all",        "low",    False),
+
     (["approve lesson", "i approve lesson"],                          "lesson_approve",            "low",    False),
 
     (["reject lesson", "i reject lesson"],                            "lesson_reject",             "low",    False),

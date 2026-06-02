@@ -1875,6 +1875,97 @@ def _plain_lesson_source(cmd: str = "") -> str:
     return "\n".join(lines)
 
 
+def _plain_lesson_approve_all(cmd: str = "") -> str:
+    """Handle 'approve all pending lessons' and 'approve all 3' commands."""
+    import re as _re
+    from lib.hermes_learning_loop import (
+        approve_all_pending_lessons,
+        list_pending_lessons,
+    )
+
+    # Extract optional limit: "approve all 3" → 3
+    limit: int | None = None
+    m = _re.search(r'\bapprove\s+all\s+(\d+)', cmd.lower())
+    if m:
+        limit = int(m.group(1))
+
+    # Count total pending before applying limit
+    all_pending = list_pending_lessons(limit=100)
+    total_pending = len(all_pending)
+
+    if total_pending == 0:
+        return (
+            "BULK LESSON APPROVAL\n\n"
+            "No pending lesson proposals to approve.\n\n"
+            "Use 'record this lesson: <text>' to create lessons first.\n"
+            "Use 'show pending lessons' to review what is waiting."
+        )
+
+    summary = approve_all_pending_lessons(limit=limit)
+    reviewed   = summary["reviewed"]
+    n_approved = summary["approved"]
+    n_blocked  = summary["blocked"]
+    n_skipped  = summary["skipped"]
+    remaining  = total_pending - reviewed
+
+    lines = ["BULK LESSON APPROVAL COMPLETE", ""]
+
+    if limit and total_pending < limit:
+        lines += [f"Note: {total_pending} pending lesson(s) found (requested up to {limit}).", ""]
+    elif limit and remaining > 0:
+        lines += [f"Note: Reviewed {limit} most recent. {remaining} more pending still need review.", ""]
+
+    lines += [
+        "Reviewed:",
+        f"{reviewed} pending lesson(s)",
+        "",
+        "Approved:",
+        f"{n_approved} lesson(s)",
+        "",
+        "Blocked:",
+        f"{n_blocked} lesson(s)",
+    ]
+
+    if n_skipped:
+        lines += ["", "Skipped (already active):", f"{n_skipped} lesson(s)"]
+
+    if summary["approved_lessons"]:
+        lines += ["", "Approved lessons:"]
+        for lsn in summary["approved_lessons"]:
+            lines.append(f"- {lsn['lesson_id']} — {lsn['title']}")
+
+    if summary["blocked_lessons"]:
+        lines += ["", "Blocked lessons:"]
+        for lsn in summary["blocked_lessons"]:
+            flags_str = ", ".join(lsn.get("flags", []))[:80]
+            lines.append(f"- {lsn['lesson_id']} — {flags_str or 'safety validation failed'}")
+
+    if summary["skipped_lessons"]:
+        lines += ["", "Skipped lessons:"]
+        for lsn in summary["skipped_lessons"]:
+            lines.append(f"- {lsn['lesson_id']} — already active")
+
+    lines += [
+        "",
+        "Memory:",
+        "Approved lessons were written to hermes_memory_v2 as active/live_answer lesson records.",
+        "",
+        "Safety:",
+        "Unsafe lessons were not approved.",
+        "Old tables were not changed.",
+    ]
+
+    if remaining > 0 and not limit:
+        lines += ["", f"Note: {remaining} pending lesson(s) still in queue."]
+
+    lines += [
+        "",
+        "Next:",
+        'Say "show active lessons" to review active memory.',
+    ]
+    return "\n".join(lines)
+
+
 def _plain_lesson_gap_generate() -> str:
     """Generate lesson proposals from open knowledge gaps."""
     from lib.hermes_learning_loop import generate_gap_lesson_proposals
@@ -1936,6 +2027,7 @@ _PLAIN_INTENTS: dict[str, object] = {
     "lesson_record":               _plain_lesson_record,
     "lesson_pending":              _plain_lesson_pending,
     "lesson_active":               _plain_lesson_active,
+    "lesson_approve_all":          _plain_lesson_approve_all,
     "lesson_approve":              _plain_lesson_approve,
     "lesson_reject":               _plain_lesson_reject,
     "lesson_deprecate":            _plain_lesson_deprecate,
@@ -1948,6 +2040,7 @@ _PLAIN_INTENTS: dict[str, object] = {
 _PLAIN_INTENTS_WITH_CMD = frozenset({
     "small_talk",
     "lesson_record",
+    "lesson_approve_all",
     "lesson_approve",
     "lesson_reject",
     "lesson_deprecate",
@@ -1980,6 +2073,10 @@ _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
     "is memory v2 primary", "is memory v2 shadow only",
     "show memory v2 primary status", "memory v2 primary status",
     "is memory v2 primary active", "primary mode status",
+    # ── Lesson bulk approval ─────────────────────────────────────────────────
+    "approve all", "approve all lessons", "approve all pending lessons",
+    "approve these lessons", "approve pending lessons",
+    "approve the pending lessons",
 ])
 
 _INTENT_HANDLERS = {

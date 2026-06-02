@@ -65,9 +65,10 @@ _BLOCKED_PATTERNS: list[str] = [
     "api key", "secret key", "private key", "password", "credentials",
     "access token", "service role key", "supabase_service_role",
     "openrouter_api_key", "oanda_api",
-    # Stale memory / evidence bypass
+    # Stale memory / evidence bypass / hallucination
     "use executive memory", "use stale memory", "ignore evidence",
-    "skip evidence", "invent task status", "make up status",
+    "skip evidence", "invent task", "make up status",
+    "make up task", "make up approval", "make up commit", "make up count",
     "hallucinate", "fabricate",
     # Safety overrides
     "disable safety", "bypass safety", "override safety",
@@ -452,6 +453,67 @@ def approve_lesson(lesson_id: str) -> dict:
         }
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
+
+
+def approve_all_pending_lessons(limit: int | None = None) -> dict:
+    """Approve all pending lesson proposals (or up to `limit` most recent).
+
+    Re-validates every proposal before writing to hermes_memory_v2.
+    ONLY writes to hermes_memory_v2. Never writes to old tables.
+    Unsafe lessons are blocked, not skipped silently.
+
+    Returns a summary dict with keys:
+      reviewed, approved, blocked, skipped,
+      approved_lessons, blocked_lessons, skipped_lessons, error
+    """
+    pending = list_pending_lessons(limit=limit if limit else 100)
+
+    approved_lessons: list[dict] = []
+    blocked_lessons:  list[dict] = []
+    skipped_lessons:  list[dict] = []
+
+    for proposal in pending:
+        lid   = proposal.get("lesson_id", "?")
+        title = proposal.get("title", "?")[:60]
+
+        # Re-validate before any write
+        ok, flags = validate_lesson_proposal(proposal)
+        if not ok:
+            _update_proposal(lid, {
+                "proposed_status": "blocked",
+                "safety_flags":    flags,
+                "updated_at":      _now_iso(),
+            })
+            blocked_lessons.append({"lesson_id": lid, "title": title, "flags": flags})
+            continue
+
+        result = approve_lesson(lid)
+        if result.get("ok"):
+            status = result.get("status", "approved")
+            if status in ("already_approved", "already_in_supabase"):
+                skipped_lessons.append({"lesson_id": lid, "title": title})
+            else:
+                approved_lessons.append({"lesson_id": lid, "title": title})
+        else:
+            error      = result.get("error", "unknown error")
+            safe_flags = result.get("safety_flags", [])
+            if "already" in error.lower():
+                skipped_lessons.append({"lesson_id": lid, "title": title})
+            elif safe_flags:
+                blocked_lessons.append({"lesson_id": lid, "title": title, "flags": safe_flags})
+            else:
+                blocked_lessons.append({"lesson_id": lid, "title": title, "flags": [error[:80]]})
+
+    return {
+        "reviewed":         len(pending),
+        "approved":         len(approved_lessons),
+        "blocked":          len(blocked_lessons),
+        "skipped":          len(skipped_lessons),
+        "approved_lessons": approved_lessons,
+        "blocked_lessons":  blocked_lessons,
+        "skipped_lessons":  skipped_lessons,
+        "error":            None,
+    }
 
 
 def explain_lesson_source(memory_id: str) -> dict:

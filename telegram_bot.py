@@ -3107,6 +3107,7 @@ class NexusTelegramBot:
         "lesson_record",
         "lesson_pending",
         "lesson_active",
+        "lesson_approve_all",
         "lesson_approve",
         "lesson_reject",
         "lesson_deprecate",
