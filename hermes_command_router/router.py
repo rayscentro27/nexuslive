@@ -996,6 +996,7 @@ def _plain_memory_sources() -> str:
     except Exception:
         lines.append("- Current rows: unavailable")
     lines.append("- Live Telegram reader: preview only / not primary yet")
+    lines.append("- Preview command: 'show memory v2 preview'")
     lines += ["", "Evidence:", "- docs/HERMES_MEMORY_SAFETY_CONTRACT.md"]
     return "\n".join(lines)
 
@@ -1255,6 +1256,141 @@ def _run_knowledge_gap_archive() -> tuple[str, list[str], str]:
     ], "Update the JSONL file to mark gaps resolved."
 
 
+# ── Memory v2 preview plain-text handlers ─────────────────────────────────────
+
+def _plain_memory_v2_preview() -> str:
+    """'show memory v2 preview' — plain-text preview of hermes_memory_v2 contents."""
+    from lib.hermes_memory_v2_reader import build_v2_memory_context_pack, _total_count, _count_by_type
+    lines = [
+        "HERMES MEMORY V2 PREVIEW",
+        "",
+        "Status:",
+        "Preview only — not the live Telegram primary reader.",
+        "",
+        "Rows:",
+    ]
+    try:
+        total = _total_count()
+        lines.append(f"- active/live_answer records: {total}")
+        for mt in ["operating_rule", "ray_preference", "approval_policy", "project_context"]:
+            cnt = _count_by_type(mt)
+            label = mt.replace("_", " ")
+            lines.append(f"- {label}s: {cnt}")
+    except Exception:
+        lines.append("- (row counts unavailable — credentials not set)")
+
+    lines += ["", "What Hermes would read:"]
+    try:
+        pack = build_v2_memory_context_pack(limit=20)
+        records = pack.get("records", [])
+        if records:
+            for i, r in enumerate(records, 1):
+                title = r.get("title", "?")[:60]
+                mt = r.get("memory_type", "?")
+                lines.append(f"  {i}. {title} — {mt}")
+        else:
+            lines.append("  (no records found — check Supabase credentials)")
+    except Exception:
+        lines.append("  (unavailable)")
+
+    lines += [
+        "",
+        "Safety:",
+        "- Archived, deprecated, blocked, debug, and stale records are excluded.",
+        "- Provider status snapshots are not used as current truth.",
+        "- Live Telegram reader has not been switched.",
+        "",
+        "Evidence:",
+        "- hermes_memory_v2",
+        "- docs/HERMES_MEMORY_V2_SCHEMA.md",
+        "- docs/HERMES_MEMORY_SAFETY_CONTRACT.md",
+    ]
+    return "\n".join(lines)
+
+
+def _plain_memory_v2_compare() -> str:
+    """'compare memory v2' — side-by-side current vs v2 preview comparison."""
+    from lib.hermes_memory_v2_reader import compare_v2_with_current_memory
+    try:
+        cmp = compare_v2_with_current_memory()
+    except Exception as exc:
+        return f"MEMORY READER COMPARISON\n\nComparison unavailable: {exc}"
+
+    lines = [
+        "MEMORY READER COMPARISON",
+        "",
+        "Current reader:",
+    ]
+    for src in cmp.get("current_sources", []):
+        lines.append(f"- {src}")
+
+    lines += ["", "Memory v2 preview:"]
+    if cmp.get("v2_available"):
+        lines.append(f"- {cmp['v2_total']} active/live_answer records")
+        for mt, cnt in cmp.get("v2_by_type", {}).items():
+            lines.append(f"- {mt}: {cnt}")
+        lines.append("- not primary yet")
+    else:
+        lines.append("- unavailable (credentials not set)")
+
+    overlap = cmp.get("overlap", [])
+    if overlap:
+        lines += ["", "Overlap (v2 covers):"]
+        for o in overlap:
+            lines.append(f"- {o}")
+
+    missing = cmp.get("missing_from_v2", [])
+    if missing:
+        lines += ["", "Missing from v2 (Batch 2 targets):"]
+        for m in missing:
+            lines.append(f"- {m}")
+
+    extra = cmp.get("extra_in_v2", [])
+    if extra:
+        lines += ["", "Extra in v2 (not in current reader):"]
+        for e in extra:
+            lines.append(f"- {e}")
+
+    lines += [
+        "",
+        "Recommendation:",
+        cmp.get("recommendation", "Keep v2 in preview mode pending Batch 2 dry run."),
+    ]
+    return "\n".join(lines)
+
+
+def _plain_memory_v2_rules() -> str:
+    """'show memory v2 rules' — operating rules from hermes_memory_v2."""
+    from lib.hermes_memory_v2_reader import load_v2_operating_rules
+    result = load_v2_operating_rules(limit=20)
+    lines = ["MEMORY V2 OPERATING RULES", ""]
+    if not result.get("available"):
+        lines.append(f"Unavailable: {result.get('reason', 'unknown')}")
+        lines += ["", "Use 'show active operating rules' for current live rules."]
+        return "\n".join(lines)
+
+    records = result.get("records", [])
+    lines.append(f"Operating rules in hermes_memory_v2 ({len(records)} records):")
+    lines.append("")
+    for i, r in enumerate(records, 1):
+        title = r.get("title", "?")[:70]
+        conf = r.get("confidence", "?")
+        lines.append(f"  {i}. {title} (confidence: {conf})")
+
+    lines += [
+        "",
+        "Note: These are preview records — not yet the live Telegram rule source.",
+        "Use 'show active operating rules' for current applied rules.",
+    ]
+    return "\n".join(lines)
+
+
+def _plain_memory_v2_status() -> str:
+    """'show memory v2 status' — current state of the v2 reader."""
+    from lib.hermes_memory_v2_reader import explain_v2_reader_status
+    return explain_v2_reader_status()
+
+
 # ── Plain-text intent routing (memory commands bypass build_report) ───────────
 # Handlers return str directly — no HERMES REPORT wrapper.
 _PLAIN_INTENTS: dict[str, object] = {
@@ -1262,6 +1398,10 @@ _PLAIN_INTENTS: dict[str, object] = {
     "memory_sources_again":   _plain_memory_sources,
     "answer_source":          _plain_answer_source,
     "active_operating_rules": _plain_active_operating_rules,
+    "memory_v2_preview":      _plain_memory_v2_preview,
+    "memory_v2_compare":      _plain_memory_v2_compare,
+    "memory_v2_rules":        _plain_memory_v2_rules,
+    "memory_v2_status":       _plain_memory_v2_status,
 }
 
 # ── Phrases that must NEVER produce a generic evidence dump ───────────────────
@@ -1271,6 +1411,8 @@ _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
     "show active operating rules", "what active rules are you using",
     "where did that answer come from", "show approval rules",
     "show live answer rules",
+    "show memory v2 preview", "preview memory v2", "compare memory v2",
+    "show memory v2 status", "show memory v2 rules",
 ])
 
 _INTENT_HANDLERS = {

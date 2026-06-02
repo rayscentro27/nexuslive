@@ -204,6 +204,21 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "show hermes rules", "show live answer rules", "show approval rules",
       "what approval rules are active"],                               "active_operating_rules",     "low",    False),
 
+    # ── Memory v2 preview commands (must be BEFORE memory sources) ──────────
+    (["show memory v2 preview", "preview memory v2", "show hermes memory v2",
+      "hermes memory v2", "memory v2 preview", "show v2 memory",
+      "show v2 preview"],                                             "memory_v2_preview",          "low",    False),
+
+    (["compare memory v2", "compare current memory and v2",
+      "compare v2", "v2 vs current memory", "memory comparison",
+      "compare memory readers", "v2 reader comparison"],             "memory_v2_compare",          "low",    False),
+
+    (["show memory v2 rules", "memory v2 rules", "v2 operating rules",
+      "what rules are in v2"],                                       "memory_v2_rules",            "low",    False),
+
+    (["show memory v2 status", "memory v2 status", "v2 reader status",
+      "is v2 reader active", "v2 status"],                          "memory_v2_status",           "low",    False),
+
     # ── Memory sources / debug commands (must be BEFORE archived_executive_memory) ──
     # "again" variants force a fresh send even if content is identical to prior response
     (["show memory sources again", "memory sources again",

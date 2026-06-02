@@ -3089,6 +3089,10 @@ class NexusTelegramBot:
         "answer_source",
         "archived_executive_memory",
         "stale_memory_debug",
+        "memory_v2_preview",
+        "memory_v2_compare",
+        "memory_v2_rules",
+        "memory_v2_status",
     })
 
     def _try_memory_command(self, text: str) -> str | None:
