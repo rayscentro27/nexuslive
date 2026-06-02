@@ -102,6 +102,37 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "pilot ready", "pilot launch", "ready to launch", "ready for launch"],
                                                            "pilot_readiness",           "high",   False),
 
+    # ── Daily operating cycle (must be BEFORE next_best_move and business_opportunities) ──
+    (["run daily operating cycle", "hermes run daily operating cycle",
+      "daily operating cycle", "run daily cycle",
+      "what should i work on today", "what should we work on today",
+      "show today's nexus plan", "show today's plan",
+      "show today nexus plan", "nexus plan today",
+      "today's nexus plan", "what is today's plan",
+      "show nexus plan", "daily plan"],                              "daily_operating_cycle",     "high",   False),
+
+    (["show approval queue", "show items needing approval",
+      "approval queue", "what is waiting for my approval",
+      "show approval needed", "what needs ray approval",
+      "show what needs approval"],                                   "approval_queue",             "high",   False),
+
+    (["continue while i am out", "continue while i'm out",
+      "keep working while i am out", "keep working while i'm out",
+      "what can you do while i am gone", "what can you do while i'm gone",
+      "what can you do while i am away", "work while i am out",
+      "keep going while i am out", "continue work"],                 "continue_while_out",         "medium", False),
+
+    (["show today's top revenue move", "show today's top money move",
+      "top revenue move", "top money move today",
+      "best revenue move today", "what is the top revenue move",
+      "today's top money move", "today's top revenue move",
+      "show top money move", "show revenue move"],                   "top_revenue_move_today",     "high",   False),
+
+    (["show today's blockers", "show blockers", "what is blocked",
+      "what is stopping us", "show current blockers",
+      "what are the blockers", "today's blockers",
+      "current blockers", "what's blocked"],                         "show_blockers",              "high",   False),
+
     (["next best move", "what should we do", "what's the next",
       "what is the next step", "what do you recommend", "recommend",
       "best move", "next move", "what now"],               "next_best_move",            "high",   False),
