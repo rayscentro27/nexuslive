@@ -1,0 +1,26 @@
+{
+  "table": "ai_memory",
+  "exported_at": "2026-06-02T01:00:00Z",
+  "row_count": 3,
+  "note": "SYNTHETIC TEST FIXTURE — no real user data",
+  "rows": [
+    {
+      "id": "fixture-row-001",
+      "memory_type": "operating_rule",
+      "content": "Synthetic test record — not real data",
+      "created_at": "2026-06-01T00:00:00Z"
+    },
+    {
+      "id": "fixture-row-002",
+      "memory_type": "project_context",
+      "content": "Synthetic test record — not real data",
+      "created_at": "2026-06-01T00:00:00Z"
+    },
+    {
+      "id": "fixture-row-003",
+      "memory_type": "goal",
+      "content": "Synthetic test record — not real data",
+      "created_at": "2026-06-01T00:00:00Z"
+    }
+  ]
+}

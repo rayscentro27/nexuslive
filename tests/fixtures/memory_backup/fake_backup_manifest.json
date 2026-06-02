@@ -1,0 +1,33 @@
+{
+  "manifest_version": "1.0",
+  "generated_at": "2026-06-02T01:00:00Z",
+  "mode": "export",
+  "exported": true,
+  "ready_for_phase4b": true,
+  "output_dir": "backups/supabase_memory_migration_20260602_010000",
+  "tables": [
+    {"table": "ai_memory", "file": "ai_memory.json", "exported": true},
+    {"table": "hermes_executive_memory", "file": "hermes_executive_memory.json", "exported": true},
+    {"table": "hermes_response_patterns", "file": "hermes_response_patterns.json", "exported": true},
+    {"table": "memory_links", "file": "memory_links.json", "exported": true},
+    {"table": "knowledge_items", "file": "knowledge_items.json", "exported": true},
+    {"table": "business_opportunities", "file": "business_opportunities.json", "exported": true},
+    {"table": "executive_briefings", "file": "executive_briefings.json", "exported": true},
+    {"table": "provider_health", "file": "provider_health.json", "exported": true},
+    {"table": "ai_task_queue", "file": "ai_task_queue.json", "exported": true},
+    {"table": "agent_dispatch_tasks", "file": "agent_dispatch_tasks.json", "exported": true},
+    {"table": "human_approval_requests", "file": "human_approval_requests.json", "exported": true},
+    {"table": "nexus_skills", "file": "nexus_skills.json", "exported": true}
+  ],
+  "local_file_snapshots": [
+    {"path": "lib/hermes_memory_freshness.py", "exists": true, "size_bytes": 4200},
+    {"path": "lib/hermes_conversation_context_resolver.py", "exists": true, "size_bytes": 3100},
+    {"path": "scripts/generate_hermes_memory_v2_dry_run.py", "exists": true, "size_bytes": 18500},
+    {"path": "docs/HERMES_MEMORY_V2_SCHEMA.md", "exists": true, "size_bytes": 7200},
+    {"path": "supabase/migrations/20260602004443_create_hermes_memory_v2.sql", "exists": true, "size_bytes": 5800},
+    {"path": "scripts/apply_hermes_memory_v2_migration.py", "exists": true, "size_bytes": 4100},
+    {"path": "scripts/export_supabase_memory_backup.py", "exists": true, "size_bytes": 5500}
+  ],
+  "gitignore_check": true,
+  "supabase_write_attempted": false
+}

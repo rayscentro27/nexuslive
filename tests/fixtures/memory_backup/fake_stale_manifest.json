@@ -1,0 +1,14 @@
+{
+  "manifest_version": "1.0",
+  "generated_at": "2026-05-01T01:00:00Z",
+  "mode": "export",
+  "exported": true,
+  "ready_for_phase4b": false,
+  "output_dir": "backups/supabase_memory_migration_20260501_010000",
+  "tables": [
+    {"table": "ai_memory", "file": "ai_memory.json", "exported": false}
+  ],
+  "local_file_snapshots": [],
+  "gitignore_check": false,
+  "supabase_write_attempted": false
+}

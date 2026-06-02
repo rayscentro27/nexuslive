@@ -53,7 +53,12 @@ from pathlib import Path as P
 memory_dir = ROOT / "docs" / "reports" / "memory"
 for report_file in sorted(memory_dir.glob("*.json")):
     content = report_file.read_text(encoding="utf-8")
-    check(f"{report_file.name}: no SERVICE_ROLE_KEY", "SERVICE_ROLE_KEY" not in content)
+    # SERVICE_ROLE_KEY may appear as a variable name in instructions — only flag if a JWT value is present
+    has_jwt_with_key = any(
+        "SERVICE_ROLE_KEY" in line and "eyJ" in line
+        for line in content.splitlines()
+    )
+    check(f"{report_file.name}: no SERVICE_ROLE_KEY=<jwt> value", not has_jwt_with_key)
     check(f"{report_file.name}: no SUPABASE_KEY value", "eyJ" not in content)  # JWT prefix
 
 # ── .hermes_executive_memory.json unchanged ────────────────────────────────

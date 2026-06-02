@@ -1,6 +1,6 @@
 """
 apply_hermes_memory_v2_migration.py
-Phase 4A — Guarded migration apply script for hermes_memory_v2.
+Phase 4A/4A.5 — Guarded migration apply script for hermes_memory_v2.
 
 DEFAULT BEHAVIOR: No-op. Prints warnings and exits safely.
 Nothing is applied unless --apply + --require-ray-approval + exact confirmation text
@@ -15,14 +15,17 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 MIGRATION_FILE_DEFAULT = ROOT / "supabase" / "migrations" / "20260602004443_create_hermes_memory_v2.sql"
 BACKUP_PLAN_GLOB = "hermes_memory_v2_backup_plan_*.md"
+BACKUP_MANIFEST_GLOB = "backup_manifest_*.json"
+BACKUP_MANIFEST_MAX_AGE_H = 24
 MEMORY_DIR = ROOT / "docs" / "reports" / "memory"
 
 REQUIRED_CONFIRM_TEXT = "I APPROVE HERMES MEMORY V2 MIGRATION"
@@ -60,6 +63,45 @@ def _check_backup_exists() -> Path | None:
     return candidates[-1] if candidates else None
 
 
+def _check_backup_manifest() -> tuple[Path | None, list[str]]:
+    """Return (manifest_path, errors). Validates ready_for_phase4b and freshness."""
+    candidates = sorted(MEMORY_DIR.glob(BACKUP_MANIFEST_GLOB))
+    if not candidates:
+        return None, ["Backup manifest not found. Run export script with --write-manifest first."]
+    manifest_path = candidates[-1]
+    errors = []
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        return manifest_path, [f"Manifest parse error: {e}"]
+
+    if not manifest.get("ready_for_phase4b"):
+        errors.append(
+            f"Manifest ready_for_phase4b is not true in {manifest_path.name}. "
+            "Re-run export with --write-manifest after successful export."
+        )
+
+    generated_at_str = manifest.get("generated_at", "")
+    if generated_at_str:
+        try:
+            generated_at = datetime.fromisoformat(generated_at_str.replace("Z", "+00:00"))
+            age = datetime.now(timezone.utc) - generated_at
+            if age > timedelta(hours=BACKUP_MANIFEST_MAX_AGE_H):
+                errors.append(
+                    f"Backup manifest is stale ({age.total_seconds()/3600:.1f}h old, "
+                    f"max {BACKUP_MANIFEST_MAX_AGE_H}h). Re-run export to refresh."
+                )
+        except ValueError:
+            errors.append(f"Cannot parse manifest generated_at: {generated_at_str!r}")
+    else:
+        errors.append("Manifest missing generated_at field.")
+
+    if manifest.get("supabase_write_attempted"):
+        errors.append("Manifest reports supabase_write_attempted=true — unexpected, investigate.")
+
+    return manifest_path, errors
+
+
 def _check_migration_file(migration_file: Path) -> bool:
     return migration_file.exists() and migration_file.stat().st_size > 0
 
@@ -75,6 +117,7 @@ def print_safety_banner() -> None:
     print("  - --apply requires --require-ray-approval.")
     print("  - --apply requires exact confirmation text.")
     print("  - --apply requires backup plan to exist.")
+    print("  - --apply requires backup manifest (ready_for_phase4b=true, <24h old).")
     print("  - --apply requires environment secrets to be set.")
     print("  - --dry-run never connects to Supabase.")
     print("  - No secrets are printed by this script.")
@@ -94,6 +137,12 @@ def run_dry_run(migration_file: Path) -> int:
 
     backup = _check_backup_exists()
     print(f"  Backup plan    : {backup.name if backup else 'MISSING'}")
+
+    manifest_path, manifest_errors = _check_backup_manifest()
+    manifest_status = "MISSING" if not manifest_path else ("VALID" if not manifest_errors else "INVALID")
+    print(f"  Backup manifest: {manifest_path.name if manifest_path else 'MISSING'} — {manifest_status}")
+    for err in manifest_errors:
+        print(f"    WARNING: {err}")
 
     missing_secrets = _check_secrets_present()
     if missing_secrets:
@@ -164,6 +213,12 @@ def run_apply(args: argparse.Namespace, migration_file: Path) -> int:
             "Backup plan not found. Run backup export before applying migration. "
             f"Expected: {MEMORY_DIR}/{BACKUP_PLAN_GLOB}"
         )
+
+    # Guard 4b: backup manifest must exist, be ready_for_phase4b=true, and be fresh
+    manifest_path, manifest_errors = _check_backup_manifest()
+    if manifest_errors:
+        for merr in manifest_errors:
+            errors.append(f"Backup manifest: {merr}")
 
     # Guard 5: env secrets must be set
     missing_secrets = _check_secrets_present()

@@ -46,6 +46,9 @@ state/
 memory/
 reports/
 
+# Pre-migration backups (may contain Supabase table data — never commit)
+backups/
+
 # Drop-in processing folder (temp files)
 workflows/research_ingestion/drop_in/*.json
 workflows/research_ingestion/transcripts/
