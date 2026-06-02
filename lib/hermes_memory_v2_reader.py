@@ -334,9 +334,8 @@ def compare_v2_with_current_memory() -> dict:
         )
     else:
         recommendation = (
-            "Batch 2 applied — all lesson/goal/tool_registry/scout_registry types present in v2."
-            " Memory v2 is ready for shadow-reader testing, but not primary live Telegram yet."
-            " Enable shadow mode with HERMES_MEMORY_V2_MODE=shadow. Primary requires Ray approval."
+            "All 8 planned Batch 1/2 types present in v2."
+            " Check current mode with 'show memory v2 primary status'."
         )
 
     return {

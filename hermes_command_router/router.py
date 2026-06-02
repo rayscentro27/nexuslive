@@ -1319,59 +1319,83 @@ def _plain_memory_v2_preview() -> str:
 
 
 def _plain_memory_v2_compare() -> str:
-    """'compare memory v2' — side-by-side current vs v2 preview comparison."""
+    """'compare memory v2' — mode-aware comparison of current vs v2 reader."""
     from lib.hermes_memory_v2_reader import compare_v2_with_current_memory
-    from lib.hermes_memory_v2_shadow import PLANNED_BATCH_TYPES, EXCLUDED_FROM_CURRENT_TRUTH
+    from lib.hermes_memory_v2_shadow import (
+        PLANNED_BATCH_TYPES, EXCLUDED_FROM_CURRENT_TRUTH, get_memory_v2_mode,
+    )
     try:
         cmp = compare_v2_with_current_memory()
     except Exception as exc:
         return f"MEMORY READER COMPARISON\n\nComparison unavailable: {exc}"
 
-    lines = [
-        "MEMORY READER COMPARISON",
-        "",
-        "Current reader:",
-    ]
-    for src in cmp.get("current_sources", []):
-        lines.append(f"- {src}")
+    mode = get_memory_v2_mode()
 
-    lines += ["", "Memory v2 preview:"]
+    lines = ["MEMORY READER COMPARISON", ""]
+
+    if mode == "primary":
+        lines += [
+            "Current live reader:",
+            "- hermes_memory_v2 is PRIMARY for structured memory",
+            "- current conversation context, latest artifacts, action queue, decision log,",
+            "  source intake, and live provider policy still have priority where applicable",
+        ]
+    elif mode == "shadow":
+        lines += [
+            "Current reader:",
+            "- live answers still use current active reader",
+            "- hermes_memory_v2 loaded in shadow for comparison only",
+        ]
+    elif mode == "off":
+        lines += [
+            "Current reader:",
+            "- hermes_memory_v2 is off",
+            "- live answers use current active reader only",
+        ]
+    else:  # preview
+        lines += [
+            "Current reader:",
+            "- live answers use current active reader",
+            "- hermes_memory_v2 available in preview commands only",
+        ]
+
+    lines += ["", "Memory v2:"]
     if cmp.get("v2_available"):
         lines.append(f"- {cmp['v2_total']} active/live_answer records")
-        for mt, cnt in cmp.get("v2_by_type", {}).items():
-            lines.append(f"- {mt}: {cnt}")
-        lines.append("- not primary yet")
+        lines.append("- all 8 planned Batch 1/2 types present" if not cmp.get("missing_from_v2") else
+                     f"- missing types: {cmp['missing_from_v2']}")
+        v2_by_type = cmp.get("v2_by_type", {})
+        for mt in PLANNED_BATCH_TYPES:
+            if v2_by_type.get(mt, 0) > 0:
+                lines.append(f"- {mt}")
     else:
         lines.append("- unavailable (credentials not set in this environment)")
-
-    # Planned Batch 1/2 coverage — show present/absent for each planned type
-    v2_by_type = cmp.get("v2_by_type", {})
-    lines += ["", "Planned Batch 1/2 coverage:"]
-    for mt in PLANNED_BATCH_TYPES:
-        status = "present" if v2_by_type.get(mt, 0) > 0 else "missing"
-        lines.append(f"- {mt}: {status}")
-
-    missing = cmp.get("missing_from_v2", [])
-    lines += ["", "Missing from planned Batch 1/2:"]
-    if missing:
-        for m in missing:
-            lines.append(f"- {m}")
-    else:
-        lines.append("- none")
 
     lines += ["", "Still excluded from current-truth memory:"]
     for et in EXCLUDED_FROM_CURRENT_TRUTH:
         lines.append(f"- {et}")
-    # Also note legacy table exclusions
     for legacy in ("old provider status", "old executive memory"):
         lines.append(f"- {legacy}")
 
-    lines += [
-        "",
-        "Recommendation:",
-        cmp.get("recommendation",
-                "Memory v2 is ready for shadow-reader testing, but not primary live Telegram yet."),
-    ]
+    if mode == "primary":
+        rec = (
+            "Primary structured memory is active. Continue monitoring."
+            " Do not backfill risky memory types until reviewed."
+        )
+    elif mode == "shadow":
+        rec = (
+            "Batch 1/2 coverage complete. Memory v2 shadow mode active."
+            " Primary mode is approved — run 'show memory v2 primary status' to confirm."
+        )
+    elif mode == "off":
+        rec = "Memory v2 is off. Enable with HERMES_MEMORY_V2_MODE=preview."
+    else:
+        missing = cmp.get("missing_from_v2", [])
+        rec = cmp.get("recommendation", "")
+        if not missing and not rec:
+            rec = "All 8 types present. Set HERMES_MEMORY_V2_MODE=shadow to enable shadow mode."
+
+    lines += ["", "Recommendation:", rec]
     return "\n".join(lines)
 
 
