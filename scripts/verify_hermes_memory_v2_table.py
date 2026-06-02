@@ -3,8 +3,10 @@ verify_hermes_memory_v2_table.py
 Verifies hermes_memory_v2 table exists in Supabase with correct structure.
 Uses read-only queries only. Never prints secrets or row data.
 Reports: table_exists, required_columns_present, row_count, constraints, indexes.
+Phase 4B mode (default): expects 0 rows.
+Phase 4C mode (--phase4c): expects rows > 0, checks active/live_answer records.
 """
-import os, sys, json
+import argparse, os, sys, json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -37,6 +39,11 @@ def _get_client():
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--phase4c", action="store_true", help="Phase 4C mode: expect rows > 0")
+    args = parser.parse_args()
+    phase4c = args.phase4c
+
     print("=== Verify hermes_memory_v2 Table ===\n")
 
     try:
@@ -53,6 +60,7 @@ def main() -> int:
         "table_exists": False,
         "required_columns_present": False,
         "row_count": None,
+        "active_live_answer_count": None,
         "constraints_checked": False,
         "indexes_checked": False,
         "backfill_occurred": None,
@@ -114,23 +122,46 @@ def main() -> int:
             results["required_columns_present"] = False
             print("Columns: spot-check failed")
 
-    # 3. Row count — must be 0 (no backfill yet)
+    # 3. Row count
     try:
         resp = client.table("hermes_memory_v2").select("memory_id", count="exact").execute()
         row_count = resp.count if resp.count is not None else len(resp.data)
         results["row_count"] = row_count
         results["backfill_occurred"] = row_count > 0
         print(f"\nRow count: {row_count}")
-        if row_count == 0:
-            print("Backfill check: PASS — 0 rows (no premature backfill)")
+        if phase4c:
+            if row_count > 0:
+                print(f"Backfill check: PASS — {row_count} rows present (Phase 4C backfill expected)")
+            else:
+                print("Backfill check: FAIL — 0 rows (Phase 4C backfill should have inserted records)")
         else:
-            print(f"Backfill check: WARNING — {row_count} rows found unexpectedly")
-            print("  Do not delete. Do not modify. Report to Ray before proceeding.")
+            if row_count == 0:
+                print("Backfill check: PASS — 0 rows (no premature backfill)")
+            else:
+                print(f"Backfill check: WARNING — {row_count} rows found unexpectedly")
+                print("  Do not delete. Do not modify. Report to Ray before proceeding.")
     except Exception as exc:
         msg = str(exc)[:120]
         if "eyJ" in msg:
             msg = "[redacted]"
         print(f"\nRow count: ERROR — {msg}")
+
+    # 3b. Phase 4C: check active/live_answer records queryable
+    if phase4c:
+        try:
+            resp_la = client.table("hermes_memory_v2") \
+                .select("memory_id,title,memory_type", count="exact") \
+                .eq("status", "active") \
+                .eq("scope", "live_answer") \
+                .execute()
+            active_count = resp_la.count if resp_la.count is not None else len(resp_la.data)
+            results["active_live_answer_count"] = active_count
+            print(f"Active/live_answer records: {active_count}")
+        except Exception as exc:
+            msg = str(exc)[:120]
+            if "eyJ" in msg:
+                msg = "[redacted]"
+            print(f"Active/live_answer check: ERROR — {msg}")
 
     # 4. CHECK constraints via pg_constraint (informational, may not work via REST)
     try:
@@ -168,15 +199,26 @@ def main() -> int:
     print(f"required_columns_present : {results['required_columns_present']}")
     print(f"row_count                : {results['row_count']}")
     print(f"backfill_occurred        : {results['backfill_occurred']}")
+    if phase4c:
+        print(f"active_live_answer_count : {results['active_live_answer_count']}")
     print(f"constraints_checked      : {results['constraints_checked']}")
     print(f"indexes_checked          : {results['indexes_checked']}")
 
-    ok = (
-        results["table_exists"] and
-        results["required_columns_present"] and
-        results["row_count"] == 0
-    )
-    print(f"\nOverall: {'PASS — table ready for Phase 4C backfill' if ok else 'FAIL'}")
+    if phase4c:
+        ok = (
+            results["table_exists"] and
+            results["required_columns_present"] and
+            (results["row_count"] or 0) > 0 and
+            (results["active_live_answer_count"] or 0) > 0
+        )
+        print(f"\nOverall: {'PASS — Phase 4C backfill verified' if ok else 'FAIL'}")
+    else:
+        ok = (
+            results["table_exists"] and
+            results["required_columns_present"] and
+            results["row_count"] == 0
+        )
+        print(f"\nOverall: {'PASS — table ready for Phase 4C backfill' if ok else 'FAIL'}")
     return 0 if ok else 1
 
 
