@@ -426,7 +426,7 @@ def build_daily_operating_plan(inputs: dict | None = None) -> dict:
         "Log any new knowledge gaps found during review",
     ]
 
-    return {
+    plan = {
         "date":              _today_str(),
         "loaded_at":         inputs.get("loaded_at", _now_iso()),
         "top_priority":      top_priority,
@@ -443,6 +443,14 @@ def build_daily_operating_plan(inputs: dict | None = None) -> dict:
         "action_count":      len(action_queue),
         "approval_boundary": APPROVAL_BOUNDARY,
     }
+
+    try:
+        from lib.hermes_daily_cycle_state import save_daily_cycle_state
+        save_daily_cycle_state(plan)
+    except Exception as exc:
+        logger.debug("save_daily_cycle_state skipped: %s", exc)
+
+    return plan
 
 
 # ── Formatters ────────────────────────────────────────────────────────────────

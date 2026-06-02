@@ -2101,6 +2101,230 @@ def _plain_thirty_day_revenue_plan() -> str:
     return "\n".join(lines)
 
 
+def _plain_show_last_daily_plan() -> str:
+    """Handle 'show last daily plan', 'what was the last plan', 'previous daily plan'."""
+    try:
+        from lib.hermes_daily_cycle_state import summarize_latest_daily_cycle
+        return summarize_latest_daily_cycle()
+    except Exception as exc:
+        return f"LAST DAILY PLAN\n\nCould not load last plan: {exc!s:.120}"
+
+
+def _plain_while_out_summary() -> str:
+    """Handle 'what did you do while I was out', 'while I was out', 'catch me up from last plan'."""
+    try:
+        from lib.hermes_daily_cycle_state import (
+            load_latest_daily_cycle_state, is_cycle_state_stale, list_pending_cycle_items,
+        )
+        state = load_latest_daily_cycle_state()
+        if not state:
+            return (
+                "WHILE YOU WERE OUT\n\n"
+                "No saved daily plan found.\n"
+                "Run: 'hermes run daily operating cycle' to generate one."
+            )
+        from datetime import datetime, timezone
+        date_str   = state.get("date", "unknown date")
+        created_at = state.get("created_at", "")
+        stale      = is_cycle_state_stale(max_age_hours=24)
+        age_str    = ""
+        if created_at:
+            try:
+                dt = datetime.fromisoformat(created_at)
+                age_h = (datetime.now(timezone.utc) - dt).total_seconds() / 3600
+                age_str = f"{age_h:.0f}h ago" if age_h >= 1 else f"{age_h * 60:.0f}m ago"
+            except Exception:
+                age_str = ""
+
+        lines = ["WHILE YOU WERE OUT", ""]
+        lines.append(f"Last plan: {date_str}" + (f" ({age_str})" if age_str else ""))
+        if stale:
+            lines.append("(Plan is over 24h old — consider running a fresh daily cycle.)")
+        lines.append("")
+
+        completed = state.get("completed_items") or []
+        if completed:
+            lines += [f"Completed since last plan ({len(completed)}):"]
+            for c in completed[:5]:
+                label = c.get("item") or c.get("blocker") or "unknown"
+                lines.append(f"  - {label}")
+            lines.append("")
+
+        pending = list_pending_cycle_items()
+        if pending:
+            lines += [f"Still pending ({len(pending)}):"]
+            for p in pending[:5]:
+                lines.append(f"  - [{p['type']}] {p['item']}")
+            lines.append("")
+
+        safe_actions = state.get("safe_next_actions") or []
+        if safe_actions:
+            lines += ["Internal work ready to run:"]
+            for a in safe_actions[:4]:
+                lines.append(f"  - {a}")
+            lines.append("")
+
+        lines += [
+            "What you can say:",
+            "  - 'show pending items' to see pending list",
+            "  - 'mark [item] complete' to record progress",
+            "  - 'hermes run daily operating cycle' to refresh the plan",
+        ]
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"WHILE YOU WERE OUT\n\nCould not load summary: {exc!s:.120}"
+
+
+def _plain_pending_daily_items() -> str:
+    """Handle 'show pending items', 'what needs doing', 'pending daily items'."""
+    try:
+        from lib.hermes_daily_cycle_state import load_latest_daily_cycle_state, list_pending_cycle_items
+        state = load_latest_daily_cycle_state()
+        if not state:
+            return (
+                "PENDING DAILY ITEMS\n\n"
+                "No saved daily plan found.\n"
+                "Run: 'hermes run daily operating cycle' to generate one."
+            )
+        pending = list_pending_cycle_items()
+        date_str = state.get("date", "unknown date")
+        lines = [f"PENDING DAILY ITEMS — {date_str}", ""]
+        if not pending:
+            lines += [
+                "No pending items found.",
+                "",
+                "Everything from the last plan may be complete or cleared.",
+                "Run 'hermes run daily operating cycle' to refresh.",
+            ]
+        else:
+            approval_items = [p for p in pending if p["type"] == "approval"]
+            blockers       = [p for p in pending if p["type"] == "blocker"]
+            if approval_items:
+                lines += [f"Needs Ray approval ({len(approval_items)}):"]
+                for a in approval_items:
+                    lines.append(f"  - {a['item']}")
+                    if a.get("why"):
+                        lines.append(f"    Why: {a['why']}")
+                lines.append("")
+            if blockers:
+                lines += [f"Blockers ({len(blockers)}):"]
+                for b in blockers:
+                    lines.append(f"  - {b['item']}")
+                    if b.get("why"):
+                        lines.append(f"    Fix: {b['why']}")
+                lines.append("")
+            lines += [
+                "To mark an item complete:",
+                "  Say: 'mark [item title] complete'",
+            ]
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"PENDING DAILY ITEMS\n\nCould not load pending items: {exc!s:.120}"
+
+
+def _plain_compare_since_last_plan() -> str:
+    """Handle 'compare since last plan', 'what changed since last plan'."""
+    try:
+        from lib.hermes_daily_cycle_state import load_latest_daily_cycle_state
+        from lib.hermes_daily_operating_cycle import build_daily_operating_plan, load_daily_operating_inputs
+        last = load_latest_daily_cycle_state()
+        if not last:
+            return (
+                "WHAT CHANGED SINCE THE LAST PLAN\n\n"
+                "No saved daily plan found to compare against.\n"
+                "Run: 'hermes run daily operating cycle' to generate one."
+            )
+        from lib.hermes_daily_cycle_state import compare_current_to_last_cycle
+        inputs  = load_daily_operating_inputs()
+        current = build_daily_operating_plan(inputs)
+        diff    = compare_current_to_last_cycle(current, last)
+
+        lines = ["WHAT CHANGED SINCE THE LAST PLAN", ""]
+        prev_date = diff.get("prev_date") or last.get("date", "unknown")
+        curr_date = diff.get("curr_date") or current.get("date", "today")
+        lines.append(f"Comparing: {prev_date} → {curr_date}")
+        lines.append("")
+
+        changes = diff.get("changes") or ["No changes detected."]
+        lines += ["Changes:"]
+        for c in changes:
+            lines.append(f"  - {c}")
+        lines.append("")
+
+        if diff.get("priority_changed"):
+            lines += [
+                f"Previous top priority: {diff['prev_priority']}",
+                f"Current top priority:  {diff['curr_priority']}",
+                "",
+            ]
+
+        lines += [
+            "Approval boundary:",
+            "  I will not publish, email, sell, deploy, spend money, or trade live without Ray approval.",
+        ]
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"WHAT CHANGED SINCE THE LAST PLAN\n\nCould not compare plans: {exc!s:.120}"
+
+
+def _plain_mark_daily_item_complete(raw_text: str = "") -> str:
+    """Handle 'mark [item] complete', 'mark done', 'mark it complete'."""
+    try:
+        from lib.hermes_daily_cycle_state import mark_cycle_item_completed, list_pending_cycle_items
+        pending = list_pending_cycle_items()
+        if not pending:
+            return (
+                "DAILY ITEM MARKED COMPLETE\n\n"
+                "No pending items found in the last saved plan.\n"
+                "Run 'hermes run daily operating cycle' first."
+            )
+
+        # Extract the item title from the raw command text
+        lowered = raw_text.strip().lower()
+        # Strip leading command words to get the item fragment
+        for prefix in ("mark as complete", "mark as done", "mark item complete",
+                       "mark item done", "mark complete", "mark done",
+                       "mark it complete", "mark it done", "that is complete",
+                       "mark that complete", "completed that", "finished that item"):
+            if lowered.startswith(prefix):
+                lowered = lowered[len(prefix):].strip()
+                break
+        # Also strip trailing "complete"/"done"/"as complete" etc.
+        for suffix in (" as complete", " complete", " as done", " done"):
+            if lowered.endswith(suffix):
+                lowered = lowered[: -len(suffix)].strip()
+                break
+
+        if not lowered:
+            # No item name given — mark the first pending item
+            first = pending[0]
+            item_title = first.get("item", "")
+        else:
+            item_title = lowered
+
+        result = mark_cycle_item_completed(item_title)
+        lines = ["DAILY ITEM MARKED COMPLETE", ""]
+        if result["success"]:
+            lines += [
+                result["message"],
+                "",
+                f"Remaining pending items: {len(list_pending_cycle_items())}",
+                "",
+                "Say 'show pending items' to see the updated list.",
+            ]
+        else:
+            lines += [
+                result["message"],
+                "",
+                "Pending items:",
+            ]
+            for p in pending[:5]:
+                lines.append(f"  - {p['item']}")
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"DAILY ITEM MARKED COMPLETE\n\nCould not mark item: {exc!s:.120}"
+
+
 def _plain_lesson_gap_generate() -> str:
     """Generate lesson proposals from open knowledge gaps."""
     from lib.hermes_learning_loop import generate_gap_lesson_proposals
@@ -2158,13 +2382,19 @@ _PLAIN_INTENTS: dict[str, object] = {
     "memory_v2_primary_status":    _plain_memory_v2_primary_status,
     "memory_v2_shadow_status":     _plain_memory_v2_shadow_status,
     "memory_v2_live_check":        _plain_memory_v2_live_check,
-    # ── Daily operating cycle ─────────────────────────────────────────────────
+    # ── Daily operating cycle (Phase 6A) ─────────────────────────────────────
     "daily_operating_cycle":       _plain_daily_operating_cycle,
     "daily_approval_needed":       _plain_daily_approval_needed,
     "daily_continue_while_out":    _plain_daily_continue_while_out,
     "daily_top_revenue_move":      _plain_daily_top_revenue_move,
     "daily_blockers":              _plain_daily_blockers,
     "thirty_day_revenue_plan":     _plain_thirty_day_revenue_plan,
+    # ── Daily cycle state (Phase 6B) ─────────────────────────────────────────
+    "show_last_daily_plan":        _plain_show_last_daily_plan,
+    "while_out_summary":           _plain_while_out_summary,
+    "pending_daily_items":         _plain_pending_daily_items,
+    "compare_since_last_plan":     _plain_compare_since_last_plan,
+    "mark_daily_item_complete":    _plain_mark_daily_item_complete,
     # ── Learning loop ─────────────────────────────────────────────────────────
     "lesson_record":               _plain_lesson_record,
     "lesson_pending":              _plain_lesson_pending,
@@ -2187,6 +2417,7 @@ _PLAIN_INTENTS_WITH_CMD = frozenset({
     "lesson_reject",
     "lesson_deprecate",
     "lesson_source",
+    "mark_daily_item_complete",
 })
 
 # ── Phrases that must NEVER produce a generic evidence dump ───────────────────

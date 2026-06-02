@@ -102,6 +102,13 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "pilot ready", "pilot launch", "ready to launch", "ready for launch"],
                                                            "pilot_readiness",           "high",   False),
 
+    # ── Phase 6B: last plan (must be BEFORE daily_operating_cycle — "daily plan" keyword collision) ──
+    (["show last daily plan", "show last plan", "what was the last plan",
+      "show previous plan", "what was yesterday's plan",
+      "show me the last daily plan", "what was the last daily plan",
+      "last nexus plan", "previous daily plan",
+      "show the last plan", "what did the last plan say"],            "show_last_daily_plan",       "high",   False),
+
     # ── Daily operating cycle (must be BEFORE next_best_move and business_opportunities) ──
     (["run daily operating cycle", "hermes run daily operating cycle",
       "hermes, run daily operating cycle",
@@ -151,6 +158,32 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "what are the blockers", "today's blockers",
       "current blockers", "what's blocked",
       "blockers today", "todays blockers"],                          "daily_blockers",              "high",   False),
+
+    # ── Phase 6B: daily cycle state commands ─────────────────────────────────
+    (["what did you do while i was out", "what happened while i was out",
+      "while i was out", "while i was away", "while i was gone",
+      "what did hermes do while i was out", "catch me up from last plan",
+      "what have you been doing", "what did you get done",
+      "while you were running", "what did you work on"],              "while_out_summary",          "high",   False),
+
+    (["show pending items", "what is pending", "pending cycle items",
+      "what needs doing", "show what is pending", "list pending items",
+      "pending daily items", "what items are pending",
+      "show pending daily items", "pending tasks",
+      "what still needs to be done", "what needs attention"],         "pending_daily_items",        "high",   False),
+
+    (["compare since last plan", "what changed since last plan",
+      "what is new since the last plan", "compare to last plan",
+      "what changed since yesterday", "what's new since the plan",
+      "what changed", "how has the plan changed",
+      "compare current plan", "plan comparison",
+      "what is different since last time"],                           "compare_since_last_plan",    "high",   False),
+
+    (["mark complete", "mark as complete", "mark done", "mark as done",
+      "mark item complete", "mark item done",
+      "that is complete", "mark that complete",
+      "mark it complete", "mark it done",
+      "completed that", "finished that item"],                        "mark_daily_item_complete",   "high",   True),
 
     (["next best move", "what should we do", "what's the next",
       "what is the next step", "what do you recommend", "recommend",

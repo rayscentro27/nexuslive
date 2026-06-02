@@ -945,6 +945,13 @@ class NexusTelegramBot:
             "show today's nexus plan", "show today's plan", "today's nexus plan",
             "show today nexus plan", "nexus plan today", "todays nexus plan",
             "todays plan", "daily plan",
+            # Phase 6B cycle state
+            "show last daily plan", "show last plan", "last nexus plan",
+            "previous daily plan", "while i was out", "while i was away",
+            "while i was gone", "what did you do while", "what happened while",
+            "show pending items", "pending cycle items", "pending daily items",
+            "what needs doing", "compare since last plan", "what changed since",
+            "mark complete", "mark done", "mark item complete",
         )
         if any(phrase in normalized for phrase in _PHASE6A_EXCLUSIONS):
             return False
@@ -3162,13 +3169,19 @@ class NexusTelegramBot:
         "lesson_learned",
         "lesson_source",
         "lesson_gap_generate",
-        # ── Daily operating cycle ─────────────────────────────────────────────
+        # ── Daily operating cycle (Phase 6A) ─────────────────────────────────
         "daily_operating_cycle",
         "daily_approval_needed",
         "daily_continue_while_out",
         "daily_top_revenue_move",
         "daily_blockers",
         "thirty_day_revenue_plan",
+        # ── Daily cycle state (Phase 6B) ─────────────────────────────────────
+        "show_last_daily_plan",
+        "while_out_summary",
+        "pending_daily_items",
+        "compare_since_last_plan",
+        "mark_daily_item_complete",
     })
 
     def _try_memory_command(self, text: str) -> str | None:
