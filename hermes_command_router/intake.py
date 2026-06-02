@@ -205,6 +205,10 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "what approval rules are active"],                               "active_operating_rules",     "low",    False),
 
     # ── Memory sources / debug commands (must be BEFORE archived_executive_memory) ──
+    # "again" variants force a fresh send even if content is identical to prior response
+    (["show memory sources again", "memory sources again",
+      "repeat memory sources", "resend memory sources"],             "memory_sources_again",       "low",    False),
+
     (["show memory sources", "memory sources", "what memory sources",
       "what are your memory sources", "where does your memory come from",
       "where do you get memory from", "what memory do you use",

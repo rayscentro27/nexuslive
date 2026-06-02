@@ -299,6 +299,7 @@ class NexusTelegramBot:
         self._last_reply_hash: str = ""
         self._last_reply_ts: float = 0.0
         self._current_chat_id: str = ""
+        self._memory_command_pending: bool = False
         self.ops_memory: dict[str, Any] = self._load_operational_memory()
         self.last_plan_items = list(self.ops_memory.get("latest_daily_plan", []))
         self.task_lifecycle = dict(self.ops_memory.get("task_lifecycle", {}))
@@ -535,6 +536,41 @@ class NexusTelegramBot:
         if sent:
             self._last_reply_hash = digest
             self._last_reply_ts = now
+        return sent
+
+    def _send_memory_command_response(self, message: str, parse_mode: str = "HTML") -> bool:
+        """Send a memory diagnostic command response, bypassing the 60-second Supabase dedup.
+
+        Memory commands ('show memory sources', 'show active operating rules', etc.) produce
+        identical content across calls. The normal send_direct_response 60-second dedup would
+        silently suppress every send after the first. bypass_dedup=True ensures the user always
+        gets a visible response regardless of how recently the same content was sent.
+        """
+        text = self._truncate_response(message or "")
+        if not text:
+            return False
+        try:
+            from lib.hermes_final_response_gate import gate
+            text = gate(text)
+        except Exception:
+            pass
+        sent = hermes_gate.send_direct_response(
+            text,
+            event_type='direct_chat_reply',
+            bot_token=self.bot_token,
+            chat_id=self.chat_id,
+            parse_mode=parse_mode,
+            bypass_dedup=True,
+        )
+        if not sent:
+            # Policy or forbidden-content blocked even with bypass_dedup — send a plain notice.
+            hermes_gate.send_direct_response(
+                "Memory sources command already answered recently. Say 'show memory sources again' to repeat.",
+                event_type='direct_chat_reply',
+                bot_token=self.bot_token,
+                chat_id=self.chat_id,
+                bypass_dedup=True,
+            )
         return sent
 
     def _conversational_reply(self, raw: str) -> str:
@@ -3037,13 +3073,20 @@ class NexusTelegramBot:
 
     def _try_memory_command(self, text: str) -> str | None:
         """Check if text is a memory-safety command and route through the command router.
-        Returns the formatted response or None to continue normal routing."""
+        Returns the formatted response or None to continue normal routing.
+
+        Sets self._memory_command_pending=True so the caller routes through
+        _send_memory_command_response (bypass_dedup=True) instead of _send_message_once.
+        This prevents the 60-second Supabase dedup in send_direct_response from silently
+        swallowing memory diagnostic responses whose content never changes.
+        """
         try:
             from hermes_command_router.intake import classify_intent
             from hermes_command_router.router import run_command
 
             MEMORY_INTENTS = {
                 "memory_sources",
+                "memory_sources_again",
                 "active_operating_rules",
                 "answer_source",
                 "archived_executive_memory",
@@ -3057,9 +3100,11 @@ class NexusTelegramBot:
                 logger.info("telegram route=memory_command intent=%s", intent)
                 result = run_command(text, source="telegram")
                 if result:
+                    self._memory_command_pending = True
                     return result
         except Exception as exc:
             logger.warning("telegram _try_memory_command failed text=%r exc=%s", text[:60], exc)
+            return None
         return None
 
     def handle_inbound_message(self, text: str) -> str:
@@ -3547,7 +3592,11 @@ class NexusTelegramBot:
             if not rendered:
                 rendered = self._fallback_response_for_command(command)
             logger.info("telegram inbound=%r response_preview=%r", text[:120], rendered[:200])
-            self._send_message_once(rendered)
+            if self._memory_command_pending:
+                self._memory_command_pending = False
+                self._send_memory_command_response(rendered)
+            else:
+                self._send_message_once(rendered)
             emit_metric(
                 "telegram_reply_success",
                 payload={

@@ -1259,13 +1259,15 @@ def _run_knowledge_gap_archive() -> tuple[str, list[str], str]:
 # Handlers return str directly — no HERMES REPORT wrapper.
 _PLAIN_INTENTS: dict[str, object] = {
     "memory_sources":         _plain_memory_sources,
+    "memory_sources_again":   _plain_memory_sources,
     "answer_source":          _plain_answer_source,
     "active_operating_rules": _plain_active_operating_rules,
 }
 
 # ── Phrases that must NEVER produce a generic evidence dump ───────────────────
 _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
-    "show memory sources", "where do you get memory from",
+    "show memory sources", "show memory sources again", "memory sources again",
+    "where do you get memory from",
     "show active operating rules", "what active rules are you using",
     "where did that answer come from", "show approval rules",
     "show live answer rules",

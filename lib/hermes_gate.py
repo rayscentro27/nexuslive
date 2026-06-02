@@ -424,6 +424,7 @@ def send_direct_response(
     bot_token: str  = '',
     chat_id: str    = '',
     parse_mode: str = 'HTML',
+    bypass_dedup: bool = False,
 ) -> bool:
     """
     Reply directly to a user command.
@@ -433,6 +434,9 @@ def send_direct_response(
       - Bypasses per-event cooldown (user asked again, so we answer again)
       - Deduplicates ONLY within 60 seconds (prevents double-send on bot restarts)
       - Never filtered for "empty signal" (user asked a question, we answer it)
+
+    bypass_dedup=True skips the 60-second Supabase check. Use for memory diagnostic
+    commands where identical content must always produce a visible response.
 
     Use this for all replies to /commands and user messages.
     Use send() for automated system alerts.
@@ -465,18 +469,20 @@ def send_direct_response(
         logger.info(f"send_direct_response suppressed [{event_type}]: forbidden_content_pattern")
         return False
 
-    # 60-second dedup window — prevents exact-duplicate double-sends only
+    # 60-second dedup window — prevents exact-duplicate double-sends only.
+    # bypass_dedup=True skips this for memory diagnostic commands that must always respond.
     h = _event_hash(event_type, text)
-    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=60)).isoformat()
-    rows = _sb_get(
-        f"hermes_aggregates?event_source=eq.hermes_gate_direct"
-        f"&event_type=eq.{event_type}"
-        f"&classification=eq.{h}"
-        f"&created_at=gt.{cutoff}&select=id&limit=1"
-    )
-    if rows:
-        logger.info(f"send_direct_response dedup [{event_type}] hash={h}: exact duplicate within 60s")
-        return False
+    if not bypass_dedup:
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=60)).isoformat()
+        rows = _sb_get(
+            f"hermes_aggregates?event_source=eq.hermes_gate_direct"
+            f"&event_type=eq.{event_type}"
+            f"&classification=eq.{h}"
+            f"&created_at=gt.{cutoff}&select=id&limit=1"
+        )
+        if rows:
+            logger.info(f"send_direct_response dedup [{event_type}] hash={h}: exact duplicate within 60s")
+            return False
 
     ok = _telegram_send(text, token, chat, parse_mode=parse_mode)
     if ok:
