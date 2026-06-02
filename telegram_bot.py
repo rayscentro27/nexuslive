@@ -3083,6 +3083,13 @@ class NexusTelegramBot:
     # These commands return identical content on every call by design (live status snapshots).
     # They must NEVER be silently suppressed by content-filter, Supabase dedup, or in-memory dedup.
     SAFE_REPEATABLE_MEMORY_INTENTS: frozenset[str] = frozenset({
+        # ── Conversational / general ──────────────────────────────────────────
+        "small_talk",
+        "date_time_question",
+        "tomorrow_plan",
+        "unknown_handling",
+        "knowledge_gap_review",
+        # ── Memory commands ───────────────────────────────────────────────────
         "memory_sources",
         "memory_sources_again",
         "active_operating_rules",

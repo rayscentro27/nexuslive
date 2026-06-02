@@ -65,6 +65,38 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "best agent for", "which cli agent", "suggest agent",
       "which coding agent"],                                  "recommend_dev_agent",       "low",    False),
 
+    # ── Small talk / greetings (must be BEFORE any generic keyword catches) ────
+    (["did you get enough sleep", "did you sleep", "do you sleep",
+      "did you rest", "are you rested",
+      "how are you", "how are you doing", "how you doing",
+      "are you awake", "are you online", "you good",
+      "good morning", "good afternoon", "good evening",
+      "good night", "hey hermes", "hi hermes",
+      "you there", "you still there"],                         "small_talk",                "low",    False),
+
+    # ── Date / time questions ─────────────────────────────────────────────────
+    (["what is today's date", "what is todays date", "what's today's date",
+      "what's todays date", "what day is it", "what day is today",
+      "what is the date", "what's the date", "today's date",
+      "what time is it", "what is the time", "current date",
+      "what is today"],                                        "date_time_question",        "low",    False),
+
+    # ── Tomorrow / planning questions ─────────────────────────────────────────
+    (["what do you have planned for tomorrow", "what are we doing tomorrow",
+      "what should we work on tomorrow", "tomorrow plan",
+      "plan for tomorrow", "what's planned for tomorrow",
+      "what is planned for tomorrow", "what's the plan for tomorrow",
+      "tomorrows plan", "tomorrow's plan"],                    "tomorrow_plan",             "low",    False),
+
+    # ── Unknown-handling / policy questions ───────────────────────────────────
+    (["what if you don't know", "what if you dont know",
+      "what if you dont have the answer", "what if you don't have the answer",
+      "what if you cannot answer", "what if you can't answer",
+      "what happens if you don't know", "what happens if you dont know",
+      "how do you handle unknowns", "how do you handle not knowing",
+      "what do you do when you don't know",
+      "what do you do when you dont know"],                    "unknown_handling",          "low",    False),
+
     # ── Special phrases (must be before generic keyword catches) ────────────────
     (["are we ready", "ready for pilot", "10-user pilot", "10 user pilot",
       "pilot ready", "pilot launch", "ready to launch", "ready for launch"],

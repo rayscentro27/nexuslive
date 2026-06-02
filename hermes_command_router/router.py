@@ -1431,6 +1431,166 @@ def _plain_memory_v2_status() -> str:
     return explain_v2_reader_status()
 
 
+def _plain_small_talk(cmd: str = "") -> str:
+    """Natural response to small talk / greetings — no evidence dump."""
+    from datetime import date
+    today = date.today().strftime("%A, %B %-d, %Y")
+    text = cmd.lower()
+    if any(w in text for w in ("sleep", "rest", "rested", "awake")):
+        return (
+            "I don't sleep, Ray — I'm online and ready.\n\n"
+            "I can help you review Nexus status, memory v2, today's money plan, "
+            "content drafts, scouts, goals, or system gaps."
+        )
+    if any(w in text for w in ("good morning",)):
+        return f"Good morning. Today is {today}.\n\nReady when you are — ask anything or say 'what do you recommend'."
+    if any(w in text for w in ("good afternoon",)):
+        return f"Good afternoon. Today is {today}.\n\nAsk me anything or say 'what do you recommend'."
+    if any(w in text for w in ("good evening", "good night")):
+        return f"Good evening. Today is {today}.\n\nAsk me anything or say 'what do you recommend'."
+    return (
+        "I'm online and ready, Ray.\n\n"
+        "I can help with: Nexus status, memory v2, today's money plan, "
+        "content drafts, scouts, goals, or knowledge gaps."
+    )
+
+
+def _plain_date_time() -> str:
+    """Return today's date without an artifact evidence dump."""
+    from datetime import date
+    try:
+        from lib.hermes_memory_v2_shadow import get_memory_v2_mode
+        mode = get_memory_v2_mode()
+    except Exception:
+        mode = "preview"
+    today = date.today().strftime("%A, %B %-d, %Y")
+    return (
+        f"Today is {today}.\n\n"
+        "Nexus context:\n"
+        f"- Memory v2 mode: {mode} for structured memory\n"
+        "- Live answers still prioritize current artifacts, actions, decisions, "
+        "source intake, and provider policy\n\n"
+        "I can give the system date from the runtime, but use your device clock for exact local time."
+    )
+
+
+def _plain_tomorrow_plan() -> str:
+    """Return a plain tomorrow plan — no artifact dump."""
+    lines = [
+        "TOMORROW PLAN",
+        "",
+        "Based on current Nexus goals and assets, I recommend:",
+        "",
+        "1. Review the Credit/Funding Readiness newsletter draft.",
+        "2. Approve or revise the lead magnet/newsletter/video asset packet.",
+        "3. Continue daily opportunity intake.",
+        "4. Monitor memory v2 primary mode for stale-answer regressions.",
+        "5. Keep risky memory types excluded until reviewed.",
+        "",
+        "Approval:",
+        "I will not publish, email subscribers, sell, deploy, spend money, "
+        "or use client-facing content without Ray approval.",
+        "",
+        "Evidence:",
+        "- active goals",
+        "- latest content artifact",
+        "- memory v2 primary status",
+    ]
+    return "\n".join(lines)
+
+
+def _plain_unknown_handling() -> str:
+    """Return the 'if I don't know' policy — no quality fallback dump."""
+    lines = [
+        "IF I DON'T KNOW",
+        "",
+        "I should not guess.",
+        "",
+        "My process is:",
+        "1. Check active memory and current artifacts first.",
+        "2. Check action queue, decision log, source intake, and goals.",
+        "3. If the answer is still missing, say I don't have verified evidence.",
+        "4. Log the gap so it can be improved.",
+        "5. Ask Ray whether to research it, create a task, or ignore it.",
+        "",
+        "I should never invent:",
+        "- task status",
+        "- approval counts",
+        "- commit hashes",
+        "- source processing results",
+        "- trading results",
+        "- client/public actions",
+        "",
+        "You can say:",
+        "- show knowledge gaps",
+        "- create better answers for gaps",
+        "- research this",
+        "- add this as a lesson",
+    ]
+    return "\n".join(lines)
+
+
+def _plain_knowledge_gaps() -> str:
+    """'show knowledge gaps' — plain text, no HERMES REPORT wrapper."""
+    try:
+        from lib.hermes_knowledge_gap_logger import load_recent_knowledge_gaps
+        gaps = load_recent_knowledge_gaps(limit=100)
+        open_gaps = [g for g in gaps if g.get("status") == "open"]
+        if not open_gaps:
+            return (
+                "KNOWLEDGE GAPS\n\nNo open knowledge gaps on record.\n\n"
+                "Hermes answered all recent questions from active memory."
+            )
+
+        groups: dict[str, dict] = {}
+        counts: dict[str, int] = {}
+        for g in open_gaps:
+            key = (g.get("normalized_message") or g.get("user_message", "?"))[:80]
+            if key not in groups:
+                groups[key] = g
+                counts[key] = 1
+            else:
+                counts[key] += 1
+
+        _RESOLVED_PHRASES = {
+            "help", "/help", "what can you do", "what can you answer",
+            "how are you", "good morning", "weather", "news",
+            "did you sleep", "what is today", "what day", "tomorrow",
+        }
+        def _is_resolved(msg: str) -> bool:
+            t = msg.lower()
+            return any(p in t for p in _RESOLVED_PHRASES)
+
+        lines = ["KNOWLEDGE GAPS", "", "Open / recent gaps:"]
+        sorted_items = sorted(groups.items(), key=lambda x: -counts[x[0]])[:10]
+        for i, (key, g) in enumerate(sorted_items, 1):
+            count_note = f" — asked {counts[key]}×" if counts[key] > 1 else ""
+            status_note = "resolved candidate — now routed" if _is_resolved(key) else "open"
+            fix_note = g.get("suggested_handler", g.get("reason", "needs handler"))
+            lines += [
+                f"{i}. {key[:70]}{count_note}",
+                f"   Status: {status_note}",
+                f"   Fix: {fix_note}",
+                "",
+            ]
+
+        resolved_count = sum(1 for k in groups if _is_resolved(k))
+        total_entries = len(open_gaps)
+        lines += [
+            "Summary:",
+            f"- {len(groups)} unique gap(s)",
+            f"- {total_entries} total entries",
+            f"- {resolved_count} resolved candidates",
+            "",
+            "Next:",
+            "Say \"create better answers for gaps\" to generate improvement proposals.",
+            "Use \"show technical gap report\" for the full HERMES REPORT wrapper.",
+        ]
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"KNOWLEDGE GAPS\n\nUnable to load gaps: {exc}\n\nCheck lib/hermes_knowledge_gap_logger.py"
+
+
 def _plain_memory_v2_primary_status() -> str:
     """'show memory v2 primary status' — primary mode guards and active state."""
     from lib.hermes_memory_v2_shadow import format_primary_status
@@ -1452,6 +1612,13 @@ def _plain_memory_v2_live_check() -> str:
 # ── Plain-text intent routing (memory commands bypass build_report) ───────────
 # Handlers return str directly — no HERMES REPORT wrapper.
 _PLAIN_INTENTS: dict[str, object] = {
+    # ── Conversational / general ─────────────────────────────────────────────
+    "small_talk":                  _plain_small_talk,
+    "date_time_question":          _plain_date_time,
+    "tomorrow_plan":               _plain_tomorrow_plan,
+    "unknown_handling":            _plain_unknown_handling,
+    "knowledge_gap_review":        _plain_knowledge_gaps,
+    # ── Memory commands ──────────────────────────────────────────────────────
     "memory_sources":              _plain_memory_sources,
     "memory_sources_again":        _plain_memory_sources,
     "answer_source":               _plain_answer_source,
@@ -1467,6 +1634,18 @@ _PLAIN_INTENTS: dict[str, object] = {
 
 # ── Phrases that must NEVER produce a generic evidence dump ───────────────────
 _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
+    # ── Conversational ───────────────────────────────────────────────────────
+    "did you get enough sleep", "did you sleep", "how are you", "are you awake",
+    "are you online", "you good", "good morning", "good afternoon", "good evening",
+    "what is today's date", "what is todays date", "what day is it",
+    "what time is it", "what is the date", "what's the date",
+    "what do you have planned for tomorrow", "what are we doing tomorrow",
+    "tomorrow plan", "plan for tomorrow",
+    "what if you don't know", "what if you dont know",
+    "what if you dont have the answer", "what if you don't have the answer",
+    "what if you cannot answer",
+    "show knowledge gaps", "show unanswered questions", "what gaps do you have",
+    # ── Memory ───────────────────────────────────────────────────────────────
     "show memory sources", "show memory sources again", "memory sources again",
     "where do you get memory from",
     "show active operating rules", "what active rules are you using",
@@ -1563,12 +1742,14 @@ def run_command(raw_text: str, source: str = "cli", sender: str = "raymond") -> 
     intent = cmd["intent"]
     mc     = model_class_for(intent)
 
-    # ── Plain-text memory commands: bypass build_report wrapper ──────────────
+    # ── Plain-text commands: bypass build_report wrapper ─────────────────────
     if intent in _PLAIN_INTENTS:
         try:
-            return _PLAIN_INTENTS[intent]()
+            fn = _PLAIN_INTENTS[intent]
+            # small_talk uses raw_text to pick the right greeting variant
+            return fn(raw_text) if intent == "small_talk" else fn()
         except Exception as e:
-            return f"HERMES MEMORY SOURCES\n\nUnable to load details: {e}\n\nCheck docs/HERMES_MEMORY_SAFETY_CONTRACT.md"
+            return f"I ran into an issue: {e}\n\nCheck logs or ask 'check backend health'."
 
     # ── Dev Agent Bridge intents ──────────────────────────────────────────────
     if intent in ("list_dev_agents", "dev_agent_status", "recommend_dev_agent", "prepare_dev_handoff"):
