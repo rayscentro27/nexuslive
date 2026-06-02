@@ -2176,7 +2176,7 @@ def _plain_while_out_summary() -> str:
 
 
 def _plain_pending_daily_items() -> str:
-    """Handle 'show pending items', 'what needs doing', 'pending daily items'."""
+    """Handle 'show pending items', 'what needs doing', 'what is still pending from today'."""
     try:
         from lib.hermes_daily_cycle_state import load_latest_daily_cycle_state, list_pending_cycle_items
         state = load_latest_daily_cycle_state()
@@ -2189,7 +2189,34 @@ def _plain_pending_daily_items() -> str:
         pending = list_pending_cycle_items()
         date_str = state.get("date", "unknown date")
         lines = [f"PENDING DAILY ITEMS — {date_str}", ""]
-        if not pending:
+
+        approval_items = [p for p in pending if p["type"] == "approval"]
+        blockers       = [p for p in pending if p["type"] == "blocker"]
+        safe_actions   = [p for p in pending if p["type"] == "safe_action"]
+
+        if blockers:
+            lines += [f"Blockers ({len(blockers)}):"]
+            for b in blockers:
+                lines.append(f"  - {b['item']}")
+                if b.get("why"):
+                    lines.append(f"    Fix: {b['why']}")
+            lines.append("")
+
+        if safe_actions:
+            lines += [f"Safe internal items ({len(safe_actions)}):"]
+            for a in safe_actions:
+                lines.append(f"  - {a['item']}")
+            lines.append("")
+
+        if approval_items:
+            lines += [f"Needs Ray approval ({len(approval_items)}):"]
+            for a in approval_items:
+                lines.append(f"  - {a['item']}")
+                if a.get("why"):
+                    lines.append(f"    Why: {a['why']}")
+            lines.append("")
+
+        if not (approval_items or blockers or safe_actions):
             lines += [
                 "No pending items found.",
                 "",
@@ -2197,25 +2224,12 @@ def _plain_pending_daily_items() -> str:
                 "Run 'hermes run daily operating cycle' to refresh.",
             ]
         else:
-            approval_items = [p for p in pending if p["type"] == "approval"]
-            blockers       = [p for p in pending if p["type"] == "blocker"]
-            if approval_items:
-                lines += [f"Needs Ray approval ({len(approval_items)}):"]
-                for a in approval_items:
-                    lines.append(f"  - {a['item']}")
-                    if a.get("why"):
-                        lines.append(f"    Why: {a['why']}")
-                lines.append("")
-            if blockers:
-                lines += [f"Blockers ({len(blockers)}):"]
-                for b in blockers:
-                    lines.append(f"  - {b['item']}")
-                    if b.get("why"):
-                        lines.append(f"    Fix: {b['why']}")
-                lines.append("")
             lines += [
+                "Evidence:",
+                "  docs/reports/operations/hermes_daily_cycle_state.json",
+                "",
                 "To mark an item complete:",
-                "  Say: 'mark [item title] complete'",
+                "  Say: 'mark item complete: [item title]'",
             ]
         return "\n".join(lines)
     except Exception as exc:
@@ -2281,15 +2295,32 @@ def _plain_mark_daily_item_complete(raw_text: str = "") -> str:
 
         # Extract the item title from the raw command text
         lowered = raw_text.strip().lower()
-        # Strip leading command words to get the item fragment
-        for prefix in ("mark as complete", "mark as done", "mark item complete",
-                       "mark item done", "mark complete", "mark done",
-                       "mark it complete", "mark it done", "that is complete",
-                       "mark that complete", "completed that", "finished that item"):
+        # Strip leading command words to get the item fragment.
+        # Order matters: longer/more-specific prefixes must come first.
+        for prefix in (
+            "mark daily item complete",
+            "mark daily item done",
+            "complete daily item",
+            "complete item",
+            "mark as complete",
+            "mark as done",
+            "mark item complete",
+            "mark item done",
+            "mark complete",
+            "mark done",
+            "mark it complete",
+            "mark it done",
+            "that is complete",
+            "mark that complete",
+            "completed that",
+            "finished that item",
+        ):
             if lowered.startswith(prefix):
                 lowered = lowered[len(prefix):].strip()
                 break
-        # Also strip trailing "complete"/"done"/"as complete" etc.
+        # Strip any leading separator: colon, dash, bullet, whitespace
+        lowered = lowered.lstrip(':–—-• \t')
+        # Strip trailing "complete"/"done" residue
         for suffix in (" as complete", " complete", " as done", " done"):
             if lowered.endswith(suffix):
                 lowered = lowered[: -len(suffix)].strip()
@@ -2305,10 +2336,17 @@ def _plain_mark_daily_item_complete(raw_text: str = "") -> str:
         result = mark_cycle_item_completed(item_title)
         lines = ["DAILY ITEM MARKED COMPLETE", ""]
         if result["success"]:
+            completed_item = result.get("completed_item") or {}
+            label = completed_item.get("item") or completed_item.get("blocker") or item_title
+            remaining = list_pending_cycle_items()
             lines += [
-                result["message"],
+                f"Completed:",
+                f"  {label}",
                 "",
-                f"Remaining pending items: {len(list_pending_cycle_items())}",
+                f"Remaining pending: {len(remaining)} item(s)",
+                "",
+                "Evidence:",
+                "  docs/reports/operations/hermes_daily_cycle_state.json",
                 "",
                 "Say 'show pending items' to see the updated list.",
             ]
@@ -2316,10 +2354,14 @@ def _plain_mark_daily_item_complete(raw_text: str = "") -> str:
             lines += [
                 result["message"],
                 "",
-                "Pending items:",
+                "Pending items you can mark complete:",
             ]
             for p in pending[:5]:
                 lines.append(f"  - {p['item']}")
+            lines += [
+                "",
+                "Say: 'mark item complete: [item title]'",
+            ]
         return "\n".join(lines)
     except Exception as exc:
         return f"DAILY ITEM MARKED COMPLETE\n\nCould not mark item: {exc!s:.120}"

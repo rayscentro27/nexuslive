@@ -556,11 +556,26 @@ def mark_cycle_item_completed(item_id_or_title: str) -> dict:
     if not state:
         return {"success": False, "message": "No saved daily plan found.", "completed_item": None}
 
+    # Safety check: never mark publishing/client-facing/paid/live-trading actions complete
+    _UNSAFE_FRAGMENTS = (
+        "publish", "email subscriber", "send to subscriber", "live trading",
+        "deploy to production", "spend money", "apply to affiliate",
+        "client-facing", "payment", "stripe",
+    )
     search = item_id_or_title.strip().lower()
+    for unsafe in _UNSAFE_FRAGMENTS:
+        if unsafe in search:
+            return {
+                "success":        False,
+                "message":        f"Cannot mark '{item_id_or_title}' complete — requires Ray approval.",
+                "completed_item": None,
+            }
+
     matched      = None
     matched_list = None
     matched_idx  = None
 
+    # Search blockers and approval_items (dict-based lists)
     for list_key in ("blockers", "approval_items"):
         for idx, item in enumerate(state.get(list_key) or []):
             label = (item.get("item") or item.get("blocker") or "").lower()
@@ -572,17 +587,32 @@ def mark_cycle_item_completed(item_id_or_title: str) -> dict:
         if matched:
             break
 
+    # Search safe_next_actions (string list)
+    if matched is None:
+        safe_actions = state.get("safe_next_actions") or []
+        for idx, action in enumerate(safe_actions):
+            if isinstance(action, str) and search in action.lower():
+                matched      = {"item": action, "type": "safe_action", "category": "internal"}
+                matched_list = "safe_next_actions"
+                matched_idx  = idx
+                break
+
     if matched is None:
         return {
-            "success":       False,
-            "message":       f"No pending item matched '{item_id_or_title}'.",
+            "success":        False,
+            "message":        f"No pending item matched '{item_id_or_title}'.",
             "completed_item": None,
         }
 
-    state[matched_list].pop(matched_idx)
+    # Remove from source list
+    if matched_list == "safe_next_actions":
+        state["safe_next_actions"].pop(matched_idx)
+    else:
+        state[matched_list].pop(matched_idx)
+
     completed = state.setdefault("completed_items", [])
-    matched["completed_at"]  = _op_now_iso()
-    matched["_source_list"]  = matched_list
+    matched["completed_at"] = _op_now_iso()
+    matched["_source_list"] = matched_list
     completed.append(matched)
 
     _op_ensure_dir()
@@ -597,10 +627,18 @@ def mark_cycle_item_completed(item_id_or_title: str) -> dict:
 
 
 def list_pending_cycle_items() -> list[dict]:
-    """Return pending items (approval_items + blockers) from latest state."""
+    """Return pending items (approval_items + blockers + safe_next_actions) from latest state.
+
+    safe_next_actions are included as type='safe_action' unless already in completed_items.
+    """
     state = load_latest_daily_cycle_state()
     if not state:
         return []
+
+    completed_labels = {
+        (c.get("item") or c.get("blocker") or "").lower()
+        for c in (state.get("completed_items") or [])
+    }
 
     pending: list[dict] = []
     for item in (state.get("approval_items") or []):
@@ -617,6 +655,14 @@ def list_pending_cycle_items() -> list[dict]:
             "why":      b.get("fix", ""),
             "category": b.get("category", ""),
         })
+    for action in (state.get("safe_next_actions") or []):
+        if isinstance(action, str) and action.lower() not in completed_labels:
+            pending.append({
+                "type":     "safe_action",
+                "item":     action,
+                "why":      "Safe internal work — no Ray approval needed.",
+                "category": "internal",
+            })
     return pending
 
 

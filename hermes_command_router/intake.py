@@ -170,7 +170,14 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "what needs doing", "show what is pending", "list pending items",
       "pending daily items", "what items are pending",
       "show pending daily items", "pending tasks",
-      "what still needs to be done", "what needs attention"],         "pending_daily_items",        "high",   False),
+      "what still needs to be done", "what needs attention",
+      # phrases with "still pending" / "pending from today" / "left from today"
+      "still pending", "pending from today",
+      "what is still pending", "what's still pending", "whats still pending",
+      "what is left from today", "what is left to do",
+      "what still needs to be done today", "what is unfinished from today",
+      "what is still open today", "what is still open",
+      "unfinished from today", "what is still left"],                "pending_daily_items",        "high",   False),
 
     (["compare since last plan", "what changed since last plan",
       "what is new since the last plan", "compare to last plan",
@@ -181,6 +188,8 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
 
     (["mark complete", "mark as complete", "mark done", "mark as done",
       "mark item complete", "mark item done",
+      "mark daily item complete", "mark daily item done",
+      "complete daily item", "complete item",
       "that is complete", "mark that complete",
       "mark it complete", "mark it done",
       "completed that", "finished that item"],                        "mark_daily_item_complete",   "high",   True),
