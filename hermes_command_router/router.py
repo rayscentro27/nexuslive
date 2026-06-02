@@ -950,71 +950,140 @@ def _run_provider_status() -> tuple[str, list[str], str]:
         return "unknown", [f"provider_policy error: {e}"], "Check lib/hermes_provider_policy.py"
 
 
-# ── Memory sources handler ───────────────────────────────────────────────────
+# ── Plain-text memory command handlers (no HERMES REPORT wrapper) ────────────
 
-def _run_memory_sources() -> tuple[str, list[str], str]:
-    """Explain where Hermes gets its answer data — plain language, no raw dumps.
-    Never calls executive memory."""
-    evidence = [
+def _plain_memory_sources() -> str:
+    """Plain text memory sources response — bypasses build_report wrapper."""
+    lines = [
         "HERMES MEMORY SOURCES",
         "",
         "Live answer sources:",
         "- Current conversation context",
-        "- Latest content artifact",
+        "- Latest content artifacts",
         "- Action queue",
         "- Decision log",
-        "- Source intake registry",
-        "- Daily research review",
+        "- Source intake records",
         "- Active operating rules",
-        "- Live provider policy",
+        "- hermes_memory_v2 active/live_answer records when preview/reader is enabled",
         "",
         "Historical sources:",
-        "Available only when explicitly requested:",
         "- archived executive memory",
-        "- stale memory debug",
+        "- old handoffs",
+        "- old reports",
+        "- old provider snapshots",
         "",
         "Blocked from live answers:",
         "- old Executive Memory defaults",
         "- stale provider status",
-        "- old Beehiiv/YouTube/OpenRouter defaults",
-        "- quality escalation fallback dumps",
+        "- Quality escalation fallback",
+        "- stale Ollama/Beehiiv/YouTube/OpenRouter defaults",
         "",
-        "Evidence:",
-        "docs/HERMES_MEMORY_SAFETY_CONTRACT.md",
+        "Supabase memory v2:",
+        "- Table: hermes_memory_v2 (exists)",
     ]
-    return "healthy", evidence, "I answered from the current active context only."
+    try:
+        url = os.environ.get("SUPABASE_URL", "")
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "") or os.environ.get("SUPABASE_KEY", "")
+        if url and key:
+            from supabase import create_client
+            client = create_client(url, key)
+            resp = client.table("hermes_memory_v2").select("memory_id", count="exact") \
+                .eq("status", "active").eq("scope", "live_answer").execute()
+            count = resp.count if resp.count is not None else len(resp.data)
+            lines.append(f"- Current rows: {count} active/live_answer")
+        else:
+            lines.append("- Current rows: unavailable (env not set)")
+    except Exception:
+        lines.append("- Current rows: unavailable")
+    lines.append("- Live Telegram reader: preview only / not primary yet")
+    lines += ["", "Evidence:", "- docs/HERMES_MEMORY_SAFETY_CONTRACT.md"]
+    return "\n".join(lines)
 
 
-# ── Answer source handler ────────────────────────────────────────────────────
-
-def _run_answer_source() -> tuple[str, list[str], str]:
-    """Explain the source of the last answer — no raw data dumps."""
+def _plain_answer_source() -> str:
+    """Plain text answer source response — bypasses build_report wrapper."""
     from pathlib import Path
     root = Path(__file__).resolve().parent.parent
-    evidence = [
+    lines = [
         "ANSWER SOURCE",
         "",
         "I answered from the current active context.",
         "",
         "Most recent evidence:",
     ]
-    # Try to resolve latest artifact / action / decision log paths
     try:
         from lib.hermes_daily_cycle_state import find_latest_daily_cycle
         cycle = find_latest_daily_cycle()
         if cycle.get("review"):
-            evidence.append(f"* Latest content artifact: {cycle['review']}")
+            lines.append(f"- Latest content artifact: {cycle['review']}")
         if cycle.get("intake"):
-            evidence.append(f"* Latest action: {cycle['intake']}")
+            lines.append(f"- Latest action: {cycle['intake']}")
     except Exception:
         pass
     dl_path = root / "docs" / "reports" / "decisions" / "hermes_decision_log.jsonl"
     decision_path = str(dl_path.relative_to(root)) if dl_path.exists() else "docs/reports/decisions/hermes_decision_log.jsonl"
-    evidence.append(f"* Latest decision log: {decision_path}")
-    evidence.append("* Memory policy: docs/HERMES_MEMORY_SAFETY_CONTRACT.md")
-    evidence.append("")
-    evidence.append("I did not use archived executive memory for that answer.")
-    return "healthy", evidence, "Sources resolve to current active context only."
+    lines.append(f"- Latest decision log: {decision_path}")
+    lines.append("- Memory policy: docs/HERMES_MEMORY_SAFETY_CONTRACT.md")
+    lines.append("- Memory v2: active/live_answer preview records if available")
+    lines.append("")
+    lines.append("I did not use archived executive memory.")
+    lines.append("")
+    lines.append("Use \"show technical source details\" for full report format.")
+    return "\n".join(lines)
+
+
+def _plain_active_operating_rules() -> str:
+    """Plain text active operating rules response — bypasses build_report wrapper."""
+    v2_count = None
+    try:
+        url = os.environ.get("SUPABASE_URL", "")
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "") or os.environ.get("SUPABASE_KEY", "")
+        if url and key:
+            from supabase import create_client
+            client = create_client(url, key)
+            resp = client.table("hermes_memory_v2").select("memory_id", count="exact") \
+                .eq("status", "active").eq("scope", "live_answer") \
+                .eq("memory_type", "operating_rule").execute()
+            v2_count = resp.count if resp.count is not None else len(resp.data)
+    except Exception:
+        pass
+    lines = [
+        "ACTIVE OPERATING RULES",
+        "",
+        "Hermes is currently following these live-answer rules:",
+        "",
+        "1. Evidence first.",
+        "2. Do not invent task status, counts, commits, approvals, or source processing.",
+        "3. Use current artifacts/actions/decisions/source intake before old memory.",
+        "4. Use active/live_answer memory only for normal Telegram answers.",
+        "5. Archived/debug memory only when Ray explicitly asks.",
+        "6. Publishing, paid tools, live trading, client-facing content, Stripe/payment, and production deployment require Ray approval.",
+        "7. Internal drafts, research, scoring, and action queue updates are allowed.",
+        "",
+        "Memory v2:",
+        "- hermes_memory_v2 exists",
+        "- Batch 1 active rules/preferences/context inserted",
+        f"- Active operating_rule records: {v2_count if v2_count is not None else 'unavailable'}",
+        "- Live reader status: preview only unless already enabled",
+        "",
+        "Evidence:",
+        "- docs/HERMES_MEMORY_SAFETY_CONTRACT.md",
+        "- docs/HERMES_MEMORY_V2_SCHEMA.md",
+        "- hermes_memory_v2 active/live_answer records if available",
+    ]
+    return "\n".join(lines)
+
+
+# ── Legacy tuple-returning handlers (kept for backward compatibility) ─────────
+
+def _run_memory_sources() -> tuple[str, list[str], str]:
+    """Kept for _INTENT_HANDLERS compatibility — routes to plain version."""
+    return "healthy", [_plain_memory_sources()], "I answered from the current active context only."
+
+
+def _run_answer_source() -> tuple[str, list[str], str]:
+    """Kept for _INTENT_HANDLERS compatibility — routes to plain version."""
+    return "healthy", [_plain_answer_source()], "Sources resolve to current active context only."
 
 
 # ── Stale memory debug handler ────────────────────────────────────────────────
@@ -1186,6 +1255,22 @@ def _run_knowledge_gap_archive() -> tuple[str, list[str], str]:
     ], "Update the JSONL file to mark gaps resolved."
 
 
+# ── Plain-text intent routing (memory commands bypass build_report) ───────────
+# Handlers return str directly — no HERMES REPORT wrapper.
+_PLAIN_INTENTS: dict[str, object] = {
+    "memory_sources":         _plain_memory_sources,
+    "answer_source":          _plain_answer_source,
+    "active_operating_rules": _plain_active_operating_rules,
+}
+
+# ── Phrases that must NEVER produce a generic evidence dump ───────────────────
+_EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
+    "show memory sources", "where do you get memory from",
+    "show active operating rules", "what active rules are you using",
+    "where did that answer come from", "show approval rules",
+    "show live answer rules",
+])
+
 _INTENT_HANDLERS = {
     "health_check":              _run_monitoring_check,
     "worker_status":             _run_worker_check,
@@ -1267,6 +1352,13 @@ def run_command(raw_text: str, source: str = "cli", sender: str = "raymond") -> 
     cmd    = normalize(raw_text, source=source, sender=sender)
     intent = cmd["intent"]
     mc     = model_class_for(intent)
+
+    # ── Plain-text memory commands: bypass build_report wrapper ──────────────
+    if intent in _PLAIN_INTENTS:
+        try:
+            return _PLAIN_INTENTS[intent]()
+        except Exception as e:
+            return f"HERMES MEMORY SOURCES\n\nUnable to load details: {e}\n\nCheck docs/HERMES_MEMORY_SAFETY_CONTRACT.md"
 
     # ── Dev Agent Bridge intents ──────────────────────────────────────────────
     if intent in ("list_dev_agents", "dev_agent_status", "recommend_dev_agent", "prepare_dev_handoff"):

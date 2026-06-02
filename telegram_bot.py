@@ -3044,6 +3044,7 @@ class NexusTelegramBot:
 
             MEMORY_INTENTS = {
                 "memory_sources",
+                "active_operating_rules",
                 "answer_source",
                 "archived_executive_memory",
                 "stale_memory_debug",

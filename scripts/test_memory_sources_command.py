@@ -64,7 +64,9 @@ combined = "\n".join(evidence)
 check("Contains HERMES MEMORY SOURCES header", "HERMES MEMORY SOURCES" in combined)
 check("Lists active live-answer sources", "Current conversation context" in combined or "Latest content artifact" in combined)
 check("Lists NOT used sources", "archived executive memory" in combined)
-check("Does not dump stale data", "Ollama" not in combined)
+blocked_ctx = combined.split("Blocked from live answers:")[-1] if "Blocked from live answers:" in combined else ""
+ollama_only_in_blocked = "Ollama" not in combined or ("Ollama" in combined and "Ollama" in blocked_ctx)
+check("Does not dump stale data (Ollama only in blocked list, not as active claim)", ollama_only_in_blocked)
 check("Does not dump raw config", "SUPABASE_URL" not in combined)
 check("References contract doc", "MEMORY_SAFETY_CONTRACT" in combined)
 

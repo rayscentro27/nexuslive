@@ -198,6 +198,12 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
     (["show artifact registry", "artifact registry", "show all artifacts",
       "what artifacts exist"],                                     "artifact_registry_status",   "low",    False),
 
+    # ── Active operating rules (must be BEFORE memory sources and research catches) ──
+    (["show active operating rules", "active operating rules",
+      "what active rules are you using", "what rules are you following",
+      "show hermes rules", "show live answer rules", "show approval rules",
+      "what approval rules are active"],                               "active_operating_rules",     "low",    False),
+
     # ── Memory sources / debug commands (must be BEFORE archived_executive_memory) ──
     (["show memory sources", "memory sources", "what memory sources",
       "what are your memory sources", "where does your memory come from",
