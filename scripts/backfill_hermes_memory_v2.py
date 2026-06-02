@@ -21,6 +21,7 @@ BATCH_CONFIRM_TEXTS = {
 
 BATCH_ALLOWED_TYPES = {
     "batch1": {"operating_rule", "ray_preference", "approval_policy", "project_context"},
+    "batch2": {"lesson", "goal", "tool_registry", "scout_registry"},
 }
 
 ALLOWED_STATUSES_FOR_INSERT = {"active"}

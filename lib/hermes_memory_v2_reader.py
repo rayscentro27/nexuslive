@@ -323,10 +323,20 @@ def compare_v2_with_current_memory() -> dict:
         if mt not in type_to_current and cnt > 0
     ]
 
-    recommendation = (
-        "Keep v2 in preview mode until Batch 2 dry run and reader comparison pass."
-        " Switch to v2 as primary only after Ray approval."
-    )
+    # Batch 2 types — present only after Batch 2 is applied
+    batch2_types = {"lesson", "goal", "tool_registry", "scout_registry"}
+    missing_from_v2 = sorted(t for t in batch2_types if v2_by_type.get(t, 0) == 0)
+
+    if missing_from_v2:
+        recommendation = (
+            "Keep v2 in preview mode until Batch 2 dry run and reader comparison pass."
+            " Switch to v2 as primary only after Ray approval."
+        )
+    else:
+        recommendation = (
+            "Batch 2 applied — all lesson/goal/tool_registry/scout_registry types present in v2."
+            " v2 remains in preview until Ray approves switching the live Telegram reader."
+        )
 
     return {
         "current_available": current_available,
@@ -336,7 +346,7 @@ def compare_v2_with_current_memory() -> dict:
         "v2_by_type": v2_by_type,
         "overlap": overlap,
         "extra_in_v2": extra_in_v2,
-        "missing_from_v2": ["lesson", "goal", "tool_registry", "scout_registry"],
+        "missing_from_v2": missing_from_v2,
         "recommendation": recommendation,
     }
 
@@ -351,9 +361,11 @@ def explain_v2_reader_status() -> str:
             "Live Telegram reader has NOT been switched to v2."
         )
     total = _total_count()
-    counts = {}
-    for mt in ["operating_rule", "ray_preference", "approval_policy", "project_context"]:
-        counts[mt] = _count_by_type(mt)
+    all_types = [
+        "operating_rule", "ray_preference", "approval_policy", "project_context",
+        "lesson", "goal", "tool_registry", "scout_registry",
+    ]
+    counts = {mt: _count_by_type(mt) for mt in all_types}
 
     lines = [
         "HERMES MEMORY V2 STATUS",
@@ -363,7 +375,8 @@ def explain_v2_reader_status() -> str:
         f"Active/live_answer records: {total}",
     ]
     for mt, cnt in counts.items():
-        lines.append(f"  {mt}: {cnt}")
+        if cnt > 0:
+            lines.append(f"  {mt}: {cnt}")
     lines += [
         "",
         "Excluded from current-truth preview:",
