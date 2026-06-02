@@ -123,7 +123,7 @@ check("no evidence dump",
       not any(m in resp for m in DUMP_MARKERS))
 
 # ── routing ────────────────────────────────────────────────────────────────
-print("\n-- routing: show_blockers intent --")
+print("\n-- routing: daily_blockers intent --")
 from hermes_command_router.router import run_command
 from hermes_command_router.intake import classify_intent
 
@@ -135,7 +135,7 @@ for phrase in [
     "current blockers",
 ]:
     intent, _, _ = classify_intent(phrase)
-    check(f"classify_intent({phrase!r}) == show_blockers", intent == "show_blockers")
+    check(f"classify_intent({phrase!r}) == daily_blockers", intent == "daily_blockers")
     resp_r = run_command(phrase, source="cli")
     check(f"'{phrase}': non-empty",                    bool(resp_r))
     check(f"'{phrase}': TODAY'S BLOCKERS",             "TODAY'S BLOCKERS" in resp_r)

@@ -77,7 +77,7 @@ check("no evidence dump",
       not any(m in resp for m in DUMP_MARKERS))
 
 # ── routing ────────────────────────────────────────────────────────────────
-print("\n-- routing: continue_while_out intent --")
+print("\n-- routing: daily_continue_while_out intent --")
 from hermes_command_router.router import run_command
 from hermes_command_router.intake import classify_intent
 
@@ -87,7 +87,7 @@ for phrase in [
     "what can you do while i am gone",
 ]:
     intent, _, _ = classify_intent(phrase)
-    check(f"classify_intent({phrase!r}) == continue_while_out", intent == "continue_while_out")
+    check(f"classify_intent({phrase!r}) == daily_continue_while_out", intent == "daily_continue_while_out")
     resp_r = run_command(phrase, source="cli")
     check(f"'{phrase}': non-empty",                         bool(resp_r))
     check(f"'{phrase}': CONTINUE WHILE YOU ARE OUT",        "CONTINUE WHILE YOU ARE OUT" in resp_r)

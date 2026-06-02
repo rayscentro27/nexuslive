@@ -162,7 +162,6 @@ KNOWLEDGE_REPORT_PHRASES = {
 
 PLANNING_PROMPTS = {
     "what do you recommend we work on today",
-    "what should we work on today",
     "next best move",
     "what should hermes do today",
 }
@@ -936,6 +935,19 @@ class NexusTelegramBot:
         return "chat"
 
     def _is_work_planning_request(self, normalized: str) -> bool:
+        # Phase 6A daily operating cycle phrases must NOT be caught here.
+        # They are handled by _try_memory_command (daily_operating_cycle intent) before
+        # this method is ever called.
+        _PHASE6A_EXCLUSIONS = (
+            "run daily operating cycle", "daily operating cycle", "run daily cycle",
+            "what should i work on today", "what should we work on today",
+            "what should i focus on today", "what should we focus on today",
+            "show today's nexus plan", "show today's plan", "today's nexus plan",
+            "show today nexus plan", "nexus plan today", "todays nexus plan",
+            "todays plan", "daily plan",
+        )
+        if any(phrase in normalized for phrase in _PHASE6A_EXCLUSIONS):
+            return False
         if any(normalized == p or normalized.startswith(p) for p in PLANNING_PROMPTS):
             return True
         # Tight heuristic: only planning/focus phrasing about today's work.
@@ -3114,6 +3126,12 @@ class NexusTelegramBot:
         "lesson_learned",
         "lesson_source",
         "lesson_gap_generate",
+        # ── Daily operating cycle ─────────────────────────────────────────────
+        "daily_operating_cycle",
+        "daily_approval_needed",
+        "daily_continue_while_out",
+        "daily_top_revenue_move",
+        "daily_blockers",
     })
 
     def _try_memory_command(self, text: str) -> str | None:

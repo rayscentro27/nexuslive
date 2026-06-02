@@ -83,7 +83,7 @@ check("no evidence dump",
       not any(m in resp for m in DUMP_MARKERS))
 
 # ── routing ────────────────────────────────────────────────────────────────
-print("\n-- routing: top_revenue_move_today intent --")
+print("\n-- routing: daily_top_revenue_move intent --")
 from hermes_command_router.router import run_command
 from hermes_command_router.intake import classify_intent
 
@@ -95,8 +95,8 @@ for phrase in [
     "today's top money move",
 ]:
     intent, _, _ = classify_intent(phrase)
-    check(f"classify_intent({phrase!r}) == top_revenue_move_today",
-          intent == "top_revenue_move_today")
+    check(f"classify_intent({phrase!r}) == daily_top_revenue_move",
+          intent == "daily_top_revenue_move")
     resp_r = run_command(phrase, source="cli")
     check(f"'{phrase}': non-empty",                    bool(resp_r))
     check(f"'{phrase}': TODAY'S TOP MONEY MOVE",       "TODAY'S TOP MONEY MOVE" in resp_r)

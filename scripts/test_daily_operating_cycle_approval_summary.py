@@ -57,7 +57,7 @@ check("no evidence dump",
       not any(m in resp for m in DUMP_MARKERS))
 
 # ── routing ────────────────────────────────────────────────────────────────
-print("\n-- routing: approval_queue intent --")
+print("\n-- routing: daily_approval_needed intent --")
 from hermes_command_router.router import run_command
 from hermes_command_router.intake import classify_intent
 
@@ -68,7 +68,7 @@ for phrase in [
     "what needs ray approval",
 ]:
     intent, _, _ = classify_intent(phrase)
-    check(f"classify_intent({phrase!r}) == approval_queue", intent == "approval_queue")
+    check(f"classify_intent({phrase!r}) == daily_approval_needed", intent == "daily_approval_needed")
     resp_r = run_command(phrase, source="cli")
     check(f"'{phrase}': non-empty",                bool(resp_r))
     check(f"'{phrase}': APPROVAL NEEDED",          "APPROVAL NEEDED" in resp_r)

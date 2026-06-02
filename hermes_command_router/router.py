@@ -1996,8 +1996,8 @@ def _plain_daily_operating_cycle() -> str:
         return f"DAILY OPERATING CYCLE\n\nCould not build today's plan: {exc!s:.120}\n\nTry: show active lessons, show action queue, show knowledge gaps."
 
 
-def _plain_approval_queue() -> str:
-    """Handle 'what needs my approval', 'show approval queue'."""
+def _plain_daily_approval_needed() -> str:
+    """Handle 'what needs my approval', 'show approval queue', 'pending approvals'."""
     from lib.hermes_daily_operating_cycle import build_daily_operating_plan, format_approval_needed_summary
     try:
         plan = build_daily_operating_plan()
@@ -2006,14 +2006,14 @@ def _plain_approval_queue() -> str:
         return f"APPROVAL NEEDED\n\nCould not check approval queue: {exc!s:.120}"
 
 
-def _plain_continue_while_out() -> str:
+def _plain_daily_continue_while_out() -> str:
     """Handle 'continue while I am out', 'keep working while I am out'."""
     from lib.hermes_daily_operating_cycle import format_continue_while_out_plan
     return format_continue_while_out_plan()
 
 
-def _plain_top_revenue_move_today() -> str:
-    """Handle 'show today's top revenue move', 'top money move'."""
+def _plain_daily_top_revenue_move() -> str:
+    """Handle 'show today's top revenue move', 'what can make money today'."""
     from lib.hermes_daily_operating_cycle import build_daily_operating_plan, format_top_revenue_move
     try:
         plan = build_daily_operating_plan()
@@ -2022,8 +2022,8 @@ def _plain_top_revenue_move_today() -> str:
         return f"TODAY'S TOP MONEY MOVE\n\nCould not build revenue plan: {exc!s:.120}"
 
 
-def _plain_show_blockers() -> str:
-    """Handle 'show today's blockers', 'what is blocked'."""
+def _plain_daily_blockers() -> str:
+    """Handle 'show today's blockers', 'what is blocked', 'blockers today'."""
     from lib.hermes_daily_operating_cycle import build_daily_operating_plan, format_blockers_summary
     try:
         plan = build_daily_operating_plan()
@@ -2091,10 +2091,10 @@ _PLAIN_INTENTS: dict[str, object] = {
     "memory_v2_live_check":        _plain_memory_v2_live_check,
     # ── Daily operating cycle ─────────────────────────────────────────────────
     "daily_operating_cycle":       _plain_daily_operating_cycle,
-    "approval_queue":              _plain_approval_queue,
-    "continue_while_out":          _plain_continue_while_out,
-    "top_revenue_move_today":      _plain_top_revenue_move_today,
-    "show_blockers":               _plain_show_blockers,
+    "daily_approval_needed":       _plain_daily_approval_needed,
+    "daily_continue_while_out":    _plain_daily_continue_while_out,
+    "daily_top_revenue_move":      _plain_daily_top_revenue_move,
+    "daily_blockers":              _plain_daily_blockers,
     # ── Learning loop ─────────────────────────────────────────────────────────
     "lesson_record":               _plain_lesson_record,
     "lesson_pending":              _plain_lesson_pending,
@@ -2148,19 +2148,27 @@ _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
     # ── Daily operating cycle ────────────────────────────────────────────────
     "run daily operating cycle", "daily operating cycle", "run daily cycle",
     "what should i work on today", "what should we work on today",
+    "what should i focus on today", "what should we focus on today",
     "show today's nexus plan", "show today's plan", "today's nexus plan",
-    "show today nexus plan", "nexus plan today", "daily plan",
+    "show today nexus plan", "nexus plan today", "todays nexus plan",
+    "todays plan", "daily plan",
     "show approval queue", "show items needing approval", "approval queue",
     "what needs ray approval", "show what needs approval",
+    "what needs my approval", "pending approvals", "approval needed",
+    "what is waiting for approval", "what requires approval",
     "continue while i am out", "continue while i'm out",
     "keep working while i am out", "keep working while i'm out",
     "what can you do while i am gone", "what can you do while i'm gone",
     "continue work", "keep going while i am out",
+    "continue while i am gone", "work while i am out",
     "show today's top revenue move", "show today's top money move",
     "top revenue move", "top money move today", "today's top money move",
     "today's top revenue move", "show top money move",
+    "what can make money today", "how do we make money today",
+    "todays top revenue move", "todays top money move",
     "show today's blockers", "show blockers", "what is blocked",
     "what is stopping us", "show current blockers", "today's blockers",
+    "blockers today", "todays blockers",
     # ── Lesson bulk approval ─────────────────────────────────────────────────
     "approve all", "approve all lessons", "approve all pending lessons",
     "approve these lessons", "approve pending lessons",
