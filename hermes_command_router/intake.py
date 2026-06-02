@@ -129,6 +129,15 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "keep going while i am out", "continue work",
       "continue while i am gone", "work while i am away"],           "daily_continue_while_out",   "medium", False),
 
+    # ── 30-day revenue plan (must be BEFORE daily_top_revenue_move and business_opportunities) ──
+    (["30 day revenue plan", "30-day revenue plan",
+      "plan to make money this month", "how do we make money this month",
+      "make money in the next 30 days", "30 day plan",
+      "get to 1000 a week", "get to $1000 a week",
+      "how do we get to 1000 a week", "how to make 1000 a week",
+      "revenue plan for the month", "monthly revenue plan",
+      "we need to come up with a plan to make money"],               "thirty_day_revenue_plan",    "high",   False),
+
     (["show today's top revenue move", "show today's top money move",
       "top revenue move", "top money move today",
       "best revenue move today", "what is the top revenue move",

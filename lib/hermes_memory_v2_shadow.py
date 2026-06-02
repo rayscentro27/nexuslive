@@ -116,22 +116,23 @@ def _check_primary_approval_guards() -> tuple[bool, list[str]]:
             build_v2_memory_context_pack,
             _env_available,
             _STALE_MARKERS,
+            _count_by_type,
+            _total_count,
         )
         if not _env_available():
             failures.append("Supabase credentials not available")
         else:
-            pack = build_v2_memory_context_pack(limit=50)
-            total = pack.get("total", 0)
-            by_type = pack.get("by_type", {})
-
-            # Guard 3: row count
+            # Guard 3: row count — use full table count, not limited sample
+            total = _total_count()
             if total < PRIMARY_MIN_ROWS:
                 failures.append(
                     f"row count {total} < required {PRIMARY_MIN_ROWS}"
                 )
 
-            # Guard 4: all 8 types present
-            missing = [t for t in PRIMARY_REQUIRED_TYPES if by_type.get(t, 0) == 0]
+            # Guard 4: all 8 types present — use per-type exact counts, not
+            # limited sample (build_v2_memory_context_pack(limit=50) may miss
+            # types that appear only outside the first 50 rows).
+            missing = [t for t in PRIMARY_REQUIRED_TYPES if _count_by_type(t) == 0]
             if missing:
                 failures.append(f"planned types missing: {missing}")
 
@@ -143,7 +144,8 @@ def _check_primary_approval_guards() -> tuple[bool, list[str]]:
                     f"missing_from_v2 non-empty: {cmp['missing_from_v2']}"
                 )
 
-            # Guard 6: stale check on titles
+            # Guard 6: stale check on titles — still uses limited sample for speed
+            pack = build_v2_memory_context_pack(limit=50)
             records = pack.get("records", [])
             from lib.hermes_memory_v2_reader import _has_stale
             for r in records[:20]:
@@ -436,16 +438,20 @@ def format_primary_status() -> str:
                 lines.append(f"  - {f}")
             lines.append("")
 
-    # Row counts from live Supabase
+    # Row counts and planned type coverage from live Supabase
     try:
         from lib.hermes_memory_v2_reader import _total_count, _count_by_type, _env_available
         if _env_available():
             total = _total_count()
             lines.append(f"Rows: {total} active/live_answer")
+            # Planned type coverage — uses full per-type counts, not limited sample
+            type_counts = {mt: _count_by_type(mt) for mt in PLANNED_BATCH_TYPES}
+            present_count = sum(1 for c in type_counts.values() if c > 0)
+            lines.append(f"Planned type coverage: {present_count}/{len(PLANNED_BATCH_TYPES)} present")
             lines.append("")
             lines.append("Loaded types:")
             for mt in PLANNED_BATCH_TYPES:
-                cnt = _count_by_type(mt)
+                cnt = type_counts[mt]
                 if cnt > 0:
                     lines.append(f"  {mt}: {cnt}")
         else:

@@ -2378,6 +2378,42 @@ class NexusTelegramBot:
 
         return format_version_comparison_response(previous, latest)
 
+    def _cmd_simplification_status(self) -> str:
+        """Explain that Hermes can/did create a simplified version and offer next steps."""
+        from lib.hermes_artifact_viewer import find_latest_content_draft
+        latest = find_latest_content_draft()
+        path_str = str(latest) if latest else None
+        lines = ["SIMPLIFICATION STATUS", ""]
+        if latest:
+            try:
+                rel = str(latest.relative_to(__import__("pathlib").Path(__file__).parent))
+            except Exception:
+                rel = path_str
+            lines += [
+                "I can make it simpler, Ray — and I can create a simplified internal version right now.",
+                "",
+                f"Latest draft: {rel}",
+                "",
+            ]
+        else:
+            lines += [
+                "I can simplify content drafts once a draft has been created.",
+                "Use 'create first draft' to build one.",
+                "",
+            ]
+        lines += [
+            "Next options:",
+            "  make it simpler         — create a simplified version",
+            "  show it                 — preview the current draft",
+            "  what changed?           — compare versions",
+            "  make it more professional — professional tone revision",
+            "  simplify it again       — another simplification pass",
+            "",
+            "Approval:",
+            "  Still internal only. Publishing, selling, emailing, or client use requires Ray approval.",
+        ]
+        return "\n".join(lines)
+
     def _handle_multiline_message(self, lines: list[str]) -> str:
         """Process up to 3 lines as sequential commands; return one combined response."""
         _UNSAFE_KEYWORDS = {"delete", "reset", "wipe", "nuke", "drop", "purge"}
@@ -3132,6 +3168,7 @@ class NexusTelegramBot:
         "daily_continue_while_out",
         "daily_top_revenue_move",
         "daily_blockers",
+        "thirty_day_revenue_plan",
     })
 
     def _try_memory_command(self, text: str) -> str | None:
@@ -3186,6 +3223,7 @@ class NexusTelegramBot:
                 self.ops_memory,
                 updated_by="telegram_user_instruction",
             )
+        from hermes_command_router.router import run_command as _run_command
         continuity = {
             "run demo readiness check": self._cmd_demo_readiness_check,
             "demo ready?": self._cmd_demo_readiness_check,
@@ -3364,12 +3402,36 @@ class NexusTelegramBot:
             "show differences": self._cmd_compare_draft_versions,
             "what improved": self._cmd_compare_draft_versions,
             "show changes": self._cmd_compare_draft_versions,
+            # Simplification follow-ups — never fall into evidence dump
+            "why cant you make it simpler": self._cmd_simplification_status,
+            "why can't you make it simpler": self._cmd_simplification_status,
+            "why cant you make it simplier": self._cmd_simplification_status,
+            "why can't you make it simplier": self._cmd_simplification_status,
+            "can you make it simpler": lambda: self._cmd_revise_draft("simplified"),
+            "make it even simpler": lambda: self._cmd_revise_draft("simplified"),
+            "simplify it again": lambda: self._cmd_revise_draft("simplified"),
+            "simplify again": lambda: self._cmd_revise_draft("simplified"),
+            "make this easier to understand": lambda: self._cmd_revise_draft("simplified"),
+            "make it even shorter": lambda: self._cmd_revise_draft("simplified"),
+            # 30-day revenue plan — explicit planning, not same as today's money move
+            "30 day revenue plan": lambda: _run_command("30 day revenue plan", source="telegram"),
+            "30-day revenue plan": lambda: _run_command("30 day revenue plan", source="telegram"),
+            "plan to make money this month": lambda: _run_command("30 day revenue plan", source="telegram"),
+            "how do we make money this month": lambda: _run_command("30 day revenue plan", source="telegram"),
+            "get to 1000 a week": lambda: _run_command("30 day revenue plan", source="telegram"),
+            "make money in the next 30 days": lambda: _run_command("30 day revenue plan", source="telegram"),
+            "we need to come up with a plan to make money in the next 30 days": lambda: _run_command("30 day revenue plan", source="telegram"),
         }
-        # Also check "hermes, X" → strip prefix then match
-        _normalized_strip = normalized.lstrip("hermes").lstrip(",").lstrip().rstrip(".?")
+        # Strip trailing punctuation before continuity lookup (handles "Show it.", "Why?")
+        _norm_no_punct = normalized.rstrip('.?!')
+        # Also strip "hermes, X" prefix — lstrip("hermes") strips individual chars from the set
+        _normalized_strip = normalized.lstrip("hermes").lstrip(",").lstrip().rstrip(".?!")
         if normalized in continuity:
             logger.info("telegram route=chat")
             return self._dispatch_continuity(continuity[normalized], normalized)
+        if _norm_no_punct and _norm_no_punct != normalized and _norm_no_punct in continuity:
+            logger.info("telegram route=chat punct-stripped")
+            return self._dispatch_continuity(continuity[_norm_no_punct], _norm_no_punct)
         if _normalized_strip and _normalized_strip in continuity:
             logger.info("telegram route=chat hermes-prefix-stripped")
             return self._dispatch_continuity(continuity[_normalized_strip], _normalized_strip)

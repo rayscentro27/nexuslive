@@ -2032,6 +2032,75 @@ def _plain_daily_blockers() -> str:
         return f"TODAY'S BLOCKERS\n\nCould not check blockers: {exc!s:.120}"
 
 
+def _plain_thirty_day_revenue_plan() -> str:
+    """Handle '30 day revenue plan', 'plan to make money this month', '30-day plan'."""
+    from datetime import date
+    from lib.hermes_daily_operating_cycle import load_daily_operating_inputs
+
+    today = date.today().strftime("%B %d, %Y")
+
+    # Try to surface the top content asset
+    top_asset_name = "lead magnet / funding readiness checklist"
+    try:
+        inputs = load_daily_operating_inputs()
+        mon_plan = inputs.get("monetization_plan") or {}
+        top_asset_name = mon_plan.get("top_asset_name") or top_asset_name
+    except Exception:
+        pass
+
+    lines = [
+        f"30-DAY NEXUS REVENUE PLAN — {today}",
+        "",
+        "Goal:",
+        "  Generate $1,000/week in recurring or repeatable revenue.",
+        "",
+        f"Best starting asset: {top_asset_name}",
+        "",
+        "Week 1 — Build and approve the asset packet",
+        "  - finalize lead magnet",
+        "  - finalize newsletter draft",
+        "  - finalize short video script",
+        "  - prepare CTA (call to action)",
+        "  - compliance and approval review",
+        "",
+        "Week 2 — Traffic and lead capture",
+        "  - publish approved content only (after Ray approval)",
+        "  - post short-form video",
+        "  - connect lead magnet to opt-in page",
+        "  - track lead volume",
+        "",
+        "Week 3 — Offer and follow-up",
+        "  - create funding readiness audit offer",
+        "  - create consultation/strategy call CTA",
+        "  - identify affiliate offers matching Nexus audience",
+        "",
+        "Week 4 — Convert and improve",
+        "  - review metrics and lead quality",
+        "  - improve CTA based on results",
+        "  - produce second content batch",
+        "  - turn best questions into lessons and knowledge gaps",
+        "",
+        "What needs Ray approval:",
+        "  - publishing to social / newsletter",
+        "  - subscriber email sends",
+        "  - affiliate signup",
+        "  - payment / Stripe activation",
+        "  - any client-facing content",
+        "",
+        "What Hermes can do internally now:",
+        "  - prepare and improve asset drafts",
+        "  - refine CTA copy",
+        "  - draft approval checklist",
+        "  - assign scouts to research leads",
+        "  - build internal launch checklist",
+        "",
+        "Approval boundary:",
+        "  I will not publish, email subscribers, sell, deploy, spend money,",
+        "  apply to affiliate programs, or run live trading without Ray approval.",
+    ]
+    return "\n".join(lines)
+
+
 def _plain_lesson_gap_generate() -> str:
     """Generate lesson proposals from open knowledge gaps."""
     from lib.hermes_learning_loop import generate_gap_lesson_proposals
@@ -2095,6 +2164,7 @@ _PLAIN_INTENTS: dict[str, object] = {
     "daily_continue_while_out":    _plain_daily_continue_while_out,
     "daily_top_revenue_move":      _plain_daily_top_revenue_move,
     "daily_blockers":              _plain_daily_blockers,
+    "thirty_day_revenue_plan":     _plain_thirty_day_revenue_plan,
     # ── Learning loop ─────────────────────────────────────────────────────────
     "lesson_record":               _plain_lesson_record,
     "lesson_pending":              _plain_lesson_pending,
@@ -2169,6 +2239,11 @@ _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
     "show today's blockers", "show blockers", "what is blocked",
     "what is stopping us", "show current blockers", "today's blockers",
     "blockers today", "todays blockers",
+    # ── 30-day revenue plan ──────────────────────────────────────────────────
+    "30 day revenue plan", "30-day revenue plan",
+    "plan to make money this month", "how do we make money this month",
+    "make money in the next 30 days", "get to 1000 a week",
+    "we need to come up with a plan to make money",
     # ── Lesson bulk approval ─────────────────────────────────────────────────
     "approve all", "approve all lessons", "approve all pending lessons",
     "approve these lessons", "approve pending lessons",
