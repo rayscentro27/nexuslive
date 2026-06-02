@@ -1901,6 +1901,26 @@ def _plain_lesson_approve_all(cmd: str = "") -> str:
             "Use 'show pending lessons' to review what is waiting."
         )
 
+    # Large batches: return immediately, process in background thread
+    if total_pending > 5:
+        import threading as _threading
+        _threading.Thread(
+            target=approve_all_pending_lessons,
+            kwargs={"limit": limit},
+            daemon=True,
+        ).start()
+        batch_note = f"up to {limit}" if limit else str(total_pending)
+        return (
+            "BULK LESSON APPROVAL STARTED\n\n"
+            f"Processing {batch_note} pending lesson(s) in the background.\n\n"
+            "Memory:\n"
+            "Safe lessons will be written to hermes_memory_v2 as active/live_answer records.\n"
+            "Unsafe lessons will be blocked automatically.\n\n"
+            "Safety:\n"
+            "Old tables will not be changed.\n\n"
+            'Say "show active lessons" in a moment to see results.'
+        )
+
     summary = approve_all_pending_lessons(limit=limit)
     reviewed   = summary["reviewed"]
     n_approved = summary["approved"]

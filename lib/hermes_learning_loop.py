@@ -150,6 +150,30 @@ def _update_proposal(lesson_id: str, updates: dict) -> bool:
     return found
 
 
+def _batch_update_proposals(updates: dict[str, dict]) -> int:
+    """Rewrite proposals file applying multiple updates in a single pass.
+
+    updates: {lesson_id: {field: value, ...}, ...}
+    Returns the number of proposals updated.
+    """
+    if not updates:
+        return 0
+    proposals = _load_proposals()
+    count = 0
+    now = _now_iso()
+    new_lines = []
+    for p in proposals:
+        lid = p.get("lesson_id")
+        if lid and lid in updates:
+            p.update(updates[lid])
+            p["updated_at"] = now
+            count += 1
+        new_lines.append(json.dumps(p, default=str))
+    if count:
+        PROPOSALS_FILE.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    return count
+
+
 # ── Safety validation ────────────────────────────────────────────────────────────
 
 def validate_lesson_proposal(proposal: dict) -> tuple[bool, list[str]]:
@@ -456,9 +480,13 @@ def approve_lesson(lesson_id: str) -> dict:
 
 
 def approve_all_pending_lessons(limit: int | None = None) -> dict:
-    """Approve all pending lesson proposals (or up to `limit` most recent).
+    """Approve all pending lesson proposals using a single batch Supabase operation.
 
-    Re-validates every proposal before writing to hermes_memory_v2.
+    Phase 1: local validation only (no network).
+    Phase 2: 1 Supabase client + 1 batch SELECT + 1 batch INSERT.
+    Phase 3: 1 _batch_update_proposals() call.
+    Falls back to serial approve_lesson() per lesson if batch fails.
+
     ONLY writes to hermes_memory_v2. Never writes to old tables.
     Unsafe lessons are blocked, not skipped silently.
 
@@ -472,37 +500,141 @@ def approve_all_pending_lessons(limit: int | None = None) -> dict:
     blocked_lessons:  list[dict] = []
     skipped_lessons:  list[dict] = []
 
+    # ── Phase 1: local validation (no network) ──────────────────────────────────
+    to_write:        list[dict]       = []
+    blocked_updates: dict[str, dict]  = {}
+
     for proposal in pending:
         lid   = proposal.get("lesson_id", "?")
         title = proposal.get("title", "?")[:60]
-
-        # Re-validate before any write
         ok, flags = validate_lesson_proposal(proposal)
         if not ok:
-            _update_proposal(lid, {
-                "proposed_status": "blocked",
-                "safety_flags":    flags,
-                "updated_at":      _now_iso(),
-            })
             blocked_lessons.append({"lesson_id": lid, "title": title, "flags": flags})
-            continue
-
-        result = approve_lesson(lid)
-        if result.get("ok"):
-            status = result.get("status", "approved")
-            if status in ("already_approved", "already_in_supabase"):
-                skipped_lessons.append({"lesson_id": lid, "title": title})
-            else:
-                approved_lessons.append({"lesson_id": lid, "title": title})
+            blocked_updates[lid] = {"proposed_status": "blocked", "safety_flags": flags}
         else:
-            error      = result.get("error", "unknown error")
-            safe_flags = result.get("safety_flags", [])
-            if "already" in error.lower():
+            to_write.append(proposal)
+
+    if not to_write:
+        if blocked_updates:
+            _batch_update_proposals(blocked_updates)
+        return {
+            "reviewed":         len(pending),
+            "approved":         0,
+            "blocked":          len(blocked_lessons),
+            "skipped":          0,
+            "approved_lessons": [],
+            "blocked_lessons":  blocked_lessons,
+            "skipped_lessons":  [],
+            "error":            None,
+        }
+
+    if not _env_available():
+        if blocked_updates:
+            _batch_update_proposals(blocked_updates)
+        cred_err = "Supabase credentials not available"
+        err_lessons = [
+            {"lesson_id": p.get("lesson_id", "?"), "title": p.get("title", "?")[:60],
+             "flags": [cred_err]}
+            for p in to_write
+        ]
+        return {
+            "reviewed":         len(pending),
+            "approved":         0,
+            "blocked":          len(blocked_lessons) + len(err_lessons),
+            "skipped":          0,
+            "approved_lessons": [],
+            "blocked_lessons":  blocked_lessons + err_lessons,
+            "skipped_lessons":  [],
+            "error":            cred_err,
+        }
+
+    # ── Phase 2: batch Supabase (1 client + 1 SELECT + 1 INSERT) ───────────────
+    prop_updates: dict[str, dict] = {**blocked_updates}
+    now = _now_iso()
+
+    try:
+        url, key = _supabase_env()
+        from supabase import create_client
+        client = create_client(url, key)
+
+        lesson_ids = [p["lesson_id"] for p in to_write]
+
+        check = (
+            client.table("hermes_memory_v2")
+            .select("memory_id")
+            .in_("memory_id", lesson_ids)
+            .execute()
+        )
+        existing_ids = {r["memory_id"] for r in (check.data or [])}
+
+        records_to_insert: list[tuple[str, str, dict]] = []
+        for p in to_write:
+            lid   = p["lesson_id"]
+            title = p.get("title", "?")[:60]
+            if lid in existing_ids:
                 skipped_lessons.append({"lesson_id": lid, "title": title})
-            elif safe_flags:
-                blocked_lessons.append({"lesson_id": lid, "title": title, "flags": safe_flags})
+                prop_updates[lid] = {
+                    "proposed_status": "approved",
+                    "approved_at":     now,
+                    "approved_by":     "Ray Davis",
+                }
             else:
-                blocked_lessons.append({"lesson_id": lid, "title": title, "flags": [error[:80]]})
+                record = build_lesson_memory_v2_record({**p, "approved_at": now, "approved_by": "Ray Davis"})
+                records_to_insert.append((lid, title, record))
+
+        if records_to_insert:
+            client.table("hermes_memory_v2").insert(
+                [rec for _, _, rec in records_to_insert]
+            ).execute()
+            for lid, title, _ in records_to_insert:
+                approved_lessons.append({"lesson_id": lid, "title": title})
+                prop_updates[lid] = {
+                    "proposed_status": "approved",
+                    "approved_at":     now,
+                    "approved_by":     "Ray Davis",
+                }
+
+    except Exception as exc:
+        logger.warning("approve_all_pending_lessons batch error: %s — falling back to serial", exc)
+        # Fallback: apply blocked updates, use serial approve_lesson() per lesson
+        if blocked_updates:
+            _batch_update_proposals(blocked_updates)
+        approved_lessons = []
+        skipped_lessons  = []
+        serial_blocked:  list[dict] = list(blocked_lessons)
+        for p in to_write:
+            lid   = p["lesson_id"]
+            title = p.get("title", "?")[:60]
+            result = approve_lesson(lid)
+            if result.get("ok"):
+                status = result.get("status", "approved")
+                if status in ("already_approved", "already_in_supabase"):
+                    skipped_lessons.append({"lesson_id": lid, "title": title})
+                else:
+                    approved_lessons.append({"lesson_id": lid, "title": title})
+            else:
+                error_val  = result.get("error", "unknown error")
+                safe_flags = result.get("safety_flags", [])
+                if "already" in error_val.lower():
+                    skipped_lessons.append({"lesson_id": lid, "title": title})
+                elif safe_flags:
+                    serial_blocked.append({"lesson_id": lid, "title": title, "flags": safe_flags})
+                else:
+                    serial_blocked.append({"lesson_id": lid, "title": title, "flags": [error_val[:80]]})
+        return {
+            "reviewed":         len(pending),
+            "approved":         len(approved_lessons),
+            "blocked":          len(serial_blocked),
+            "skipped":          len(skipped_lessons),
+            "approved_lessons": approved_lessons,
+            "blocked_lessons":  serial_blocked,
+            "skipped_lessons":  skipped_lessons,
+            "error":            str(exc),
+        }
+
+    # ── Phase 3: single JSONL rewrite for all status updates ───────────────────
+    if prop_updates:
+        _batch_update_proposals(prop_updates)
 
     return {
         "reviewed":         len(pending),
