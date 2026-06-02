@@ -1997,13 +1997,12 @@ def _plain_daily_operating_cycle() -> str:
 
 
 def _plain_daily_approval_needed() -> str:
-    """Handle 'what needs my approval', 'show approval queue', 'pending approvals'."""
-    from lib.hermes_daily_operating_cycle import build_daily_operating_plan, format_approval_needed_summary
+    """Handle legacy 'daily approval needed' intent — delegates to Phase 6C queue."""
     try:
-        plan = build_daily_operating_plan()
-        return format_approval_needed_summary(plan)
+        from lib.hermes_approval_queue import format_approval_queue
+        return format_approval_queue()
     except Exception as exc:
-        return f"APPROVAL NEEDED\n\nCould not check approval queue: {exc!s:.120}"
+        return f"APPROVAL QUEUE\n\nCould not load approval queue: {exc!s:.120}"
 
 
 def _plain_daily_continue_while_out() -> str:
@@ -2367,6 +2366,223 @@ def _plain_mark_daily_item_complete(raw_text: str = "") -> str:
         return f"DAILY ITEM MARKED COMPLETE\n\nCould not mark item: {exc!s:.120}"
 
 
+# ── Phase 6C: Approval Queue ─────────────────────────────────────────────────
+
+def _plain_show_approval_queue() -> str:
+    """Handle 'show approval queue', 'what needs my approval', 'pending approvals'."""
+    try:
+        from lib.hermes_approval_queue import format_approval_queue
+        return format_approval_queue()
+    except Exception as exc:
+        return f"APPROVAL QUEUE\n\nCould not load approval queue: {exc!s:.120}"
+
+
+def _plain_show_approval_item(raw_text: str = "") -> str:
+    """Handle 'show approval item N', 'approval item detail N'."""
+    try:
+        from lib.hermes_approval_queue import format_approval_item_detail
+        # Extract ref (number or approval_id) from raw_text
+        lowered = raw_text.strip().lower()
+        for prefix in (
+            "show approval item",
+            "approval item detail",
+            "tell me about approval item",
+            "details for approval item",
+            "what is approval item",
+            "describe approval item",
+            "approval item info",
+            "explain approval item",
+        ):
+            if lowered.startswith(prefix):
+                lowered = lowered[len(prefix):].strip().lstrip(":– \t")
+                break
+        ref = lowered.split()[0] if lowered.split() else ""
+        if not ref:
+            return "APPROVAL ITEM\n\nPlease specify an item number, e.g.:\n  show approval item 1"
+        return format_approval_item_detail(ref)
+    except Exception as exc:
+        return f"APPROVAL ITEM\n\nCould not load item detail: {exc!s:.120}"
+
+
+def _plain_approve_item(raw_text: str = "") -> str:
+    """Handle 'approve item N'."""
+    try:
+        from lib.hermes_approval_queue import approve_approval_item, format_approval_result
+        lowered = raw_text.strip().lower()
+        for prefix in (
+            "approve number",
+            "yes approve item",
+            "give approval for item",
+            "i approve item",
+            "approve this item",
+            "approve item",
+            "approved item",
+        ):
+            if lowered.startswith(prefix):
+                lowered = lowered[len(prefix):].strip().lstrip(":– \t")
+                break
+        ref = lowered.split()[0] if lowered.split() else ""
+        if not ref:
+            return "APPROVAL RECORDED\n\nPlease specify an item number, e.g.:\n  approve item 1"
+        result = approve_approval_item(ref)
+        return format_approval_result(ref, result)
+    except Exception as exc:
+        return f"APPROVAL RECORDED\n\nCould not approve item: {exc!s:.120}"
+
+
+def _plain_reject_item(raw_text: str = "") -> str:
+    """Handle 'reject item N [reason]'."""
+    try:
+        from lib.hermes_approval_queue import reject_approval_item, format_approval_result
+        lowered = raw_text.strip().lower()
+        reason_text = raw_text.strip()
+        for prefix in (
+            "do not approve item",
+            "decline item",
+            "rejected item",
+            "i reject item",
+            "reject this item",
+            "reject item",
+            "deny item",
+        ):
+            if lowered.startswith(prefix):
+                lowered = lowered[len(prefix):].strip().lstrip(":– \t")
+                reason_text = raw_text.strip()[raw_text.strip().lower().find(prefix) + len(prefix):].strip().lstrip(":– \t")
+                break
+        parts = lowered.split(None, 1)
+        ref    = parts[0] if parts else ""
+        reason = parts[1].strip() if len(parts) > 1 else reason_text.split(None, 1)[1].strip() if len(reason_text.split(None, 1)) > 1 else ""
+        if not ref:
+            return "APPROVAL REJECTED\n\nPlease specify an item number, e.g.:\n  reject item 1"
+        result = reject_approval_item(ref, reason or None)
+        return format_approval_result(ref, result)
+    except Exception as exc:
+        return f"APPROVAL REJECTED\n\nCould not reject item: {exc!s:.120}"
+
+
+def _plain_approval_impact(raw_text: str = "") -> str:
+    """Handle 'what happens if I approve item N', 'if rejected item N'."""
+    try:
+        from lib.hermes_approval_queue import format_approval_impact
+        lowered = raw_text.strip().lower()
+        action = "approve"
+        if any(k in lowered for k in ("reject", "denied", "not approve")):
+            action = "reject"
+        # Extract ref
+        for prefix in (
+            "what happens if i approve",
+            "what would happen if i approve",
+            "if i approve item",
+            "impact of approving",
+            "if approved item",
+            "simulate approval",
+            "what happens if i reject",
+            "if i reject item",
+            "impact of rejecting",
+            "if rejected item",
+            "simulate rejection",
+        ):
+            if lowered.startswith(prefix):
+                lowered = lowered[len(prefix):].strip().lstrip(":– \t")
+                break
+        # Strip trailing words like "item", "number"
+        lowered = lowered.lstrip("item #").strip()
+        ref = lowered.split()[0] if lowered.split() else ""
+        if not ref:
+            return f"IF {'APPROVED' if action == 'approve' else 'REJECTED'} — ITEM ?\n\nPlease specify an item number."
+        return format_approval_impact(ref, action)
+    except Exception as exc:
+        return f"APPROVAL IMPACT\n\nCould not simulate impact: {exc!s:.120}"
+
+
+def _plain_clear_stale_approvals() -> str:
+    """Handle 'clear stale approvals', 'archive old approvals'."""
+    try:
+        from lib.hermes_approval_queue import archive_stale_approval_items
+        result = archive_stale_approval_items(max_age_days=7)
+        count = result.get("archived_count", 0)
+        if count == 0:
+            return (
+                "STALE APPROVAL CLEANUP\n\n"
+                "No stale approval items found.\n"
+                "(Items are marked stale after 7 days in pending state.)\n\n"
+                "Evidence: docs/reports/approvals/hermes_approval_queue_state.json"
+            )
+        titles = result.get("stale_titles") or []
+        lines = ["STALE APPROVAL CLEANUP", "", f"Archived {count} stale item(s):", ""]
+        for t in titles[:10]:
+            lines.append(f"  - {t}")
+        lines += [
+            "",
+            "These items remain in the state file with status=stale.",
+            "They can be reviewed but will not appear in the active queue.",
+            "",
+            "Evidence: docs/reports/approvals/hermes_approval_queue_state.json",
+        ]
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"STALE APPROVAL CLEANUP\n\nCould not clean up approvals: {exc!s:.120}"
+
+
+def _plain_bulk_approve_blocked() -> str:
+    """Handle 'bulk approve blocked internal items'."""
+    try:
+        from lib.hermes_approval_queue import (
+            list_approval_items, approve_approval_item,
+            format_approval_result, HIGH_RISK_CATEGORIES,
+        )
+        pending = list_approval_items(limit=20)
+        if not pending:
+            return (
+                "BULK APPROVE\n\n"
+                "No pending approval items found.\n"
+                "Use 'show approval queue' to check current queue."
+            )
+        safe_items = [i for i in pending if i.get("category") not in HIGH_RISK_CATEGORIES]
+        blocked_items = [i for i in pending if i.get("category") in HIGH_RISK_CATEGORIES]
+        if not safe_items:
+            lines = ["BULK APPROVE", "", "No safe internal items eligible for bulk approval.", ""]
+            if blocked_items:
+                lines += [
+                    f"{len(blocked_items)} high-risk item(s) require individual Ray approval:",
+                ]
+                for item in blocked_items[:5]:
+                    lines.append(f"  - [{item['category']}] {item['title']}")
+            lines += [
+                "",
+                "High-risk categories cannot be bulk approved:",
+                "  content_publish, subscriber_email, live_trading, production_deploy,",
+                "  payment_or_stripe, affiliate_signup, paid_tool, client_facing_content",
+            ]
+            return "\n".join(lines)
+
+        approved_titles: list[str] = []
+        for item in safe_items:
+            r = approve_approval_item(item["approval_id"])
+            if r.get("success"):
+                approved_titles.append(item["title"])
+
+        lines = ["BULK APPROVE", "", f"Approved {len(approved_titles)} safe internal item(s):", ""]
+        for t in approved_titles:
+            lines.append(f"  - {t}")
+        if blocked_items:
+            lines += [
+                "",
+                f"{len(blocked_items)} high-risk item(s) skipped (require individual approval):",
+            ]
+            for item in blocked_items[:5]:
+                lines.append(f"  - [{item['category']}] {item['title']}")
+        lines += [
+            "",
+            "Safety: no content published, no emails sent, no money spent.",
+            "",
+            "Evidence: docs/reports/approvals/hermes_approval_queue_state.json",
+        ]
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"BULK APPROVE\n\nCould not bulk approve items: {exc!s:.120}"
+
+
 def _plain_lesson_gap_generate() -> str:
     """Generate lesson proposals from open knowledge gaps."""
     from lib.hermes_learning_loop import generate_gap_lesson_proposals
@@ -2437,6 +2653,14 @@ _PLAIN_INTENTS: dict[str, object] = {
     "pending_daily_items":         _plain_pending_daily_items,
     "compare_since_last_plan":     _plain_compare_since_last_plan,
     "mark_daily_item_complete":    _plain_mark_daily_item_complete,
+    # ── Approval queue (Phase 6C) ─────────────────────────────────────────────
+    "show_approval_queue":         _plain_show_approval_queue,
+    "show_approval_item":          _plain_show_approval_item,
+    "approve_item":                _plain_approve_item,
+    "reject_item":                 _plain_reject_item,
+    "approval_impact":             _plain_approval_impact,
+    "clear_stale_approvals":       _plain_clear_stale_approvals,
+    "bulk_approve_blocked":        _plain_bulk_approve_blocked,
     # ── Learning loop ─────────────────────────────────────────────────────────
     "lesson_record":               _plain_lesson_record,
     "lesson_pending":              _plain_lesson_pending,
@@ -2460,6 +2684,10 @@ _PLAIN_INTENTS_WITH_CMD = frozenset({
     "lesson_deprecate",
     "lesson_source",
     "mark_daily_item_complete",
+    "show_approval_item",
+    "approve_item",
+    "reject_item",
+    "approval_impact",
 })
 
 # ── Phrases that must NEVER produce a generic evidence dump ───────────────────
@@ -2499,6 +2727,15 @@ _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
     "what needs ray approval", "show what needs approval",
     "what needs my approval", "pending approvals", "approval needed",
     "what is waiting for approval", "what requires approval",
+    "what approvals are pending", "list approval items", "list approvals",
+    "what is in the approval queue", "approval item detail",
+    "tell me about approval item", "details for approval item",
+    "approve item", "reject item", "approve this item", "reject this item",
+    "what happens if i approve", "what would happen if i approve",
+    "if i approve item", "impact of approving", "if approved item",
+    "what happens if i reject", "if i reject item",
+    "clear stale approvals", "clean up stale approvals", "archive old approvals",
+    "bulk approve", "approve all safe items", "approve blocked internal items",
     "continue while i am out", "continue while i'm out",
     "keep working while i am out", "keep working while i'm out",
     "what can you do while i am gone", "what can you do while i'm gone",

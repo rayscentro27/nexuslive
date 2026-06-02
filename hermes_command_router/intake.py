@@ -121,13 +121,14 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "todays plan",
       "show nexus plan", "daily plan"],                              "daily_operating_cycle",     "high",   False),
 
+    # Redirected to Phase 6C show_approval_queue (replaces old daily_approval_needed keywords)
     (["show approval queue", "show items needing approval",
       "approval queue", "what is waiting for my approval",
       "show approval needed", "what needs ray approval",
       "show what needs approval",
       "what needs my approval", "pending approvals",
       "approval needed", "what is waiting for approval",
-      "what requires approval", "what is pending approval"],         "daily_approval_needed",      "high",   False),
+      "what requires approval", "what is pending approval"],         "show_approval_queue",        "high",   False),
 
     (["continue while i am out", "continue while i'm out",
       "keep working while i am out", "keep working while i'm out",
@@ -193,6 +194,45 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "that is complete", "mark that complete",
       "mark it complete", "mark it done",
       "completed that", "finished that item"],                        "mark_daily_item_complete",   "high",   True),
+
+    # ── Phase 6C: Approval queue (must be BEFORE handoff_check — "approval required" keyword collision) ──
+    (["show approval queue", "approval queue",
+      "what needs my approval", "what needs approval",
+      "show pending approvals", "pending approvals",
+      "approval needed", "what approvals are pending",
+      "show items needing approval", "items needing approval",
+      "list approval items", "list approvals",
+      "what is in the approval queue"],                              "show_approval_queue",        "high",   False),
+
+    (["show approval item", "approval item detail",
+      "tell me about approval item", "details for approval item",
+      "what is approval item", "describe approval item",
+      "approval item info", "explain approval item"],               "show_approval_item",         "high",   False),
+
+    # approval_impact must be BEFORE approve_item/reject_item — "approve item" is a substring
+    (["what happens if i approve", "what would happen if i approve",
+      "if i approve item", "impact of approving",
+      "if approved item", "simulate approval",
+      "what happens if i reject", "if i reject item",
+      "impact of rejecting", "if rejected item",
+      "simulate rejection"],                                        "approval_impact",            "high",   False),
+
+    (["approve item", "approve this item", "i approve item",
+      "give approval for item", "approved item",
+      "yes approve item", "approve number"],                        "approve_item",               "high",   True),
+
+    (["reject item", "reject this item", "i reject item",
+      "do not approve item", "deny item",
+      "rejected item", "decline item"],                             "reject_item",                "high",   True),
+
+    (["clear stale approvals", "clean up stale approvals",
+      "archive old approvals", "remove stale approvals",
+      "stale approval cleanup", "clear old approvals",
+      "cleanup stale approvals"],                                   "clear_stale_approvals",      "medium", False),
+
+    (["bulk approve", "approve all safe items",
+      "approve blocked internal items", "approve all internal items",
+      "bulk approve blocked", "approve safe items"],                "bulk_approve_blocked",       "high",   True),
 
     (["next best move", "what should we do", "what's the next",
       "what is the next step", "what do you recommend", "recommend",

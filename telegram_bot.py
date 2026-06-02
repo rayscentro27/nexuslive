@@ -952,6 +952,12 @@ class NexusTelegramBot:
             "show pending items", "pending cycle items", "pending daily items",
             "what needs doing", "compare since last plan", "what changed since",
             "mark complete", "mark done", "mark item complete",
+            # Phase 6C approval queue
+            "show approval queue", "approval queue", "what needs my approval",
+            "what needs approval", "show pending approvals", "pending approvals",
+            "approval needed", "what approvals are pending", "approval item",
+            "approve item", "reject item", "approval impact", "if i approve",
+            "if i reject", "clear stale approvals", "bulk approve",
         )
         if any(phrase in normalized for phrase in _PHASE6A_EXCLUSIONS):
             return False
@@ -3182,6 +3188,14 @@ class NexusTelegramBot:
         "pending_daily_items",
         "compare_since_last_plan",
         "mark_daily_item_complete",
+        # ── Approval queue (Phase 6C) ─────────────────────────────────────────
+        "show_approval_queue",
+        "show_approval_item",
+        "approve_item",
+        "reject_item",
+        "approval_impact",
+        "clear_stale_approvals",
+        "bulk_approve_blocked",
     })
 
     def _try_memory_command(self, text: str) -> str | None:
