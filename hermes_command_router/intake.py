@@ -234,6 +234,41 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "approve blocked internal items", "approve all internal items",
       "bulk approve blocked", "approve safe items"],                "bulk_approve_blocked",       "high",   True),
 
+    # ── Phase 7: CFO conversation / research queue (BEFORE Phase 6F to avoid collisions) ──
+    (["show research queue", "research queue",
+      "show open research questions", "what is in the research queue",
+      "what questions are open", "show pending research"],            "show_research_queue",         "medium", False),
+
+    (["show scout assignments", "scout assignments",
+      "what are scouts working on", "active scout assignments",
+      "show active scouts"],                                          "show_scout_assignments",       "medium", False),
+
+    (["what did the scouts find", "what did scouts find",
+      "what did you find", "scout findings", "show scout results",
+      "what have scouts discovered"],                                 "show_scout_assignments",       "medium", False),
+
+    (["what are you still trying to figure out", "what are you figuring out",
+      "show unresolved questions", "unresolved questions",
+      "what don't you know", "what do you not know yet",
+      "show unknown questions", "what can't you answer"],            "show_unresolved_questions",    "medium", False),
+
+    (["create prompt from this", "create a prompt from this",
+      "turn this into a claude prompt", "turn this into a prompt",
+      "create implementation prompt", "give me a prompt for claude",
+      "what should i send claude", "create a super prompt",
+      "have opencode fix this", "make an implementation prompt"],    "create_implementation_prompt", "high",   True),
+
+    (["show last strategic decision", "last strategic decision",
+      "show cfo notes", "cfo notes", "what did hermes decide",
+      "show strategic decisions"],                                    "show_cfo_notes",               "medium", False),
+
+    (["save this as a decision", "save as decision",
+      "record this decision", "save this decision"],                  "save_cfo_decision",            "medium", True),
+
+    (["add this to the research queue", "add to research queue",
+      "add this question to research", "put this in the research queue"],
+                                                                      "show_research_queue",          "medium", True),
+
     # ── Phase 6F: Revenue asset fixer (BEFORE Phase 6E/6D to avoid substring collisions) ──
     (["fix revenue packet assets", "apply safe asset fixes",
       "fix packet gaps", "fix revenue asset gaps",

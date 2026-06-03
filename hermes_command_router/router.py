@@ -1991,9 +1991,23 @@ def _plain_daily_operating_cycle() -> str:
     from lib.hermes_daily_operating_cycle import build_daily_operating_plan, format_daily_operating_plan
     try:
         plan = build_daily_operating_plan()
-        return format_daily_operating_plan(plan)
+        output = format_daily_operating_plan(plan)
     except Exception as exc:
         return f"DAILY OPERATING CYCLE\n\nCould not build today's plan: {exc!s:.120}\n\nTry: show active lessons, show action queue, show knowledge gaps."
+    # Append research queue summary
+    try:
+        from lib.hermes_cfo_conversation_layer import load_research_queue
+        open_qs = load_research_queue(status="open")
+        if open_qs:
+            output += (
+                f"\n\nResearch queue:\n"
+                f"  Open questions: {len(open_qs)}\n"
+                f"  Top question: {open_qs[0].get('question','')[:80]}\n"
+                f"  Say 'show research queue' to review."
+            )
+    except Exception:
+        pass
+    return output
 
 
 def _plain_daily_approval_needed() -> str:
@@ -2008,7 +2022,22 @@ def _plain_daily_approval_needed() -> str:
 def _plain_daily_continue_while_out() -> str:
     """Handle 'continue while I am out', 'keep working while I am out'."""
     from lib.hermes_daily_operating_cycle import format_continue_while_out_plan
-    return format_continue_while_out_plan()
+    output = format_continue_while_out_plan()
+    # Append research queue context for while-out
+    try:
+        from lib.hermes_cfo_conversation_layer import load_research_queue, load_scout_assignments
+        open_qs = load_research_queue(status="open")
+        assignments = load_scout_assignments()
+        if open_qs or assignments:
+            output += "\n\nWhile you are out — research status:"
+            if open_qs:
+                output += f"\n  Open research questions: {len(open_qs)}"
+            if assignments:
+                output += f"\n  Scout assignments: {len(assignments)}"
+            output += "\n  Say 'show research queue' or 'show scout assignments' to review."
+    except Exception:
+        pass
+    return output
 
 
 def _plain_daily_top_revenue_move() -> str:
@@ -2937,6 +2966,108 @@ def _plain_show_final_review_checklist() -> str:
         return f"FINAL REVIEW CHECKLIST\n\nCould not load checklist: {exc!s:.200}"
 
 
+# ── Phase 7: CFO Conversation / Research Queue ───────────────────────────────
+
+def _plain_show_research_queue(raw_text: str = "") -> str:
+    """Handle 'show research queue', 'add this to the research queue'."""
+    try:
+        from lib.hermes_cfo_conversation_layer import (
+            format_research_queue, _add_to_research_queue, _select_scout,
+            classify_cfo_conversation,
+        )
+        raw = (raw_text or "").strip()
+        # If user is adding something to the queue
+        if any(k in raw.lower() for k in ["add this", "add to research", "put this"]):
+            category = classify_cfo_conversation(raw)
+            scout = _select_scout(category)
+            entry = _add_to_research_queue(raw, scout, [f"Research: {raw[:100]}"])
+            return (
+                f"RESEARCH QUEUE\n\nAdded to research queue.\n\n"
+                f"ID: {entry.get('research_id', '?')}\n"
+                f"Scout: {scout}\n\n"
+                f"Say 'show research queue' to see all open questions."
+            )
+        return format_research_queue()
+    except Exception as exc:
+        return f"RESEARCH QUEUE\n\nCould not load research queue: {exc!s:.200}"
+
+
+def _plain_show_scout_assignments() -> str:
+    """Handle 'show scout assignments', 'what did the scouts find'."""
+    try:
+        from lib.hermes_cfo_conversation_layer import format_scout_assignments
+        return format_scout_assignments()
+    except Exception as exc:
+        return f"SCOUT ASSIGNMENTS\n\nCould not load scout assignments: {exc!s:.200}"
+
+
+def _plain_show_unresolved_questions() -> str:
+    """Handle 'show unresolved questions', 'what are you still trying to figure out'."""
+    try:
+        from lib.hermes_cfo_conversation_layer import format_unresolved_questions
+        return format_unresolved_questions()
+    except Exception as exc:
+        return f"UNRESOLVED QUESTIONS\n\nCould not load: {exc!s:.200}"
+
+
+def _plain_create_implementation_prompt(raw_text: str = "") -> str:
+    """Handle 'create prompt from this', 'turn this into a Claude prompt'."""
+    try:
+        from lib.hermes_cfo_conversation_layer import _build_implementation_prompt_text
+        context_note = (raw_text or "").strip()
+        return _build_implementation_prompt_text(context_note or "implement the requested feature")
+    except Exception as exc:
+        return f"IMPLEMENTATION PROMPT\n\nCould not generate prompt: {exc!s:.200}"
+
+
+def _plain_show_cfo_notes() -> str:
+    """Handle 'show last strategic decision', 'show cfo notes'."""
+    try:
+        from lib.hermes_approval_queue import load_approval_queue
+        queue = load_approval_queue()
+        cfo_items = [i for i in (queue or []) if i.get("category") == "strategic_decision"]
+        if not cfo_items:
+            return (
+                "CFO NOTES\n\n"
+                "No strategic decisions on file yet.\n\n"
+                "Ask Hermes a strategic question and it will record a decision candidate."
+            )
+        lines = ["CFO NOTES", "", f"{len(cfo_items)} decision candidate(s):", ""]
+        for item in cfo_items[:5]:
+            lines += [
+                f"  {item.get('title', '?')[:60]}",
+                f"  Status: {item.get('status', '?')}",
+                f"  {item.get('summary', '')[:80]}",
+                "",
+            ]
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"CFO NOTES\n\nCould not load notes: {exc!s:.200}"
+
+
+def _plain_save_cfo_decision(raw_text: str = "") -> str:
+    """Handle 'save this as a decision'."""
+    try:
+        from lib.hermes_cfo_conversation_layer import save_cfo_decision_candidate, SAFETY_BOUNDARY
+        note = (raw_text or "").strip() or "Strategic decision from Ray"
+        result = save_cfo_decision_candidate({
+            "category": "general_business_question",
+            "recommendation": note,
+            "real_issue": note,
+        })
+        added = result.get("added", 0)
+        return (
+            f"CFO DECISION SAVED\n\n"
+            f"Decision recorded for Ray review.\n"
+            f"Items added: {added}\n\n"
+            f"Say 'show approval queue' to review.\n"
+            f"Say 'show cfo notes' to see strategic decisions.\n\n"
+            f"Safety: {SAFETY_BOUNDARY}"
+        )
+    except Exception as exc:
+        return f"CFO DECISION SAVED\n\nCould not save decision: {exc!s:.200}"
+
+
 # ── Phase 6F: Revenue Asset Fixer ────────────────────────────────────────────
 
 def _plain_fix_revenue_packet_assets() -> str:
@@ -3095,6 +3226,13 @@ _PLAIN_INTENTS: dict[str, object] = {
     "show_packet_improvement_plan":    _plain_show_packet_improvement_plan,
     "rescore_revenue_packet":          _plain_rescore_revenue_packet,
     "show_final_review_checklist":     _plain_show_final_review_checklist,
+    # ── CFO conversation / research queue (Phase 7) ───────────────────────────
+    "show_research_queue":             _plain_show_research_queue,
+    "show_scout_assignments":          _plain_show_scout_assignments,
+    "show_unresolved_questions":       _plain_show_unresolved_questions,
+    "create_implementation_prompt":    _plain_create_implementation_prompt,
+    "show_cfo_notes":                  _plain_show_cfo_notes,
+    "save_cfo_decision":               _plain_save_cfo_decision,
     # ── Revenue asset fixer (Phase 6F) ────────────────────────────────────────
     "fix_revenue_packet_assets":       _plain_fix_revenue_packet_assets,
     "show_asset_fix_report":           _plain_show_asset_fix_report,
@@ -3126,6 +3264,10 @@ _PLAIN_INTENTS_WITH_CMD = frozenset({
     "approve_item",
     "reject_item",
     "approval_impact",
+    # Phase 7
+    "show_research_queue",
+    "create_implementation_prompt",
+    "save_cfo_decision",
 })
 
 # ── Phrases that must NEVER produce a generic evidence dump ───────────────────
@@ -3217,6 +3359,19 @@ _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
     "refresh revenue packet score", "recalculate packet score",
     "show final review checklist", "final review checklist", "final checklist",
     "pre-launch final checklist", "show pre-launch review",
+    # ── CFO conversation / research queue (Phase 7) ──────────────────────────
+    "show research queue", "research queue", "show open research questions",
+    "what is in the research queue", "what questions are open",
+    "show scout assignments", "scout assignments", "what are scouts working on",
+    "what did the scouts find", "what did scouts find", "scout findings",
+    "what are you still trying to figure out", "show unresolved questions",
+    "unresolved questions", "what don't you know", "what do you not know yet",
+    "create prompt from this", "turn this into a claude prompt",
+    "create implementation prompt", "give me a prompt for claude",
+    "what should i send claude", "create a super prompt",
+    "show last strategic decision", "show cfo notes", "cfo notes",
+    "save this as a decision", "save as decision",
+    "add this to the research queue", "add to research queue",
     # ── Revenue asset fixer (Phase 6F) ───────────────────────────────────────
     "fix revenue packet assets", "apply safe asset fixes", "fix packet gaps",
     "fix revenue asset gaps", "clean revenue assets", "fix revenue assets",
@@ -3434,6 +3589,19 @@ def run_command(raw_text: str, source: str = "cli", sender: str = "raymond") -> 
             next_best_step="" if status == "healthy" else f"Ask Hermes: '{raw_text}' again if conditions change.",
             command=raw_text,
         )
+
+    # ── CFO Conversation Layer (Phase 7): catch natural/strategic messages ──────
+    try:
+        from lib.hermes_cfo_conversation_layer import (
+            detect_cfo_conversation_need, build_cfo_context, build_cfo_response,
+            format_cfo_response,
+        )
+        if detect_cfo_conversation_need(raw_text):
+            context = build_cfo_context(raw_text)
+            response = build_cfo_response(raw_text, context)
+            return format_cfo_response(response)
+    except Exception:
+        pass  # Fall through to unknown handler
 
     # ── Unknown — ask ONE clarifying question ─────────────────────────────────
     return build_report(

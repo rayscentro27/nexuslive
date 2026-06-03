@@ -986,6 +986,17 @@ class NexusTelegramBot:
             "what was fixed", "show what was fixed", "asset repair report",
             "rescore after fixes", "rescore packet after fixes",
             "update score after fixes", "refresh score after fixes",
+            # Phase 7 CFO / research queue
+            "show research queue", "research queue", "show open research questions",
+            "show scout assignments", "scout assignments", "what are scouts working on",
+            "what did the scouts find", "what did scouts find",
+            "what are you still trying to figure out", "show unresolved questions",
+            "unresolved questions",
+            "create prompt from this", "turn this into a claude prompt",
+            "create implementation prompt", "give me a prompt for claude",
+            "what should i send claude", "create a super prompt",
+            "show last strategic decision", "show cfo notes", "cfo notes",
+            "save this as a decision", "add this to the research queue",
         )
         if any(phrase in normalized for phrase in _PHASE6A_EXCLUSIONS):
             return False
@@ -3245,6 +3256,13 @@ class NexusTelegramBot:
         "fix_revenue_packet_assets",
         "show_asset_fix_report",
         "rescore_after_fixes",
+        # ── CFO conversation / research queue (Phase 7) ───────────────────────
+        "show_research_queue",
+        "show_scout_assignments",
+        "show_unresolved_questions",
+        "create_implementation_prompt",
+        "show_cfo_notes",
+        "save_cfo_decision",
     })
 
     def _try_memory_command(self, text: str) -> str | None:
