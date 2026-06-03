@@ -2937,6 +2937,69 @@ def _plain_show_final_review_checklist() -> str:
         return f"FINAL REVIEW CHECKLIST\n\nCould not load checklist: {exc!s:.200}"
 
 
+# ── Phase 6F: Revenue Asset Fixer ────────────────────────────────────────────
+
+def _plain_fix_revenue_packet_assets() -> str:
+    """Handle 'fix revenue packet assets', 'apply safe asset fixes'."""
+    try:
+        from lib.hermes_revenue_asset_fixer import apply_safe_asset_fixes, format_asset_fix_report
+        result = apply_safe_asset_fixes()
+        return format_asset_fix_report(result)
+    except Exception as exc:
+        return f"REVENUE ASSET FIXES APPLIED\n\nCould not apply fixes: {exc!s:.200}"
+
+
+def _plain_show_asset_fix_report() -> str:
+    """Handle 'show asset fix report', 'what was fixed'."""
+    try:
+        from lib.hermes_revenue_asset_fixer import (
+            apply_safe_asset_fixes, format_asset_fix_report, find_assets_needing_fixes,
+        )
+        from lib.hermes_revenue_asset_packet import (
+            load_latest_revenue_asset_packet, build_revenue_asset_packet,
+        )
+        packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+        needing = find_assets_needing_fixes(packet)
+        if needing:
+            result = apply_safe_asset_fixes()
+            return format_asset_fix_report(result)
+        # Nothing left to fix — show current packet state
+        score = packet.get("readiness_score", 0)
+        ready = packet.get("approval_ready_items") or []
+        lines = [
+            "REVENUE ASSET FIX REPORT",
+            "",
+            f"Score:          {score}/100",
+            f"Assets:         {len(packet.get('assets') or [])}",
+            f"Approval-ready: {len(ready)}",
+            "",
+            "No assets currently need safe internal fixes.",
+            "",
+            "Safety: No content published. No emails sent. No spending.",
+        ]
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"REVENUE ASSET FIX REPORT\n\nCould not generate report: {exc!s:.200}"
+
+
+def _plain_rescore_after_fixes() -> str:
+    """Handle 'rescore after fixes', 'update score after fixes'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            load_latest_revenue_asset_packet, build_revenue_asset_packet,
+            build_revenue_asset_packet_with_fixes, save_revenue_asset_packet,
+        )
+        from lib.hermes_revenue_asset_fixer import format_rescore_after_fixes_report
+        old_packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+        old_score = old_packet.get("readiness_score", 0)
+        new_packet = build_revenue_asset_packet_with_fixes()
+        save_revenue_asset_packet(new_packet)
+        new_score = new_packet.get("readiness_score", 0)
+        return format_rescore_after_fixes_report(old_score, new_score, new_packet)
+    except Exception as exc:
+        return f"REVENUE PACKET RESCORED AFTER FIXES\n\nCould not rescore: {exc!s:.200}"
+
+
 def _plain_lesson_gap_generate() -> str:
     """Generate lesson proposals from open knowledge gaps."""
     from lib.hermes_learning_loop import generate_gap_lesson_proposals
@@ -3032,6 +3095,10 @@ _PLAIN_INTENTS: dict[str, object] = {
     "show_packet_improvement_plan":    _plain_show_packet_improvement_plan,
     "rescore_revenue_packet":          _plain_rescore_revenue_packet,
     "show_final_review_checklist":     _plain_show_final_review_checklist,
+    # ── Revenue asset fixer (Phase 6F) ────────────────────────────────────────
+    "fix_revenue_packet_assets":       _plain_fix_revenue_packet_assets,
+    "show_asset_fix_report":           _plain_show_asset_fix_report,
+    "rescore_after_fixes":             _plain_rescore_after_fixes,
     # ── Learning loop ─────────────────────────────────────────────────────────
     "lesson_record":               _plain_lesson_record,
     "lesson_pending":              _plain_lesson_pending,
@@ -3150,6 +3217,22 @@ _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
     "refresh revenue packet score", "recalculate packet score",
     "show final review checklist", "final review checklist", "final checklist",
     "pre-launch final checklist", "show pre-launch review",
+    # ── Revenue asset fixer (Phase 6F) ───────────────────────────────────────
+    "fix revenue packet assets", "apply safe asset fixes", "fix packet gaps",
+    "fix revenue asset gaps", "clean revenue assets", "fix revenue assets",
+    "apply internal fixes", "fix content assets",
+    "remove unsafe promises from assets", "soften unsafe language",
+    "fix unsafe promise language", "remove guarantees from assets",
+    "fix promise language",
+    "add cta to revenue assets", "add cta to assets",
+    "add call to action to assets",
+    "add compliance notes to assets", "add compliance note to assets",
+    "add disclaimer to assets", "add compliance notes",
+    "show asset fix report", "asset fix report", "show fix report",
+    "what was fixed", "show what was fixed", "asset repair report",
+    "rescore after fixes", "rescore packet after fixes",
+    "update score after fixes", "refresh score after fixes",
+    "what is the score after fixes",
 ])
 
 _INTENT_HANDLERS = {

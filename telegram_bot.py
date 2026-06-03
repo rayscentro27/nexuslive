@@ -973,6 +973,19 @@ class NexusTelegramBot:
             "show packet improvement plan", "packet improvement plan",
             "rescore revenue packet", "rescore packet",
             "show final review checklist", "final review checklist",
+            # Phase 6F revenue asset fixer
+            "fix revenue packet assets", "apply safe asset fixes", "fix packet gaps",
+            "fix revenue asset gaps", "clean revenue assets", "fix revenue assets",
+            "apply internal fixes", "fix content assets",
+            "remove unsafe promises from assets", "soften unsafe language",
+            "fix unsafe promise language", "remove guarantees from assets",
+            "add cta to revenue assets", "add cta to assets",
+            "add compliance notes to assets", "add compliance note to assets",
+            "add disclaimer to assets", "add compliance notes",
+            "show asset fix report", "asset fix report", "show fix report",
+            "what was fixed", "show what was fixed", "asset repair report",
+            "rescore after fixes", "rescore packet after fixes",
+            "update score after fixes", "refresh score after fixes",
         )
         if any(phrase in normalized for phrase in _PHASE6A_EXCLUSIONS):
             return False
@@ -3228,6 +3241,10 @@ class NexusTelegramBot:
         "show_packet_improvement_plan",
         "rescore_revenue_packet",
         "show_final_review_checklist",
+        # ── Revenue asset fixer (Phase 6F) ────────────────────────────────────
+        "fix_revenue_packet_assets",
+        "show_asset_fix_report",
+        "rescore_after_fixes",
     })
 
     def _try_memory_command(self, text: str) -> str | None:

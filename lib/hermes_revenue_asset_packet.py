@@ -274,11 +274,17 @@ def discover_revenue_assets() -> list[dict]:
         _ROOT / "docs" / "content",
     ]
 
+    # Skip the fixed/ subdirectory — fixer-generated copies are handled separately
+    _SKIP_SUBDIRS = {"fixed"}
+
     raw: list[dict] = []
     for search_dir in search_dirs:
         if not search_dir.exists():
             continue
         for fpath in search_dir.rglob("*.md"):
+            # Skip files inside any excluded subdirectory
+            if any(part in _SKIP_SUBDIRS for part in fpath.parts):
+                continue
             try:
                 stat = fpath.stat()
                 raw.append({
@@ -556,6 +562,121 @@ def generate_approval_candidates(packet: dict) -> list[dict]:
         })
 
     return candidates
+
+
+def build_revenue_asset_packet_with_fixes() -> dict:
+    """Build packet substituting fixed copies for their originals (Phase 6F).
+
+    Reads fixed copies from docs/reports/content/fixed/ and scores them
+    with their ORIGINAL category preserved so classification is accurate.
+    """
+    _FIXED_DIR = _ROOT / "docs" / "reports" / "content" / "fixed"
+    assets = discover_revenue_assets()
+
+    if not _FIXED_DIR.exists():
+        return build_revenue_asset_packet()
+
+    # Build map: original_stem → fixed_path
+    fixed_by_stem: dict[str, Path] = {}
+    for fp in _FIXED_DIR.glob("*_safe_fixed_*.md"):
+        stem = fp.stem
+        if "_safe_fixed_" in stem:
+            orig_stem = stem.split("_safe_fixed_")[0]
+            existing = fixed_by_stem.get(orig_stem)
+            if existing is None or str(fp) > str(existing):
+                fixed_by_stem[orig_stem] = fp
+
+    # Substitute fixed paths, preserve original category
+    substituted = []
+    for asset in assets:
+        orig_stem = Path(asset["path"]).stem
+        fixed_path = fixed_by_stem.get(orig_stem)
+        if fixed_path and fixed_path.exists():
+            try:
+                stat = fixed_path.stat()
+                substituted.append({
+                    **asset,
+                    "path":        str(fixed_path),
+                    "filename":    fixed_path.name,
+                    "modified_at": datetime.fromtimestamp(
+                        stat.st_mtime, tz=timezone.utc
+                    ).isoformat(),
+                    "original_path": asset["path"],
+                    "is_fixed_copy": True,
+                })
+            except Exception:
+                substituted.append(asset)
+        else:
+            substituted.append(asset)
+
+    scored = [score_asset_readiness(a) for a in substituted]
+
+    approval_ready  = [a for a in scored if a["readiness_status"] == "approval_ready"]
+    needs_revision  = [a for a in scored if a["readiness_status"] == "needs_revision"]
+    internal_drafts = [a for a in scored if a["readiness_status"] == "internal_draft"]
+    blocked         = [a for a in scored if a["readiness_status"] == "blocked"]
+
+    overall_score = (
+        int(sum(a["readiness_score"] for a in scored) / len(scored))
+        if scored else 0
+    )
+
+    blockers: list[str] = []
+    if not any(a["category"] == "lead_magnet" for a in scored):
+        blockers.append("No lead magnet found in content directory")
+    if not any(a["category"] == "newsletter" for a in scored):
+        blockers.append("No newsletter draft found")
+
+    evidence_paths: list[str] = []
+    for a in scored[:5]:
+        p = a.get("path", "")
+        if p:
+            evidence_paths.append(
+                str(Path(p).relative_to(_ROOT)) if Path(p).is_relative_to(_ROOT) else p
+            )
+
+    packet_id = _stable_packet_id(f"nexus_revenue_packet_fixed_{_now_iso()[:10]}")
+    cta_opts  = build_cta_options()
+    launch_cl = build_launch_checklist()
+    approval_cl = build_approval_checklist()
+
+    approval_candidates = generate_approval_candidates({
+        "assets": scored, "packet_id": packet_id,
+    })
+
+    next_best_step = (
+        "Say 'show approval queue' to review and approve assets."
+        if approval_ready else
+        "Say 'show revenue asset packet' to review assets needing revision."
+    )
+
+    return {
+        "packet_id":             packet_id,
+        "created_at":            _now_iso(),
+        "goal":                  REVENUE_GOAL,
+        "summary": (
+            f"Nexus revenue asset packet (with fixes) — {len(scored)} asset(s) found, "
+            f"{len(approval_ready)} approval-ready, "
+            f"{len(needs_revision)} needing revision."
+        ),
+        "primary_offer":         PRIMARY_OFFER,
+        "target_audience":       TARGET_AUDIENCE,
+        "assets":                scored,
+        "readiness_score":       overall_score,
+        "approval_ready_items":  approval_ready,
+        "needs_revision_items":  needs_revision,
+        "internal_draft_items":  internal_drafts,
+        "blocked_items":         blocked,
+        "blockers":              blockers,
+        "cta_options":           cta_opts,
+        "launch_checklist":      launch_cl,
+        "approval_checklist":    approval_cl,
+        "approval_candidates":   approval_candidates,
+        "evidence_paths":        evidence_paths,
+        "safety_boundary":       SAFETY_BOUNDARY,
+        "next_best_step":        next_best_step,
+        "fixes_applied":         True,
+    }
 
 
 def save_revenue_asset_packet(packet: dict) -> dict:

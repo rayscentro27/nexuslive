@@ -234,6 +234,30 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "approve blocked internal items", "approve all internal items",
       "bulk approve blocked", "approve safe items"],                "bulk_approve_blocked",       "high",   True),
 
+    # ── Phase 6F: Revenue asset fixer (BEFORE Phase 6E/6D to avoid substring collisions) ──
+    (["fix revenue packet assets", "apply safe asset fixes",
+      "fix packet gaps", "fix revenue asset gaps",
+      "clean revenue assets", "fix revenue assets",
+      "apply internal fixes", "fix content assets"],               "fix_revenue_packet_assets",   "high",  False),
+
+    (["remove unsafe promises from assets", "soften unsafe language",
+      "fix unsafe promise language", "remove guarantees from assets",
+      "fix promise language"],                                     "fix_revenue_packet_assets",   "high",  False),
+
+    (["add cta to revenue assets", "add cta to assets",
+      "add call to action to assets"],                             "fix_revenue_packet_assets",   "high",  False),
+
+    (["add compliance notes to assets", "add compliance note to assets",
+      "add disclaimer to assets", "add compliance notes"],        "fix_revenue_packet_assets",   "high",  False),
+
+    (["show asset fix report", "asset fix report",
+      "show fix report", "what was fixed",
+      "show what was fixed", "asset repair report"],              "show_asset_fix_report",       "medium", False),
+
+    (["rescore after fixes", "rescore packet after fixes",
+      "update score after fixes", "refresh score after fixes",
+      "what is the score after fixes"],                           "rescore_after_fixes",         "high",  False),
+
     # ── Phase 6E: Revenue packet improvement (BEFORE Phase 6D to avoid substring collisions) ──
     (["show revenue packet gaps", "show readiness gaps",
       "revenue packet gaps", "what are the packet gaps",
