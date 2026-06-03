@@ -105,6 +105,114 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
     ],
 }
 
+# ── High-priority CFO phrases (Phase 7A) ─────────────────────────────────────
+# These bypass _EXACT_COMMAND_SIGNALS so messages like "create a prompt for Claude"
+# still reach the CFO layer even though they start with a command verb.
+
+_HIGH_PRIORITY_CFO_PHRASES: list[str] = [
+    # Strategic concern / Hermes behavior
+    "command bot", "not a cfo", "master/dog", "master dog",
+    "worried hermes", "worried about hermes",
+    "chatgpt has", "chatgpt does", "chatgpt can",
+    "feel like a cfo", "act like a cfo", "feels like a command",
+    # Follow-up strategy
+    "what should we do about that", "how do we fix that",
+    "what do you think we should do", "what do we do about",
+    # Unknown / scout dispatch
+    "can your scouts", "can hermes find", "can hermes research",
+    "can hermes look", "scouts figure it out", "let the scouts",
+    "have the scouts", "send the scouts",
+    # Implementation prompt (catches "create a prompt for Claude" which starts with "create")
+    "create a prompt for claude", "give me a prompt for claude",
+    "what should i send claude", "create a super prompt",
+    "turn this into a claude prompt", "prompt for claude to",
+    "create a prompt to", "claude prompt", "prompt for claude",
+    "prompt to fix this", "prompt to build this",
+]
+
+
+def is_high_priority_cfo_phrase(message: str) -> bool:
+    """Return True if message contains a high-priority CFO phrase.
+
+    Called alongside detect_cfo_conversation_need so messages that start with a
+    command verb (e.g. 'create a prompt for Claude') still reach the CFO layer.
+    """
+    msg = message.strip().lower()
+    return any(phrase in msg for phrase in _HIGH_PRIORITY_CFO_PHRASES)
+
+
+# ── CFO context state (Phase 7A) ──────────────────────────────────────────────
+# Stores the last CFO conversation so contextual follow-ups like
+# "what should we do about that?" can thread back to the prior topic.
+
+_CFO_CONTEXT_STATE_PATH = _STRATEGY_DIR / "hermes_cfo_context_state.json"
+
+_CFO_CONTEXT_STATE_DEFAULT: dict = {
+    "last_cfo_topic": None,
+    "last_concern_summary": None,
+    "last_recommendation": None,
+    "last_unknown_gap_id": None,
+    "last_scout_assignment_id": None,
+    "created_at": None,
+    "stale_after_hours": 24,
+}
+
+
+def load_cfo_context_state() -> dict:
+    """Load persisted CFO context state."""
+    try:
+        if _CFO_CONTEXT_STATE_PATH.exists():
+            data = json.loads(_CFO_CONTEXT_STATE_PATH.read_text(encoding="utf-8"))
+            # Check staleness
+            created = data.get("created_at")
+            if created:
+                from datetime import timedelta
+                age = datetime.now(timezone.utc) - datetime.fromisoformat(created.replace("Z", "+00:00"))
+                stale_hours = data.get("stale_after_hours", 24)
+                if age > timedelta(hours=stale_hours):
+                    return dict(_CFO_CONTEXT_STATE_DEFAULT)
+            return data
+    except Exception:
+        pass
+    return dict(_CFO_CONTEXT_STATE_DEFAULT)
+
+
+def save_cfo_context_state(state: dict) -> None:
+    """Persist CFO context state to disk."""
+    try:
+        _STRATEGY_DIR.mkdir(parents=True, exist_ok=True)
+        _CFO_CONTEXT_STATE_PATH.write_text(
+            json.dumps(state, indent=2, default=str), encoding="utf-8"
+        )
+    except Exception as exc:
+        logger.warning("save_cfo_context_state error: %s", exc)
+
+
+def update_cfo_context_state(
+    *,
+    topic: str | None = None,
+    concern_summary: str | None = None,
+    recommendation: str | None = None,
+    unknown_gap_id: str | None = None,
+    scout_assignment_id: str | None = None,
+) -> dict:
+    """Update and persist CFO context with latest conversation data."""
+    state = dict(_CFO_CONTEXT_STATE_DEFAULT)
+    state["created_at"] = datetime.now(timezone.utc).isoformat()
+    if topic is not None:
+        state["last_cfo_topic"] = topic[:200]
+    if concern_summary is not None:
+        state["last_concern_summary"] = concern_summary[:300]
+    if recommendation is not None:
+        state["last_recommendation"] = recommendation[:300]
+    if unknown_gap_id is not None:
+        state["last_unknown_gap_id"] = unknown_gap_id
+    if scout_assignment_id is not None:
+        state["last_scout_assignment_id"] = scout_assignment_id
+    save_cfo_context_state(state)
+    return state
+
+
 # ── Detect if message needs CFO handling ─────────────────────────────────────
 
 _EXACT_COMMAND_SIGNALS = re.compile(
@@ -164,7 +272,15 @@ def build_cfo_context(message: str) -> dict:
         "approval_queue_count": 0,
         "open_gaps": 0,
         "last_daily_plan": None,
+        "prior_cfo_state": None,
     }
+    # Load prior CFO context for follow-up threading
+    try:
+        prior = load_cfo_context_state()
+        if prior.get("last_cfo_topic"):
+            context["prior_cfo_state"] = prior
+    except Exception:
+        pass
     # Try to read memory v2 status
     try:
         from lib.hermes_memory_v2 import get_memory_v2_primary_status
@@ -233,13 +349,23 @@ def select_cfo_response_strategy(message: str, context: dict) -> str:
     category = context.get("category", "general_business_question")
     msg_lower = message.lower()
 
-    # Implementation prompt requested
+    # Implementation prompt requested — must check before scout delegation
     if any(k in msg_lower for k in [
         "give me a prompt", "create the prompt", "have opencode", "turn this into",
         "create a super prompt", "what should i send claude", "create a prompt",
-        "implementation prompt",
+        "implementation prompt", "prompt for claude", "claude prompt",
+        "prompt to fix", "prompt to build",
     ]):
         return "implementation_prompt"
+
+    # Explicit scout / research delegation → unknown_dispatch
+    if any(k in msg_lower for k in [
+        "can your scouts", "can hermes find", "can hermes research",
+        "can hermes look", "scouts figure it out", "have the scouts",
+        "let the scouts", "send the scouts", "i don't know the answer",
+        "i don't know, can", "i don't know can",
+    ]):
+        return "unknown_dispatch"
 
     # No knowns at all → dispatch to scout
     ku = separate_knowns_unknowns(message, context)
@@ -256,20 +382,30 @@ def build_cfo_response(message: str, context: dict) -> dict:
     ku = separate_knowns_unknowns(message, context)
 
     if strategy == "implementation_prompt":
-        return _build_implementation_prompt_response(message, context)
+        resp = _build_implementation_prompt_response(message, context)
+        update_cfo_context_state(topic=category, concern_summary=message[:200])
+        return resp
 
     if strategy == "unknown_dispatch":
-        return _build_unknown_dispatch_response(message, context)
+        resp = _build_unknown_dispatch_response(message, context)
+        update_cfo_context_state(
+            topic=category,
+            concern_summary=message[:200],
+            unknown_gap_id=resp.get("research_id"),
+            scout_assignment_id=resp.get("research_id"),
+        )
+        return resp
 
     # Standard CFO response
     options = _build_options(message, category)
     recommendation = _build_recommendation(message, category)
     next_steps = _build_next_steps(message, category, context)
 
-    return {
+    prior_state = context.get("prior_cfo_state")
+    resp = {
         "strategy": "cfo_response",
         "category": category,
-        "real_issue": _frame_real_issue(message, category),
+        "real_issue": _frame_real_issue(message, category, prior_state),
         "knowns": ku["knowns"],
         "unknowns": ku["unknowns"],
         "options": options,
@@ -278,10 +414,30 @@ def build_cfo_response(message: str, context: dict) -> dict:
         "safety_boundary": SAFETY_BOUNDARY,
         "created_at": _now_iso(),
     }
+    update_cfo_context_state(
+        topic=category,
+        concern_summary=message[:200],
+        recommendation=recommendation[:300],
+    )
+    return resp
 
 
-def _frame_real_issue(message: str, category: str) -> str:
+def _frame_real_issue(message: str, category: str, prior_state: dict | None = None) -> str:
     """Return plain-language framing of the real issue."""
+    # Contextual follow-up — thread back to the prior concern
+    msg_lower = message.strip().lower()
+    _followup_triggers = [
+        "what should we do about that", "how do we fix that",
+        "what do you think we should do", "what do we do about",
+        "what now", "so what do we do",
+    ]
+    if prior_state and prior_state.get("last_concern_summary") and any(t in msg_lower for t in _followup_triggers):
+        prior_concern = prior_state["last_concern_summary"]
+        prior_rec = prior_state.get("last_recommendation", "")
+        follow_up = f"Following up on your earlier concern: \"{prior_concern[:120]}\""
+        if prior_rec:
+            follow_up += f"\n\nMy prior recommendation was: {prior_rec[:200]}"
+        return follow_up
     if category == "hermes_behavior_feedback":
         return (
             "Hermes is behaving like a command dispatcher — it only responds well when given "
@@ -537,8 +693,23 @@ def _unknown_gaps_path() -> Path:
     return _RESEARCH_QUEUE_DIR / "hermes_unknown_answer_gaps.jsonl"
 
 
+def _normalize_question(q: str) -> str:
+    """Normalize a research question for dedup comparison."""
+    return re.sub(r"[^a-z0-9 ]", "", q.strip().lower())
+
+
 def _add_to_research_queue(message: str, scout: str, evidence_needed: list[str]) -> dict:
-    """Append question to hermes_research_queue.jsonl."""
+    """Append question to hermes_research_queue.jsonl, deduplicating by normalized text."""
+    normalized_q = _normalize_question(message)
+    # Check for existing open entry with same normalized question
+    try:
+        existing = load_research_queue(status="open")
+        for e in existing:
+            if _normalize_question(e.get("question", "")) == normalized_q:
+                return e  # Return existing entry — do not add duplicate
+    except Exception:
+        pass
+
     entry = {
         "research_id": f"rq_{_now_ts()}",
         "question": message.strip()[:300],
@@ -572,6 +743,50 @@ def _append_scout_assignment(task: dict) -> None:
             f.write(json.dumps(task) + "\n")
     except Exception as exc:
         logger.warning("_append_scout_assignment error: %s", exc)
+
+
+def dedupe_research_queue() -> dict:
+    """Remove duplicate open research queue entries by normalized question text.
+
+    Returns dict with keys: removed, kept, total_before, total_after.
+    """
+    path = _research_queue_path()
+    if not path.exists():
+        return {"removed": 0, "kept": 0, "total_before": 0, "total_after": 0}
+    try:
+        raw_lines = [l.strip() for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    except Exception:
+        return {"removed": 0, "kept": 0, "total_before": 0, "total_after": 0}
+
+    total_before = len(raw_lines)
+    seen_norms: set[str] = set()
+    kept_lines: list[str] = []
+    removed = 0
+
+    for line in raw_lines:
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            kept_lines.append(line)
+            continue
+        # Non-open entries are always kept
+        if entry.get("status") != "open":
+            kept_lines.append(line)
+            continue
+        norm = _normalize_question(entry.get("question", ""))
+        if norm in seen_norms:
+            removed += 1
+        else:
+            seen_norms.add(norm)
+            kept_lines.append(line)
+
+    try:
+        path.write_text("\n".join(kept_lines) + ("\n" if kept_lines else ""), encoding="utf-8")
+    except Exception as exc:
+        logger.warning("dedupe_research_queue write error: %s", exc)
+
+    kept = len(kept_lines)
+    return {"removed": removed, "kept": kept, "total_before": total_before, "total_after": kept}
 
 
 def load_research_queue(status: str = "open") -> list[dict]:

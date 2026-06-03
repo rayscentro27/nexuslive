@@ -997,6 +997,9 @@ class NexusTelegramBot:
             "what should i send claude", "create a super prompt",
             "show last strategic decision", "show cfo notes", "cfo notes",
             "save this as a decision", "add this to the research queue",
+            # Phase 7A research queue dedup
+            "dedupe research queue", "deduplicate research queue",
+            "clean research queue", "remove duplicate research questions",
         )
         if any(phrase in normalized for phrase in _PHASE6A_EXCLUSIONS):
             return False
@@ -3256,13 +3259,14 @@ class NexusTelegramBot:
         "fix_revenue_packet_assets",
         "show_asset_fix_report",
         "rescore_after_fixes",
-        # ── CFO conversation / research queue (Phase 7) ───────────────────────
+        # ── CFO conversation / research queue (Phase 7 + 7A) ─────────────────
         "show_research_queue",
         "show_scout_assignments",
         "show_unresolved_questions",
         "create_implementation_prompt",
         "show_cfo_notes",
         "save_cfo_decision",
+        "dedupe_research_queue",
     })
 
     def _try_memory_command(self, text: str) -> str | None:
@@ -3543,6 +3547,31 @@ class NexusTelegramBot:
             goal = text.strip()[len("plan swarm task for "):].strip()
             logger.info("telegram route=command")
             return self.render_chat_response(self._plan_swarm_task_summary(goal or "general operational improvement"))
+
+        # ── CFO conversation intercept (Phase 7A) ─────────────────────────────
+        # Must run BEFORE TelegramRouter / _conversational_reply so that natural
+        # strategic messages reach the CFO layer instead of the LLM evidence-dump path.
+        # Calls CFO functions DIRECTLY to bypass all existing intent handlers in run_command.
+        try:
+            from lib.hermes_cfo_conversation_layer import (
+                detect_cfo_conversation_need,
+                is_high_priority_cfo_phrase,
+                build_cfo_context,
+                build_cfo_response,
+                format_cfo_response,
+            )
+            _needs_cfo = detect_cfo_conversation_need(normalized) or is_high_priority_cfo_phrase(normalized)
+            if _needs_cfo:
+                _ctx = build_cfo_context(text)
+                _resp = build_cfo_response(text, _ctx)
+                _cfo_result = format_cfo_response(_resp)
+                if _cfo_result:
+                    logger.info("telegram route=cfo_conversation")
+                    self._memory_command_pending = True
+                    self._memory_command_intent = "cfo_conversation"
+                    return _cfo_result
+        except Exception as _cfo_exc:
+            logger.warning("telegram cfo_intercept failed text=%r exc=%s", text[:60], _cfo_exc)
 
         router = TelegramRouter(
             classify_message_route=self.classify_message_route,

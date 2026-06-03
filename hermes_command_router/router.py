@@ -3068,6 +3068,25 @@ def _plain_save_cfo_decision(raw_text: str = "") -> str:
         return f"CFO DECISION SAVED\n\nCould not save decision: {exc!s:.200}"
 
 
+def _plain_dedupe_research_queue() -> str:
+    """Handle 'dedupe research queue'."""
+    try:
+        from lib.hermes_cfo_conversation_layer import dedupe_research_queue
+        result = dedupe_research_queue()
+        removed = result.get("removed", 0)
+        kept = result.get("kept", 0)
+        total_before = result.get("total_before", 0)
+        return (
+            f"RESEARCH QUEUE DEDUPED\n\n"
+            f"Entries before: {total_before}\n"
+            f"Duplicates removed: {removed}\n"
+            f"Entries kept: {kept}\n\n"
+            f"Say 'show research queue' to see the cleaned queue."
+        )
+    except Exception as exc:
+        return f"RESEARCH QUEUE DEDUPED\n\nCould not deduplicate: {exc!s:.200}"
+
+
 # ── Phase 6F: Revenue Asset Fixer ────────────────────────────────────────────
 
 def _plain_fix_revenue_packet_assets() -> str:
@@ -3226,13 +3245,14 @@ _PLAIN_INTENTS: dict[str, object] = {
     "show_packet_improvement_plan":    _plain_show_packet_improvement_plan,
     "rescore_revenue_packet":          _plain_rescore_revenue_packet,
     "show_final_review_checklist":     _plain_show_final_review_checklist,
-    # ── CFO conversation / research queue (Phase 7) ───────────────────────────
+    # ── CFO conversation / research queue (Phase 7 + 7A) ─────────────────────
     "show_research_queue":             _plain_show_research_queue,
     "show_scout_assignments":          _plain_show_scout_assignments,
     "show_unresolved_questions":       _plain_show_unresolved_questions,
     "create_implementation_prompt":    _plain_create_implementation_prompt,
     "show_cfo_notes":                  _plain_show_cfo_notes,
     "save_cfo_decision":               _plain_save_cfo_decision,
+    "dedupe_research_queue":           _plain_dedupe_research_queue,
     # ── Revenue asset fixer (Phase 6F) ────────────────────────────────────────
     "fix_revenue_packet_assets":       _plain_fix_revenue_packet_assets,
     "show_asset_fix_report":           _plain_show_asset_fix_report,
@@ -3480,6 +3500,21 @@ def run_command(raw_text: str, source: str = "cli", sender: str = "raymond") -> 
         except Exception as e:
             return f"I ran into an issue: {e}\n\nCheck logs or ask 'check backend health'."
 
+    # ── High-priority CFO intercept (Phase 7A): before codex/reasoning handlers ─
+    # Catches phrases like "create a prompt for Claude" (code_task) and
+    # "what should we do about that?" (next_best_move) before they hit wrong handlers.
+    try:
+        from lib.hermes_cfo_conversation_layer import (
+            is_high_priority_cfo_phrase,
+            build_cfo_context, build_cfo_response, format_cfo_response,
+        )
+        if is_high_priority_cfo_phrase(raw_text):
+            _ctx = build_cfo_context(raw_text)
+            _resp = build_cfo_response(raw_text, _ctx)
+            return format_cfo_response(_resp)
+    except Exception:
+        pass  # Fall through to normal handlers
+
     # ── Dev Agent Bridge intents ──────────────────────────────────────────────
     if intent in ("list_dev_agents", "dev_agent_status", "recommend_dev_agent", "prepare_dev_handoff"):
         try:
@@ -3590,13 +3625,13 @@ def run_command(raw_text: str, source: str = "cli", sender: str = "raymond") -> 
             command=raw_text,
         )
 
-    # ── CFO Conversation Layer (Phase 7): catch natural/strategic messages ──────
+    # ── CFO Conversation Layer (Phase 7 + 7A): catch natural/strategic messages ─
     try:
         from lib.hermes_cfo_conversation_layer import (
-            detect_cfo_conversation_need, build_cfo_context, build_cfo_response,
-            format_cfo_response,
+            detect_cfo_conversation_need, is_high_priority_cfo_phrase,
+            build_cfo_context, build_cfo_response, format_cfo_response,
         )
-        if detect_cfo_conversation_need(raw_text):
+        if detect_cfo_conversation_need(raw_text) or is_high_priority_cfo_phrase(raw_text):
             context = build_cfo_context(raw_text)
             response = build_cfo_response(raw_text, context)
             return format_cfo_response(response)

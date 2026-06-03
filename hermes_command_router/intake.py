@@ -234,7 +234,12 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "approve blocked internal items", "approve all internal items",
       "bulk approve blocked", "approve safe items"],                "bulk_approve_blocked",       "high",   True),
 
-    # ── Phase 7: CFO conversation / research queue (BEFORE Phase 6F to avoid collisions) ──
+    # ── Phase 7 + 7A: CFO conversation / research queue (BEFORE Phase 6F to avoid collisions) ──
+    # dedupe_research_queue MUST come before show_research_queue (contains "research queue")
+    (["dedupe research queue", "deduplicate research queue",
+      "clean research queue", "remove duplicate research questions",
+      "remove duplicates from research queue"],                       "dedupe_research_queue",        "medium", False),
+
     (["show research queue", "research queue",
       "show open research questions", "what is in the research queue",
       "what questions are open", "show pending research"],            "show_research_queue",         "medium", False),
