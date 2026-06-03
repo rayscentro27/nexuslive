@@ -274,6 +274,21 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "add this question to research", "put this in the research queue"],
                                                                       "show_research_queue",          "medium", True),
 
+    # ── Phase 7B: Failure learning commands ──────────────────────────────────
+    (["show failed responses", "show failure log", "show bad responses",
+      "show logged failures", "review failed responses",
+      "what failed", "what responses failed"],                         "show_failed_responses",        "medium", False),
+
+    (["log this as a bad response", "log this failure",
+      "that was a bad response", "mark this as a failure"],            "log_bad_response",             "medium", True),
+
+    (["hermes, learn from that", "learn from that",
+      "hermes learn from this", "log this as a lesson"],               "learn_from_that",              "medium", True),
+
+    (["create tests from failures", "generate tests from failures",
+      "build test cases from failures", "make tests from failures",
+      "tests from failures"],                                          "create_tests_from_failures",   "medium", False),
+
     # ── Phase 6F: Revenue asset fixer (BEFORE Phase 6E/6D to avoid substring collisions) ──
     (["fix revenue packet assets", "apply safe asset fixes",
       "fix packet gaps", "fix revenue asset gaps",

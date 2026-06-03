@@ -3068,6 +3068,88 @@ def _plain_save_cfo_decision(raw_text: str = "") -> str:
         return f"CFO DECISION SAVED\n\nCould not save decision: {exc!s:.200}"
 
 
+def _plain_show_failed_responses() -> str:
+    """Handle 'show failed responses'."""
+    try:
+        from lib.hermes_failure_learning import format_failure_review
+        return format_failure_review()
+    except Exception as exc:
+        return f"FAILED RESPONSES\n\nCould not load failure log: {exc!s:.200}"
+
+
+def _plain_log_bad_response() -> str:
+    """Handle 'log this as a bad response'."""
+    try:
+        from lib.hermes_failure_learning import log_failed_response
+        from lib.hermes_conversation_state import load_conversation_state
+        state = load_conversation_state()
+        log_failed_response(
+            message=state.get("last_user_message", "unknown"),
+            response=state.get("last_hermes_response_full", ""),
+            reason="generic_quality_fallback",
+        )
+        return (
+            "BAD RESPONSE LOGGED\n\n"
+            "I logged the last interaction as a training failure.\n\n"
+            "Say 'show failed responses' to review.\n"
+            "Say 'create tests from failures' to generate a test case."
+        )
+    except Exception as exc:
+        return f"BAD RESPONSE LOGGED\n\nCould not log failure: {exc!s:.200}"
+
+
+def _plain_learn_from_that() -> str:
+    """Handle 'hermes, learn from that'."""
+    try:
+        from lib.hermes_failure_learning import log_failed_response, suggest_training_example
+        from lib.hermes_conversation_state import load_conversation_state
+        state = load_conversation_state()
+        msg = state.get("last_user_message", "unknown")
+        resp = state.get("last_hermes_response_full", "")
+        entry = log_failed_response(message=msg, response=resp, reason="generic_quality_fallback")
+        suggest_training_example(msg, resp)
+        return (
+            "LESSON LOGGED\n\n"
+            "I logged this as a training example.\n\n"
+            "What I think you actually wanted:\n"
+            "  A plain, direct answer without jargon or artifact inventory.\n\n"
+            "Say 'create tests from failures' to generate a test case from this lesson."
+        )
+    except Exception as exc:
+        return f"LESSON LOGGED\n\nCould not log lesson: {exc!s:.200}"
+
+
+def _plain_create_tests_from_failures() -> str:
+    """Handle 'create tests from failures'."""
+    try:
+        from lib.hermes_failure_learning import load_failed_responses, generate_test_from_failure
+        failures = load_failed_responses(reviewed=False)
+        if not failures:
+            return (
+                "TEST CASES\n\n"
+                "No unreviewed failures in the log yet.\n\n"
+                "Say 'log this as a bad response' to add one."
+            )
+        specs = []
+        for f in failures[:3]:
+            spec = generate_test_from_failure(f)
+            specs.append(
+                f"Failure type: {spec.get('failure_type', 'unknown')}\n"
+                f"Message: {spec.get('input_message', '')[:80]}\n"
+                f"Expected intent: {spec.get('expected_intent', 'unknown')}\n"
+                f"Expected header: {spec.get('expected_header', 'PLAIN ANSWER')}"
+            )
+        specs_text = "\n\n".join(specs)
+        return (
+            f"TEST CASES FROM FAILURES\n\n"
+            f"Generated {len(specs)} test specs:\n\n"
+            f"{specs_text}\n\n"
+            f"Paste these into scripts/test_cfo_brain_failure_learning.py"
+        )
+    except Exception as exc:
+        return f"TEST CASES\n\nCould not generate test cases: {exc!s:.200}"
+
+
 def _plain_dedupe_research_queue() -> str:
     """Handle 'dedupe research queue'."""
     try:
@@ -3253,6 +3335,11 @@ _PLAIN_INTENTS: dict[str, object] = {
     "show_cfo_notes":                  _plain_show_cfo_notes,
     "save_cfo_decision":               _plain_save_cfo_decision,
     "dedupe_research_queue":           _plain_dedupe_research_queue,
+    # ── Failure learning (Phase 7B) ───────────────────────────────────────────
+    "show_failed_responses":           _plain_show_failed_responses,
+    "log_bad_response":                _plain_log_bad_response,
+    "learn_from_that":                 _plain_learn_from_that,
+    "create_tests_from_failures":      _plain_create_tests_from_failures,
     # ── Revenue asset fixer (Phase 6F) ────────────────────────────────────────
     "fix_revenue_packet_assets":       _plain_fix_revenue_packet_assets,
     "show_asset_fix_report":           _plain_show_asset_fix_report,

@@ -1000,6 +1000,10 @@ class NexusTelegramBot:
             # Phase 7A research queue dedup
             "dedupe research queue", "deduplicate research queue",
             "clean research queue", "remove duplicate research questions",
+            # Phase 7B failure learning commands
+            "show failed responses", "log this as a bad response",
+            "hermes, learn from that", "learn from that",
+            "create tests from failures", "show failure log",
         )
         if any(phrase in normalized for phrase in _PHASE6A_EXCLUSIONS):
             return False
@@ -3267,6 +3271,11 @@ class NexusTelegramBot:
         "show_cfo_notes",
         "save_cfo_decision",
         "dedupe_research_queue",
+        # ── Failure learning (Phase 7B) ───────────────────────────────────────
+        "show_failed_responses",
+        "log_bad_response",
+        "learn_from_that",
+        "create_tests_from_failures",
     })
 
     def _try_memory_command(self, text: str) -> str | None:
@@ -3573,6 +3582,22 @@ class NexusTelegramBot:
         except Exception as _cfo_exc:
             logger.warning("telegram cfo_intercept failed text=%r exc=%s", text[:60], _cfo_exc)
 
+        # ── CFO Brain intercept (Phase 7B) ─────────────────────────────────────
+        # General natural-language reasoning layer: option selection, task reference,
+        # simplify/explain follow-ups, morning summary, queue status, money strategy.
+        # Runs AFTER Phase 7A CFO intercept. Falls through if it returns None.
+        try:
+            from lib.hermes_cfo_brain import should_use_cfo_brain, process_with_cfo_brain
+            if should_use_cfo_brain(normalized):
+                _brain_result = process_with_cfo_brain(text, normalized)
+                if _brain_result:
+                    logger.info("telegram route=cfo_brain")
+                    self._memory_command_pending = True
+                    self._memory_command_intent = "cfo_brain"
+                    return _brain_result
+        except Exception as _brain_exc:
+            logger.warning("telegram cfo_brain failed text=%r exc=%s", text[:60], _brain_exc)
+
         router = TelegramRouter(
             classify_message_route=self.classify_message_route,
             handle_command_mode=self._handle_command_mode,
@@ -3852,6 +3877,13 @@ class NexusTelegramBot:
             if not rendered:
                 rendered = self._fallback_response_for_command(command)
             logger.info("telegram inbound=%r response_preview=%r", text[:120], rendered[:200])
+            # Phase 7B: save conversation state after every response so CFO brain
+            # can resolve follow-ups like "let's do 1", "simplify that", "task 1"
+            try:
+                from lib.hermes_conversation_state import update_conversation_state
+                update_conversation_state(text, rendered)
+            except Exception:
+                pass
             if self._memory_command_pending:
                 _intent = self._memory_command_intent
                 self._memory_command_pending = False
