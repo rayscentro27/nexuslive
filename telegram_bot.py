@@ -3534,6 +3534,19 @@ class NexusTelegramBot:
         # Also strip "hermes, X" prefix — lstrip("hermes") strips individual chars from the set
         _normalized_strip = normalized.lstrip("hermes").lstrip(",").lstrip().rstrip(".?!")
 
+        # ── Phase 8B: CFO Shadow commands ────────────────────────────────────
+        # Handle "show cfo shadow status", "show cfo shadow traces", etc.
+        # Read-only commands, safe always. Must run before Phase 7C so they are
+        # never misrouted to CFO Brain or TelegramRouter.
+        try:
+            from lib.hermes_cfo_loop_shadow import handle_cfo_shadow_command
+            _shadow_cmd_result = handle_cfo_shadow_command(normalized) or handle_cfo_shadow_command(_normalized_strip)
+            if _shadow_cmd_result:
+                logger.info("telegram route=cfo_shadow_command")
+                return _shadow_cmd_result
+        except Exception as _shadow_cmd_exc:
+            logger.warning("telegram cfo_shadow_command failed: %s", _shadow_cmd_exc)
+
         # ── Phase 7C: Pre-continuity CFO Brain intercept ─────────────────────
         # Catches option-selection, task-reference, simplify/explain, morning-summary,
         # and failure-feedback BEFORE the continuity dict and TelegramRouter so that
@@ -3683,6 +3696,15 @@ class NexusTelegramBot:
                     user_message=text,
                     current_response=response,
                 )
+        except Exception:
+            pass  # shadow errors must never affect live response
+
+        # ── Phase 8B: CFO Loop shadow trace (fire-and-forget, never changes response) ──
+        try:
+            from lib.hermes_cfo_loop_shadow import should_run_cfo_shadow, run_cfo_shadow_async
+            if should_run_cfo_shadow(text):
+                run_cfo_shadow_async(message=text, live_response=response)
+                logger.debug("telegram cfo_shadow=queued")
         except Exception:
             pass  # shadow errors must never affect live response
 

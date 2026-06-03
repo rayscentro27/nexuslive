@@ -1,0 +1,121 @@
+{
+  "version": "1.0",
+  "description": "Phase 8B shadow mode test messages. Used to verify the CFO loop shadow runs correctly for all common message types.",
+  "messages": [
+    {
+      "id": "msg_01",
+      "text": "HOW DO WE MAKE MONEY THIS WEEK",
+      "expected_intent": "money_strategy",
+      "expected_tool": "show_revenue_plan",
+      "category": "strategic"
+    },
+    {
+      "id": "msg_02",
+      "text": "LETS DO 1",
+      "expected_intent": "option_selection",
+      "expected_tool": "select_option",
+      "category": "option_followup"
+    },
+    {
+      "id": "msg_03",
+      "text": "WHAT WAS TASK 1",
+      "expected_intent": "task_reference",
+      "expected_tool": "select_option",
+      "category": "task_followup"
+    },
+    {
+      "id": "msg_04",
+      "text": "CAN YOU SIMPLIFY YOUR RESPONSE",
+      "expected_intent": "simplify_previous_response",
+      "expected_tool": "simplify_last_response",
+      "category": "followup"
+    },
+    {
+      "id": "msg_05",
+      "text": "EXPLAIN YOUR RECOMMENDATION IN PLAIN LANGUAGE",
+      "expected_intent": "explain_previous_response",
+      "expected_tool": "explain_recommendation",
+      "category": "followup"
+    },
+    {
+      "id": "msg_06",
+      "text": "what changed",
+      "expected_intent": "draft_comparison",
+      "expected_tool": "compare_drafts",
+      "category": "draft_followup"
+    },
+    {
+      "id": "msg_07",
+      "text": "i approve them all",
+      "expected_intent": "approval_bulk_request",
+      "expected_tool": "bulk_approval_safety_check",
+      "category": "approval"
+    },
+    {
+      "id": "msg_08",
+      "text": "what are all the scouts doing right now",
+      "expected_intent": "scout_status",
+      "expected_tool": "show_scout_status",
+      "category": "scout"
+    },
+    {
+      "id": "msg_09",
+      "text": "can you have the scouts check youtube for new videos",
+      "expected_intent": "scout_assignment",
+      "expected_tool": "create_scout_assignment",
+      "category": "scout"
+    },
+    {
+      "id": "msg_10",
+      "text": "what is claude working on right now",
+      "expected_intent": "tool_status_question",
+      "expected_tool": "show_tool_status",
+      "category": "tool_status"
+    },
+    {
+      "id": "msg_11",
+      "text": "create the implementation prompt now",
+      "expected_intent": "implementation_prompt_request",
+      "expected_tool": "create_implementation_prompt",
+      "category": "implementation"
+    },
+    {
+      "id": "msg_12",
+      "text": "implement it",
+      "expected_intent": "implement_now",
+      "expected_tool": "create_implementation_prompt",
+      "category": "implementation"
+    },
+    {
+      "id": "msg_13",
+      "text": "do you understand my question",
+      "expected_intent": "acknowledgement_check",
+      "expected_tool": "plain_acknowledgement",
+      "category": "acknowledgement"
+    },
+    {
+      "id": "msg_14",
+      "text": "show approval queue",
+      "expected_intent": null,
+      "expected_tool": null,
+      "category": "exact_command",
+      "note": "Exact command — routes via live system, shadow still logs intent"
+    },
+    {
+      "id": "msg_15",
+      "text": "Hermes, run daily operating cycle",
+      "expected_intent": null,
+      "expected_tool": null,
+      "category": "exact_command",
+      "note": "Exact command — routes via live system, shadow still logs intent"
+    },
+    {
+      "id": "msg_16",
+      "text": "show memory v2 primary status",
+      "expected_intent": null,
+      "expected_tool": null,
+      "category": "exact_command",
+      "note": "Exact command — routes via live system, shadow still logs intent"
+    }
+  ]
+}
