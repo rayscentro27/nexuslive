@@ -965,6 +965,14 @@ class NexusTelegramBot:
             "show content awaiting approval", "show cta options",
             "show launch checklist", "show approval checklist",
             "generate approval candidates", "create approval items from packet",
+            # Phase 6E revenue packet improvement
+            "show revenue packet gaps", "show readiness gaps", "revenue packet gaps",
+            "improve revenue asset packet", "improve packet score", "raise packet readiness",
+            "show improved cta options", "improved cta options",
+            "show offer bridge", "offer bridge", "funnel model",
+            "show packet improvement plan", "packet improvement plan",
+            "rescore revenue packet", "rescore packet",
+            "show final review checklist", "final review checklist",
         )
         if any(phrase in normalized for phrase in _PHASE6A_EXCLUSIONS):
             return False
@@ -3212,6 +3220,14 @@ class NexusTelegramBot:
         "show_launch_checklist",
         "show_approval_checklist",
         "generate_approval_candidates",
+        # ── Revenue packet improvement (Phase 6E) ─────────────────────────────
+        "show_revenue_packet_gaps",
+        "improve_revenue_asset_packet",
+        "show_improved_cta_options",
+        "show_offer_bridge",
+        "show_packet_improvement_plan",
+        "rescore_revenue_packet",
+        "show_final_review_checklist",
     })
 
     def _try_memory_command(self, text: str) -> str | None:

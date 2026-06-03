@@ -2801,6 +2801,142 @@ def _plain_generate_approval_candidates() -> str:
         return f"APPROVAL CANDIDATES GENERATED\n\nCould not generate candidates: {exc!s:.200}"
 
 
+# ── Phase 6E: Revenue Packet Improvement ─────────────────────────────────────
+
+def _plain_show_revenue_packet_gaps() -> str:
+    """Handle 'show revenue packet gaps', 'show readiness gaps'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            load_latest_revenue_asset_packet, build_revenue_asset_packet,
+            format_packet_readiness_gaps,
+        )
+        packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+        return format_packet_readiness_gaps(packet)
+    except Exception as exc:
+        return f"REVENUE PACKET READINESS GAPS\n\nCould not analyze gaps: {exc!s:.200}"
+
+
+def _plain_improve_revenue_asset_packet() -> str:
+    """Handle 'improve revenue asset packet', 'improve packet score', 'raise packet readiness'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            load_latest_revenue_asset_packet, build_revenue_asset_packet,
+            apply_internal_packet_improvements, recommend_packet_improvements,
+            save_improved_revenue_packet, inject_approval_candidates,
+            generate_approval_candidates,
+        )
+        packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+        improvements = recommend_packet_improvements(packet)
+        improved = apply_internal_packet_improvements(packet)
+        save_result = save_improved_revenue_packet(improved, improvements)
+
+        # Update approval candidates from improved packet
+        candidates = generate_approval_candidates(improved)
+        inject_result = inject_approval_candidates(candidates)
+
+        old_score = packet.get("readiness_score", 0)
+        new_score = improved.get("readiness_score", 0)
+        ready = improved.get("approval_ready_items") or []
+        added = inject_result.get("added", 0)
+
+        lines = ["REVENUE PACKET IMPROVED", ""]
+        lines += [
+            f"Previous score: {old_score}/100",
+            f"Current score:  {new_score}/100",
+            f"Approval-ready: {len(ready)}",
+            f"New approval queue items: {added}",
+            "",
+        ]
+
+        if improvements:
+            lines += ["Improvements noted:", ""]
+            for imp in improvements[:5]:
+                lines.append(f"  - {imp}")
+            if len(improvements) > 5:
+                lines.append(f"  ... and {len(improvements) - 5} more.")
+            lines.append("")
+
+        lines += [
+            "Safety: no content published, no emails sent, no money spent.",
+            "",
+            "Evidence:",
+            f"  {save_result.get('saved_md', '')}",
+            "",
+            "Next:",
+            "  Say 'show revenue packet gaps' to review remaining gaps.",
+            "  Say 'show approval queue' to review approval items.",
+        ]
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"REVENUE PACKET IMPROVED\n\nCould not improve packet: {exc!s:.200}"
+
+
+def _plain_show_improved_cta_options() -> str:
+    """Handle 'show improved cta options'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            load_latest_revenue_asset_packet, format_improved_cta_options,
+        )
+        packet = load_latest_revenue_asset_packet()
+        return format_improved_cta_options(packet)
+    except Exception as exc:
+        return f"IMPROVED CTA OPTIONS\n\nCould not load CTA options: {exc!s:.200}"
+
+
+def _plain_show_offer_bridge() -> str:
+    """Handle 'show offer bridge', 'funnel model'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            load_latest_revenue_asset_packet, format_offer_bridge,
+        )
+        packet = load_latest_revenue_asset_packet()
+        return format_offer_bridge(packet)
+    except Exception as exc:
+        return f"OFFER BRIDGE\n\nCould not load offer bridge: {exc!s:.200}"
+
+
+def _plain_show_packet_improvement_plan() -> str:
+    """Handle 'show packet improvement plan'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            load_latest_revenue_asset_packet, build_revenue_asset_packet,
+            format_packet_improvement_plan,
+        )
+        packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+        return format_packet_improvement_plan(packet)
+    except Exception as exc:
+        return f"PACKET IMPROVEMENT PLAN\n\nCould not build plan: {exc!s:.200}"
+
+
+def _plain_rescore_revenue_packet() -> str:
+    """Handle 'rescore revenue packet', 'refresh revenue packet score'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            load_latest_revenue_asset_packet, build_revenue_asset_packet,
+            rescore_packet_after_improvements, save_revenue_asset_packet,
+            format_rescored_packet,
+        )
+        packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+        rescored = rescore_packet_after_improvements(packet)
+        save_revenue_asset_packet(rescored)
+        return format_rescored_packet(rescored)
+    except Exception as exc:
+        return f"REVENUE PACKET RESCORED\n\nCould not rescore packet: {exc!s:.200}"
+
+
+def _plain_show_final_review_checklist() -> str:
+    """Handle 'show final review checklist', 'pre-launch final checklist'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            load_latest_revenue_asset_packet, build_revenue_asset_packet,
+            format_final_review_checklist,
+        )
+        packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+        return format_final_review_checklist(packet)
+    except Exception as exc:
+        return f"FINAL REVIEW CHECKLIST\n\nCould not load checklist: {exc!s:.200}"
+
+
 def _plain_lesson_gap_generate() -> str:
     """Generate lesson proposals from open knowledge gaps."""
     from lib.hermes_learning_loop import generate_gap_lesson_proposals
@@ -2888,6 +3024,14 @@ _PLAIN_INTENTS: dict[str, object] = {
     "show_launch_checklist":           _plain_show_launch_checklist,
     "show_approval_checklist":         _plain_show_approval_checklist,
     "generate_approval_candidates":    _plain_generate_approval_candidates,
+    # ── Revenue packet improvement (Phase 6E) ─────────────────────────────────
+    "show_revenue_packet_gaps":        _plain_show_revenue_packet_gaps,
+    "improve_revenue_asset_packet":    _plain_improve_revenue_asset_packet,
+    "show_improved_cta_options":       _plain_show_improved_cta_options,
+    "show_offer_bridge":               _plain_show_offer_bridge,
+    "show_packet_improvement_plan":    _plain_show_packet_improvement_plan,
+    "rescore_revenue_packet":          _plain_rescore_revenue_packet,
+    "show_final_review_checklist":     _plain_show_final_review_checklist,
     # ── Learning loop ─────────────────────────────────────────────────────────
     "lesson_record":               _plain_lesson_record,
     "lesson_pending":              _plain_lesson_pending,
@@ -2994,6 +3138,18 @@ _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
     "show approval checklist", "approval checklist",
     "generate approval candidates", "create approval candidates",
     "create approval items from packet", "generate approval items",
+    # ── Revenue packet improvement (Phase 6E) ────────────────────────────────
+    "show revenue packet gaps", "show readiness gaps", "revenue packet gaps",
+    "what are the packet gaps", "show packet gaps", "packet readiness gaps",
+    "improve revenue asset packet", "improve the revenue packet",
+    "improve packet score", "raise packet readiness", "fix revenue packet",
+    "show improved cta options", "improved cta options", "improved cta set",
+    "show offer bridge", "offer bridge", "show the offer bridge", "funnel model",
+    "show packet improvement plan", "packet improvement plan", "improvement roadmap",
+    "rescore revenue packet", "rescore the revenue packet", "rescore packet",
+    "refresh revenue packet score", "recalculate packet score",
+    "show final review checklist", "final review checklist", "final checklist",
+    "pre-launch final checklist", "show pre-launch review",
 ])
 
 _INTENT_HANDLERS = {

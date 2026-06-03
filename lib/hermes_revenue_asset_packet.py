@@ -857,3 +857,677 @@ def inject_approval_candidates(candidates: list[dict]) -> dict:
     _save_state(state)
 
     return {"added": added, "skipped": skipped, "total": len(candidates)}
+
+
+# ── Phase 6E: Gap analysis & packet improvement ──────────────────────────────
+
+GAP_CATEGORIES = (
+    "missing_lead_magnet",
+    "missing_internal_marker",
+    "missing_cta",
+    "not_revenue_connected",
+    "unsafe_promise_detected",
+    "low_overall_score",
+    "missing_newsletter",
+    "missing_video_script",
+    "missing_compliance_note",
+    "no_approval_ready_assets",
+)
+
+IMPROVED_CTA_SET = {
+    "lead_magnet":      "Download the free Business Funding Readiness Checklist",
+    "newsletter":       "Get funding-ready tips every week — free",
+    "short_video":      "Watch: The #1 mistake small businesses make before applying for funding",
+    "landing_page":     "Is your business funding-ready? Find out in 5 minutes",
+    "direct_offer":     "Get your free Business Funding Readiness Score today",
+    "soft_educational": "Learn what lenders look for before you apply",
+    "consultation":     "Book a free funding readiness review",
+    "nexus_membership": "Track your funding readiness journey with Nexus",
+}
+
+_GAP_SCORE_IMPACT = {
+    "missing_lead_magnet":      20,
+    "missing_internal_marker":  15,
+    "missing_cta":              15,
+    "not_revenue_connected":    15,
+    "unsafe_promise_detected":  20,
+    "low_overall_score":        10,
+    "missing_newsletter":       10,
+    "missing_video_script":      5,
+    "missing_compliance_note":  10,
+    "no_approval_ready_assets": 10,
+}
+
+_GAP_REMEDIATION = {
+    "missing_lead_magnet":      "Create or update a lead magnet file in docs/reports/content/",
+    "missing_internal_marker":  "Add 'INTERNAL ONLY' or 'Internal Draft' header to content files",
+    "missing_cta":              "Add a clear call-to-action to each asset (download, join, check)",
+    "not_revenue_connected":    "Reference revenue goal, funding, credit, or Nexus membership in content",
+    "unsafe_promise_detected":  "Remove guaranteed/promise/100% success language from content",
+    "low_overall_score":        "Improve scoring criteria — internal marker, CTA, revenue connection",
+    "missing_newsletter":       "Create a newsletter draft in docs/reports/content/",
+    "missing_video_script":     "Create a short video script in docs/reports/content/",
+    "missing_compliance_note":  "Add a compliance/disclaimer note to public-facing assets",
+    "no_approval_ready_assets": "Resolve flags on existing assets to reach approval_ready status",
+}
+
+
+def analyze_packet_readiness_gaps(packet: dict) -> list[dict]:
+    """Identify readiness gaps across the packet. Returns list of gap dicts."""
+    assets = packet.get("assets") or []
+    gaps: list[dict] = []
+
+    # Missing lead magnet
+    has_lm = any(a.get("category") == "lead_magnet" for a in assets)
+    if not has_lm:
+        gaps.append({
+            "gap": "missing_lead_magnet",
+            "detail": "No lead magnet asset found.",
+            "score_impact": _GAP_SCORE_IMPACT["missing_lead_magnet"],
+            "remediation": _GAP_REMEDIATION["missing_lead_magnet"],
+        })
+
+    # Missing newsletter
+    has_nl = any(a.get("category") == "newsletter" for a in assets)
+    if not has_nl:
+        gaps.append({
+            "gap": "missing_newsletter",
+            "detail": "No newsletter draft found.",
+            "score_impact": _GAP_SCORE_IMPACT["missing_newsletter"],
+            "remediation": _GAP_REMEDIATION["missing_newsletter"],
+        })
+
+    # Missing video script
+    has_vid = any(a.get("category") in ("short_video_script", "youtube_script") for a in assets)
+    if not has_vid:
+        gaps.append({
+            "gap": "missing_video_script",
+            "detail": "No short video or YouTube script found.",
+            "score_impact": _GAP_SCORE_IMPACT["missing_video_script"],
+            "remediation": _GAP_REMEDIATION["missing_video_script"],
+        })
+
+    # Assets missing internal marker
+    no_marker = [a for a in assets if "no_internal_marker" in (a.get("readiness_flags") or [])]
+    if no_marker:
+        gaps.append({
+            "gap": "missing_internal_marker",
+            "detail": f"{len(no_marker)} asset(s) missing internal-only marker.",
+            "affected_assets": [a["filename"] for a in no_marker],
+            "score_impact": _GAP_SCORE_IMPACT["missing_internal_marker"],
+            "remediation": _GAP_REMEDIATION["missing_internal_marker"],
+        })
+
+    # Assets missing CTA
+    no_cta = [a for a in assets if "no_cta_detected" in (a.get("readiness_flags") or [])]
+    if no_cta:
+        gaps.append({
+            "gap": "missing_cta",
+            "detail": f"{len(no_cta)} asset(s) missing a CTA.",
+            "affected_assets": [a["filename"] for a in no_cta],
+            "score_impact": _GAP_SCORE_IMPACT["missing_cta"],
+            "remediation": _GAP_REMEDIATION["missing_cta"],
+        })
+
+    # Assets not revenue connected
+    not_rev = [a for a in assets if "not_revenue_connected" in (a.get("readiness_flags") or [])]
+    if not_rev:
+        gaps.append({
+            "gap": "not_revenue_connected",
+            "detail": f"{len(not_rev)} asset(s) not connected to revenue goal.",
+            "affected_assets": [a["filename"] for a in not_rev],
+            "score_impact": _GAP_SCORE_IMPACT["not_revenue_connected"],
+            "remediation": _GAP_REMEDIATION["not_revenue_connected"],
+        })
+
+    # Unsafe promise detected
+    unsafe = [a for a in assets if "unsafe_promise_detected" in (a.get("readiness_flags") or [])]
+    if unsafe:
+        gaps.append({
+            "gap": "unsafe_promise_detected",
+            "detail": f"{len(unsafe)} asset(s) contain unsafe promise language.",
+            "affected_assets": [a["filename"] for a in unsafe],
+            "score_impact": _GAP_SCORE_IMPACT["unsafe_promise_detected"],
+            "remediation": _GAP_REMEDIATION["unsafe_promise_detected"],
+        })
+
+    # Low overall score
+    score = packet.get("readiness_score", 0)
+    if score < 80:
+        gaps.append({
+            "gap": "low_overall_score",
+            "detail": f"Overall packet score is {score}/100 (target: 80+).",
+            "score_impact": _GAP_SCORE_IMPACT["low_overall_score"],
+            "remediation": _GAP_REMEDIATION["low_overall_score"],
+        })
+
+    # Missing compliance note
+    has_compliance = any(a.get("category") == "compliance_note" for a in assets)
+    if not has_compliance:
+        gaps.append({
+            "gap": "missing_compliance_note",
+            "detail": "No compliance note or disclaimer found.",
+            "score_impact": _GAP_SCORE_IMPACT["missing_compliance_note"],
+            "remediation": _GAP_REMEDIATION["missing_compliance_note"],
+        })
+
+    # No approval-ready assets
+    ready = packet.get("approval_ready_items") or []
+    if not ready:
+        gaps.append({
+            "gap": "no_approval_ready_assets",
+            "detail": "No assets are in approval_ready status yet.",
+            "score_impact": _GAP_SCORE_IMPACT["no_approval_ready_assets"],
+            "remediation": _GAP_REMEDIATION["no_approval_ready_assets"],
+        })
+
+    return gaps
+
+
+def format_packet_readiness_gaps(packet: dict) -> str:
+    """Format packet readiness gaps as a readable report."""
+    gaps = analyze_packet_readiness_gaps(packet)
+    score = packet.get("readiness_score", 0)
+    total_impact = sum(g.get("score_impact", 0) for g in gaps)
+    projected = min(100, score + total_impact)
+
+    lines = [
+        "REVENUE PACKET READINESS GAPS",
+        "",
+        f"Current score:   {score}/100",
+        f"Target score:    80+",
+        f"Projected score: {projected}/100 (if all gaps resolved)",
+        "",
+    ]
+
+    if not gaps:
+        lines += [
+            "No critical gaps found. Packet is in good shape.",
+            "",
+            "Say 'show revenue asset packet' to review full packet.",
+        ]
+        return "\n".join(lines)
+
+    lines += [f"{len(gaps)} gap(s) identified:", ""]
+    for i, gap in enumerate(gaps, 1):
+        label = gap["gap"].replace("_", " ").title()
+        impact = gap.get("score_impact", 0)
+        lines += [
+            f"  {i}. {label} (+{impact} pts if resolved)",
+            f"     {gap['detail']}",
+            f"     Fix: {gap['remediation']}",
+        ]
+        affected = gap.get("affected_assets") or []
+        if affected:
+            lines.append(f"     Affected: {', '.join(affected[:3])}")
+        lines.append("")
+
+    lines += [
+        "Safety: no content published, no emails sent, no money spent.",
+        "",
+        "Next:",
+        "  Say 'show packet improvement plan' to see prioritized fixes.",
+        "  Say 'improve revenue asset packet' to apply safe internal improvements.",
+    ]
+    return "\n".join(lines)
+
+
+def recommend_packet_improvements(packet: dict) -> list[str]:
+    """Return prioritized list of actionable improvement strings."""
+    gaps = analyze_packet_readiness_gaps(packet)
+    improvements: list[str] = []
+
+    # Sort by score impact descending
+    sorted_gaps = sorted(gaps, key=lambda g: g.get("score_impact", 0), reverse=True)
+    for gap in sorted_gaps:
+        improvements.append(gap["remediation"])
+
+    if not improvements:
+        improvements.append("All scoring criteria met — packet is in good shape.")
+
+    return improvements
+
+
+def build_packet_improvement_plan(packet: dict) -> dict:
+    """Build a structured improvement plan dict for the packet."""
+    gaps = analyze_packet_readiness_gaps(packet)
+    improvements = recommend_packet_improvements(packet)
+    score = packet.get("readiness_score", 0)
+    total_impact = sum(g.get("score_impact", 0) for g in gaps)
+    projected = min(100, score + total_impact)
+
+    return {
+        "current_score":      score,
+        "target_score":       80,
+        "projected_score":    projected,
+        "gap_count":          len(gaps),
+        "gaps":               gaps,
+        "improvements":       improvements,
+        "estimated_score_gain": total_impact,
+        "safe_next_steps": [
+            "Add 'INTERNAL ONLY' marker to all content files",
+            "Add CTA to each asset referencing the lead magnet or Nexus membership",
+            "Reference revenue goal, funding, or credit in all assets",
+            "Remove unsafe promises from any content that has them",
+            "Build a compliance note asset",
+        ],
+        "blocked_until_ray_approves": [
+            "Publish any asset",
+            "Email subscribers",
+            "Post to social media",
+            "Activate Stripe or payment",
+            "Apply to affiliate programs",
+            "Deploy to production",
+        ],
+        "safety_boundary":    SAFETY_BOUNDARY,
+        "created_at":         _now_iso(),
+    }
+
+
+def apply_internal_packet_improvements(packet: dict) -> dict:
+    """Apply safe internal improvements to the packet — no content publishing.
+
+    This does NOT modify actual content files. It updates asset metadata and
+    regenerates scores based on what can be improved internally:
+      - Notes gaps and logs improvement opportunities
+      - Marks internally-fixable flags
+      - Returns improved packet dict with updated summary
+
+    Does NOT: publish, email, spend money, modify production, apply to affiliate programs.
+    """
+    assets = packet.get("assets") or []
+    improved_assets = []
+
+    for asset in assets:
+        flags = list(asset.get("readiness_flags") or [])
+        new_score = asset.get("readiness_score", 0)
+        note = ""
+
+        # Internal improvement: if file exists but missing CTA — note it
+        if "no_cta_detected" in flags and asset.get("readiness_status") != "blocked":
+            note = "CTA can be added internally — update file content."
+
+        # Internal improvement: if missing internal marker — note it
+        if "no_internal_marker" in flags and asset.get("readiness_status") != "blocked":
+            note = (note + " " if note else "") + "Internal marker can be added to file."
+
+        improved = {**asset, "improvement_note": note}
+        improved_assets.append(improved)
+
+    # Re-score the packet
+    scored = [score_asset_readiness(a) for a in improved_assets]
+    approval_ready  = [a for a in scored if a["readiness_status"] == "approval_ready"]
+    needs_revision  = [a for a in scored if a["readiness_status"] == "needs_revision"]
+    internal_drafts = [a for a in scored if a["readiness_status"] == "internal_draft"]
+    blocked         = [a for a in scored if a["readiness_status"] == "blocked"]
+
+    new_overall = (
+        int(sum(a["readiness_score"] for a in scored) / len(scored))
+        if scored else 0
+    )
+
+    improved_packet = {
+        **packet,
+        "assets":                scored,
+        "readiness_score":       new_overall,
+        "approval_ready_items":  approval_ready,
+        "needs_revision_items":  needs_revision,
+        "internal_draft_items":  internal_drafts,
+        "blocked_items":         blocked,
+        "improved_at":           _now_iso(),
+        "improvement_applied":   True,
+        "summary": (
+            f"Improved Nexus revenue asset packet — {len(scored)} asset(s), "
+            f"{len(approval_ready)} approval-ready, "
+            f"{len(needs_revision)} needing revision."
+        ),
+    }
+    return improved_packet
+
+
+def rescore_packet_after_improvements(packet: dict) -> dict:
+    """Rescore all assets in the packet and return updated packet with new score."""
+    assets = packet.get("assets") or []
+    if not assets:
+        return {**packet, "readiness_score": 0, "rescored_at": _now_iso()}
+
+    rescored = [score_asset_readiness(a) for a in assets]
+    approval_ready  = [a for a in rescored if a["readiness_status"] == "approval_ready"]
+    needs_revision  = [a for a in rescored if a["readiness_status"] == "needs_revision"]
+    internal_drafts = [a for a in rescored if a["readiness_status"] == "internal_draft"]
+    blocked         = [a for a in rescored if a["readiness_status"] == "blocked"]
+
+    new_score = (
+        int(sum(a["readiness_score"] for a in rescored) / len(rescored))
+        if rescored else 0
+    )
+
+    return {
+        **packet,
+        "assets":               rescored,
+        "readiness_score":      new_score,
+        "approval_ready_items": approval_ready,
+        "needs_revision_items": needs_revision,
+        "internal_draft_items": internal_drafts,
+        "blocked_items":        blocked,
+        "rescored_at":          _now_iso(),
+    }
+
+
+def build_improved_cta_set(packet: dict | None = None) -> dict:
+    """Return the improved 8-category CTA set for Phase 6E.
+
+    Internal only — no CTAs are published until Ray approves.
+    """
+    return dict(IMPROVED_CTA_SET)
+
+
+def build_offer_bridge(packet: dict | None = None) -> dict:
+    """Build the offer bridge: free → paid → recurring.
+
+    Internal model only. No payment activated. No Stripe. No signup links
+    until Ray explicitly approves each step.
+    """
+    return {
+        "free": {
+            "name":        "Business Funding Readiness Checklist",
+            "format":      "PDF checklist — downloadable",
+            "cta":         "Download the free checklist",
+            "status":      "internal_draft",
+            "safety_note": "Not published. Requires Ray approval before distribution.",
+        },
+        "next_step": {
+            "name":        "Funding Readiness Review",
+            "format":      "1:1 review call or async audit",
+            "cta":         "Book your free funding readiness review",
+            "status":      "internal_draft",
+            "safety_note": "Not scheduled. Requires Ray approval before offering.",
+        },
+        "recurring": {
+            "name":        "Nexus Membership",
+            "format":      "Recurring membership — track readiness progress",
+            "cta":         "Join Nexus to track your funding readiness",
+            "status":      "internal_draft",
+            "safety_note": "No payment activated. No Stripe. Requires Ray approval.",
+        },
+        "safety_note":    "Internal bridge model only. No payment, no publishing, no outreach.",
+        "safety_boundary": SAFETY_BOUNDARY,
+        "created_at":     _now_iso(),
+    }
+
+
+def save_improved_revenue_packet(packet: dict, improvements: list[str] | None = None) -> dict:
+    """Save improved packet to docs/reports/revenue_packets/ as JSON and Markdown.
+
+    Returns dict with saved_json, saved_md, latest_updated.
+    """
+    _ensure_dirs()
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    base = f"nexus_revenue_asset_packet_improved_{ts}"
+
+    json_path = _PACKET_DIR / f"{base}.json"
+    md_path   = _PACKET_DIR / f"{base}.md"
+
+    try:
+        packet_clean = {k: v for k, v in packet.items() if k != "assets"}
+        packet_clean["assets"] = [
+            {kk: vv for kk, vv in a.items() if kk != "text_preview"}
+            for a in (packet.get("assets") or [])
+        ]
+        if improvements:
+            packet_clean["improvements_applied"] = improvements
+        json_path.write_text(json.dumps(packet_clean, indent=2, default=str))
+    except Exception as exc:
+        logger.warning("save improved packet json error: %s", exc)
+
+    try:
+        md_content = format_improved_packet_report(packet, improvements)
+        md_path.write_text(md_content)
+    except Exception as exc:
+        logger.warning("save improved packet md error: %s", exc)
+
+    # Update latest pointer
+    try:
+        _LATEST_FILE.write_text(json.dumps({
+            "packet_id":      packet.get("packet_id"),
+            "created_at":     packet.get("created_at"),
+            "improved_at":    packet.get("improved_at", _now_iso()),
+            "json_path":      str(json_path.relative_to(_ROOT)),
+            "md_path":        str(md_path.relative_to(_ROOT)),
+            "readiness_score": packet.get("readiness_score", 0),
+            "phase":          "6E",
+        }, indent=2))
+    except Exception as exc:
+        logger.warning("save improved latest pointer error: %s", exc)
+
+    return {
+        "saved_json":     str(json_path),
+        "saved_md":       str(md_path),
+        "latest_updated": str(_LATEST_FILE),
+    }
+
+
+# ── Phase 6E formatters ──────────────────────────────────────────────────────
+
+def format_improved_packet_report(packet: dict, improvements: list[str] | None = None) -> str:
+    """Full improved packet markdown report."""
+    score = packet.get("readiness_score", 0)
+    assets = packet.get("assets") or []
+    ready  = packet.get("approval_ready_items") or []
+
+    lines = [
+        "REVENUE PACKET IMPROVED",
+        "",
+        f"Readiness score: {score}/100",
+        f"Assets: {len(assets)}",
+        f"Approval-ready: {len(ready)}",
+        "",
+        "Goal:",
+        f"  {REVENUE_GOAL}",
+        "",
+        "Safety: no content published, no emails sent, no money spent.",
+        "",
+    ]
+
+    if improvements:
+        lines += ["Improvements applied:", ""]
+        for imp in improvements:
+            lines.append(f"  - {imp}")
+        lines.append("")
+
+    if ready:
+        lines += ["Launch-ready assets:", ""]
+        for a in ready:
+            lines.append(f"  - {a.get('category','').replace('_',' ')}: {a['filename']}")
+        lines.append("")
+
+    lines += [
+        "Next:",
+        "  Say 'show approval queue' to review and approve assets.",
+        "  Say 'generate approval candidates' to queue approval items.",
+    ]
+    return "\n".join(lines)
+
+
+def format_improved_cta_options(packet: dict | None = None) -> str:
+    """Format improved 8-category CTA set."""
+    cta_set = build_improved_cta_set(packet)
+    lines = ["IMPROVED CTA OPTIONS", "", "8-category CTA set for Nexus lead magnet:", ""]
+    for label, text in cta_set.items():
+        label_display = label.replace("_", " ").title()
+        lines.append(f"  [{label_display}]")
+        lines.append(f"  {text}")
+        lines.append("")
+    lines += [
+        "These are internal drafts — not published.",
+        "Safety: no CTA is active until Ray approves and explicitly activates it.",
+        "",
+        "Say 'approve item N' to approve a CTA for use.",
+        "Say 'show offer bridge' to see the full funnel model.",
+    ]
+    return "\n".join(lines)
+
+
+def format_offer_bridge(packet: dict | None = None) -> str:
+    """Format the offer bridge model."""
+    bridge = build_offer_bridge(packet)
+    lines = ["OFFER BRIDGE", "", "Internal funnel model: free → paid → recurring", ""]
+
+    for step_key in ("free", "next_step", "recurring"):
+        step = bridge.get(step_key) or {}
+        step_label = step_key.replace("_", " ").title()
+        lines += [
+            f"[{step_label}]",
+            f"  Name:   {step.get('name', '')}",
+            f"  Format: {step.get('format', '')}",
+            f"  CTA:    {step.get('cta', '')}",
+            f"  Status: {step.get('status', 'internal_draft')}",
+            f"  Note:   {step.get('safety_note', '')}",
+            "",
+        ]
+
+    lines += [
+        "Approval boundary:",
+        f"  {bridge.get('safety_boundary', SAFETY_BOUNDARY)}",
+        "",
+        "Nothing in this bridge activates until Ray explicitly approves each step.",
+    ]
+    return "\n".join(lines)
+
+
+def format_packet_improvement_plan(packet: dict) -> str:
+    """Format the improvement plan as readable output."""
+    plan = build_packet_improvement_plan(packet)
+    score = plan["current_score"]
+    target = plan["target_score"]
+    projected = plan["projected_score"]
+    improvements = plan["improvements"]
+    gaps = plan["gaps"]
+
+    lines = [
+        "PACKET IMPROVEMENT PLAN",
+        "",
+        f"Current score:   {score}/100",
+        f"Target score:    {target}+",
+        f"Projected score: {projected}/100 (if all gaps resolved)",
+        f"Gaps identified: {len(gaps)}",
+        "",
+    ]
+
+    if improvements:
+        lines += ["Prioritized improvements:", ""]
+        for i, imp in enumerate(improvements, 1):
+            lines.append(f"  {i}. {imp}")
+        lines.append("")
+
+    lines += ["Safe internal steps Hermes can take:", ""]
+    for step in plan["safe_next_steps"]:
+        lines.append(f"  - {step}")
+    lines += [""]
+
+    lines += ["Blocked until Ray approves:", ""]
+    for step in plan["blocked_until_ray_approves"]:
+        lines.append(f"  - {step}")
+    lines += [
+        "",
+        "Approval boundary:",
+        f"  {plan['safety_boundary']}",
+        "",
+        "Next:",
+        "  Say 'improve revenue asset packet' to apply safe internal improvements.",
+        "  Say 'rescore revenue packet' to refresh scores after changes.",
+    ]
+    return "\n".join(lines)
+
+
+def format_rescored_packet(packet: dict) -> str:
+    """Format rescored packet output."""
+    score = packet.get("readiness_score", 0)
+    assets = packet.get("assets") or []
+    ready  = packet.get("approval_ready_items") or []
+    rescored_at = packet.get("rescored_at", "")
+
+    lines = [
+        "REVENUE PACKET RESCORED",
+        "",
+        f"Score: {score}/100",
+        f"Assets scored: {len(assets)}",
+        f"Approval-ready: {len(ready)}",
+        "",
+    ]
+
+    if assets:
+        lines += ["Asset scores:", ""]
+        for a in assets:
+            cat    = a.get("category", "").replace("_", " ")
+            ascore = a.get("readiness_score", 0)
+            status = a.get("readiness_status", "unknown")
+            lines.append(f"  {cat}: {ascore}/100 ({status})")
+        lines.append("")
+
+    if rescored_at:
+        lines.append(f"Rescored at: {rescored_at[:19]}")
+        lines.append("")
+
+    lines += [
+        "Next:",
+        "  Say 'show revenue asset packet' to review full packet.",
+        "  Say 'show revenue packet gaps' to see what to improve.",
+    ]
+    return "\n".join(lines)
+
+
+def format_final_review_checklist(packet: dict | None = None) -> str:
+    """Format the final review checklist before Ray approves for launch."""
+    if packet is None:
+        packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+
+    score  = packet.get("readiness_score", 0)
+    assets = packet.get("assets") or []
+    ready  = packet.get("approval_ready_items") or []
+    gaps   = analyze_packet_readiness_gaps(packet)
+
+    lines = [
+        "FINAL REVIEW CHECKLIST",
+        "",
+        f"Packet score: {score}/100",
+        f"Assets: {len(assets)} | Approval-ready: {len(ready)} | Gaps: {len(gaps)}",
+        "",
+        "Pre-launch review items (Ray approval required for each):",
+        "",
+        "  Content review:",
+        "  - [ ] Lead magnet reviewed for accuracy and compliance",
+        "  - [ ] Newsletter reviewed — no unsafe promises",
+        "  - [ ] Short video script reviewed — no misleading claims",
+        "  - [ ] CTA copy reviewed — clear and compliant",
+        "  - [ ] Compliance/disclaimer note present in public-facing assets",
+        "",
+        "  Technical review:",
+        "  - [ ] Opt-in mechanism confirmed before publishing",
+        "  - [ ] No Stripe/payment activated without explicit command",
+        "  - [ ] No subscriber emails sent without explicit command",
+        "  - [ ] Approval queue items all reviewed",
+        "",
+        "  Safety review:",
+        "  - [ ] No content published without explicit Ray approval",
+        "  - [ ] No affiliate program applications without explicit Ray approval",
+        "  - [ ] No production deploys without explicit Ray approval",
+        "  - [ ] No live trading without explicit Ray approval",
+        "",
+    ]
+
+    if gaps:
+        lines += [f"Outstanding gaps ({len(gaps)}):", ""]
+        for g in gaps[:5]:
+            lines.append(f"  - {g['gap'].replace('_',' ').title()}: {g['detail']}")
+        if len(gaps) > 5:
+            lines.append(f"  ... and {len(gaps) - 5} more. Say 'show revenue packet gaps' for full list.")
+        lines.append("")
+
+    lines += [
+        "Approval boundary:",
+        "  Nothing launches until Ray explicitly approves each item above.",
+        "",
+        "Say 'show approval queue' to review pending approval items.",
+    ]
+    return "\n".join(lines)

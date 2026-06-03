@@ -234,6 +234,38 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "approve blocked internal items", "approve all internal items",
       "bulk approve blocked", "approve safe items"],                "bulk_approve_blocked",       "high",   True),
 
+    # ── Phase 6E: Revenue packet improvement (BEFORE Phase 6D to avoid substring collisions) ──
+    (["show revenue packet gaps", "show readiness gaps",
+      "revenue packet gaps", "what are the packet gaps",
+      "show packet gaps", "packet readiness gaps",
+      "what gaps does the revenue packet have"],                    "show_revenue_packet_gaps",    "high",   False),
+
+    (["improve revenue asset packet", "improve the revenue packet",
+      "improve packet score", "raise packet readiness",
+      "improve readiness score", "fix revenue packet",
+      "raise revenue packet score"],                               "improve_revenue_asset_packet", "high",  False),
+
+    (["show improved cta options", "show improved cta",
+      "improved cta options", "improved cta set",
+      "show enhanced cta", "show all cta options"],                "show_improved_cta_options",   "medium", False),
+
+    (["show offer bridge", "offer bridge",
+      "show the offer bridge", "what is the offer bridge",
+      "show funnel model", "funnel model",
+      "free to paid funnel"],                                      "show_offer_bridge",           "medium", False),
+
+    (["show packet improvement plan", "packet improvement plan",
+      "show improvement plan", "what is the improvement plan",
+      "revenue packet plan", "improvement roadmap"],               "show_packet_improvement_plan", "high",  False),
+
+    (["rescore revenue packet", "rescore the revenue packet",
+      "refresh revenue packet score", "rescore packet",
+      "recalculate packet score", "update packet score"],          "rescore_revenue_packet",      "high",   False),
+
+    (["show final review checklist", "final review checklist",
+      "final checklist", "pre-launch final checklist",
+      "show pre-launch review", "final pre-launch checklist"],     "show_final_review_checklist", "high",   False),
+
     # ── Phase 6D: Revenue asset packet ───────────────────────────────────────
     (["build revenue asset packet", "create revenue asset packet",
       "generate revenue asset packet", "build revenue packet",
