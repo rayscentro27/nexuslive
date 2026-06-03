@@ -1,0 +1,187 @@
+{
+  "version": "1.0",
+  "description": "Real failure cases from live Telegram validation. Used for Phase 8 CFO loop evaluation.",
+  "cases": [
+    {
+      "id": "case_01",
+      "message": "what changed",
+      "context": {
+        "last_response_was_draft": true,
+        "current_topic": "lead_magnet",
+        "description": "Last response created a lead magnet draft."
+      },
+      "expected": {
+        "intent": "draft_comparison",
+        "tool": "compare_drafts",
+        "response_must_contain": ["changed", "draft"],
+        "response_must_not_contain": ["daily plan", "artifact_inventory", "I wasn't able to generate a quality response", "HERMES REPORT"],
+        "description": "Compare new draft to previous draft, not daily plan."
+      }
+    },
+    {
+      "id": "case_02",
+      "message": "i approve them all",
+      "context": {
+        "last_response_was_approval_queue": true,
+        "description": "Last response was the approval queue."
+      },
+      "expected": {
+        "intent": "approval_bulk_request",
+        "tool": "bulk_approval_safety_check",
+        "response_must_contain": ["safe", "high-risk", "approval"],
+        "response_must_not_contain": ["artifact_inventory", "I wasn't able to generate a quality response", "HERMES REPORT"],
+        "description": "Bulk approval safety check, high-risk items skipped."
+      }
+    },
+    {
+      "id": "case_03",
+      "message": "what are all the scouts doing right now",
+      "context": {
+        "description": "Research/scout assignments exist in the system."
+      },
+      "expected": {
+        "intent": "scout_status",
+        "tool": "show_scout_status",
+        "response_must_contain": ["scout"],
+        "response_must_not_contain": ["artifact_inventory", "handoff dump", "I wasn't able to generate a quality response", "HERMES REPORT", "source intake"],
+        "description": "Scout assignment/status summary, not source intake dump."
+      }
+    },
+    {
+      "id": "case_04",
+      "message": "can you have the scouts check youtube for new videos",
+      "context": {
+        "description": "No prior scout context required."
+      },
+      "expected": {
+        "intent": "scout_assignment",
+        "tool": "create_scout_assignment",
+        "response_must_contain": ["scout", "YouTube"],
+        "response_must_not_contain": ["artifact_inventory", "I wasn't able to generate a quality response", "HERMES REPORT"],
+        "description": "Create a specific scout assignment for YouTube/content scout, not generic research."
+      }
+    },
+    {
+      "id": "case_05",
+      "message": "what is claude working on right now",
+      "context": {
+        "description": "Tool/task tracking exists in mock fixture."
+      },
+      "expected": {
+        "intent": "tool_status_question",
+        "tool": "show_tool_status",
+        "response_must_contain": ["claude"],
+        "response_must_not_contain": ["artifact_inventory", "I wasn't able to generate a quality response", "HERMES REPORT"],
+        "description": "Check tool/task/session status. If unknown, say not verified and offer to add tracking."
+      }
+    },
+    {
+      "id": "case_06",
+      "message": "what is codex working on right now",
+      "context": {
+        "description": "Codex is not tracked in the session registry."
+      },
+      "expected": {
+        "intent": "tool_status_question",
+        "tool": "show_tool_status",
+        "response_must_contain": ["codex"],
+        "response_must_not_contain": ["artifact_inventory", "I wasn't able to generate a quality response", "HERMES REPORT"],
+        "description": "Check tool status. Codex not tracked — say not verified and offer to add tracking."
+      }
+    },
+    {
+      "id": "case_07",
+      "message": "create the implementation prompt now",
+      "context": {
+        "last_selected_option": 1,
+        "last_selected_option_text": "Activate the lead magnet funnel with affiliate offer",
+        "description": "Option 1 has been selected."
+      },
+      "expected": {
+        "intent": "implementation_prompt_request",
+        "tool": "create_implementation_prompt",
+        "response_must_contain": ["implementation", "prompt"],
+        "response_must_not_contain": ["artifact_inventory", "I wasn't able to generate a quality response", "HERMES REPORT", "published to", "payment activated", "stripe activated"],
+        "description": "Generate implementation prompt for selected option. Internal only."
+      }
+    },
+    {
+      "id": "case_08",
+      "message": "implement it",
+      "context": {
+        "last_selected_option": 1,
+        "last_selected_option_text": "Activate the lead magnet funnel with affiliate offer",
+        "description": "Option 1 selected. 'implement it' should not execute public/paid action."
+      },
+      "expected": {
+        "intent": "implement_now",
+        "tool": "create_implementation_prompt",
+        "response_must_contain": ["prompt", "approval"],
+        "response_must_not_contain": ["artifact_inventory", "I wasn't able to generate a quality response", "HERMES REPORT", "published", "activated", "deployed"],
+        "description": "Produce safe implementation plan and ask for approval. Do not execute public/paid action."
+      }
+    },
+    {
+      "id": "case_09",
+      "message": "do you understand my question",
+      "context": {
+        "description": "Generic acknowledgement check."
+      },
+      "expected": {
+        "intent": "acknowledgement_check",
+        "tool": "plain_acknowledgement",
+        "response_must_contain": ["understand"],
+        "response_must_not_contain": ["artifact_inventory", "I wasn't able to generate a quality response", "HERMES REPORT"],
+        "description": "Plain acknowledgement + restate understood intent + ask correction if needed."
+      }
+    },
+    {
+      "id": "case_10",
+      "message": "can you simplify your response",
+      "context": {
+        "last_meaningful_response": "WEEKLY MONEY PLAN\n\n1. Activate the lead magnet funnel with affiliate offer\n2. Launch Nexus membership at founding-member price\n3. Run YouTube/LinkedIn content push\n\nMy recommendation: Start with option 1 — closest to revenue with no upfront spend.",
+        "description": "Prior meaningful response exists."
+      },
+      "expected": {
+        "intent": "simplify_previous_response",
+        "tool": "simplify_last_response",
+        "response_must_contain": ["PLAIN ANSWER"],
+        "response_must_not_contain": ["artifact_inventory", "I wasn't able to generate a quality response", "HERMES REPORT", "I can answer from verified artifacts"],
+        "description": "Useful simplified version, not fragments."
+      }
+    },
+    {
+      "id": "case_11",
+      "message": "explain your recommendation in plain language",
+      "context": {
+        "active_recommendation": "Start with option 1 — closest to revenue with no upfront spend.",
+        "last_meaningful_response_summary": "Weekly money plan with 3 options. Recommendation: Start with option 1.",
+        "description": "Active recommendation exists."
+      },
+      "expected": {
+        "intent": "explain_previous_response",
+        "tool": "explain_recommendation",
+        "response_must_contain": ["recommendation", "PLAIN ANSWER"],
+        "response_must_not_contain": ["artifact_inventory", "I wasn't able to generate a quality response", "HERMES REPORT", "plain-language mode enabled", "I can answer from verified artifacts"],
+        "description": "Explain active recommendation, not generic plain-language mode."
+      }
+    },
+    {
+      "id": "case_12",
+      "message": "what was task 1",
+      "context": {
+        "last_selected_option": 1,
+        "last_selected_option_text": "Activate the lead magnet funnel with affiliate offer",
+        "last_option_map": {"1": "Activate the lead magnet funnel with affiliate offer", "2": "Launch Nexus membership at founding-member price", "3": "Run YouTube/LinkedIn content push"},
+        "description": "Option 1 was previously selected."
+      },
+      "expected": {
+        "intent": "task_reference",
+        "tool": "select_option",
+        "response_must_contain": ["option 1", "lead magnet"],
+        "response_must_not_contain": ["artifact_inventory", "I wasn't able to generate a quality response", "HERMES REPORT", "I don't have task 1"],
+        "description": "Resolve selected option/task 1 from state."
+      }
+    }
+  ]
+}
