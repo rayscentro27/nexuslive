@@ -1,0 +1,258 @@
+{
+  "timestamp": "20260603_164713",
+  "steps": [
+    {
+      "step": 1,
+      "name": "Memory command pre-check",
+      "function_name": "NexusTelegramBot._try_memory_command",
+      "file_path": "telegram_bot.py",
+      "line_number": 3281,
+      "message_types": [
+        "memory commands",
+        "approval queue read commands",
+        "daily plan read commands",
+        "learning loop commands"
+      ],
+      "can_override_later_layers": true,
+      "can_cause_evidence_dump": false,
+      "can_cause_quality_fallback": false,
+      "phase8c_position": "before"
+    },
+    {
+      "step": 2,
+      "name": "Inbound normalization",
+      "function_name": "_normalize_telegram_command",
+      "file_path": "telegram_bot.py",
+      "line_number": 83,
+      "message_types": [
+        "all text"
+      ],
+      "can_override_later_layers": false,
+      "can_cause_evidence_dump": false,
+      "can_cause_quality_fallback": false,
+      "phase8c_position": "before"
+    },
+    {
+      "step": 3,
+      "name": "CFO shadow command exact handler",
+      "function_name": "handle_cfo_shadow_command",
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line_number": 714,
+      "message_types": [
+        "show cfo shadow status",
+        "show cfo limited primary status",
+        "rollback cfo loop to shadow"
+      ],
+      "can_override_later_layers": true,
+      "can_cause_evidence_dump": false,
+      "can_cause_quality_fallback": false,
+      "phase8c_position": "before"
+    },
+    {
+      "step": 4,
+      "name": "Phase 8C limited primary intercept",
+      "function_name": "run_cfo_limited_primary",
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line_number": 3295,
+      "message_types": [
+        "allowlisted grounded CFO intents"
+      ],
+      "can_override_later_layers": true,
+      "can_cause_evidence_dump": false,
+      "can_cause_quality_fallback": false,
+      "phase8c_position": "self"
+    },
+    {
+      "step": 5,
+      "name": "Phase 7C forced intents",
+      "function_name": "process_with_cfo_brain",
+      "file_path": "telegram_bot.py",
+      "line_number": 3588,
+      "message_types": [
+        "option selection",
+        "task reference",
+        "simplify/explain",
+        "morning activity",
+        "failure feedback"
+      ],
+      "can_override_later_layers": true,
+      "can_cause_evidence_dump": false,
+      "can_cause_quality_fallback": false,
+      "phase8c_position": "after"
+    },
+    {
+      "step": 6,
+      "name": "Continuity exact command map",
+      "function_name": "continuity[...] -> _dispatch_continuity",
+      "file_path": "telegram_bot.py",
+      "line_number": 3348,
+      "message_types": [
+        "exact Telegram-only phrases and follow-ups"
+      ],
+      "can_override_later_layers": true,
+      "can_cause_evidence_dump": false,
+      "can_cause_quality_fallback": false,
+      "phase8c_position": "after"
+    },
+    {
+      "step": 7,
+      "name": "CFO conversation intercept",
+      "function_name": "build_cfo_response",
+      "file_path": "telegram_bot.py",
+      "line_number": 3642,
+      "message_types": [
+        "high-priority strategic conversation"
+      ],
+      "can_override_later_layers": true,
+      "can_cause_evidence_dump": false,
+      "can_cause_quality_fallback": false,
+      "phase8c_position": "after"
+    },
+    {
+      "step": 8,
+      "name": "CFO brain general intercept",
+      "function_name": "process_with_cfo_brain",
+      "file_path": "telegram_bot.py",
+      "line_number": 3666,
+      "message_types": [
+        "general CFO natural-language reasoning"
+      ],
+      "can_override_later_layers": true,
+      "can_cause_evidence_dump": false,
+      "can_cause_quality_fallback": false,
+      "phase8c_position": "after"
+    },
+    {
+      "step": 9,
+      "name": "TelegramRouter",
+      "function_name": "TelegramRouter.route_incoming_message",
+      "file_path": "lib/telegram_router.py",
+      "line_number": 81,
+      "message_types": [
+        "approval replies",
+        "risky action requests",
+        "strategic regex routes",
+        "command mode",
+        "report requests",
+        "daily plan",
+        "generic chat"
+      ],
+      "can_override_later_layers": true,
+      "can_cause_evidence_dump": true,
+      "can_cause_quality_fallback": true,
+      "phase8c_position": "after"
+    },
+    {
+      "step": 10,
+      "name": "Command router",
+      "function_name": "run_command",
+      "file_path": "hermes_command_router/router.py",
+      "line_number": 3546,
+      "message_types": [
+        "normalized command intents"
+      ],
+      "can_override_later_layers": true,
+      "can_cause_evidence_dump": false,
+      "can_cause_quality_fallback": false,
+      "phase8c_position": "after"
+    },
+    {
+      "step": 11,
+      "name": "Evidence/artifact fallback",
+      "function_name": "try_internal_first / evidence-only chat fallback",
+      "file_path": "lib/hermes_internal_first.py",
+      "line_number": 94,
+      "message_types": [
+        "generic strategy/fallback questions"
+      ],
+      "can_override_later_layers": false,
+      "can_cause_evidence_dump": true,
+      "can_cause_quality_fallback": false,
+      "phase8c_position": "after"
+    },
+    {
+      "step": 12,
+      "name": "Quality fallback",
+      "function_name": "hermes_response_quality fallback",
+      "file_path": "lib/hermes_response_quality.py",
+      "line_number": 261,
+      "message_types": [
+        "failed/gated responses"
+      ],
+      "can_override_later_layers": false,
+      "can_cause_evidence_dump": false,
+      "can_cause_quality_fallback": true,
+      "phase8c_position": "after"
+    },
+    {
+      "step": 13,
+      "name": "Send response",
+      "function_name": "handle_inbound_message return",
+      "file_path": "telegram_bot.py",
+      "line_number": 3747,
+      "message_types": [
+        "all finalized answers"
+      ],
+      "can_override_later_layers": false,
+      "can_cause_evidence_dump": false,
+      "can_cause_quality_fallback": false,
+      "phase8c_position": "after"
+    },
+    {
+      "step": 14,
+      "name": "Shadow trace / memory shadow logging",
+      "function_name": "trigger_shadow_comparison_async / run_cfo_shadow_async",
+      "file_path": "telegram_bot.py",
+      "line_number": 3726,
+      "message_types": [
+        "all messages when shadow modes are enabled"
+      ],
+      "can_override_later_layers": false,
+      "can_cause_evidence_dump": false,
+      "can_cause_quality_fallback": false,
+      "phase8c_position": "after"
+    }
+  ],
+  "collisions": [
+    {
+      "collision": "what changed in the draft vs daily plan comparison",
+      "where": "Memory command pre-check vs Phase 8C draft comparison",
+      "current_status": "Phase 8C now wins in limited_primary because _try_memory_command explicitly yields to allowlisted Phase 8C intents."
+    },
+    {
+      "collision": "approve all approvals vs lesson bulk approval",
+      "where": "Approval queue bulk approval vs learning-loop lesson bulk approval phrases",
+      "current_status": "Potential overlap remains because 'approve all' style phrases exist in multiple approval systems; current mitigation relies on exact intent patterns."
+    },
+    {
+      "collision": "implementation prompt now vs evidence fallback",
+      "where": "Phase 8C implementation_prompt_request vs generic evidence/chat fallback",
+      "current_status": "Grounded limited_primary now handles the phrase in limited_primary mode; legacy fallback still exists when Phase 8C is off."
+    },
+    {
+      "collision": "scout status vs source intake dump",
+      "where": "Phase 8C scout_status vs evidence/artifact fallback",
+      "current_status": "Grounded limited_primary now wins in limited_primary mode; outside that mode, generic evidence fallback can still dump intake-heavy responses."
+    },
+    {
+      "collision": "approval safety vs approval queue",
+      "where": "Phase 8C approval_bulk_request vs Phase 6C approval queue exact commands",
+      "current_status": "Different phrases hit different paths; conversational 'i approve them all' resolves to Phase 8C in limited_primary."
+    },
+    {
+      "collision": "summary of day vs generic strategy",
+      "where": "Phase 8C summary_of_day vs internal evidence fallback",
+      "current_status": "Limited_primary path is grounded; without it, strategy/evidence fallback remains possible."
+    },
+    {
+      "collision": "launch packet review vs generic strategy",
+      "where": "No dedicated Phase 8 intercept; likely falls to generic strategy or evidence fallback.",
+      "current_status": "Unresolved overlap; should stay in audit recommendations."
+    },
+    {
+      "collision": "clarifying question vs evidence fallback",
+      "where": "Phase 8C clarifying_question_request vs generic fallback",
+      "current_status": "Resolved in limited_primary; older fallback still exists when Phase 8C is not active."
+    }
+  ]
+}

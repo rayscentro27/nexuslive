@@ -1,0 +1,1025 @@
+{
+  "timestamp": "20260603_164713",
+  "occurrences": [
+    {
+      "file_path": "telegram_bot.py",
+      "line": 2059,
+      "marker": "fake",
+      "context": "\"  - fake sources\\n\"",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 11,
+      "marker": "mock",
+      "context": "HERMES_CFO_LOOP_PROVIDER mock | openrouter | deepseek | local (default: mock)",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 38,
+      "marker": "mock",
+      "context": "_VALID_PROVIDERS = (\"mock\", \"openrouter\", \"deepseek\", \"local\")",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 77,
+      "marker": "I wasn't able to generate a quality response",
+      "context": "\"i wasn't able to generate a quality response\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 85,
+      "marker": "artifact_inventory",
+      "context": "\"artifact_inventory\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 86,
+      "marker": "I can answer from verified artifacts",
+      "context": "\"i can answer from verified artifacts\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 89,
+      "marker": "mock",
+      "context": "_MOCK_BLOCK_MARKERS = [",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 90,
+      "marker": "Based on mock data",
+      "context": "\"based on mock data\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 90,
+      "marker": "mock",
+      "context": "\"based on mock data\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 91,
+      "marker": "sample",
+      "context": "\"sample\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 92,
+      "marker": "mock",
+      "context": "\"mock\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 93,
+      "marker": "Mailchimp opt-in form",
+      "context": "\"mailchimp opt-in form\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 94,
+      "marker": "Build and publish lead magnet landing page",
+      "context": "\"build and publish lead magnet landing page\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 95,
+      "marker": "Connect affiliate offer link",
+      "context": "\"connect affiliate offer link\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 96,
+      "marker": "research_scout_1",
+      "context": "\"research_scout_1\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 97,
+      "marker": "draft v2 approved",
+      "context": "\"draft v2 approved\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 127,
+      "marker": "mock",
+      "context": "\"\"\"Return current provider. Defaults to mock (no network calls).\"\"\"",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 128,
+      "marker": "mock",
+      "context": "raw = os.getenv(\"HERMES_CFO_LOOP_PROVIDER\", \"mock\").lower().strip()",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 130,
+      "marker": "mock",
+      "context": "return \"mock\"",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 275,
+      "marker": "mock",
+      "context": "mock_blocked = False",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 292,
+      "marker": "mock",
+      "context": "mock_blocked = any(marker in lowered_response for marker in _MOCK_BLOCK_MARKERS)",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 296,
+      "marker": "mock",
+      "context": "elif mock_blocked:",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 297,
+      "marker": "mock",
+      "context": "fallback_reason = \"mock_output_blocked\"",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 318,
+      "marker": "mock",
+      "context": "mock_blocked=mock_blocked,",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 337,
+      "marker": "mock",
+      "context": "mock_blocked: bool = False,",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 388,
+      "marker": "mock",
+      "context": "\"mock_blocked\": mock_blocked,",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 549,
+      "marker": "mock",
+      "context": "mock_blocked_count = sum(1 for t in traces if t.get(\"mock_blocked\"))",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "line": 560,
+      "marker": "mock",
+      "context": "f\"Mock-blocked count: {mock_blocked_count}\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 5,
+      "marker": "mock",
+      "context": "Default mode: mock model, deterministic simulated LLM decisions, no network calls, no Supabase writes.",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 25,
+      "marker": "mock",
+      "context": "MOCK_MODE = not bool(os.getenv(\"HERMES_CFO_MODEL_PROVIDER\"))",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 39,
+      "marker": "artifact_inventory",
+      "context": "\"artifact_inventory\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 40,
+      "marker": "handoff dump",
+      "context": "\"handoff dump\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 41,
+      "marker": "I can answer from verified artifacts",
+      "context": "\"i can answer from verified artifacts\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 42,
+      "marker": "I wasn't able to generate a quality response",
+      "context": "\"i wasn't able to generate a quality response\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 48,
+      "marker": "mock",
+      "context": "MOCK_RESPONSE_MARKERS = (",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 49,
+      "marker": "Based on mock data",
+      "context": "\"based on mock data\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 49,
+      "marker": "mock",
+      "context": "\"based on mock data\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 50,
+      "marker": "sample",
+      "context": "\"sample\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 51,
+      "marker": "mock",
+      "context": "\"mock\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 52,
+      "marker": "Mailchimp opt-in form",
+      "context": "\"mailchimp opt-in form\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 53,
+      "marker": "Build and publish lead magnet landing page",
+      "context": "\"build and publish lead magnet landing page\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 54,
+      "marker": "Connect affiliate offer link",
+      "context": "\"connect affiliate offer link\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 55,
+      "marker": "research_scout_1",
+      "context": "\"research_scout_1\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 56,
+      "marker": "draft v2 approved",
+      "context": "\"draft v2 approved\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 108,
+      "marker": "mock",
+      "context": "# \u2500\u2500 Mock Fixtures \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 110,
+      "marker": "mock",
+      "context": "_MOCK_FIXTURES: dict[str, Any] = {",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 150,
+      "marker": "research_scout_1",
+      "context": "{\"scout\": \"research_scout_1\", \"task\": \"Monitor YouTube for new funding content creators\", \"status\": \"active\", \"last_run\": \"2026-06-02\"},",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 151,
+      "marker": "content_scout",
+      "context": "{\"scout\": \"content_scout\", \"task\": \"Review competitor lead magnet landing pages\", \"status\": \"queued\", \"last_run\": None},",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 164,
+      "marker": "Build and publish lead magnet landing page",
+      "context": "\"top_priority\": \"Build and publish lead magnet landing page\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 166,
+      "marker": "draft v2 approved",
+      "context": "\"1. Finalize landing page copy (draft v2 approved)\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 167,
+      "marker": "Mailchimp opt-in form",
+      "context": "\"2. Set up Mailchimp opt-in form\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 168,
+      "marker": "Connect affiliate offer link",
+      "context": "\"3. Connect affiliate offer link\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 200,
+      "marker": "mock",
+      "context": "def _contains_mock_marker(text: str) -> bool:",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 202,
+      "marker": "mock",
+      "context": "return any(marker in lowered for marker in MOCK_RESPONSE_MARKERS)",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 505,
+      "marker": "mock",
+      "context": "evidence[\"tool_status\"] = _MOCK_FIXTURES[\"tool_status\"]",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 507,
+      "marker": "mock",
+      "context": "evidence[\"revenue_packet\"] = _MOCK_FIXTURES[\"revenue_packet\"]",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 548,
+      "marker": "mock",
+      "context": "In mock mode: deterministic rule-based tool selection.",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 574,
+      "marker": "mock",
+      "context": "if MOCK_MODE:",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 575,
+      "marker": "mock",
+      "context": "return self._mock_reason(message, state, evidence, intent_result)",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 578,
+      "marker": "mock",
+      "context": "def _mock_reason(self, message: str, state: ConversationState, evidence: dict, intent_result: dict) -> dict:",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 597,
+      "marker": "mock",
+      "context": "\"mode\": \"mock\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 614,
+      "marker": "content_scout",
+      "context": "return {\"scout_type\": \"content_scout\", \"task\": f\"Check {topic} for new relevant content\", \"context\": message}",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 664,
+      "marker": "mock",
+      "context": "provider = os.getenv(\"HERMES_CFO_MODEL_PROVIDER\", \"mock\")",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 668,
+      "marker": "mock",
+      "context": "f\"Provider configured: {provider}. Use mock mode for testing.\"",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 726,
+      "marker": "mock",
+      "context": "queue = _MOCK_FIXTURES[\"approval_queue\"]",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 815,
+      "marker": "mock",
+      "context": "packet = _MOCK_FIXTURES[\"revenue_packet\"]",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 852,
+      "marker": "mock",
+      "context": "statuses = _MOCK_FIXTURES[\"tool_status\"]",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 989,
+      "marker": "content_scout",
+      "context": "f\"  Scout: {a.get('scout', 'content_scout')}\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 1173,
+      "marker": "mock",
+      "context": "\"mode\": reasoning.get(\"mode\", \"mock\"),",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 1250,
+      "marker": "mock",
+      "context": "\"mode\": \"mock\" if MOCK_MODE else \"live\",",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "line": 1253,
+      "marker": "mock",
+      "context": "\"mock_response_blocked\": _contains_mock_marker(response),",
+      "live_path_risk": false,
+      "test_only": false,
+      "prototype_only": true,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "hermes_command_router/router.py",
+      "line": 976,
+      "marker": "old Executive Memory",
+      "context": "\"- old Executive Memory defaults\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "hermes_command_router/router.py",
+      "line": 977,
+      "marker": "stale provider status",
+      "context": "\"- stale provider status\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "hermes_command_router/router.py",
+      "line": 1377,
+      "marker": "old Executive Memory",
+      "context": "for legacy in (\"old provider status\", \"old executive memory\"):",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "hermes_command_router/router.py",
+      "line": 3555,
+      "marker": "fake",
+      "context": "# \u2500\u2500 Evidence gate: block fake trading execution claims before any routing \u2500\u2500",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "hermes_command_router/router.py",
+      "line": 3557,
+      "marker": "fake",
+      "context": "from lib.hermes_evidence_mode import is_fake_trading_claim",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "hermes_command_router/router.py",
+      "line": 3558,
+      "marker": "fake",
+      "context": "if is_fake_trading_claim(raw_text):",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "hermes_command_router/router.py",
+      "line": 3561,
+      "marker": "fake",
+      "context": "what_happened=\"Fake trading execution claim detected.\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "hermes_command_router/intake.py",
+      "line": 595,
+      "marker": "old Executive Memory",
+      "context": "\"what was in the old executive memory\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "hermes_command_router/intake.py",
+      "line": 596,
+      "marker": "old Executive Memory",
+      "context": "\"show old executive memory\", \"show historical executive memory\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "hermes_command_router/intake.py",
+      "line": 597,
+      "marker": "old Executive Memory",
+      "context": "\"old executive memory\", \"historical executive memory\"],        \"archived_executive_memory\", \"low\",    False),",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/telegram_router.py",
+      "line": 10,
+      "marker": "fake",
+      "context": "is_fake_trading_claim as _is_fake_trading,",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/telegram_router.py",
+      "line": 16,
+      "marker": "fake",
+      "context": "def _is_fake_trading(t: str) -> bool: return False  # type: ignore[misc]",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/telegram_router.py",
+      "line": 82,
+      "marker": "fake",
+      "context": "# \u2500\u2500 Evidence gate: block all fake trading execution claims globally \u2500\u2500\u2500",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/telegram_router.py",
+      "line": 83,
+      "marker": "fake",
+      "context": "if _EVIDENCE_GATING and _is_fake_trading(text):",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/telegram_router.py",
+      "line": 149,
+      "marker": "fake",
+      "context": "# \u2500\u2500 Evidence gate: block fake trading claims before routing \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/telegram_router.py",
+      "line": 150,
+      "marker": "fake",
+      "context": "if _EVIDENCE_GATING and _is_fake_trading(text) and route == ROUTE_DEMO_STATUS:",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_response_quality.py",
+      "line": 261,
+      "marker": "I wasn't able to generate a quality response",
+      "context": "\"I wasn't able to generate a quality response right now. \"",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "lib/hermes_internal_first.py",
+      "line": 2230,
+      "marker": "fake",
+      "context": "\"  - fake sources\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_supabase_first.py",
+      "line": 734,
+      "marker": "fake",
+      "context": "st = classify_market_state({\"trend_strength\": 0.62, \"volatility\": 0.58, \"liquidity\": 0.66, \"session\": \"new york\", \"momentum\": 0.61, \"fakeout_risk\": 0.33})",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_supabase_first.py",
+      "line": 737,
+      "marker": "fake",
+      "context": "f\"Confidence: {round(float(st.get('confidence') or 0)*100,1)}% | Volatility: {st.get('volatility')} | Fakeout risk: {st.get('fakeout_risk')}\\n\"",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_supabase_first.py",
+      "line": 742,
+      "marker": "fake",
+      "context": "st = classify_market_state({\"trend_strength\": 0.62, \"volatility\": 0.58, \"liquidity\": 0.66, \"session\": \"new york\", \"momentum\": 0.61, \"fakeout_risk\": 0.33})",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_supabase_first.py",
+      "line": 746,
+      "marker": "fake",
+      "context": "{\"drawdown\": 1.8, \"fakeout_frequency\": 0.22, \"stability\": 0.67},",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_supabase_first.py",
+      "line": 751,
+      "marker": "fake",
+      "context": "st = classify_market_state({\"trend_strength\": 0.28, \"volatility\": 0.82, \"liquidity\": 0.31, \"session\": \"post-close\", \"momentum\": 0.22, \"fakeout_risk\": 0.79, \"news_instability\": True})",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_supabase_first.py",
+      "line": 766,
+      "marker": "fake",
+      "context": "\"fakeout_involvement\": True,",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_supabase_first.py",
+      "line": 781,
+      "marker": "fake",
+      "context": "return \"Common failing pattern right now: fakeout entries during unstable/news-driven or low-liquidity windows.\"",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_supabase_first.py",
+      "line": 787,
+      "marker": "fake",
+      "context": "{\"name\": \"C\", \"fakeout_filter\": \"confirmation_close_required\"},",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_supabase_first.py",
+      "line": 789,
+      "marker": "fake",
+      "context": "return f\"Promising mutation: {m.get('name')} with {m.get('volatility_filter')} + {m.get('fakeout_filter')} (testing only).\"",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_supabase_first.py",
+      "line": 796,
+      "marker": "fake",
+      "context": "f\"\u2022 EURUSD: {p1.get('momentum_personality')} momentum, fakeout {p1.get('fakeout_tendency')}\\n\"",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_supabase_first.py",
+      "line": 797,
+      "marker": "fake",
+      "context": "f\"\u2022 BTCUSD: {p2.get('momentum_personality')} momentum, fakeout {p2.get('fakeout_tendency')}\"",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": false
+    },
+    {
+      "file_path": "lib/hermes_plain_language_rewriter.py",
+      "line": 39,
+      "marker": "artifact_inventory",
+      "context": "\"artifact_inventory\", \"handoff\", \"HERMES REPORT\", \"Evidence:\", \"Source:\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": true
+    },
+    {
+      "file_path": "lib/hermes_plain_language_rewriter.py",
+      "line": 152,
+      "marker": "artifact_inventory",
+      "context": "\"artifact_inventory\", \"handoff_state\", \"What happened:\",",
+      "live_path_risk": true,
+      "test_only": false,
+      "prototype_only": false,
+      "should_block_from_primary": true
+    }
+  ]
+}

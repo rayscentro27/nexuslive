@@ -357,8 +357,11 @@ def _resolve_implementation_target(args: dict, state: ConversationState) -> Opti
     current_topic = (state.current_topic or "").strip().lower()
     generic_research = "research the question and return with verified evidence"
     if selected and selected.lower() == generic_research and recommendation:
-        if current_topic in {"nexus_plan", "money_strategy", "daily_plan"}:
+        if recommendation.lower() != generic_research:
             return recommendation
+        if current_topic in {"nexus_plan", "money_strategy", "daily_plan", "options", "recommendation"}:
+            return selected
+        return None
     return selected or recommendation or None
 
 

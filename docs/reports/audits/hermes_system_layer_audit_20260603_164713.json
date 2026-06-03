@@ -1,0 +1,761 @@
+{
+  "timestamp": "20260603_164713",
+  "layers": [
+    {
+      "layer": "Telegram bot entrypoint",
+      "file_path": "telegram_bot.py",
+      "purpose": "Primary inbound Telegram handler and top-level routing orchestration.",
+      "state": "active",
+      "pattern": "def handle_inbound_message",
+      "line_number": 3327,
+      "read_sources": [
+        "docs/reports/actions/hermes_action_queue.jsonl"
+      ],
+      "write_targets": [
+        "docs/reports/actions/hermes_action_queue.jsonl"
+      ],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [
+        "Routing collisions from multiple legacy layers.",
+        "Memory pre-check can preempt newer layers."
+      ],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": true,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "telegram_bot.py routing order",
+      "file_path": "telegram_bot.py",
+      "purpose": "Pre-router order for memory commands, CFO phases, continuity, TelegramRouter, and shadow logging.",
+      "state": "active",
+      "pattern": "def handle_inbound_message",
+      "line_number": 3327,
+      "read_sources": [
+        "docs/reports/actions/hermes_action_queue.jsonl"
+      ],
+      "write_targets": [
+        "docs/reports/actions/hermes_action_queue.jsonl"
+      ],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": true,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Command intake",
+      "file_path": "hermes_command_router/intake.py",
+      "purpose": "Deterministic phrase-to-intent normalization and approval flags.",
+      "state": "active",
+      "pattern": "def classify_intent",
+      "line_number": 622,
+      "read_sources": [],
+      "write_targets": [],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Command router",
+      "file_path": "hermes_command_router/router.py",
+      "purpose": "Maps normalized intents to plain handlers, reports, or model-backed fallback.",
+      "state": "active",
+      "pattern": "def run_command",
+      "line_number": 3546,
+      "read_sources": [
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/artifact_registry/nexus_artifact_registry.jsonl",
+        "docs/reports/ceo_review/",
+        "docs/reports/ceo_review/NEXUS_MONETIZATION_CEO_PACKET_",
+        "docs/reports/decisions/hermes_decision_log.jsonl",
+        "docs/reports/hermes_decisions/",
+        "docs/reports/hermes_decisions/hermes_decision_log.jsonl",
+        "docs/reports/hermes_handoffs/",
+        "docs/reports/hermes_handoffs/handoff_",
+        "docs/reports/hermes_proactive_notifications.jsonl",
+        "docs/reports/intake/telegram_source_intake.jsonl",
+        "docs/reports/knowledge_gaps/hermes_knowledge_gaps.jsonl",
+        "docs/reports/memory/learning/hermes_lesson_proposals.jsonl",
+        "docs/reports/operations/hermes_daily_cycle_state.json",
+        "docs/reports/premium_blockers/",
+        "docs/reports/premium_blockers/blocker_resolution_beehiiv_",
+        "docs/reports/ray_feedback/",
+        "docs/reports/revenue_packets/latest_revenue_asset_packet.json",
+        "docs/reports/youtube/source_registry.json",
+        "hermes_memory_v2"
+      ],
+      "write_targets": [
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/artifact_registry/nexus_artifact_registry.jsonl",
+        "docs/reports/ceo_review/",
+        "docs/reports/ceo_review/NEXUS_MONETIZATION_CEO_PACKET_",
+        "docs/reports/decisions/hermes_decision_log.jsonl",
+        "docs/reports/hermes_decisions/",
+        "docs/reports/hermes_decisions/hermes_decision_log.jsonl",
+        "docs/reports/hermes_handoffs/",
+        "docs/reports/hermes_handoffs/handoff_",
+        "docs/reports/hermes_proactive_notifications.jsonl",
+        "docs/reports/intake/telegram_source_intake.jsonl",
+        "docs/reports/knowledge_gaps/hermes_knowledge_gaps.jsonl",
+        "docs/reports/memory/learning/hermes_lesson_proposals.jsonl",
+        "docs/reports/operations/hermes_daily_cycle_state.json",
+        "docs/reports/premium_blockers/",
+        "docs/reports/premium_blockers/blocker_resolution_beehiiv_",
+        "docs/reports/ray_feedback/",
+        "docs/reports/revenue_packets/latest_revenue_asset_packet.json",
+        "docs/reports/youtube/source_registry.json"
+      ],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [
+        "Non-plain intents can still use HERMES REPORT wrapper.",
+        "Some handlers can touch network-backed providers."
+      ],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": true,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Phase 6 daily operating cycle",
+      "file_path": "lib/hermes_daily_operating_cycle.py",
+      "purpose": "Builds today's internal plan, top revenue move, blockers, and approval summaries.",
+      "state": "active",
+      "pattern": "def build_daily_operating_plan",
+      "line_number": 374,
+      "read_sources": [],
+      "write_targets": [],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Daily cycle state",
+      "file_path": "lib/hermes_daily_cycle_state.py",
+      "purpose": "Stores latest daily cycle state, history, pending items, and plan comparisons.",
+      "state": "active",
+      "pattern": "State file:",
+      "line_number": 12,
+      "read_sources": [
+        "docs/reports/operations/hermes_daily_cycle_history.jsonl",
+        "docs/reports/operations/hermes_daily_cycle_state.json"
+      ],
+      "write_targets": [
+        "docs/reports/operations/hermes_daily_cycle_history.jsonl",
+        "docs/reports/operations/hermes_daily_cycle_state.json"
+      ],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Approval queue",
+      "file_path": "lib/hermes_approval_queue.py",
+      "purpose": "Normalizes local approval items and supports local approve/reject/safety impact workflows.",
+      "state": "active",
+      "pattern": "Phase 6C",
+      "line_number": 3,
+      "read_sources": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/approvals/hermes_approval_history.jsonl",
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/decisions/hermes_decision_log.jsonl",
+        "docs/reports/memory/hermes_lessons.jsonl",
+        "docs/reports/operations/hermes_daily_cycle_state.json"
+      ],
+      "write_targets": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/approvals/hermes_approval_history.jsonl",
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/decisions/hermes_decision_log.jsonl",
+        "docs/reports/memory/hermes_lessons.jsonl",
+        "docs/reports/operations/hermes_daily_cycle_state.json"
+      ],
+      "safety_boundary": "Approve authorizes next step only; no publish/email/spend/deploy/trade execution.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Revenue asset packet",
+      "file_path": "lib/hermes_revenue_asset_packet.py",
+      "purpose": "Builds and scores revenue packet assets and approval candidates.",
+      "state": "active",
+      "pattern": "revenue",
+      "line_number": 2,
+      "read_sources": [
+        "docs/reports/content/",
+        "docs/reports/content/fixed/",
+        "docs/reports/revenue_packets/"
+      ],
+      "write_targets": [
+        "docs/reports/content/",
+        "docs/reports/content/fixed/",
+        "docs/reports/revenue_packets/"
+      ],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Funnel packet / launch packet",
+      "file_path": "docs/reports/funnel/",
+      "purpose": "Internal report artifacts for launch/funnel approval packets; not a live routing module.",
+      "state": "legacy",
+      "pattern": "",
+      "line_number": null,
+      "read_sources": [],
+      "write_targets": [],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": false,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Learning loop",
+      "file_path": "lib/hermes_learning_loop.py",
+      "purpose": "Captures lesson proposals locally and, after explicit approval, can write to hermes_memory_v2.",
+      "state": "active",
+      "pattern": "Phase 5",
+      "line_number": 3,
+      "read_sources": [
+        "hermes_memory_v2"
+      ],
+      "write_targets": [],
+      "safety_boundary": "Pending proposals local only; approved lesson writes require Ray approval and target hermes_memory_v2 only.",
+      "known_risks": [
+        "Approved lessons can write Supabase.",
+        "Proposal file may accumulate stale items."
+      ],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": true,
+      "can_write_supabase": true
+    },
+    {
+      "layer": "Memory v2 reader",
+      "file_path": "lib/hermes_memory_v2_reader.py",
+      "purpose": "Preview-only structured memory reader for active/live_answer rows.",
+      "state": "preview",
+      "pattern": "Preview-only reader",
+      "line_number": 2,
+      "read_sources": [
+        "hermes_memory_v2"
+      ],
+      "write_targets": [],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [
+        "Supabase credential dependence.",
+        "Preview-only can diverge from live truth."
+      ],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": true,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Memory v2 primary mode",
+      "file_path": "lib/hermes_memory_v2_shadow.py",
+      "purpose": "Mode gates preview/shadow/primary behavior for memory v2 with strong approval guards.",
+      "state": "preview",
+      "pattern": "Phase 4E/4F",
+      "line_number": 3,
+      "read_sources": [
+        "docs/reports/memory/hermes_memory_v2_primary_approval.json"
+      ],
+      "write_targets": [
+        "docs/reports/memory/hermes_memory_v2_primary_approval.json"
+      ],
+      "safety_boundary": "Primary mode requires explicit approval file and guard checks.",
+      "known_risks": [
+        "Guarded primary may be requested but not actually active.",
+        "Shadow/preview drift can confuse operators."
+      ],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "CFO brain Phase 7",
+      "file_path": "lib/hermes_cfo_brain.py",
+      "purpose": "Handles follow-up reasoning, option selection, explain/simplify, failure feedback, and selected strategy responses.",
+      "state": "active",
+      "pattern": "def classify_cfo_intent",
+      "line_number": 171,
+      "read_sources": [],
+      "write_targets": [],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Conversation state manager",
+      "file_path": "lib/hermes_conversation_state.py",
+      "purpose": "Persists last options, selected option, recommendation, artifact path, and meaningful response context.",
+      "state": "active",
+      "pattern": "def update_conversation_state",
+      "line_number": 307,
+      "read_sources": [],
+      "write_targets": [],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Plain-language rewriter",
+      "file_path": "lib/hermes_plain_language_rewriter.py",
+      "purpose": "Rewrites or compresses complex outputs into operator-friendly plain language.",
+      "state": "active",
+      "pattern": "def rewrite",
+      "line_number": null,
+      "read_sources": [],
+      "write_targets": [],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Failure learning",
+      "file_path": "lib/hermes_failure_learning.py",
+      "purpose": "Logs bad responses and generates learn/test artifacts from failures.",
+      "state": "active",
+      "pattern": "failed",
+      "line_number": 9,
+      "read_sources": [
+        "docs/reports/training/hermes_failed_response_examples.jsonl",
+        "docs/reports/training/hermes_response_training_set.jsonl"
+      ],
+      "write_targets": [
+        "docs/reports/training/hermes_failed_response_examples.jsonl",
+        "docs/reports/training/hermes_response_training_set.jsonl"
+      ],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Custom GPT trainer package",
+      "file_path": "docs/hermes/custom_gpt_trainer/",
+      "purpose": "Documentation/training package for response rewrite, failure review, and alignment prompts.",
+      "state": "legacy",
+      "pattern": "",
+      "line_number": null,
+      "read_sources": [],
+      "write_targets": [],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": false,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Phase 8A CFO prototype",
+      "file_path": "prototypes/hermes_agentic_cfo_loop.py",
+      "purpose": "Prototype agentic CFO loop with intent/retrieval/reasoning/tool/plain-language stages.",
+      "state": "prototype-only",
+      "pattern": "class HermesCFOLoop",
+      "line_number": 1193,
+      "read_sources": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/content/",
+        "docs/reports/operations/hermes_daily_cycle_state.json",
+        "docs/reports/research_queue/hermes_research_queue.jsonl",
+        "docs/reports/research_queue/hermes_scout_assignments.jsonl",
+        "docs/reports/scouts/",
+        "docs/reports/strategy/",
+        "docs/reports/strategy/hermes_conversation_state.json"
+      ],
+      "write_targets": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/content/",
+        "docs/reports/operations/hermes_daily_cycle_state.json",
+        "docs/reports/research_queue/hermes_research_queue.jsonl",
+        "docs/reports/research_queue/hermes_scout_assignments.jsonl",
+        "docs/reports/scouts/",
+        "docs/reports/strategy/",
+        "docs/reports/strategy/hermes_conversation_state.json"
+      ],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [
+        "Prototype mock markers exist in codebase.",
+        "Not safe as full live primary without guards."
+      ],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": true,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Phase 8B shadow mode",
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "purpose": "Runs CFO loop in background and logs traces without changing live response.",
+      "state": "inactive",
+      "pattern": "Phase 8B/8C",
+      "line_number": 3,
+      "read_sources": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/content/",
+        "docs/reports/operations/hermes_daily_cycle_state.json",
+        "docs/reports/research_queue/hermes_research_queue.jsonl",
+        "docs/reports/research_queue/hermes_scout_assignments.jsonl",
+        "docs/reports/scouts/",
+        "docs/reports/strategy/",
+        "docs/reports/strategy/hermes_conversation_state.json"
+      ],
+      "write_targets": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/content/",
+        "docs/reports/operations/hermes_daily_cycle_state.json",
+        "docs/reports/research_queue/hermes_research_queue.jsonl",
+        "docs/reports/research_queue/hermes_scout_assignments.jsonl",
+        "docs/reports/scouts/",
+        "docs/reports/strategy/",
+        "docs/reports/strategy/hermes_conversation_state.json"
+      ],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [
+        "Trace volume can obscure latest state.",
+        "Prototype output still exists in shadow path."
+      ],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": true,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Phase 8C limited primary mode",
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "purpose": "Allows grounded, allowlisted CFO responses to become live Telegram answers.",
+      "state": "inactive",
+      "pattern": "LIMITED_PRIMARY_CONFIDENCE_THRESHOLD",
+      "line_number": 42,
+      "read_sources": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/content/",
+        "docs/reports/operations/hermes_daily_cycle_state.json",
+        "docs/reports/research_queue/hermes_research_queue.jsonl",
+        "docs/reports/research_queue/hermes_scout_assignments.jsonl",
+        "docs/reports/scouts/",
+        "docs/reports/strategy/",
+        "docs/reports/strategy/hermes_conversation_state.json"
+      ],
+      "write_targets": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/content/",
+        "docs/reports/operations/hermes_daily_cycle_state.json",
+        "docs/reports/research_queue/hermes_research_queue.jsonl",
+        "docs/reports/research_queue/hermes_scout_assignments.jsonl",
+        "docs/reports/scouts/",
+        "docs/reports/strategy/",
+        "docs/reports/strategy/hermes_conversation_state.json"
+      ],
+      "safety_boundary": "Allowlisted intents only; hard blocked/risky intents never become primary.",
+      "known_risks": [
+        "Allowlisted intents only; anything outside falls to legacy routing.",
+        "Grounding depends on local state quality."
+      ],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Phase 8C.1 grounded limited primary guard",
+      "file_path": "lib/hermes_cfo_loop_shadow.py",
+      "purpose": "Blocks mock/sample output and requires grounded evidence paths before primary use.",
+      "state": "active",
+      "pattern": "_MOCK_BLOCK_MARKERS",
+      "line_number": 89,
+      "read_sources": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/content/",
+        "docs/reports/operations/hermes_daily_cycle_state.json",
+        "docs/reports/research_queue/hermes_research_queue.jsonl",
+        "docs/reports/research_queue/hermes_scout_assignments.jsonl",
+        "docs/reports/scouts/",
+        "docs/reports/strategy/",
+        "docs/reports/strategy/hermes_conversation_state.json"
+      ],
+      "write_targets": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/content/",
+        "docs/reports/operations/hermes_daily_cycle_state.json",
+        "docs/reports/research_queue/hermes_research_queue.jsonl",
+        "docs/reports/research_queue/hermes_scout_assignments.jsonl",
+        "docs/reports/scouts/",
+        "docs/reports/strategy/",
+        "docs/reports/strategy/hermes_conversation_state.json"
+      ],
+      "safety_boundary": "Blocks mock/sample output and ungrounded primary answers.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Scout assignments",
+      "file_path": "lib/hermes_scout_dispatcher.py",
+      "purpose": "Creates scout dispatch handoffs and logs scout dispatch artifacts.",
+      "state": "active",
+      "pattern": "Scout Dispatch Handoff",
+      "line_number": 250,
+      "read_sources": [],
+      "write_targets": [],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": false,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Research queue",
+      "file_path": "hermes_command_router/router.py",
+      "purpose": "Read-only queue review, dedupe, assignment visibility, and unresolved question surfacing.",
+      "state": "active",
+      "pattern": "show_research_queue",
+      "line_number": 2971,
+      "read_sources": [
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/artifact_registry/nexus_artifact_registry.jsonl",
+        "docs/reports/ceo_review/",
+        "docs/reports/ceo_review/NEXUS_MONETIZATION_CEO_PACKET_",
+        "docs/reports/decisions/hermes_decision_log.jsonl",
+        "docs/reports/hermes_decisions/",
+        "docs/reports/hermes_decisions/hermes_decision_log.jsonl",
+        "docs/reports/hermes_handoffs/",
+        "docs/reports/hermes_handoffs/handoff_",
+        "docs/reports/hermes_proactive_notifications.jsonl",
+        "docs/reports/intake/telegram_source_intake.jsonl",
+        "docs/reports/knowledge_gaps/hermes_knowledge_gaps.jsonl",
+        "docs/reports/memory/learning/hermes_lesson_proposals.jsonl",
+        "docs/reports/operations/hermes_daily_cycle_state.json",
+        "docs/reports/premium_blockers/",
+        "docs/reports/premium_blockers/blocker_resolution_beehiiv_",
+        "docs/reports/ray_feedback/",
+        "docs/reports/revenue_packets/latest_revenue_asset_packet.json",
+        "docs/reports/youtube/source_registry.json",
+        "hermes_memory_v2"
+      ],
+      "write_targets": [
+        "docs/reports/approvals/hermes_approval_queue_state.json",
+        "docs/reports/artifact_registry/nexus_artifact_registry.jsonl",
+        "docs/reports/ceo_review/",
+        "docs/reports/ceo_review/NEXUS_MONETIZATION_CEO_PACKET_",
+        "docs/reports/decisions/hermes_decision_log.jsonl",
+        "docs/reports/hermes_decisions/",
+        "docs/reports/hermes_decisions/hermes_decision_log.jsonl",
+        "docs/reports/hermes_handoffs/",
+        "docs/reports/hermes_handoffs/handoff_",
+        "docs/reports/hermes_proactive_notifications.jsonl",
+        "docs/reports/intake/telegram_source_intake.jsonl",
+        "docs/reports/knowledge_gaps/hermes_knowledge_gaps.jsonl",
+        "docs/reports/memory/learning/hermes_lesson_proposals.jsonl",
+        "docs/reports/operations/hermes_daily_cycle_state.json",
+        "docs/reports/premium_blockers/",
+        "docs/reports/premium_blockers/blocker_resolution_beehiiv_",
+        "docs/reports/ray_feedback/",
+        "docs/reports/revenue_packets/latest_revenue_asset_packet.json",
+        "docs/reports/youtube/source_registry.json"
+      ],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": true,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Action queue",
+      "file_path": "lib/hermes_action_queue.py",
+      "purpose": "Append-only local action tracker for opportunities, approvals, scouts, and artifacts.",
+      "state": "active",
+      "pattern": "Hermes action tracker",
+      "line_number": 4,
+      "read_sources": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/actions/hermes_action_queue_latest.md"
+      ],
+      "write_targets": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/actions/hermes_action_queue_latest.md"
+      ],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Decision log",
+      "file_path": "lib/hermes_decision_log.py",
+      "purpose": "Stores decision artifacts and feeds approval queue / recent decision views.",
+      "state": "active",
+      "pattern": "decision",
+      "line_number": 2,
+      "read_sources": [
+        "docs/reports/decisions/hermes_decision_log.jsonl",
+        "docs/reports/decisions/hermes_decision_log_latest.md"
+      ],
+      "write_targets": [
+        "docs/reports/decisions/hermes_decision_log.jsonl",
+        "docs/reports/decisions/hermes_decision_log_latest.md"
+      ],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Evidence/artifact fallback",
+      "file_path": "lib/hermes_internal_first.py",
+      "purpose": "Builds internal evidence-based fallback answers from local artifacts and handoffs.",
+      "state": "active",
+      "pattern": "verified artifacts",
+      "line_number": null,
+      "read_sources": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/content/",
+        "docs/reports/core/nexus_project_brief.md",
+        "docs/reports/handoffs/",
+        "docs/reports/handoffs/.",
+        "docs/reports/intake/telegram_source_intake.jsonl",
+        "docs/reports/monetization/",
+        "docs/reports/monetization/.",
+        "docs/reports/trading/"
+      ],
+      "write_targets": [
+        "docs/reports/actions/hermes_action_queue.jsonl",
+        "docs/reports/content/",
+        "docs/reports/core/nexus_project_brief.md",
+        "docs/reports/handoffs/",
+        "docs/reports/handoffs/.",
+        "docs/reports/intake/telegram_source_intake.jsonl",
+        "docs/reports/monetization/",
+        "docs/reports/monetization/.",
+        "docs/reports/trading/"
+      ],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [
+        "Can produce artifact dumps instead of operator answer.",
+        "May surface stale handoff-heavy summaries."
+      ],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Old HERMES REPORT wrapper",
+      "file_path": "hermes_command_router/report.py",
+      "purpose": "Wraps non-plain router outputs into HERMES REPORT structure.",
+      "state": "legacy",
+      "pattern": "def build",
+      "line_number": 14,
+      "read_sources": [],
+      "write_targets": [],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Quality fallback",
+      "file_path": "lib/hermes_response_quality.py",
+      "purpose": "Last-resort fallback text when response quality checks fail.",
+      "state": "active",
+      "pattern": "quality response",
+      "line_number": 261,
+      "read_sources": [],
+      "write_targets": [],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [
+        "Generic low-signal answer if upstream path fails."
+      ],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": false,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "Provider/gateway layer",
+      "file_path": "lib/hermes_model_router.py",
+      "purpose": "Chooses/synthesizes provider-backed model calls for non-plain command router paths.",
+      "state": "active",
+      "pattern": "synthesize",
+      "line_number": 82,
+      "read_sources": [],
+      "write_targets": [],
+      "safety_boundary": "Internal-only boundary expected; no autonomous publish/email/payment/deploy/live-trade path allowed.",
+      "known_risks": [],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": true,
+      "can_write_supabase": false
+    },
+    {
+      "layer": "TelegramRouter / LLM fallback",
+      "file_path": "lib/telegram_router.py",
+      "purpose": "Secondary Telegram routing for approvals, strategic regexes, commands, report requests, and generic conversational fallback.",
+      "state": "active",
+      "pattern": "def route_incoming_message",
+      "line_number": 81,
+      "read_sources": [],
+      "write_targets": [],
+      "safety_boundary": "Can still fall through to conversational/model layer when earlier layers do not intercept.",
+      "known_risks": [
+        "Can trigger evidence dumps or model fallback if higher-order layers miss."
+      ],
+      "can_affect_live_telegram_response": true,
+      "uses_mock_data": false,
+      "can_call_network_or_model_providers": true,
+      "can_write_supabase": false
+    }
+  ],
+  "supabase_write_attempted": false
+}

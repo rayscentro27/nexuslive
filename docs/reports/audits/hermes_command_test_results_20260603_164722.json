@@ -1,0 +1,5772 @@
+{
+  "timestamp": "20260603_164722",
+  "summary": {
+    "total_commands_found": 1108,
+    "commands_tested": 35,
+    "commands_skipped": 1073,
+    "commands_passing": 35,
+    "commands_failing": 0,
+    "commands_producing_evidence_dump": 0,
+    "commands_producing_quality_fallback": 0,
+    "duplicate_commands": 14,
+    "orphaned_intents": [],
+    "missing_handlers": [],
+    "handlers_with_no_phrases": [],
+    "phrases_with_no_handlers": []
+  },
+  "tested": [
+    {
+      "phrase": "what is today's date",
+      "intent": "date_time_question",
+      "handler": "_plain_date_time",
+      "output_header": "Today is Wednesday, June 3, 2026.",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "Today is Wednesday, June 3, 2026.\n\nNexus context:\n- Memory v2 mode: preview for structured memory\n- Live answers still prioritize current artifacts, actions, decisions, source intake, and provider policy\n\nI can give the system date from the"
+    },
+    {
+      "phrase": "show last daily plan",
+      "intent": "show_last_daily_plan",
+      "handler": "_plain_show_last_daily_plan",
+      "output_header": "LAST DAILY PLAN",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "LAST DAILY PLAN\n\nPlan date: 2026-06-03 (saved 0m ago)\n\nTop priority: Build a Credit/Funding Readiness Checklist lead magnet (free to draft, no approval needed)\n\nWhy: Ready-to-produce product: checklist, template, or audit offer.\n\nMoney move"
+    },
+    {
+      "phrase": "run daily operating cycle",
+      "intent": "daily_operating_cycle",
+      "handler": "_plain_daily_operating_cycle",
+      "output_header": "TODAY'S NEXUS PLAN \u2014 2026-06-03",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "TODAY'S NEXUS PLAN \u2014 2026-06-03\n\nTop priority:\nBuild a Credit/Funding Readiness Checklist lead magnet (free to draft, no approval needed)\n\nWhy: Ready-to-produce product: checklist, template, or audit offer.\n\n1. Money move\n\n   Advance conten"
+    },
+    {
+      "phrase": "show approval queue",
+      "intent": "show_approval_queue",
+      "handler": "_plain_show_approval_queue",
+      "output_header": "APPROVAL QUEUE",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "APPROVAL QUEUE\n\nPending approval items (10):\n\n1. Lesson: When Ray asks for external real-time info like weather, news, or live prices, I \n   Category: lesson approval\n   Risk: low\n   Needed for: Lesson must be approved before it enters memo"
+    },
+    {
+      "phrase": "continue while i am out",
+      "intent": "daily_continue_while_out",
+      "handler": "_plain_daily_continue_while_out",
+      "output_header": "CONTINUE WHILE YOU ARE OUT",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "CONTINUE WHILE YOU ARE OUT\n\nI can safely continue internal work only.\n\nI will:\n\n1. Review latest source intake\n2. Score monetization opportunities\n3. Prepare draft improvements\n4. Assign internal scout tasks\n5. Update action queue\n6. Log kn"
+    },
+    {
+      "phrase": "30 day revenue plan",
+      "intent": "thirty_day_revenue_plan",
+      "handler": "_plain_thirty_day_revenue_plan",
+      "output_header": "30-DAY NEXUS REVENUE PLAN \u2014 June 03, 2026",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "30-DAY NEXUS REVENUE PLAN \u2014 June 03, 2026\n\nGoal:\n  Generate $1,000/week in recurring or repeatable revenue.\n\nBest starting asset: lead magnet / funding readiness checklist\n\nWeek 1 \u2014 Build and approve the asset packet\n  - finalize lead magne"
+    },
+    {
+      "phrase": "show today's top revenue move",
+      "intent": "daily_top_revenue_move",
+      "handler": "_plain_daily_top_revenue_move",
+      "output_header": "TODAY'S TOP MONEY MOVE \u2014 2026-06-03",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "TODAY'S TOP MONEY MOVE \u2014 2026-06-03\n\nBest move: Advance content draft: credit_funding_readiness_checklist_draft_20260531_213740_862_lead_magnet.md\n\nWhy this is first: Highest-value content asset ready for next step toward 30-Day Revenue Goa"
+    },
+    {
+      "phrase": "show today's blockers",
+      "intent": "daily_blockers",
+      "handler": "_plain_daily_blockers",
+      "output_header": "TODAY'S BLOCKERS \u2014 2026-06-03",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "TODAY'S BLOCKERS \u2014 2026-06-03\n\nCritical blockers:\n\n- No critical blockers found.\n\nOperational blockers:\n\n- Open knowledge gaps: external_info_question, external_info_question, external_info_question\n  Fix: Send sources or links via Telegram"
+    },
+    {
+      "phrase": "what did you do while i was out",
+      "intent": "while_out_summary",
+      "handler": "_plain_while_out_summary",
+      "output_header": "WHILE YOU WERE OUT",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "WHILE YOU WERE OUT\n\nLast plan: 2026-06-03 (0m ago)\n\nStill pending (5):\n  - [blocker] Open knowledge gaps: external_info_question, external_info_question, external_info_question\n  - [safe_action] Review and score latest source intake records"
+    },
+    {
+      "phrase": "show pending items",
+      "intent": "pending_daily_items",
+      "handler": "_plain_pending_daily_items",
+      "output_header": "PENDING DAILY ITEMS \u2014 2026-06-03",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "PENDING DAILY ITEMS \u2014 2026-06-03\n\nBlockers (1):\n  - Open knowledge gaps: external_info_question, external_info_question, external_info_question\n    Fix: Send sources or links via Telegram to close gaps.\n\nSafe internal items (4):\n  - Review "
+    },
+    {
+      "phrase": "compare since last plan",
+      "intent": "compare_since_last_plan",
+      "handler": "_plain_compare_since_last_plan",
+      "output_header": "WHAT CHANGED SINCE THE LAST PLAN",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "WHAT CHANGED SINCE THE LAST PLAN\n\nComparing: 2026-06-03 \u2192 2026-06-03\n\nChanges:\n  - No significant changes detected.\n\nApproval boundary:\n  I will not publish, email, sell, deploy, spend money, or trade live without Ray approval."
+    },
+    {
+      "phrase": "what happens if i approve",
+      "intent": "approval_impact",
+      "handler": "_plain_approval_impact",
+      "output_header": "IF APPROVED \u2014 ITEM ?",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "IF APPROVED \u2014 ITEM ?\n\nPlease specify an item number."
+    },
+    {
+      "phrase": "show research queue",
+      "intent": "show_research_queue",
+      "handler": "_plain_show_research_queue",
+      "output_header": "RESEARCH QUEUE",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "RESEARCH QUEUE\n\n17 open question(s):\n\nID:       rq_20260603_061954\nQuestion: What is the best affiliate offer for the funding checklist audience?\nScout:    monetization_scout\nStatus:   open\nCreated:  2026-06-03T06:19:54\n\nID:       rq_202606"
+    },
+    {
+      "phrase": "show scout assignments",
+      "intent": "show_scout_assignments",
+      "handler": "_plain_show_scout_assignments",
+      "output_header": "SCOUT ASSIGNMENTS",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "SCOUT ASSIGNMENTS\n\n4 assignment(s):\n\nScout:    monetization_scout\nQuestion: Which affiliate offer converts best for funding-readiness audience?\nStatus:   open\nCreated:  2026-06-03T06:19:55\n\nScout:    general_research_scout\nQuestion: How oft"
+    },
+    {
+      "phrase": "what are you still trying to figure out",
+      "intent": "show_unresolved_questions",
+      "handler": "_plain_show_unresolved_questions",
+      "output_header": "UNRESOLVED QUESTIONS",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "UNRESOLVED QUESTIONS\n\n15 open:\n\n  - What is the best affiliate offer for the funding checklist audience?\n    Status: open  |  2026-06-03T06:19:54\n\n  - Test: what is the best affiliate offer?\n    Status: open  |  2026-06-03T06:20:46\n\n  - Tes"
+    },
+    {
+      "phrase": "show active operating rules",
+      "intent": "active_operating_rules",
+      "handler": "_plain_active_operating_rules",
+      "output_header": "ACTIVE OPERATING RULES",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "ACTIVE OPERATING RULES\n\nHermes is currently following these live-answer rules:\n\n1. Evidence first.\n2. Do not invent task status, counts, commits, approvals, or source processing.\n3. Use current artifacts/actions/decisions/source intake befo"
+    },
+    {
+      "phrase": "show memory v2 preview",
+      "intent": "memory_v2_preview",
+      "handler": "_plain_memory_v2_preview",
+      "output_header": "HERMES MEMORY V2 PREVIEW",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "HERMES MEMORY V2 PREVIEW\n\nStatus:\nPreview only \u2014 not the live Telegram primary reader.\n\nRows:\n- active/live_answer records: 0\n- operating rules: 0\n- ray preferences: 0\n- approval policys: 0\n- project contexts: 0\n\nWhat Hermes would read:\n  ("
+    },
+    {
+      "phrase": "show memory v2 status",
+      "intent": "memory_v2_status",
+      "handler": "_plain_memory_v2_status",
+      "output_header": "HERMES MEMORY V2 STATUS",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "HERMES MEMORY V2 STATUS\n\nStatus: preview reader unavailable \u2014 Supabase credentials not configured in this environment.\n\nThe v2 reader module is loaded but cannot connect to Supabase.\nLive Telegram reader has NOT been switched to v2."
+    },
+    {
+      "phrase": "show memory v2 primary status",
+      "intent": "memory_v2_primary_status",
+      "handler": "_plain_memory_v2_primary_status",
+      "output_header": "HERMES MEMORY V2 PRIMARY STATUS",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "HERMES MEMORY V2 PRIMARY STATUS\n\nMode: preview (primary not active)\n\nRows: unavailable (credentials not in this env)\n\nSafety:\n  archived/deprecated/blocked/debug records excluded\n  stale strings excluded\n  provider snapshots not used as cur"
+    },
+    {
+      "phrase": "show memory v2 shadow status",
+      "intent": "memory_v2_shadow_status",
+      "handler": "_plain_memory_v2_shadow_status",
+      "output_header": "HERMES MEMORY V2 SHADOW STATUS",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "HERMES MEMORY V2 SHADOW STATUS\n\nMode: preview\n\nLive Telegram reader: current active reader\nMemory v2: preview mode\n\nRows: unavailable (credentials not in local env)\n\nLast shadow comparison: none yet\n\nImportant: Shadow mode does not change H"
+    },
+    {
+      "phrase": "is memory v2 live",
+      "intent": "memory_v2_live_check",
+      "handler": "_plain_memory_v2_live_check",
+      "output_header": "Memory v2 is preview only. Live answers use current reader.",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "Memory v2 is preview only. Live answers use current reader."
+    },
+    {
+      "phrase": "show memory sources again",
+      "intent": "memory_sources_again",
+      "handler": "_plain_memory_sources",
+      "output_header": "HERMES MEMORY SOURCES",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "HERMES MEMORY SOURCES\n\nLive answer sources:\n- Current conversation context\n- Latest content artifacts\n- Action queue\n- Decision log\n- Source intake records\n- Active operating rules\n- hermes_memory_v2 active/live_answer records when preview/"
+    },
+    {
+      "phrase": "show memory sources",
+      "intent": "memory_sources",
+      "handler": "_plain_memory_sources",
+      "output_header": "HERMES MEMORY SOURCES",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "HERMES MEMORY SOURCES\n\nLive answer sources:\n- Current conversation context\n- Latest content artifacts\n- Action queue\n- Decision log\n- Source intake records\n- Active operating rules\n- hermes_memory_v2 active/live_answer records when preview/"
+    },
+    {
+      "phrase": "where did that answer come from",
+      "intent": "answer_source",
+      "handler": "_plain_answer_source",
+      "output_header": "ANSWER SOURCE",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "ANSWER SOURCE\n\nI answered from the current active context.\n\nMost recent evidence:\n- Latest content artifact: /Users/raymonddavis/nexus-ai/docs/reports/review/daily_research_review_20260530_035332.json\n- Latest action: /Users/raymonddavis/ne"
+    },
+    {
+      "phrase": "show decision log",
+      "intent": "telegram_continuity_exact",
+      "handler": "self._cmd_decision_log",
+      "output_header": "DECISION LOG",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "DECISION LOG\n\nRecent Hermes decisions (10 shown):\n\n1. Created simplified revision artifact\n   When: 2026-06-03 \u2014 Ray requested: simplified revision of checklist draft\n   Why: Internal draft revision per Ray's instruction\n   Evidence: docs/r"
+    },
+    {
+      "phrase": "show approval policy",
+      "intent": "telegram_continuity_exact",
+      "handler": "self._cmd_approval_policy",
+      "output_header": "APPROVAL POLICY",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "APPROVAL POLICY\n\nAutonomous allowed:\n  - free research\n  - source intake\n  - scoring opportunities\n  - assigning scouts\n  - internal drafts\n  - internal reports\n  - action queue / decision log updates\n  - demo/paper testing under caps\n\nRay "
+    },
+    {
+      "phrase": "show action queue",
+      "intent": "telegram_continuity_exact",
+      "handler": "self._cmd_action_queue",
+      "output_header": "ACTION QUEUE",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "ACTION QUEUE\n\nI have 103 open action records, 93 are duplicates. The top work is:\n\n1. build a credit/funding readiness checklist lead magnet (free to draft, no approv\n   Why it matters: fastest reviewable revenue asset.\n   Scout: content_in"
+    },
+    {
+      "phrase": "what changed",
+      "intent": "telegram_continuity_exact",
+      "handler": "self._cmd_compare_draft_versions",
+      "output_header": "DRAFT COMPARISON",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "DRAFT COMPARISON\n\nHere is what changed in the draft:\n\n  Updated section: Compliance Note\n\nNext safe step: Review the latest draft or ask for a specific revision.\n\nApproval boundary:\n  I will not publish, email, spend money, apply to affilia"
+    },
+    {
+      "phrase": "show cfo shadow status",
+      "intent": "cfo_shadow_command",
+      "handler": "format_shadow_status",
+      "output_header": "CFO LOOP SHADOW STATUS",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "CFO LOOP SHADOW STATUS\n\nMode: limited_primary\nProvider: mock\nLive response changed: NO\n\nRecent traces: 31\nLast intent: draft_comparison\nLast selected tool: compare_drafts\nWould-have-fixed count: 0/31\nErrors: 0\n\nSafety:\n  Shadow mode does no"
+    },
+    {
+      "phrase": "show cfo loop mode",
+      "intent": "cfo_shadow_command",
+      "handler": "format_shadow_status",
+      "output_header": "CFO LOOP SHADOW STATUS",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "CFO LOOP SHADOW STATUS\n\nMode: limited_primary\nProvider: mock\nLive response changed: NO\n\nRecent traces: 31\nLast intent: draft_comparison\nLast selected tool: compare_drafts\nWould-have-fixed count: 0/31\nErrors: 0\n\nSafety:\n  Shadow mode does no"
+    },
+    {
+      "phrase": "show cfo shadow traces",
+      "intent": "cfo_shadow_command",
+      "handler": "lambda: format_recent_shadow_traces(10)",
+      "output_header": "CFO SHADOW TRACES",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "CFO SHADOW TRACES\n\nRecent traces (last 10):\n\n  1. Message: review the funding readiness launch packet and give me the a\n     Intent: unknown_answer\n     Tool: plain_acknowledgement\n     Would have fixed live issue: no\n     Confidence: 50%\n\n"
+    },
+    {
+      "phrase": "compare cfo shadow",
+      "intent": "cfo_shadow_command",
+      "handler": "compare_live_vs_shadow",
+      "output_header": "CFO LIVE VS SHADOW COMPARISON",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "CFO LIVE VS SHADOW COMPARISON\n\nMessage: what changed\n\nLive response:\n  None\n\nCFO Loop would have:\n  Intent: draft_comparison\n  Tool: compare_drafts\n  Preview: DRAFT COMPARISON\n\nHere is what changed in the draft:\n\n  Updated section: Complian"
+    },
+    {
+      "phrase": "show cfo limited primary status",
+      "intent": "cfo_shadow_command",
+      "handler": "format_limited_primary_status",
+      "output_header": "CFO LOOP LIMITED PRIMARY STATUS",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "CFO LOOP LIMITED PRIMARY STATUS\n\nMode: limited_primary\nProvider: mock\n\nPrimary used count: 22\nMock-blocked count: 0\nGrounded count: 31\nFallback count: 9\n\nAllowlisted intents:\n  - acknowledgement_check\n  - approval_bulk_request\n  - clarifyin"
+    },
+    {
+      "phrase": "show cfo primary status",
+      "intent": "cfo_shadow_command",
+      "handler": "format_limited_primary_status",
+      "output_header": "CFO LOOP LIMITED PRIMARY STATUS",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "CFO LOOP LIMITED PRIMARY STATUS\n\nMode: limited_primary\nProvider: mock\n\nPrimary used count: 22\nMock-blocked count: 0\nGrounded count: 31\nFallback count: 9\n\nAllowlisted intents:\n  - acknowledgement_check\n  - approval_bulk_request\n  - clarifyin"
+    },
+    {
+      "phrase": "rollback cfo loop to shadow",
+      "intent": "cfo_shadow_command",
+      "handler": "format_rollback_instructions",
+      "output_header": "CFO LOOP ROLLED BACK TO SHADOW",
+      "passed": true,
+      "evidence_dump": false,
+      "quality_fallback": false,
+      "mock_output": false,
+      "response_preview": "CFO LOOP ROLLED BACK TO SHADOW\n\nManual rollback steps:\n\n  1. Edit the plist:\n     ~/Library/LaunchAgents/com.raymonddavis.nexus.telegram.plist\n\n  2. Set HERMES_CFO_LOOP_MODE to: shadow\n\n  3. Unload the service:\n     launchctl unload ~/Libra"
+    }
+  ],
+  "skipped": [
+    {
+      "phrase": "list dev agents",
+      "intent": "list_dev_agents",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "which coding agents",
+      "intent": "list_dev_agents",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "coding agents available",
+      "intent": "list_dev_agents",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what agents",
+      "intent": "list_dev_agents",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "dev agents",
+      "intent": "list_dev_agents",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "available agents",
+      "intent": "list_dev_agents",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "agent bridge",
+      "intent": "list_dev_agents",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "run dev agent status",
+      "intent": "list_dev_agents",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "ask gemini",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "prepare a prompt for gemini",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "use gemini",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "gemini review",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "gemini analyze",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "ask opencode",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "prepare a prompt for opencode",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "use opencode",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "opencode implement",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "ask claude cli",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "prepare a prompt for claude",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "claude cli review",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "ask codex",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "prepare a prompt for codex",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "use codex",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "codex patch",
+      "intent": "prepare_dev_handoff",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "recommend agent",
+      "intent": "recommend_dev_agent",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "which agent should",
+      "intent": "recommend_dev_agent",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what agent should",
+      "intent": "recommend_dev_agent",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "best agent for",
+      "intent": "recommend_dev_agent",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "which cli agent",
+      "intent": "recommend_dev_agent",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "suggest agent",
+      "intent": "recommend_dev_agent",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "which coding agent",
+      "intent": "recommend_dev_agent",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "did you get enough sleep",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "did you sleep",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "do you sleep",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "did you rest",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "are you rested",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "how are you",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "how are you doing",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "how you doing",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "are you awake",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "are you online",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "you good",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "good morning",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "good afternoon",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "good evening",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "good night",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "hey hermes",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "hi hermes",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "you there",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "you still there",
+      "intent": "small_talk",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "what is todays date",
+      "intent": "date_time_question",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what's today's date",
+      "intent": "date_time_question",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what's todays date",
+      "intent": "date_time_question",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what day is it",
+      "intent": "date_time_question",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what day is today",
+      "intent": "date_time_question",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is the date",
+      "intent": "date_time_question",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what's the date",
+      "intent": "date_time_question",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "today's date",
+      "intent": "date_time_question",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what time is it",
+      "intent": "date_time_question",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is the time",
+      "intent": "date_time_question",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "current date",
+      "intent": "date_time_question",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is today",
+      "intent": "date_time_question",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what do you have planned for tomorrow",
+      "intent": "tomorrow_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what are we doing tomorrow",
+      "intent": "tomorrow_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what should we work on tomorrow",
+      "intent": "tomorrow_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "tomorrow plan",
+      "intent": "tomorrow_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "plan for tomorrow",
+      "intent": "tomorrow_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what's planned for tomorrow",
+      "intent": "tomorrow_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is planned for tomorrow",
+      "intent": "tomorrow_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what's the plan for tomorrow",
+      "intent": "tomorrow_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "tomorrows plan",
+      "intent": "tomorrow_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "tomorrow's plan",
+      "intent": "tomorrow_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what if you don't know",
+      "intent": "unknown_handling",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "what if you dont know",
+      "intent": "unknown_handling",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "what if you dont have the answer",
+      "intent": "unknown_handling",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "what if you don't have the answer",
+      "intent": "unknown_handling",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "what if you cannot answer",
+      "intent": "unknown_handling",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "what if you can't answer",
+      "intent": "unknown_handling",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "what happens if you don't know",
+      "intent": "unknown_handling",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "what happens if you dont know",
+      "intent": "unknown_handling",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "how do you handle unknowns",
+      "intent": "unknown_handling",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "how do you handle not knowing",
+      "intent": "unknown_handling",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "what do you do when you don't know",
+      "intent": "unknown_handling",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "what do you do when you dont know",
+      "intent": "unknown_handling",
+      "reason": "not useful for deterministic audit"
+    },
+    {
+      "phrase": "are we ready",
+      "intent": "pilot_readiness",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "ready for pilot",
+      "intent": "pilot_readiness",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "10-user pilot",
+      "intent": "pilot_readiness",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "10 user pilot",
+      "intent": "pilot_readiness",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "pilot ready",
+      "intent": "pilot_readiness",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "pilot launch",
+      "intent": "pilot_readiness",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "ready to launch",
+      "intent": "pilot_readiness",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "ready for launch",
+      "intent": "pilot_readiness",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show last plan",
+      "intent": "show_last_daily_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what was the last plan",
+      "intent": "show_last_daily_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show previous plan",
+      "intent": "show_last_daily_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what was yesterday's plan",
+      "intent": "show_last_daily_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show me the last daily plan",
+      "intent": "show_last_daily_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what was the last daily plan",
+      "intent": "show_last_daily_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "last nexus plan",
+      "intent": "show_last_daily_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "previous daily plan",
+      "intent": "show_last_daily_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show the last plan",
+      "intent": "show_last_daily_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what did the last plan say",
+      "intent": "show_last_daily_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "hermes run daily operating cycle",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "hermes, run daily operating cycle",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "daily operating cycle",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "run daily cycle",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what should i work on today",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what should we work on today",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what should i focus on today",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what should we focus on today",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show today's nexus plan",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show today's plan",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show today nexus plan",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "nexus plan today",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "today's nexus plan",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "todays nexus plan",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "todays plan",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show nexus plan",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "daily plan",
+      "intent": "daily_operating_cycle",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show items needing approval",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "approval queue",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is waiting for my approval",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show approval needed",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what needs ray approval",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show what needs approval",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what needs my approval",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "pending approvals",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "approval needed",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is waiting for approval",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what requires approval",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is pending approval",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "continue while i'm out",
+      "intent": "daily_continue_while_out",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "keep working while i am out",
+      "intent": "daily_continue_while_out",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "keep working while i'm out",
+      "intent": "daily_continue_while_out",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what can you do while i am gone",
+      "intent": "daily_continue_while_out",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what can you do while i'm gone",
+      "intent": "daily_continue_while_out",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what can you do while i am away",
+      "intent": "daily_continue_while_out",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "work while i am out",
+      "intent": "daily_continue_while_out",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "keep going while i am out",
+      "intent": "daily_continue_while_out",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "continue work",
+      "intent": "daily_continue_while_out",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "continue while i am gone",
+      "intent": "daily_continue_while_out",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "work while i am away",
+      "intent": "daily_continue_while_out",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "30-day revenue plan",
+      "intent": "thirty_day_revenue_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "plan to make money this month",
+      "intent": "thirty_day_revenue_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "how do we make money this month",
+      "intent": "thirty_day_revenue_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "make money in the next 30 days",
+      "intent": "thirty_day_revenue_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "30 day plan",
+      "intent": "thirty_day_revenue_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "get to 1000 a week",
+      "intent": "thirty_day_revenue_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "get to $1000 a week",
+      "intent": "thirty_day_revenue_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "how do we get to 1000 a week",
+      "intent": "thirty_day_revenue_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "how to make 1000 a week",
+      "intent": "thirty_day_revenue_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "revenue plan for the month",
+      "intent": "thirty_day_revenue_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "monthly revenue plan",
+      "intent": "thirty_day_revenue_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "we need to come up with a plan to make money",
+      "intent": "thirty_day_revenue_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show today's top money move",
+      "intent": "daily_top_revenue_move",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "top revenue move",
+      "intent": "daily_top_revenue_move",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "top money move today",
+      "intent": "daily_top_revenue_move",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "best revenue move today",
+      "intent": "daily_top_revenue_move",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is the top revenue move",
+      "intent": "daily_top_revenue_move",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "today's top money move",
+      "intent": "daily_top_revenue_move",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "today's top revenue move",
+      "intent": "daily_top_revenue_move",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show top money move",
+      "intent": "daily_top_revenue_move",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show revenue move",
+      "intent": "daily_top_revenue_move",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what can make money today",
+      "intent": "daily_top_revenue_move",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "how do we make money today",
+      "intent": "daily_top_revenue_move",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "todays top revenue move",
+      "intent": "daily_top_revenue_move",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "todays top money move",
+      "intent": "daily_top_revenue_move",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show blockers",
+      "intent": "daily_blockers",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is blocked",
+      "intent": "daily_blockers",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is stopping us",
+      "intent": "daily_blockers",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show current blockers",
+      "intent": "daily_blockers",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what are the blockers",
+      "intent": "daily_blockers",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "today's blockers",
+      "intent": "daily_blockers",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "current blockers",
+      "intent": "daily_blockers",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what's blocked",
+      "intent": "daily_blockers",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "blockers today",
+      "intent": "daily_blockers",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "todays blockers",
+      "intent": "daily_blockers",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what happened while i was out",
+      "intent": "while_out_summary",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "while i was out",
+      "intent": "while_out_summary",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "while i was away",
+      "intent": "while_out_summary",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "while i was gone",
+      "intent": "while_out_summary",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what did hermes do while i was out",
+      "intent": "while_out_summary",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "catch me up from last plan",
+      "intent": "while_out_summary",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what have you been doing",
+      "intent": "while_out_summary",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what did you get done",
+      "intent": "while_out_summary",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "while you were running",
+      "intent": "while_out_summary",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what did you work on",
+      "intent": "while_out_summary",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is pending",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "pending cycle items",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what needs doing",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show what is pending",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "list pending items",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "pending daily items",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what items are pending",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show pending daily items",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "pending tasks",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what still needs to be done",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what needs attention",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "still pending",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "pending from today",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is still pending",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what's still pending",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "whats still pending",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is left from today",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is left to do",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what still needs to be done today",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is unfinished from today",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is still open today",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is still open",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "unfinished from today",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is still left",
+      "intent": "pending_daily_items",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what changed since last plan",
+      "intent": "compare_since_last_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is new since the last plan",
+      "intent": "compare_since_last_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "compare to last plan",
+      "intent": "compare_since_last_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what changed since yesterday",
+      "intent": "compare_since_last_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what's new since the plan",
+      "intent": "compare_since_last_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what changed",
+      "intent": "compare_since_last_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "how has the plan changed",
+      "intent": "compare_since_last_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "compare current plan",
+      "intent": "compare_since_last_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "plan comparison",
+      "intent": "compare_since_last_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is different since last time",
+      "intent": "compare_since_last_plan",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "mark complete",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "mark as complete",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "mark done",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "mark as done",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "mark item complete",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "mark item done",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "mark daily item complete",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "mark daily item done",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "complete daily item",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "complete item",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "that is complete",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "mark that complete",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "mark it complete",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "mark it done",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "completed that",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "finished that item",
+      "intent": "mark_daily_item_complete",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "what needs approval",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show pending approvals",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what approvals are pending",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "items needing approval",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "list approval items",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "list approvals",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is in the approval queue",
+      "intent": "show_approval_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show approval item",
+      "intent": "show_approval_item",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "approval item detail",
+      "intent": "show_approval_item",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "tell me about approval item",
+      "intent": "show_approval_item",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "details for approval item",
+      "intent": "show_approval_item",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is approval item",
+      "intent": "show_approval_item",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "describe approval item",
+      "intent": "show_approval_item",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "approval item info",
+      "intent": "show_approval_item",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "explain approval item",
+      "intent": "show_approval_item",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what would happen if i approve",
+      "intent": "approval_impact",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "if i approve item",
+      "intent": "approval_impact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "impact of approving",
+      "intent": "approval_impact",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "if approved item",
+      "intent": "approval_impact",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "simulate approval",
+      "intent": "approval_impact",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what happens if i reject",
+      "intent": "approval_impact",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "if i reject item",
+      "intent": "approval_impact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "impact of rejecting",
+      "intent": "approval_impact",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "if rejected item",
+      "intent": "approval_impact",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "simulate rejection",
+      "intent": "approval_impact",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "approve item",
+      "intent": "approve_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "approve this item",
+      "intent": "approve_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "i approve item",
+      "intent": "approve_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "give approval for item",
+      "intent": "approve_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "approved item",
+      "intent": "approve_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "yes approve item",
+      "intent": "approve_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "approve number",
+      "intent": "approve_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "reject item",
+      "intent": "reject_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "reject this item",
+      "intent": "reject_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "i reject item",
+      "intent": "reject_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "do not approve item",
+      "intent": "reject_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "deny item",
+      "intent": "reject_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "rejected item",
+      "intent": "reject_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "decline item",
+      "intent": "reject_item",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "clear stale approvals",
+      "intent": "clear_stale_approvals",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "clean up stale approvals",
+      "intent": "clear_stale_approvals",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "archive old approvals",
+      "intent": "clear_stale_approvals",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "remove stale approvals",
+      "intent": "clear_stale_approvals",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "stale approval cleanup",
+      "intent": "clear_stale_approvals",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "clear old approvals",
+      "intent": "clear_stale_approvals",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "cleanup stale approvals",
+      "intent": "clear_stale_approvals",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "bulk approve",
+      "intent": "bulk_approve_blocked",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "approve all safe items",
+      "intent": "bulk_approve_blocked",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "approve blocked internal items",
+      "intent": "bulk_approve_blocked",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "approve all internal items",
+      "intent": "bulk_approve_blocked",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "bulk approve blocked",
+      "intent": "bulk_approve_blocked",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "approve safe items",
+      "intent": "bulk_approve_blocked",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "dedupe research queue",
+      "intent": "dedupe_research_queue",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "deduplicate research queue",
+      "intent": "dedupe_research_queue",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "clean research queue",
+      "intent": "dedupe_research_queue",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "remove duplicate research questions",
+      "intent": "dedupe_research_queue",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "remove duplicates from research queue",
+      "intent": "dedupe_research_queue",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "research queue",
+      "intent": "show_research_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show open research questions",
+      "intent": "show_research_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what is in the research queue",
+      "intent": "show_research_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what questions are open",
+      "intent": "show_research_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show pending research",
+      "intent": "show_research_queue",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "scout assignments",
+      "intent": "show_scout_assignments",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what are scouts working on",
+      "intent": "show_scout_assignments",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "active scout assignments",
+      "intent": "show_scout_assignments",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show active scouts",
+      "intent": "show_scout_assignments",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what did the scouts find",
+      "intent": "show_scout_assignments",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what did scouts find",
+      "intent": "show_scout_assignments",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what did you find",
+      "intent": "show_scout_assignments",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "scout findings",
+      "intent": "show_scout_assignments",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show scout results",
+      "intent": "show_scout_assignments",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what have scouts discovered",
+      "intent": "show_scout_assignments",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what are you figuring out",
+      "intent": "show_unresolved_questions",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show unresolved questions",
+      "intent": "show_unresolved_questions",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "unresolved questions",
+      "intent": "show_unresolved_questions",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what don't you know",
+      "intent": "show_unresolved_questions",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what do you not know yet",
+      "intent": "show_unresolved_questions",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show unknown questions",
+      "intent": "show_unresolved_questions",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what can't you answer",
+      "intent": "show_unresolved_questions",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "create prompt from this",
+      "intent": "create_implementation_prompt",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "create a prompt from this",
+      "intent": "create_implementation_prompt",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "turn this into a claude prompt",
+      "intent": "create_implementation_prompt",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "turn this into a prompt",
+      "intent": "create_implementation_prompt",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "create implementation prompt",
+      "intent": "create_implementation_prompt",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "give me a prompt for claude",
+      "intent": "create_implementation_prompt",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "what should i send claude",
+      "intent": "create_implementation_prompt",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "create a super prompt",
+      "intent": "create_implementation_prompt",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "have opencode fix this",
+      "intent": "create_implementation_prompt",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "make an implementation prompt",
+      "intent": "create_implementation_prompt",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "show last strategic decision",
+      "intent": "show_cfo_notes",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "last strategic decision",
+      "intent": "show_cfo_notes",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show cfo notes",
+      "intent": "show_cfo_notes",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "cfo notes",
+      "intent": "show_cfo_notes",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what did hermes decide",
+      "intent": "show_cfo_notes",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show strategic decisions",
+      "intent": "show_cfo_notes",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "save this as a decision",
+      "intent": "save_cfo_decision",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "save as decision",
+      "intent": "save_cfo_decision",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "record this decision",
+      "intent": "save_cfo_decision",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "save this decision",
+      "intent": "save_cfo_decision",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "add this to the research queue",
+      "intent": "show_research_queue",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "add to research queue",
+      "intent": "show_research_queue",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "add this question to research",
+      "intent": "show_research_queue",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "put this in the research queue",
+      "intent": "show_research_queue",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "show failed responses",
+      "intent": "show_failed_responses",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show failure log",
+      "intent": "show_failed_responses",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show bad responses",
+      "intent": "show_failed_responses",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show logged failures",
+      "intent": "show_failed_responses",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "review failed responses",
+      "intent": "show_failed_responses",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what failed",
+      "intent": "show_failed_responses",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what responses failed",
+      "intent": "show_failed_responses",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "log this as a bad response",
+      "intent": "log_bad_response",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "log this failure",
+      "intent": "log_bad_response",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "that was a bad response",
+      "intent": "log_bad_response",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "mark this as a failure",
+      "intent": "log_bad_response",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "hermes, learn from that",
+      "intent": "learn_from_that",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "learn from that",
+      "intent": "learn_from_that",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "hermes learn from this",
+      "intent": "learn_from_that",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "log this as a lesson",
+      "intent": "learn_from_that",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "create tests from failures",
+      "intent": "create_tests_from_failures",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "generate tests from failures",
+      "intent": "create_tests_from_failures",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "build test cases from failures",
+      "intent": "create_tests_from_failures",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "make tests from failures",
+      "intent": "create_tests_from_failures",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "tests from failures",
+      "intent": "create_tests_from_failures",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "fix revenue packet assets",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "apply safe asset fixes",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "fix packet gaps",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "fix revenue asset gaps",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "clean revenue assets",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "fix revenue assets",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "apply internal fixes",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "fix content assets",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "remove unsafe promises from assets",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "soften unsafe language",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "fix unsafe promise language",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "remove guarantees from assets",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "fix promise language",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "add cta to revenue assets",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "add cta to assets",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "add call to action to assets",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "add compliance notes to assets",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "add compliance note to assets",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "add disclaimer to assets",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "add compliance notes",
+      "intent": "fix_revenue_packet_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show asset fix report",
+      "intent": "show_asset_fix_report",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "asset fix report",
+      "intent": "show_asset_fix_report",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "show fix report",
+      "intent": "show_asset_fix_report",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "what was fixed",
+      "intent": "show_asset_fix_report",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show what was fixed",
+      "intent": "show_asset_fix_report",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "asset repair report",
+      "intent": "show_asset_fix_report",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "rescore after fixes",
+      "intent": "rescore_after_fixes",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "rescore packet after fixes",
+      "intent": "rescore_after_fixes",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "update score after fixes",
+      "intent": "rescore_after_fixes",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "refresh score after fixes",
+      "intent": "rescore_after_fixes",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is the score after fixes",
+      "intent": "rescore_after_fixes",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show revenue packet gaps",
+      "intent": "show_revenue_packet_gaps",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show readiness gaps",
+      "intent": "show_revenue_packet_gaps",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "revenue packet gaps",
+      "intent": "show_revenue_packet_gaps",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what are the packet gaps",
+      "intent": "show_revenue_packet_gaps",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show packet gaps",
+      "intent": "show_revenue_packet_gaps",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "packet readiness gaps",
+      "intent": "show_revenue_packet_gaps",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what gaps does the revenue packet have",
+      "intent": "show_revenue_packet_gaps",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "improve revenue asset packet",
+      "intent": "improve_revenue_asset_packet",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "improve the revenue packet",
+      "intent": "improve_revenue_asset_packet",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "improve packet score",
+      "intent": "improve_revenue_asset_packet",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "raise packet readiness",
+      "intent": "improve_revenue_asset_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "improve readiness score",
+      "intent": "improve_revenue_asset_packet",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "fix revenue packet",
+      "intent": "improve_revenue_asset_packet",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "raise revenue packet score",
+      "intent": "improve_revenue_asset_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show improved cta options",
+      "intent": "show_improved_cta_options",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show improved cta",
+      "intent": "show_improved_cta_options",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "improved cta options",
+      "intent": "show_improved_cta_options",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "improved cta set",
+      "intent": "show_improved_cta_options",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show enhanced cta",
+      "intent": "show_improved_cta_options",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show all cta options",
+      "intent": "show_improved_cta_options",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show offer bridge",
+      "intent": "show_offer_bridge",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "offer bridge",
+      "intent": "show_offer_bridge",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show the offer bridge",
+      "intent": "show_offer_bridge",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is the offer bridge",
+      "intent": "show_offer_bridge",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show funnel model",
+      "intent": "show_offer_bridge",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "funnel model",
+      "intent": "show_offer_bridge",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "free to paid funnel",
+      "intent": "show_offer_bridge",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show packet improvement plan",
+      "intent": "show_packet_improvement_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "packet improvement plan",
+      "intent": "show_packet_improvement_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show improvement plan",
+      "intent": "show_packet_improvement_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is the improvement plan",
+      "intent": "show_packet_improvement_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "revenue packet plan",
+      "intent": "show_packet_improvement_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "improvement roadmap",
+      "intent": "show_packet_improvement_plan",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "rescore revenue packet",
+      "intent": "rescore_revenue_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "rescore the revenue packet",
+      "intent": "rescore_revenue_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "refresh revenue packet score",
+      "intent": "rescore_revenue_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "rescore packet",
+      "intent": "rescore_revenue_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "recalculate packet score",
+      "intent": "rescore_revenue_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "update packet score",
+      "intent": "rescore_revenue_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show final review checklist",
+      "intent": "show_final_review_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "final review checklist",
+      "intent": "show_final_review_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "final checklist",
+      "intent": "show_final_review_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "pre-launch final checklist",
+      "intent": "show_final_review_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show pre-launch review",
+      "intent": "show_final_review_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "final pre-launch checklist",
+      "intent": "show_final_review_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "build revenue asset packet",
+      "intent": "build_revenue_asset_packet",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "create revenue asset packet",
+      "intent": "build_revenue_asset_packet",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "generate revenue asset packet",
+      "intent": "build_revenue_asset_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "build revenue packet",
+      "intent": "build_revenue_asset_packet",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "create revenue packet",
+      "intent": "build_revenue_asset_packet",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "show revenue asset packet",
+      "intent": "show_revenue_asset_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show latest revenue packet",
+      "intent": "show_revenue_asset_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show revenue packet",
+      "intent": "show_revenue_asset_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "revenue asset packet",
+      "intent": "show_revenue_asset_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "revenue packet status",
+      "intent": "show_revenue_asset_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show the revenue packet",
+      "intent": "show_revenue_asset_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is in the revenue packet",
+      "intent": "show_revenue_asset_packet",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show launch-ready assets",
+      "intent": "show_launch_ready_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show launch ready assets",
+      "intent": "show_launch_ready_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "launch ready assets",
+      "intent": "show_launch_ready_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what assets are launch ready",
+      "intent": "show_launch_ready_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is launch ready",
+      "intent": "show_launch_ready_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show ready assets",
+      "intent": "show_launch_ready_assets",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show content awaiting approval",
+      "intent": "show_content_awaiting_approval",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "content awaiting approval",
+      "intent": "show_content_awaiting_approval",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what content needs approval",
+      "intent": "show_content_awaiting_approval",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show content pending approval",
+      "intent": "show_content_awaiting_approval",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "content pending review",
+      "intent": "show_content_awaiting_approval",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is awaiting approval",
+      "intent": "show_content_awaiting_approval",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show cta options",
+      "intent": "show_cta_options",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show cta",
+      "intent": "show_cta_options",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "cta options",
+      "intent": "show_cta_options",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what are the cta options",
+      "intent": "show_cta_options",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show call to action",
+      "intent": "show_cta_options",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "cta copy options",
+      "intent": "show_cta_options",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show launch checklist",
+      "intent": "show_launch_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "launch checklist",
+      "intent": "show_launch_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show the launch checklist",
+      "intent": "show_launch_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is on the launch checklist",
+      "intent": "show_launch_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "pre-launch checklist",
+      "intent": "show_launch_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "pre launch checklist",
+      "intent": "show_launch_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show approval checklist",
+      "intent": "show_approval_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "approval checklist",
+      "intent": "show_approval_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show the approval checklist",
+      "intent": "show_approval_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is on the approval checklist",
+      "intent": "show_approval_checklist",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "generate approval candidates",
+      "intent": "generate_approval_candidates",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "create approval candidates",
+      "intent": "generate_approval_candidates",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "create approval items from packet",
+      "intent": "generate_approval_candidates",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "generate approval items",
+      "intent": "generate_approval_candidates",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "create approval queue items from packet",
+      "intent": "generate_approval_candidates",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "generate candidates from packet",
+      "intent": "generate_approval_candidates",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "next best move",
+      "intent": "next_best_move",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what should we do",
+      "intent": "next_best_move",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what's the next",
+      "intent": "next_best_move",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is the next step",
+      "intent": "next_best_move",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what do you recommend",
+      "intent": "next_best_move",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "recommend",
+      "intent": "next_best_move",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "best move",
+      "intent": "next_best_move",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "next move",
+      "intent": "next_best_move",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what now",
+      "intent": "next_best_move",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "catch me up",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "where are we",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "are we on track",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what did nexus produce",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what happened since",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "nexus status",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what's the nexus status",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "pending handoff",
+      "intent": "handoff_check",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "waiting on me",
+      "intent": "handoff_check",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show handoffs",
+      "intent": "handoff_check",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what do you need",
+      "intent": "handoff_check",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "need my sign",
+      "intent": "handoff_check",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "approval required",
+      "intent": "handoff_check",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "needs approval",
+      "intent": "handoff_check",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is pending my",
+      "intent": "handoff_check",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what evidence do you have",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show verified status",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show me verified",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "verified status only",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is verified",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show evidence",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "evidence only",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what artifacts do you have",
+      "intent": "nexus_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what youtube videos did i send",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what youtube did i send today",
+      "intent": "source_intake_status",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "youtube videos today",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "which youtube did i send",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what links did i send today",
+      "intent": "source_intake_status",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "what videos did i send",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what happened to the last link",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "last link i sent",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what did you do with the link",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "did you process the link",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what happened to the link i sent",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "hermes decided",
+      "intent": "decision_log",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "decision log",
+      "intent": "decision_log",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what did hermes decide",
+      "intent": "decision_log",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "autonomous decision",
+      "intent": "decision_log",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "hermes own decision",
+      "intent": "decision_log",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "demo order",
+      "intent": "demo_broker_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "oanda demo",
+      "intent": "demo_broker_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "demo broker",
+      "intent": "demo_broker_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "demo trade",
+      "intent": "demo_broker_status",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "last trade demo",
+      "intent": "demo_broker_status",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "practice order",
+      "intent": "demo_broker_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "beehiiv",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "beehive",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "bee hive",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "bee-hive",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "behive",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "behiiv",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "newsletter alternative",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "newsletter platform",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "email platform alternative",
+      "intent": "premium_blocker_resolver",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "newsletter tool alternative",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "premium blocker",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "free alternative",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "replace beehiiv",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "cheap alternative",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "tool blocker",
+      "intent": "premium_blocker_resolver",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "record this lesson:",
+      "intent": "lesson_record",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "remember this lesson:",
+      "intent": "lesson_record",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "learn this:",
+      "intent": "lesson_record",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "use this lesson next time:",
+      "intent": "lesson_record",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "save this as a lesson:",
+      "intent": "lesson_record",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "add lesson:",
+      "intent": "lesson_record",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "note this lesson:",
+      "intent": "lesson_record",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "store this lesson:",
+      "intent": "lesson_record",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "lesson:",
+      "intent": "lesson_record",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show pending lessons",
+      "intent": "lesson_pending",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "list pending lessons",
+      "intent": "lesson_pending",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what lessons are pending",
+      "intent": "lesson_pending",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "pending lesson proposals",
+      "intent": "lesson_pending",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show lesson proposals",
+      "intent": "lesson_pending",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "lessons pending review",
+      "intent": "lesson_pending",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show active lessons",
+      "intent": "lesson_active",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "list active lessons",
+      "intent": "lesson_active",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what lessons are active",
+      "intent": "lesson_active",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "active lessons in memory",
+      "intent": "lesson_active",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show lessons in memory",
+      "intent": "lesson_active",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what lessons did hermes learn",
+      "intent": "lesson_active",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "approve all",
+      "intent": "lesson_approve_all",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "approve these lessons",
+      "intent": "lesson_approve_all",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "approve pending lessons",
+      "intent": "lesson_approve_all",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "approve the pending lessons",
+      "intent": "lesson_approve_all",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "approve lesson",
+      "intent": "lesson_approve",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "i approve lesson",
+      "intent": "lesson_approve",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "reject lesson",
+      "intent": "lesson_reject",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "i reject lesson",
+      "intent": "lesson_reject",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "deprecate lesson",
+      "intent": "lesson_deprecate",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "remove lesson",
+      "intent": "lesson_deprecate",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what did you learn from that",
+      "intent": "lesson_learned",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what lesson did you learn",
+      "intent": "lesson_learned",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what did hermes learn",
+      "intent": "lesson_learned",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what lesson came from that",
+      "intent": "lesson_learned",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show last lesson proposal",
+      "intent": "lesson_learned",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "last lesson",
+      "intent": "lesson_learned",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "where did that lesson come from",
+      "intent": "lesson_source",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "why did you use that memory",
+      "intent": "lesson_source",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "lesson source",
+      "intent": "lesson_source",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "explain lesson",
+      "intent": "lesson_source",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "lesson traceability",
+      "intent": "lesson_source",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "where does that lesson come from",
+      "intent": "lesson_source",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is the source of that lesson",
+      "intent": "lesson_source",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "generate gap lessons",
+      "intent": "lesson_gap_generate",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "create lessons from gaps",
+      "intent": "lesson_gap_generate",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "turn gaps into lessons",
+      "intent": "lesson_gap_generate",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "convert gaps to lessons",
+      "intent": "lesson_gap_generate",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "record lesson",
+      "intent": "save_ray_feedback",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "remember this",
+      "intent": "save_ray_feedback",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "save feedback",
+      "intent": "save_ray_feedback",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "save lesson",
+      "intent": "save_ray_feedback",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "note this",
+      "intent": "save_ray_feedback",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "log lesson",
+      "intent": "save_ray_feedback",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "notification log",
+      "intent": "notification_log",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "telegram notification",
+      "intent": "notification_log",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what did hermes send",
+      "intent": "notification_log",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "hermes notification",
+      "intent": "notification_log",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "notification sent",
+      "intent": "notification_log",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "proactive notification",
+      "intent": "notification_log",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "can you hear me",
+      "intent": "communication_health",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "test communication",
+      "intent": "communication_health",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "hello hermes",
+      "intent": "communication_health",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "are you there",
+      "intent": "communication_health",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "is this working",
+      "intent": "communication_health",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "comm check",
+      "intent": "communication_health",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "comms check",
+      "intent": "communication_health",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "communication test",
+      "intent": "communication_health",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "ping",
+      "intent": "communication_health",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show knowledge gaps",
+      "intent": "knowledge_gap_review",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show unanswered questions",
+      "intent": "knowledge_gap_review",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what could you not answer",
+      "intent": "knowledge_gap_review",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show gaps",
+      "intent": "knowledge_gap_review",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what questions were unanswered",
+      "intent": "knowledge_gap_review",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show unanswered",
+      "intent": "knowledge_gap_review",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what did you not know",
+      "intent": "knowledge_gap_review",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what gaps do you have",
+      "intent": "knowledge_gap_review",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "hermes show knowledge gaps",
+      "intent": "knowledge_gap_review",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "research unanswered",
+      "intent": "knowledge_gap_research",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "create better answers for gaps",
+      "intent": "knowledge_gap_research",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "research knowledge gaps",
+      "intent": "knowledge_gap_research",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "improve gap answers",
+      "intent": "knowledge_gap_research",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "fix knowledge gaps",
+      "intent": "knowledge_gap_research",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "resolve knowledge gaps",
+      "intent": "knowledge_gap_research",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "create gap research tasks",
+      "intent": "knowledge_gap_research",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "improve hermes answers",
+      "intent": "knowledge_gap_research",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "unanswered questions research",
+      "intent": "knowledge_gap_research",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "archive resolved gaps",
+      "intent": "knowledge_gap_archive",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "clear resolved gaps",
+      "intent": "knowledge_gap_archive",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "archive old gaps",
+      "intent": "knowledge_gap_archive",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "mark gaps resolved",
+      "intent": "knowledge_gap_archive",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "fastest money",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "fastest revenue",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "fastest path to money",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "fastest money path",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "health",
+      "intent": "health_check",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "backend",
+      "intent": "health_check",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "system check",
+      "intent": "health_check",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "check system",
+      "intent": "health_check",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "worker",
+      "intent": "worker_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "heartbeat",
+      "intent": "worker_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "workers",
+      "intent": "worker_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "queue",
+      "intent": "queue_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "backlog",
+      "intent": "queue_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "pending signal",
+      "intent": "queue_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "test",
+      "intent": "run_tests",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "run test",
+      "intent": "run_tests",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "trading",
+      "intent": "trading_lab_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "trade",
+      "intent": "trading_lab_status",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "position",
+      "intent": "trading_lab_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "oanda",
+      "intent": "trading_lab_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "funding",
+      "intent": "funding_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "fund",
+      "intent": "funding_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "credit",
+      "intent": "credit_workflow_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "score",
+      "intent": "credit_workflow_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "fico",
+      "intent": "credit_workflow_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "grant",
+      "intent": "grant_research_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "grants",
+      "intent": "grant_research_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "research",
+      "intent": "research_task",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "youtube",
+      "intent": "research_task",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "signal",
+      "intent": "research_task",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "ceo digest",
+      "intent": "ceo_digest",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "ceo report",
+      "intent": "ceo_digest",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "ceo brief",
+      "intent": "ceo_digest",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "executive digest",
+      "intent": "ceo_digest",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "daily digest",
+      "intent": "ceo_digest",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show me the digest",
+      "intent": "ceo_digest",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "platform digest",
+      "intent": "ceo_digest",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "anomaly",
+      "intent": "ceo_digest",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "anomalies",
+      "intent": "ceo_digest",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what's broken",
+      "intent": "ceo_digest",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is broken",
+      "intent": "ceo_digest",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "health report",
+      "intent": "ceo_digest",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "platform health",
+      "intent": "ceo_digest",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "ceo",
+      "intent": "summarize_recent_activity",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "daily report",
+      "intent": "summarize_recent_activity",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "weekly report",
+      "intent": "summarize_recent_activity",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "brief",
+      "intent": "summarize_recent_activity",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "refactor",
+      "intent": "code_task",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "fix",
+      "intent": "code_task",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "build",
+      "intent": "code_task",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "implement",
+      "intent": "code_task",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "code",
+      "intent": "code_task",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "write",
+      "intent": "code_task",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "deploy",
+      "intent": "code_task",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "push",
+      "intent": "code_task",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "release",
+      "intent": "code_task",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "rm ",
+      "intent": "code_task",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "delete ",
+      "intent": "code_task",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "drop ",
+      "intent": "code_task",
+      "reason": "approval-required"
+    },
+    {
+      "phrase": "summary",
+      "intent": "summarize_recent_activity",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "summarize",
+      "intent": "summarize_recent_activity",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "activity",
+      "intent": "summarize_recent_activity",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "business opportunity",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "business opportunities",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what opportunities",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show opportunities",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "best opportunity",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "top opportunity",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "side hustle",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "ai content agency",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "credit repair consulting",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "funding broker",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "opportunities ready",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "how do we make money",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "how can we make money",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "how to make money today",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "best money making opportunity",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what can make money",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "money making opportunity",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "best revenue move",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "next best money move",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what should we monetize",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "make money right now",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "nexus monetization audit",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "run nexus monetization audit",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show monetization audit",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "monetization audit",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "monetization plan",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "monetization priorities",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "revenue plan for today",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is our fastest money path",
+      "intent": "business_opportunities",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "app url",
+      "intent": "app_url",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "website url",
+      "intent": "app_url",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is the url",
+      "intent": "app_url",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what's the url",
+      "intent": "app_url",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "app link",
+      "intent": "app_url",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "platform url",
+      "intent": "app_url",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "nexus url",
+      "intent": "app_url",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "goclear",
+      "intent": "app_url",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what is the app",
+      "intent": "app_url",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "where is the app",
+      "intent": "app_url",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "how do i access",
+      "intent": "app_url",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "onboarding",
+      "intent": "onboarding_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "getting started",
+      "intent": "onboarding_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "setup steps",
+      "intent": "onboarding_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "new user",
+      "intent": "onboarding_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "how to start",
+      "intent": "onboarding_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "first steps",
+      "intent": "onboarding_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "user intelligence",
+      "intent": "user_intelligence_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "user score",
+      "intent": "user_intelligence_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "engagement score",
+      "intent": "user_intelligence_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "user profile",
+      "intent": "user_intelligence_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "user readiness",
+      "intent": "user_intelligence_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "who are my users",
+      "intent": "user_intelligence_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "platform analytics",
+      "intent": "platform_analytics",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "usage stats",
+      "intent": "platform_analytics",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "how many users",
+      "intent": "platform_analytics",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "user count",
+      "intent": "platform_analytics",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "active users",
+      "intent": "platform_analytics",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show source intake",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what links did i send",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what youtube did i send",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show failed source",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "continue processing",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "reroute this source",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "assign this to claude",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "assign to youtube",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show pending source",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "source intake queue",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what artifacts did nexus create",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what did claude code finish",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what did codex finish",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show unregistered artifacts",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "backfill the artifact registry",
+      "intent": "source_intake_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show artifact registry",
+      "intent": "artifact_registry_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "artifact registry",
+      "intent": "artifact_registry_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show all artifacts",
+      "intent": "artifact_registry_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what artifacts exist",
+      "intent": "artifact_registry_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "active operating rules",
+      "intent": "active_operating_rules",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what active rules are you using",
+      "intent": "active_operating_rules",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what rules are you following",
+      "intent": "active_operating_rules",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show hermes rules",
+      "intent": "active_operating_rules",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show live answer rules",
+      "intent": "active_operating_rules",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show approval rules",
+      "intent": "active_operating_rules",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what approval rules are active",
+      "intent": "active_operating_rules",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "preview memory v2",
+      "intent": "memory_v2_preview",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show hermes memory v2",
+      "intent": "memory_v2_preview",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "hermes memory v2",
+      "intent": "memory_v2_preview",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "memory v2 preview",
+      "intent": "memory_v2_preview",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show v2 memory",
+      "intent": "memory_v2_preview",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show v2 preview",
+      "intent": "memory_v2_preview",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "compare memory v2",
+      "intent": "memory_v2_compare",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "compare current memory and v2",
+      "intent": "memory_v2_compare",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "compare v2",
+      "intent": "memory_v2_compare",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "v2 vs current memory",
+      "intent": "memory_v2_compare",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "memory comparison",
+      "intent": "memory_v2_compare",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "compare memory readers",
+      "intent": "memory_v2_compare",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "v2 reader comparison",
+      "intent": "memory_v2_compare",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show memory v2 rules",
+      "intent": "memory_v2_rules",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "memory v2 rules",
+      "intent": "memory_v2_rules",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "v2 operating rules",
+      "intent": "memory_v2_rules",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what rules are in v2",
+      "intent": "memory_v2_rules",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "memory v2 status",
+      "intent": "memory_v2_status",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "v2 reader status",
+      "intent": "memory_v2_status",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "is v2 reader active",
+      "intent": "memory_v2_status",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "v2 status",
+      "intent": "memory_v2_status",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "memory v2 primary status",
+      "intent": "memory_v2_primary_status",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "is memory v2 primary active",
+      "intent": "memory_v2_primary_status",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "primary mode status",
+      "intent": "memory_v2_primary_status",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "v2 primary status",
+      "intent": "memory_v2_primary_status",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "memory v2 shadow status",
+      "intent": "memory_v2_shadow_status",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show shadow memory status",
+      "intent": "memory_v2_shadow_status",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "shadow memory status",
+      "intent": "memory_v2_shadow_status",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "v2 shadow status",
+      "intent": "memory_v2_shadow_status",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "is memory v2 primary",
+      "intent": "memory_v2_live_check",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "is memory v2 shadow only",
+      "intent": "memory_v2_live_check",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "is v2 primary",
+      "intent": "memory_v2_live_check",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "is v2 live",
+      "intent": "memory_v2_live_check",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "is v2 the live reader",
+      "intent": "memory_v2_live_check",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "has v2 switched",
+      "intent": "memory_v2_live_check",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "did v2 switch",
+      "intent": "memory_v2_live_check",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "memory sources again",
+      "intent": "memory_sources_again",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "repeat memory sources",
+      "intent": "memory_sources_again",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "resend memory sources",
+      "intent": "memory_sources_again",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "memory sources",
+      "intent": "memory_sources",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what memory sources",
+      "intent": "memory_sources",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what are your memory sources",
+      "intent": "memory_sources",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "where does your memory come from",
+      "intent": "memory_sources",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "where do you get memory from",
+      "intent": "memory_sources",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what memory do you use",
+      "intent": "memory_sources",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what sources do you use",
+      "intent": "memory_sources",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show your memory sources",
+      "intent": "memory_sources",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "archived memory",
+      "intent": "archived_executive_memory",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "stale defaults",
+      "intent": "archived_executive_memory",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "load archived defaults",
+      "intent": "archived_executive_memory",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show archived defaults",
+      "intent": "archived_executive_memory",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "archived executive memory",
+      "intent": "archived_executive_memory",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what were the old defaults",
+      "intent": "archived_executive_memory",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "original defaults",
+      "intent": "archived_executive_memory",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what was in the old executive memory",
+      "intent": "archived_executive_memory",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show old executive memory",
+      "intent": "archived_executive_memory",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show historical executive memory",
+      "intent": "archived_executive_memory",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "old executive memory",
+      "intent": "archived_executive_memory",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "historical executive memory",
+      "intent": "archived_executive_memory",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "where does that come from",
+      "intent": "answer_source",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "where does your answer come from",
+      "intent": "answer_source",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "cite that answer",
+      "intent": "answer_source",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "cite source",
+      "intent": "answer_source",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "answer source",
+      "intent": "answer_source",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "what source did you use",
+      "intent": "answer_source",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "why did you answer that",
+      "intent": "answer_source",
+      "reason": "duplicate intent coverage"
+    },
+    {
+      "phrase": "show stale memory debug",
+      "intent": "stale_memory_debug",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "stale memory debug",
+      "intent": "stale_memory_debug",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "stale debug",
+      "intent": "stale_memory_debug",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "debug memory",
+      "intent": "stale_memory_debug",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show debug memory",
+      "intent": "stale_memory_debug",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show blocked memory debug",
+      "intent": "stale_memory_debug",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show deprecated memory debug",
+      "intent": "stale_memory_debug",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "blocked memory debug",
+      "intent": "stale_memory_debug",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "deprecated memory debug",
+      "intent": "stale_memory_debug",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what brain are you using",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "which brain",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "are you using chatgpt",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "chatgpt auth",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "are you using openai",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "are you using openrouter",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "is openrouter enabled",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "openrouter status",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show provider status",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "provider status",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "which llm",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what llm",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what model are you using",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "which model",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "brain status",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "disable openrouter",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "disable open router",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "show evidence mode status",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "evidence mode status",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "what provider",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "which provider",
+      "intent": "provider_status",
+      "reason": "intent outside safe deterministic whitelist"
+    },
+    {
+      "phrase": "run demo readiness check",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "demo ready?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "demo ready",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what funding blockers do we have",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what trading strategies are launch focus",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what trading strategies are lanch focus",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what opportunities should we review",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "where are you getting your information from",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "are you using what is in supabase",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "run remote readiness check",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "send remote ceo report",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "what needs my approval?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what knowledge emails came in?",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "what marketing tasks are ready?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what should i do before travel?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "start work session",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "pause work session",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "resume work session",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "summarize work session",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what are we working on?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what are we working on",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what are we currently working on?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what are we currently working on",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what is still pending?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what is still pending",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what approvals are waiting?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what approvals are waiting",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what did we finish today?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what did we finish today",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "resume previous work",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what is blocked?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what is blocked",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what failed?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what failed",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show active priorities",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what were we working on?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what were we working on",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what were working on?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what were working on",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "did we finish item 1?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "did we finish item 1",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "did we finish item 2?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "did we finish item 2",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "did we finish item 3?",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "did we finish item 3",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "run ops monitor",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "check ops monitor",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "ops monitor summary",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "run qa check",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "run test agent",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "check system tests",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "send executive report",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "write weekly report",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "send nexus summary",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "draft a telegram update",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "draft client update",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "review funding strategy",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "funding next step",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "review credit workflow",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "credit next step",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show daily research review",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show daily review",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "daily research review",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show research review",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show latest review",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "hermes show daily research review",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "hermes, show daily research review",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show raw evidence",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "raw evidence",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what did hermes decide",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "hermes decisions",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show recent decisions",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "decision log",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what can you do autonomously",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "hermes policy",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "action queue",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what should i review first",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what is the next thing i should review",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "can i view it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "can i see it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "open it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "let me see it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "view it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "view the draft",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "see the draft",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show the draft",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show the first one",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show the best one",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show the top one",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "why did you pick that",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "why that one",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "why that",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "why pick that",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "why did you choose that",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "explain your choice",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what is its status",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what is the status",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what happened with that",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "status",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "where are we with it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what happened with it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "is it done",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "is it assigned",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "who has it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what is next for it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what is next",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what needs my approval",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what can i do without approval",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what can you do without approval",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "create the first draft for the credit/funding readiness checklist",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "create the first draft for the checklist",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "create first draft",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "build checklist draft",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "draft lead magnet",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "create the checklist draft",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "build the checklist",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "create a new version of the checklist draft",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "create a new version",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "revise the checklist",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "create version 2",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "make it simpler",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "simplify it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "make this simpler",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "make it shorter",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "make it clearer",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "make it more professional",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "make it more persuasive",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "make it better",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "improve it",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "revise it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "update it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "update the draft",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "turn it into a lead magnet",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "turn this into a lead magnet",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "create a short video script from this",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "create a tiktok script from this",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "create a newsletter from this",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "create an email from this",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "clean it up",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "remove duplicates",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "fix duplicate sections",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "clean up the draft",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "deduplicate it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what do you recommend",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what do you recommend next",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what should i do next",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what is your recommendation",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "should we keep this",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "is this good",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what would you improve",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what is the next best move",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what should we do with it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what should i do with it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what is next for this",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "is it ready",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "is it ready to publish",
+      "intent": "telegram_continuity_exact",
+      "reason": "write-or-unsafe-capable"
+    },
+    {
+      "phrase": "what did you change",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what is different",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "compare it",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "compare versions",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show differences",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "what improved",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "show changes",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "why cant you make it simpler",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "why can't you make it simpler",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "why cant you make it simplier",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "why can't you make it simplier",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "can you make it simpler",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "make it even simpler",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "simplify it again",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "simplify again",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "make this easier to understand",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "make it even shorter",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "30 day revenue plan",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "30-day revenue plan",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "plan to make money this month",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "how do we make money this month",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "get to 1000 a week",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "make money in the next 30 days",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "we need to come up with a plan to make money in the next 30 days",
+      "intent": "telegram_continuity_exact",
+      "reason": "telegram exact not in safe whitelist"
+    },
+    {
+      "phrase": "cfo shadow status",
+      "intent": "cfo_shadow_command",
+      "reason": "not in safe exact whitelist"
+    },
+    {
+      "phrase": "cfo loop mode",
+      "intent": "cfo_shadow_command",
+      "reason": "not in safe exact whitelist"
+    },
+    {
+      "phrase": "cfo shadow traces",
+      "intent": "cfo_shadow_command",
+      "reason": "not in safe exact whitelist"
+    },
+    {
+      "phrase": "cfo shadow compare",
+      "intent": "cfo_shadow_command",
+      "reason": "not in safe exact whitelist"
+    },
+    {
+      "phrase": "clear cfo shadow test traces",
+      "intent": "cfo_shadow_command",
+      "reason": "not in safe exact whitelist"
+    },
+    {
+      "phrase": "clear cfo shadow traces",
+      "intent": "cfo_shadow_command",
+      "reason": "not in safe exact whitelist"
+    },
+    {
+      "phrase": "cfo limited primary status",
+      "intent": "cfo_shadow_command",
+      "reason": "not in safe exact whitelist"
+    },
+    {
+      "phrase": "cfo primary status",
+      "intent": "cfo_shadow_command",
+      "reason": "not in safe exact whitelist"
+    },
+    {
+      "phrase": "rollback cfo to shadow",
+      "intent": "cfo_shadow_command",
+      "reason": "not in safe exact whitelist"
+    }
+  ],
+  "supabase_write_attempted": false
+}

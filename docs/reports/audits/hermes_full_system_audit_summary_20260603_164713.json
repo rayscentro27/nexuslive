@@ -1,0 +1,144 @@
+{
+  "timestamp": "20260603_164713",
+  "executive_summary": "Hermes currently runs a stacked routing architecture: Telegram pre-checks, command-router plain intents, CFO conversation/brain layers, Phase 8 limited-primary grounding, and TelegramRouter/model fallback. Multiple older fallback paths still exist and can collide when newer intercepts are off.",
+  "current_active_architecture": [
+    "Telegram bot entrypoint",
+    "telegram_bot.py routing order",
+    "Command intake",
+    "Command router",
+    "Phase 6 daily operating cycle",
+    "Daily cycle state",
+    "Approval queue",
+    "Revenue asset packet",
+    "Learning loop",
+    "Memory v2 reader",
+    "Memory v2 primary mode",
+    "CFO brain Phase 7",
+    "Conversation state manager",
+    "Plain-language rewriter",
+    "Failure learning",
+    "Phase 8C.1 grounded limited primary guard",
+    "Scout assignments",
+    "Research queue",
+    "Action queue",
+    "Decision log",
+    "Evidence/artifact fallback",
+    "Quality fallback",
+    "Provider/gateway layer",
+    "TelegramRouter / LLM fallback"
+  ],
+  "live_telegram_routing_order": [
+    "Memory command pre-check",
+    "Inbound normalization",
+    "CFO shadow command exact handler",
+    "Phase 8C limited primary intercept",
+    "Phase 7C forced intents",
+    "Continuity exact command map",
+    "CFO conversation intercept",
+    "CFO brain general intercept",
+    "TelegramRouter",
+    "Command router",
+    "Evidence/artifact fallback",
+    "Quality fallback",
+    "Send response",
+    "Shadow trace / memory shadow logging"
+  ],
+  "command_inventory_count": 1108,
+  "active_commands_by_category": {
+    "CFO loop status": 10,
+    "approval": 89,
+    "content draft": 17,
+    "daily plan": 156,
+    "fallback/help/small talk": 31,
+    "learning": 59,
+    "memory": 75,
+    "revenue/funnel": 77,
+    "scouts/research": 62,
+    "shadow/primary mode": 16,
+    "summaries": 398,
+    "system health": 118
+  },
+  "data_sources_read_written": "See companion data source audit.",
+  "supabase_writes_possible": true,
+  "local_writes_possible": true,
+  "mock_stale_data_risks": 102,
+  "safety_approval_gaps": [
+    {
+      "command_or_intent": "subscriber email",
+      "function": "TelegramRouter report/knowledge email paths; approval queue high-risk categories",
+      "file": "lib/telegram_router.py / lib/hermes_approval_queue.py",
+      "current_behavior": "Email-capable path still exists in router; approval queue treats subscriber email as high risk.",
+      "approval_required": true,
+      "approval_boundary_shown": true,
+      "blocked_correctly": false,
+      "risk_level": "high",
+      "recommendation": "Audit/disable live email-send paths before future feature work."
+    },
+    {
+      "command_or_intent": "external network/model calls",
+      "function": "TelegramRouter conversational fallback, command router model router, provider checks",
+      "file": "lib/telegram_router.py / hermes_command_router/router.py / lib/hermes_provider_policy.py",
+      "current_behavior": "Still possible in non-plain/router/model-backed paths.",
+      "approval_required": false,
+      "approval_boundary_shown": false,
+      "blocked_correctly": false,
+      "risk_level": "medium",
+      "recommendation": "Prefer local deterministic paths for audits and safety-sensitive commands."
+    }
+  ],
+  "duplicate_overlapping_systems": [
+    "what changed in the draft vs daily plan comparison",
+    "approve all approvals vs lesson bulk approval",
+    "implementation prompt now vs evidence fallback",
+    "scout status vs source intake dump",
+    "approval safety vs approval queue",
+    "summary of day vs generic strategy",
+    "launch packet review vs generic strategy",
+    "clarifying question vs evidence fallback"
+  ],
+  "top_10_broken_or_risky_paths": [
+    "Memory command pre-check can still preempt newer layers.",
+    "Legacy TelegramRouter conversational fallback can still hit evidence/model paths.",
+    "Old HERMES REPORT wrapper still exists for non-plain command-router intents.",
+    "Learning loop is the active Supabase-write path.",
+    "Email/report router paths still exist in TelegramRouter.",
+    "Revenue/funnel artifacts are spread across report folders and modules.",
+    "Shadow/preview/primary terminology differs between memory v2 and CFO loop.",
+    "Evidence fallback can still surface stale artifact-heavy summaries.",
+    "Approval concepts exist in approval queue, learning loop, and conversational approvals.",
+    "Prototype CFO loop code still contains mock/stale markers even though primary guard blocks them."
+  ],
+  "top_10_cleanup_recommendations": [
+    "Unify all live Telegram routing into one documented precedence chain.",
+    "Keep _try_memory_command narrow and explicit.",
+    "Deprecate or isolate old HERMES REPORT wrapper paths.",
+    "Add a single command registry as source of truth.",
+    "Separate read-only audit-safe handlers from write-capable handlers.",
+    "Move funnel/launch packet logic from artifact-only reports into explicit modules or mark it archival.",
+    "Reduce generic evidence fallback for operator-facing questions.",
+    "Consolidate approval semantics across approval queue and learning loop.",
+    "Mark prototype/mock files more aggressively as non-live.",
+    "Keep Phase 8C grounding tests as required regression gates."
+  ],
+  "what_to_keep": [
+    "Phase 8C.1 grounded limited primary guard",
+    "Approval queue local-only normalization",
+    "Daily cycle plain-text outputs",
+    "Memory v2 guardrails"
+  ],
+  "what_to_deprecate": [
+    "Old HERMES REPORT wrapper for operator-facing status commands",
+    "Artifact dump fallback for strategic summaries"
+  ],
+  "what_to_fix_next": [
+    "routing collisions",
+    "command registry duplication",
+    "email/router safety gaps"
+  ],
+  "what_not_to_touch": [
+    "Supabase tables",
+    "secrets/env handling",
+    "live trading gates"
+  ],
+  "recommended_phase_8d_or_cleanup_plan": "Prefer a cleanup phase over new features: unify registry, collapse fallback layers, and reduce live-path ambiguity before Phase 8D expansion."
+}

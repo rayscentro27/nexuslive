@@ -1,0 +1,278 @@
+{
+  "timestamp": "20260603_164713",
+  "results": [
+    {
+      "message": "show memory v2 primary status",
+      "handled_by_layer": "memory_command_precheck",
+      "intent": "memory_v2_primary_status",
+      "handler": "_try_memory_command -> run_command",
+      "mode": "exact",
+      "output_header": "HERMES MEMORY V2 PRIMARY STATUS",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "blocked"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "Hermes, run daily operating cycle",
+      "handled_by_layer": "memory_command_precheck",
+      "intent": "daily_operating_cycle",
+      "handler": "_try_memory_command -> run_command",
+      "mode": "exact",
+      "output_header": "TODAY'S NEXUS PLAN \u2014 2026-06-03",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "show approval queue",
+      "handled_by_layer": "phase8c_limited_primary",
+      "intent": "limited_primary",
+      "handler": "run_cfo_limited_primary",
+      "mode": "primary",
+      "output_header": "APPROVAL BULK CHECK",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "i approve them all",
+      "handled_by_layer": "phase8c_limited_primary",
+      "intent": "limited_primary",
+      "handler": "run_cfo_limited_primary",
+      "mode": "primary",
+      "output_header": "APPROVAL BULK CHECK",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "what happens if I approve item 1",
+      "handled_by_layer": "phase8c_limited_primary",
+      "intent": "limited_primary",
+      "handler": "run_cfo_limited_primary",
+      "mode": "primary",
+      "output_header": "APPROVAL BULK CHECK",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "what are all the scouts doing right now",
+      "handled_by_layer": "phase8c_limited_primary",
+      "intent": "limited_primary",
+      "handler": "run_cfo_limited_primary",
+      "mode": "primary",
+      "output_header": "SCOUT STATUS",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "show research queue",
+      "handled_by_layer": "memory_command_precheck",
+      "intent": "show_research_queue",
+      "handler": "_try_memory_command -> run_command",
+      "mode": "exact",
+      "output_header": "RESEARCH QUEUE",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "what did we work on today",
+      "handled_by_layer": "phase8c_limited_primary",
+      "intent": "limited_primary",
+      "handler": "run_cfo_limited_primary",
+      "mode": "primary",
+      "output_header": "DAY SUMMARY",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "create the implementation prompt now",
+      "handled_by_layer": "phase8c_limited_primary",
+      "intent": "limited_primary",
+      "handler": "run_cfo_limited_primary",
+      "mode": "primary",
+      "output_header": "IMPLEMENTATION PROMPT",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary",
+        "internal only"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "implement it",
+      "handled_by_layer": "phase8c_limited_primary",
+      "intent": "limited_primary",
+      "handler": "run_cfo_limited_primary",
+      "mode": "primary",
+      "output_header": "IMPLEMENTATION PROMPT",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary",
+        "internal only"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "what changed in the draft",
+      "handled_by_layer": "phase8c_limited_primary",
+      "intent": "limited_primary",
+      "handler": "run_cfo_limited_primary",
+      "mode": "primary",
+      "output_header": "DRAFT COMPARISON",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "ask me a better clarifying question",
+      "handled_by_layer": "phase8c_limited_primary",
+      "intent": "limited_primary",
+      "handler": "run_cfo_limited_primary",
+      "mode": "primary",
+      "output_header": "CLARIFYING QUESTION",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "Review the Funding Readiness Launch Packet and give me the approval decision summary.",
+      "handled_by_layer": "phase7a_cfo_conversation",
+      "intent": "cfo_conversation",
+      "handler": "build_cfo_response",
+      "mode": "legacy",
+      "output_header": "RAY, I UNDERSTAND THE CONCERN",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "what is the current revenue packet score",
+      "handled_by_layer": "phase7a_cfo_conversation",
+      "intent": "cfo_conversation",
+      "handler": "build_cfo_response",
+      "mode": "legacy",
+      "output_header": "RAY, I UNDERSTAND THE CONCERN",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "which asset is closest to launch ready",
+      "handled_by_layer": "phase7a_cfo_conversation",
+      "intent": "cfo_conversation",
+      "handler": "build_cfo_response",
+      "mode": "legacy",
+      "output_header": "RAY, I UNDERSTAND THE CONCERN",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "show cfo limited primary status",
+      "handled_by_layer": "cfo_shadow_command",
+      "intent": "cfo_shadow_command",
+      "handler": "handle_cfo_shadow_command",
+      "mode": "exact",
+      "output_header": "CFO LOOP LIMITED PRIMARY STATUS",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "blocked"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "show cfo shadow traces",
+      "handled_by_layer": "cfo_shadow_command",
+      "intent": "cfo_shadow_command",
+      "handler": "handle_cfo_shadow_command",
+      "mode": "exact",
+      "output_header": "CFO SHADOW TRACES",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    },
+    {
+      "message": "rollback cfo loop to shadow",
+      "handled_by_layer": "cfo_shadow_command",
+      "intent": "cfo_shadow_command",
+      "handler": "handle_cfo_shadow_command",
+      "mode": "exact",
+      "output_header": "CFO LOOP ROLLED BACK TO SHADOW",
+      "evidence_dump_appeared": false,
+      "quality_fallback_appeared": false,
+      "mock_output_appeared": false,
+      "safety_flags": [
+        "approval boundary"
+      ],
+      "recommended_fix_if_failed": ""
+    }
+  ],
+  "supabase_write_attempted": false
+}

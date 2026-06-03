@@ -1,0 +1,324 @@
+{
+  "timestamp": "20260603_164713",
+  "sources": [
+    {
+      "source": "docs/reports/strategy/hermes_conversation_state.json",
+      "read_by_modules": [
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard"
+      ],
+      "written_by_modules": [
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard"
+      ],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "medium",
+      "duplicate_risk": "medium",
+      "source_of_truth_status": "active"
+    },
+    {
+      "source": "docs/reports/operations/hermes_daily_cycle_state.json",
+      "read_by_modules": [
+        "Approval queue",
+        "Command router",
+        "Daily cycle state",
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard",
+        "Research queue"
+      ],
+      "written_by_modules": [
+        "Approval queue",
+        "Command router",
+        "Daily cycle state",
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard",
+        "Research queue"
+      ],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "medium",
+      "duplicate_risk": "medium",
+      "source_of_truth_status": "active"
+    },
+    {
+      "source": "docs/reports/actions/hermes_action_queue.jsonl",
+      "read_by_modules": [
+        "Action queue",
+        "Approval queue",
+        "Evidence/artifact fallback",
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard",
+        "Telegram bot entrypoint",
+        "telegram_bot.py routing order"
+      ],
+      "written_by_modules": [
+        "Action queue",
+        "Approval queue",
+        "Evidence/artifact fallback",
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard",
+        "Telegram bot entrypoint",
+        "telegram_bot.py routing order"
+      ],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "medium",
+      "duplicate_risk": "medium",
+      "source_of_truth_status": "active"
+    },
+    {
+      "source": "docs/reports/approvals/hermes_approval_queue_state.json",
+      "read_by_modules": [
+        "Approval queue",
+        "Command router",
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard",
+        "Research queue"
+      ],
+      "written_by_modules": [
+        "Approval queue",
+        "Command router",
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard",
+        "Research queue"
+      ],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "medium",
+      "duplicate_risk": "medium",
+      "source_of_truth_status": "active"
+    },
+    {
+      "source": "docs/reports/research_queue/hermes_research_queue.jsonl",
+      "read_by_modules": [
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard"
+      ],
+      "written_by_modules": [
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard"
+      ],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "medium",
+      "duplicate_risk": "medium",
+      "source_of_truth_status": "active"
+    },
+    {
+      "source": "docs/reports/research_queue/hermes_scout_assignments.jsonl",
+      "read_by_modules": [
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard"
+      ],
+      "written_by_modules": [
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard"
+      ],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "medium",
+      "duplicate_risk": "medium",
+      "source_of_truth_status": "active"
+    },
+    {
+      "source": "docs/reports/decisions/hermes_decision_log.jsonl",
+      "read_by_modules": [
+        "Approval queue",
+        "Command router",
+        "Decision log",
+        "Research queue"
+      ],
+      "written_by_modules": [
+        "Approval queue",
+        "Command router",
+        "Decision log",
+        "Research queue"
+      ],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "medium",
+      "duplicate_risk": "medium",
+      "source_of_truth_status": "active"
+    },
+    {
+      "source": "docs/reports/content/",
+      "read_by_modules": [
+        "Evidence/artifact fallback",
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard",
+        "Revenue asset packet"
+      ],
+      "written_by_modules": [
+        "Evidence/artifact fallback",
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard",
+        "Revenue asset packet"
+      ],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "high",
+      "duplicate_risk": "high",
+      "source_of_truth_status": "active"
+    },
+    {
+      "source": "docs/reports/funnel/",
+      "read_by_modules": [],
+      "written_by_modules": [],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "high",
+      "duplicate_risk": "high",
+      "source_of_truth_status": "legacy/reference only"
+    },
+    {
+      "source": "docs/reports/scouts/",
+      "read_by_modules": [
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard"
+      ],
+      "written_by_modules": [
+        "Phase 8A CFO prototype",
+        "Phase 8B shadow mode",
+        "Phase 8C limited primary mode",
+        "Phase 8C.1 grounded limited primary guard"
+      ],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "high",
+      "duplicate_risk": "high",
+      "source_of_truth_status": "active"
+    },
+    {
+      "source": "docs/reports/strategy/shadow/hermes_cfo_loop_shadow_traces.jsonl",
+      "read_by_modules": [],
+      "written_by_modules": [],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "medium",
+      "duplicate_risk": "medium",
+      "source_of_truth_status": "legacy/reference only"
+    },
+    {
+      "source": "docs/reports/training/hermes_failed_response_examples.jsonl",
+      "read_by_modules": [
+        "Failure learning"
+      ],
+      "written_by_modules": [
+        "Failure learning"
+      ],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "medium",
+      "duplicate_risk": "medium",
+      "source_of_truth_status": "active"
+    },
+    {
+      "source": "docs/reports/training/hermes_response_training_set.jsonl",
+      "read_by_modules": [
+        "Failure learning"
+      ],
+      "written_by_modules": [
+        "Failure learning"
+      ],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "medium",
+      "duplicate_risk": "medium",
+      "source_of_truth_status": "active"
+    },
+    {
+      "source": "docs/hermes/",
+      "read_by_modules": [],
+      "written_by_modules": [],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "medium",
+      "duplicate_risk": "medium",
+      "source_of_truth_status": "legacy/reference only"
+    },
+    {
+      "source": "docs/hermes/custom_gpt_trainer/",
+      "read_by_modules": [],
+      "written_by_modules": [],
+      "safe_or_unsafe": "safe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "medium",
+      "duplicate_risk": "medium",
+      "source_of_truth_status": "legacy/reference only"
+    },
+    {
+      "source": "hermes_memory_v2",
+      "read_by_modules": [
+        "Command router",
+        "Learning loop",
+        "Memory v2 reader",
+        "Research queue"
+      ],
+      "written_by_modules": [],
+      "safe_or_unsafe": "unsafe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "medium",
+      "duplicate_risk": "medium",
+      "source_of_truth_status": "active"
+    },
+    {
+      "source": "old memory / task / agent / approval tables",
+      "read_by_modules": [],
+      "written_by_modules": [],
+      "safe_or_unsafe": "unsafe",
+      "contains_secrets": "no",
+      "contains_private_client_data": "unknown",
+      "stale_risk": "high",
+      "duplicate_risk": "high",
+      "source_of_truth_status": "legacy/reference only"
+    }
+  ],
+  "supabase_write_attempted": false
+}
