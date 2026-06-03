@@ -26,6 +26,8 @@ from lib.hermes_cfo_brain import (
 from lib.hermes_conversation_state import (
     update_conversation_state,
     load_conversation_state,
+    save_conversation_state,
+    _STATE_SCHEMA,
 )
 
 # ── Seed state with numbered items ────────────────────────────────────────────
@@ -84,11 +86,8 @@ check("process: 'task 1' returns string", isinstance(r4, str) and len(r4) > 10)
 
 # ── Task reference when no state ──────────────────────────────────────────────
 
-update_conversation_state(
-    user_message="test reset",
-    hermes_response="no tasks here",
-    tool_used=None,
-)
+# Hard-reset state (update_conversation_state now preserves prior context by design)
+save_conversation_state(dict(_STATE_SCHEMA))
 empty_state = load_conversation_state()
 r5 = handle_task_reference("what was task 1", empty_state)
 check("no-context task ref is graceful", isinstance(r5, str))

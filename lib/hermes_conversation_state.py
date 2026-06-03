@@ -36,11 +36,19 @@ _STATE_SCHEMA: dict = {
     "last_hermes_response_summary": None,
     "last_hermes_response_full": None,
     "last_recommendation": None,
+    # active_recommendation: persists through follow-ups; only set by explicit "My recommendation:" markers
+    "active_recommendation": None,
+    # last_meaningful_response: last strategic/option/plan response; NOT updated by fallbacks
+    "last_meaningful_response": None,
+    "last_meaningful_response_summary": None,
     "last_options": [],
     "last_option_map": {},
     "last_tasks": [],
     "last_task_map": {},
     "last_selected_option": None,
+    # last_selected_option_number/text: set by mark_option_selected; preserved across follow-ups
+    "last_selected_option_number": None,
+    "last_selected_option_text": None,
     "last_tool_used": None,
     "last_artifact_path": None,
     "last_approval_item": None,
@@ -83,6 +91,16 @@ def load_conversation_state() -> dict:
     except Exception:
         pass
     return dict(_STATE_SCHEMA)
+
+
+def _load_raw_state() -> dict:
+    """Load state without staleness check — used for field preservation across follow-ups."""
+    try:
+        if _STATE_PATH.exists():
+            return json.loads(_STATE_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
 
 
 def save_conversation_state(state: dict) -> None:
@@ -211,6 +229,79 @@ def _extract_topic(message: str, text: str) -> Optional[str]:
     return None
 
 
+# ── Fallback / meaningful response detection ──────────────────────────────────
+
+# These body markers identify responses that must NOT overwrite last_meaningful_response
+# or active_recommendation — fallbacks, task-missing, and clarification-only responses.
+_FALLBACK_BODY_MARKERS = [
+    "i don't have task",
+    "i don't have the option list",
+    "i don't have a previous response",
+    "i don't have a recent recommendation",
+    "please ask me a question",
+    "try: 'how do we make money",
+    "try asking:",
+    "i wasn't able to generate",
+    "quality response",
+    "plain-language mode enabled",
+    "i need clarification",
+    "ask me a question first",
+    "please ask me",
+]
+
+# Response headers that are informational (correction, clarification) but are NOT
+# strategic plan/option responses. They must not overwrite last_meaningful_response
+# even though they don't contain typical fallback body text.
+_NON_STRATEGIC_HEADERS = frozenset({
+    "CORRECTING COURSE",
+    "I NEED CLARIFICATION",
+})
+
+
+def _is_meaningful_strategic_response(text: str) -> bool:
+    """Return True if this response should update last_meaningful_response.
+
+    Fallback, task-missing, clarification-only, and correction responses do NOT
+    qualify. Only strategic/plan/option responses update last_meaningful_response.
+    """
+    if not text or len(text.strip()) < 30:
+        return False
+    # Non-strategic headers (correction, clarification) never replace last strategic plan
+    first_line = text.strip().splitlines()[0].strip().upper()
+    if first_line in _NON_STRATEGIC_HEADERS:
+        return False
+    text_lower = text.strip().lower()
+    return not any(m in text_lower for m in _FALLBACK_BODY_MARKERS)
+
+
+def _extract_explicit_recommendation(text: str) -> Optional[str]:
+    """Extract ONLY explicitly marked recommendations (no fallback to numbered items).
+
+    Used for active_recommendation so it is not accidentally set from a fallback.
+    """
+    explicit_patterns = [
+        re.compile(r'(?:my recommendation|recommendation)[:\s]+(.+)', re.IGNORECASE | re.DOTALL),
+        re.compile(r'(?:i recommend|hermes recommends)[:\s]+(.+)', re.IGNORECASE | re.DOTALL),
+        re.compile(r'(?:best move|top move|priority)[:\s]+(.+)', re.IGNORECASE | re.DOTALL),
+    ]
+    for pat in explicit_patterns:
+        m = pat.search(text)
+        if m:
+            rec_text = m.group(1).strip()
+            rec_lines = []
+            for line in rec_text.splitlines():
+                if "approval boundary" in line.lower() or "i will not publish" in line.lower():
+                    break
+                if line.strip():
+                    rec_lines.append(line.strip())
+                if len(rec_lines) >= 2:
+                    break
+            candidate = " ".join(rec_lines)[:400]
+            if candidate and "approval" not in candidate.lower()[:30]:
+                return candidate
+    return None
+
+
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def update_conversation_state(
@@ -225,24 +316,69 @@ def update_conversation_state(
 ) -> dict:
     """Parse the Hermes response and persist conversation state.
 
-    Called after every Hermes response so follow-ups can reference context.
+    Preserves option maps, task maps, recommendation, and selected option text
+    across follow-up responses so "WHAT WAS TASK 1" works after "LETS DO 1",
+    and simplify/explain use the last meaningful response rather than a fallback.
     """
-    state = dict(_STATE_SCHEMA)
+    # Load raw existing state for field preservation (no stale check — preserve is safe)
+    existing = _load_raw_state()
     now = _now_iso()
 
     numbered = _extract_numbered_list(hermes_response)
-    options_list = [v for _, v in sorted(numbered.items())]
-    tasks_list = list(options_list)  # Same extraction, context determines meaning
+    new_rec = _extract_recommendation(hermes_response)
+    explicit_rec = _extract_explicit_recommendation(hermes_response)
+    is_meaningful = _is_meaningful_strategic_response(hermes_response)
 
+    # Option/task maps: preserve existing when new response has no numbered items
+    if numbered:
+        option_map = {str(k): v for k, v in numbered.items()}
+        options_list = [v for _, v in sorted(numbered.items())]
+    else:
+        option_map = existing.get("last_option_map") or {}
+        options_list = existing.get("last_options") or []
+
+    # Recommendation: preserve existing when new response has no recommendation
+    recommendation = new_rec or existing.get("last_recommendation")
+
+    # Active recommendation: only update from explicit "My recommendation:" markers
+    active_rec = (
+        explicit_rec
+        or existing.get("active_recommendation")
+        or recommendation
+    )
+
+    # Meaningful response: only update for strategic/plan/option responses, not fallbacks
+    if is_meaningful:
+        meaningful_response = hermes_response[:2000]
+        meaningful_summary = _summarize_response(hermes_response)
+    else:
+        meaningful_response = existing.get("last_meaningful_response") or hermes_response[:2000]
+        meaningful_summary = (
+            existing.get("last_meaningful_response_summary")
+            or _summarize_response(hermes_response)
+        )
+
+    # Preserve selected option data set by mark_option_selected
+    selected_option_number = existing.get("last_selected_option_number")
+    selected_option_text = existing.get("last_selected_option_text")
+    selected_option = existing.get("last_selected_option")
+
+    state = dict(_STATE_SCHEMA)
     state.update({
         "last_user_message": user_message[:500],
         "last_hermes_response_summary": _summarize_response(hermes_response),
         "last_hermes_response_full": hermes_response[:2000],
-        "last_recommendation": _extract_recommendation(hermes_response),
+        "last_recommendation": recommendation,
+        "active_recommendation": active_rec,
+        "last_meaningful_response": meaningful_response,
+        "last_meaningful_response_summary": meaningful_summary,
         "last_options": options_list,
-        "last_option_map": {str(k): v for k, v in numbered.items()},
-        "last_tasks": tasks_list,
-        "last_task_map": {str(k): v for k, v in numbered.items()},
+        "last_option_map": option_map,
+        "last_tasks": options_list,
+        "last_task_map": option_map,
+        "last_selected_option": selected_option,
+        "last_selected_option_number": selected_option_number,
+        "last_selected_option_text": selected_option_text,
         "last_tool_used": tool_used,
         "last_artifact_path": artifact_path,
         "last_approval_item": approval_item,
@@ -289,12 +425,36 @@ def get_last_response_summary() -> Optional[str]:
     return load_conversation_state().get("last_hermes_response_summary")
 
 
-def mark_option_selected(number: int) -> None:
-    """Record that Ray selected a specific option."""
-    state = load_conversation_state()
+def mark_option_selected(number: int, text: Optional[str] = None) -> None:
+    """Record that Ray selected a specific option, preserving the option text.
+
+    Uses _load_raw_state so selection data is never lost to a stale-check race.
+    """
+    state = _load_raw_state() or dict(_STATE_SCHEMA)
     state["last_selected_option"] = number
+    state["last_selected_option_number"] = number
+    if text:
+        state["last_selected_option_text"] = text
     state["updated_at"] = _now_iso()
     save_conversation_state(state)
+
+
+def get_active_recommendation() -> Optional[str]:
+    """Return the active recommendation that persists through follow-up responses."""
+    state = load_conversation_state()
+    return state.get("active_recommendation") or state.get("last_recommendation")
+
+
+def get_last_meaningful_response() -> Optional[str]:
+    """Return the last meaningful strategic response (never a fallback message)."""
+    state = load_conversation_state()
+    return state.get("last_meaningful_response") or state.get("last_hermes_response_full")
+
+
+def get_selected_option_context() -> tuple:
+    """Return (number, text) of the last option Ray selected. Both may be None."""
+    state = load_conversation_state()
+    return state.get("last_selected_option_number"), state.get("last_selected_option_text")
 
 
 def has_active_context() -> bool:

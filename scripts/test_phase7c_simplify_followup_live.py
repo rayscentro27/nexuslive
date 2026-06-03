@@ -25,7 +25,9 @@ from lib.hermes_cfo_brain import (
     process_with_cfo_brain,
     _is_meaningful_response,
 )
-from lib.hermes_conversation_state import update_conversation_state, load_conversation_state
+from lib.hermes_conversation_state import (
+    update_conversation_state, load_conversation_state, save_conversation_state, _STATE_SCHEMA,
+)
 
 # ── _is_meaningful_response correctly identifies content ─────────────────────
 
@@ -63,12 +65,8 @@ check("should_use_cfo_brain: can you simplify your response",
 
 # ── Simplify with no prior context returns graceful message ───────────────────
 
-# Reset state to no meaningful content
-update_conversation_state(
-    user_message="test",
-    hermes_response="PLAIN ANSWER\n\nPlease ask me a question first then I can help.",
-    tool_used=None,
-)
+# Hard-reset state to no meaningful content (update_conversation_state now preserves prior context)
+save_conversation_state(dict(_STATE_SCHEMA))
 state = load_conversation_state()
 r_no_ctx = handle_simplify_request("can you simplify your response", state)
 check("no-context simplify returns string", isinstance(r_no_ctx, str))

@@ -72,6 +72,8 @@ _INTENT_PATTERNS: list[tuple[str, list[str]]] = [
         "what is task", "first task", "second task", "third task",
         "what were the tasks", "show me task", "the first option",
         "what was the first", "what was option",
+        "what was number", "number 1", "number 2", "number 3",
+        "remind me what", "which one was", "remind me of",
     ]),
     ("morning_activity_question", [
         "what did you do this morning", "what happened this morning",
@@ -266,14 +268,18 @@ def _is_meaningful_response(text: str) -> bool:
 
 
 def handle_simplify_request(message: str, context: dict) -> str:
-    """Handle: 'CAN YOU SIMPLIFY YOUR RESPONSE'"""
-    from lib.hermes_conversation_state import get_last_response_full, get_last_response_summary
+    """Handle: 'CAN YOU SIMPLIFY YOUR RESPONSE'
+
+    Uses last_meaningful_response so a task-missing fallback or CORRECTING COURSE
+    message does not accidentally become the thing being simplified.
+    """
+    from lib.hermes_conversation_state import get_last_meaningful_response, get_last_response_summary
     from lib.hermes_plain_language_rewriter import simplify_response_text
 
-    last_full = get_last_response_full()
+    # Use meaningful response (never a fallback) for simplification
+    last_full = get_last_meaningful_response()
     last_summary = get_last_response_summary()
 
-    # Check if there is a meaningful prior response to simplify
     has_content = _is_meaningful_response(last_full or "") or _is_meaningful_response(last_summary or "")
     if not has_content:
         return format_cfo_brain_response(
@@ -292,52 +298,89 @@ def handle_simplify_request(message: str, context: dict) -> str:
 
 
 def handle_explain_request(message: str, context: dict) -> str:
-    """Handle: 'AND WHAT DOES THAT MEAN' / 'EXPLAIN YOUR RECOMMENDATION IN PLAIN LANGUAGE'"""
+    """Handle: 'AND WHAT DOES THAT MEAN' / 'EXPLAIN YOUR RECOMMENDATION IN PLAIN LANGUAGE'
+
+    Resolution order:
+    1. active_recommendation (persists through option selection, fallbacks)
+    2. last_selected_option_text (what Ray actually chose)
+    3. last_option_map first item
+    4. last_meaningful_response explain path
+    5. Graceful no-context fallback
+    """
     from lib.hermes_conversation_state import (
-        get_last_recommendation, get_last_response_full, load_conversation_state,
+        get_active_recommendation, get_last_meaningful_response,
+        get_selected_option_context, load_conversation_state,
     )
     from lib.hermes_plain_language_rewriter import explain_response_plainly
 
-    last_rec = get_last_recommendation()
-    last_full = get_last_response_full()
+    active_rec = get_active_recommendation()
+    selected_num, selected_text = get_selected_option_context()
+    last_full = get_last_meaningful_response()
     state = load_conversation_state()
-
-    # Build meaningful context for the explanation
-    topic = state.get("current_topic") or "the last response"
     option_map = state.get("last_option_map") or {}
 
-    # If we have a real recommendation, explain it directly
-    if last_rec and _is_meaningful_response(last_rec):
+    # If Ray selected an option, explain THAT as the active recommendation
+    if selected_text and _is_meaningful_response(selected_text):
         parts = [
             "PLAIN ANSWER",
             "",
-            "My previous recommendation was:",
-            f"  {last_rec[:200]}",
+            "My recommendation was:",
+            f"  {(active_rec or selected_text)[:200]}",
+            "",
+            "What that means:",
+            f"  {selected_text[:200]}",
+            "  Use this as the front-end asset to attract your target audience,",
+            "  then connect to an opt-in and later to an affiliate or Nexus offer.",
+            "",
+            "Why:",
+            "  It is the closest asset to launch-ready, but it still needs Ray approval",
+            "  before public use.",
+            "",
+            "Next safe step:",
+            "  Prepare the implementation prompt or assign the monetization scout.",
+            "  Say 'create a prompt for Claude' to get started without spending money.",
+            "",
+            "Requires Ray approval before:",
+            "  Publishing, emailing subscribers, applying to affiliates,",
+            "  activating payments, deploying, or running live trading.",
+            "",
+            "Approval boundary:",
+            f"  {_SAFETY_BOUNDARY}",
+        ]
+        return "\n".join(parts)
+
+    # Use active_recommendation directly
+    if active_rec and _is_meaningful_response(active_rec):
+        parts = [
+            "PLAIN ANSWER",
+            "",
+            "My recommendation was:",
+            f"  {active_rec[:200]}",
             "",
             "What it means in plain language:",
-            f"  This is the safest path to revenue that doesn't require Ray approval for internal prep.",
-            "  You can start this without publishing, spending money, or deploying anything.",
+            "  This is the safest path to revenue that requires no money or deployment.",
+            "  Internal preparation only — public use requires Ray approval.",
             "",
-            "My recommendation:",
-            "  Say 'let's do 1' to proceed, or 'create a prompt for Claude' for implementation steps.",
+            "Next safe step:",
+            "  Say 'let's do 1' to confirm, or 'create a prompt for Claude' for implementation steps.",
             "",
             "Requires Ray approval before:",
             "  Publishing, emailing subscribers, spending money, applying to affiliates,",
             "  activating Stripe/payment, deploying, or running live trading.",
             "",
-            f"Approval boundary:",
+            "Approval boundary:",
             f"  {_SAFETY_BOUNDARY}",
         ]
         return "\n".join(parts)
 
-    # If we have options but no explicit recommendation, explain the first option
+    # Fall back to first option in map
     if option_map:
         first_opt = option_map.get("1") or option_map.get(1) or next(iter(option_map.values()), None)
         if first_opt:
             parts = [
                 "PLAIN ANSWER",
                 "",
-                f"The top option from the last response was:",
+                "The top option from the last response was:",
                 f"  {first_opt[:200]}",
                 "",
                 "What it means in plain language:",
@@ -347,15 +390,14 @@ def handle_explain_request(message: str, context: dict) -> str:
                 "My recommendation:",
                 "  Say 'let's do 1' to proceed, or ask me to break it down further.",
                 "",
-                f"Approval boundary:",
+                "Approval boundary:",
                 f"  {_SAFETY_BOUNDARY}",
             ]
             return "\n".join(parts)
 
-    # No prior context — ask for clarification
+    # Full response explain path
     if last_full and _is_meaningful_response(last_full):
-        explained = explain_response_plainly(last_full, context)
-        return explained
+        return explain_response_plainly(last_full, context)
 
     return format_cfo_brain_response(
         header="PLAIN ANSWER",
@@ -387,7 +429,8 @@ def handle_option_selection(message: str, context: dict) -> str:
             approval_boundary=True,
         )
 
-    mark_option_selected(number)
+    # Preserve option text so "WHAT WAS TASK 1" resolves correctly after selection
+    mark_option_selected(number, text=option_text)
 
     parts = [
         "OPTION SELECTED",
@@ -397,6 +440,7 @@ def handle_option_selection(message: str, context: dict) -> str:
         "",
         "Safe next step:",
         "  I can create an implementation prompt for this, or assign a scout to research it.",
+        "  Say 'what was task 1' to review it, or 'create a prompt for Claude' to get started.",
         "",
         "Requires Ray approval before:",
         "  Publishing, sending emails, spending money, deploying, or applying to affiliates.",
@@ -408,34 +452,60 @@ def handle_option_selection(message: str, context: dict) -> str:
 
 
 def handle_task_reference(message: str, context: dict) -> str:
-    """Handle: 'WHAT WAS TASK 1' / 'WHAT WAS THE FIRST TASK'"""
-    from lib.hermes_conversation_state import get_task, get_option
+    """Handle: 'WHAT WAS TASK 1' / 'WHAT WAS THE FIRST TASK'
 
-    # Extract the number
+    Resolution order:
+    1. last_selected_option_text if number matches selected option
+    2. last_option_map[number]
+    3. last_task_map[number]
+    4. Graceful no-context fallback
+    """
+    from lib.hermes_conversation_state import get_task, get_option, get_selected_option_context
+
     m = re.search(r'(\d+)', message)
     number = int(m.group(1)) if m else 1
 
-    # Try task map first, then option map
-    task_text = get_task(number) or get_option(number)
+    # Check selected option first — survives "LETS DO 1" state overwrite
+    selected_num, selected_text = get_selected_option_context()
+    if selected_num == number and selected_text:
+        task_text = selected_text
+    else:
+        task_text = get_option(number) or get_task(number)
 
     if not task_text:
         return format_cfo_brain_response(
             header="PLAIN ANSWER",
             answer=(
                 f"I don't have task {number} from the last response. "
-                f"There may not have been a numbered list, or the context may have expired."
+                f"There may not have been a numbered list, or the context may have expired.\n\n"
+                f"Try asking 'how do we make money this week' to get a fresh option list."
             ),
             why="Conversation context expires after 24 hours.",
             approval_boundary=True,
         )
 
-    return format_cfo_brain_response(
-        header="PLAIN ANSWER",
-        answer=f"Task {number} was:\n  {task_text[:200]}",
-        why="This came from the numbered list in my previous response.",
-        recommendation=f"Say 'let's do {number}' to select this option, or ask me to explain it.",
-        approval_boundary=True,
-    )
+    parts = [
+        "PLAIN ANSWER",
+        "",
+        f"Task {number} was:",
+        f"  {task_text[:200]}",
+        "",
+        "What it means:",
+        "  Use this as the front-end asset: prep it internally, then connect to an opt-in",
+        "  and pair with an affiliate or Nexus offer after Ray approves public use.",
+        "",
+        "Safe next step:",
+        f"  Prepare the implementation prompt or assign the monetization scout to research it.",
+        f"  Say 'create a prompt for Claude' to get started.",
+        "",
+        "Requires Ray approval before:",
+        "  Publishing, emailing subscribers, applying to affiliates,",
+        "  activating payments, or using client-facing content.",
+        "",
+        "Approval boundary:",
+        f"  {_SAFETY_BOUNDARY}",
+    ]
+    return "\n".join(parts)
 
 
 def handle_morning_activity(message: str, context: dict) -> str:
