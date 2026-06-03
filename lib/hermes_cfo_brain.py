@@ -239,6 +239,32 @@ def _save_interaction_context(message: str, response: str, tool_used: Optional[s
 
 # ── Individual handlers ───────────────────────────────────────────────────────
 
+_NO_CONTEXT_MARKERS = [
+    "i don't have a previous",
+    "ask me a question first",
+    "please ask me",
+    "no previous response",
+    "can do next",
+    "approval boundary",
+]
+
+
+def _is_meaningful_response(text: str) -> bool:
+    """Return True if text contains actual content (not a default template)."""
+    if not text or len(text.strip()) < 30:
+        return False
+    text_lower = text.lower()
+    # Skip responses that are themselves "no context" messages
+    if any(m in text_lower for m in _NO_CONTEXT_MARKERS[:3]):
+        return False
+    # Filter out template/boundary lines
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
+    real_content_lines = [l for l in lines
+                          if not any(m in l.lower() for m in _NO_CONTEXT_MARKERS)]
+    # Accept if 3+ meaningful lines, or a single substantive sentence (>= 40 chars)
+    return len(real_content_lines) >= 3 or len(text.strip()) >= 40
+
+
 def handle_simplify_request(message: str, context: dict) -> str:
     """Handle: 'CAN YOU SIMPLIFY YOUR RESPONSE'"""
     from lib.hermes_conversation_state import get_last_response_full, get_last_response_summary
@@ -247,10 +273,16 @@ def handle_simplify_request(message: str, context: dict) -> str:
     last_full = get_last_response_full()
     last_summary = get_last_response_summary()
 
-    if not last_full and not last_summary:
+    # Check if there is a meaningful prior response to simplify
+    has_content = _is_meaningful_response(last_full or "") or _is_meaningful_response(last_summary or "")
+    if not has_content:
         return format_cfo_brain_response(
             header="PLAIN ANSWER",
-            answer="I don't have a previous response to simplify yet. Ask me a question first.",
+            answer=(
+                "I don't have a previous response to simplify yet.\n\n"
+                "Try: 'how do we make money this week' or 'show approval queue' first, "
+                "then ask me to simplify."
+            ),
             approval_boundary=True,
         )
 
@@ -261,24 +293,78 @@ def handle_simplify_request(message: str, context: dict) -> str:
 
 def handle_explain_request(message: str, context: dict) -> str:
     """Handle: 'AND WHAT DOES THAT MEAN' / 'EXPLAIN YOUR RECOMMENDATION IN PLAIN LANGUAGE'"""
-    from lib.hermes_conversation_state import get_last_recommendation, get_last_response_full
+    from lib.hermes_conversation_state import (
+        get_last_recommendation, get_last_response_full, load_conversation_state,
+    )
     from lib.hermes_plain_language_rewriter import explain_response_plainly
 
     last_rec = get_last_recommendation()
     last_full = get_last_response_full()
+    state = load_conversation_state()
 
-    if not last_rec and not last_full:
-        return format_cfo_brain_response(
-            header="PLAIN ANSWER",
-            answer="I don't have a previous recommendation to explain. Ask me a question first.",
-            approval_boundary=True,
-        )
+    # Build meaningful context for the explanation
+    topic = state.get("current_topic") or "the last response"
+    option_map = state.get("last_option_map") or {}
 
-    explained = explain_response_plainly(last_full or last_rec or "", context)
-    if last_rec and last_rec not in explained:
-        # Prepend the recommendation clearly
-        explained = f"PLAIN ANSWER\n\nMy previous recommendation was:\n  {last_rec}\n\n" + "\n".join(explained.splitlines()[2:])
-    return explained
+    # If we have a real recommendation, explain it directly
+    if last_rec and _is_meaningful_response(last_rec):
+        parts = [
+            "PLAIN ANSWER",
+            "",
+            "My previous recommendation was:",
+            f"  {last_rec[:200]}",
+            "",
+            "What it means in plain language:",
+            f"  This is the safest path to revenue that doesn't require Ray approval for internal prep.",
+            "  You can start this without publishing, spending money, or deploying anything.",
+            "",
+            "My recommendation:",
+            "  Say 'let's do 1' to proceed, or 'create a prompt for Claude' for implementation steps.",
+            "",
+            "Requires Ray approval before:",
+            "  Publishing, emailing subscribers, spending money, applying to affiliates,",
+            "  activating Stripe/payment, deploying, or running live trading.",
+            "",
+            f"Approval boundary:",
+            f"  {_SAFETY_BOUNDARY}",
+        ]
+        return "\n".join(parts)
+
+    # If we have options but no explicit recommendation, explain the first option
+    if option_map:
+        first_opt = option_map.get("1") or option_map.get(1) or next(iter(option_map.values()), None)
+        if first_opt:
+            parts = [
+                "PLAIN ANSWER",
+                "",
+                f"The top option from the last response was:",
+                f"  {first_opt[:200]}",
+                "",
+                "What it means in plain language:",
+                "  This is a safe internal action you can prep without Ray approval.",
+                "  No money spent, no publishing, no client-facing use until Ray approves.",
+                "",
+                "My recommendation:",
+                "  Say 'let's do 1' to proceed, or ask me to break it down further.",
+                "",
+                f"Approval boundary:",
+                f"  {_SAFETY_BOUNDARY}",
+            ]
+            return "\n".join(parts)
+
+    # No prior context — ask for clarification
+    if last_full and _is_meaningful_response(last_full):
+        explained = explain_response_plainly(last_full, context)
+        return explained
+
+    return format_cfo_brain_response(
+        header="PLAIN ANSWER",
+        answer=(
+            "I don't have a recent recommendation to explain.\n\n"
+            "Try asking: 'how do we make money this week' then 'explain your recommendation'."
+        ),
+        approval_boundary=True,
+    )
 
 
 def handle_option_selection(message: str, context: dict) -> str:
@@ -420,15 +506,18 @@ def handle_queue_status(message: str, context: dict) -> str:
 
 
 def handle_money_strategy(message: str, context: dict) -> str:
-    """Handle: 'HOW DO WE MAKE MONEY THIS WEEK'"""
+    """Handle: 'HOW DO WE MAKE MONEY THIS WEEK'
+
+    Response uses numbered items so conversation state can resolve
+    'LETS DO 1', 'WHAT WAS OPTION 2', etc. in follow-up messages.
+    """
     from lib.hermes_tool_chooser import execute_chosen_tool
 
     packet_result = execute_chosen_tool("revenue_asset_packet", message, context) or ""
-    approval_result = execute_chosen_tool("approval_queue", message, context) or ""
 
     parts = ["WEEKLY MONEY PLAN", ""]
 
-    # Extract score and key assets
+    # Extract readiness score
     score_match = re.search(r'readiness[:\s]+(\d+)/100', packet_result, re.IGNORECASE)
     score = score_match.group(1) if score_match else "unknown"
 
@@ -436,41 +525,59 @@ def handle_money_strategy(message: str, context: dict) -> str:
         f"Revenue readiness score: {score}/100",
         "",
         "Best money moves this week:",
+        "",
     ]
 
-    # Extract key items from packet result
-    if packet_result:
-        lines = [l.strip() for l in packet_result.splitlines() if l.strip()
-                 and not re.match(r'^[═─]+$', l)
-                 and "REVENUE ASSET PACKET" not in l.upper()]
-        for line in lines[:5]:
-            if any(k in line.lower() for k in ["lead magnet", "affiliate", "membership",
-                                                 "funding", "credit", "checklist", "offer"]):
-                parts.append(f"  * {line[:100]}")
-
-    if len(parts) <= 5:
-        parts += [
-            "  * Activate the funding readiness lead magnet funnel",
-            "  * Add affiliate offer to funding checklist landing page",
-            "  * Promote Nexus membership to funding-ready audience",
+    # Build numbered options from packet result or use sensible defaults
+    numbered_options = _extract_money_options(packet_result)
+    if not numbered_options:
+        numbered_options = [
+            "Activate the funding readiness lead magnet funnel with an affiliate offer.",
+            "Launch Nexus membership at a founding-member price.",
+            "Run a YouTube/LinkedIn content push to build inbound interest.",
         ]
 
-    if approval_result and "no pending" not in approval_result.lower():
-        parts += ["", "Pending approvals that could unlock revenue:"]
-        approval_lines = [l.strip() for l in approval_result.splitlines()
-                          if l.strip() and re.match(r'^\s*[-•*]\s|^\s*\d+[.:)]\s', l)]
-        for line in approval_lines[:3]:
-            parts.append(f"  * {line[:100]}")
+    for i, opt in enumerate(numbered_options[:3], start=1):
+        parts.append(f"{i}. {opt[:120]}")
 
     parts += [
         "",
         "My recommendation:",
-        "  Say 'build revenue asset packet' to see all options, then 'let's do 1' to proceed.",
+        "  Start with option 1 — it is closest to revenue with no upfront spend.",
+        f"  Say 'let's do 1' to select it or 'what was option 2' to review others.",
+        "",
+        "Requires Ray approval before:",
+        "  Publishing, emailing subscribers, spending money, applying to affiliates,",
+        "  activating Stripe/payment, deploying, or running live trading.",
         "",
         f"Approval boundary:",
         f"  {_SAFETY_BOUNDARY}",
     ]
     return "\n".join(parts)
+
+
+def _extract_money_options(packet_result: str) -> list[str]:
+    """Extract money move options from revenue packet result as plain strings."""
+    if not packet_result:
+        return []
+    options = []
+    keywords = ["lead magnet", "affiliate", "membership", "funding", "credit",
+                 "checklist", "offer", "launch", "promote", "activate"]
+    for line in packet_result.splitlines():
+        stripped = line.strip()
+        if not stripped or re.match(r'^[═─\*•\-]+$', stripped):
+            continue
+        if "REVENUE ASSET PACKET" in stripped.upper():
+            continue
+        if any(k in stripped.lower() for k in keywords) and len(stripped) > 15:
+            # Clean the line for use as a numbered option
+            clean = re.sub(r'^[\*\-•\s]+', '', stripped).strip()
+            clean = re.sub(r'^(?:option\s*)?(\d+)[.:\)]\s*', '', clean, flags=re.IGNORECASE).strip()
+            if clean and clean not in options:
+                options.append(clean[:120])
+        if len(options) >= 3:
+            break
+    return options
 
 
 def handle_failure_feedback(message: str, context: dict) -> str:
@@ -486,8 +593,8 @@ def handle_failure_feedback(message: str, context: dict) -> str:
     )
 
     # Try to infer what Ray actually wanted
-    prior_msg = context.get("last_user_message", "your last message")
-    prior_topic = context.get("current_topic", "this topic")
+    prior_msg = context.get("last_user_message") or "your last message"
+    prior_topic = context.get("current_topic") or "this topic"
 
     return "\n".join([
         "CORRECTING COURSE",
@@ -615,10 +722,46 @@ def handle_general_business(message: str, context: dict) -> Optional[str]:
         if detect_cfo_conversation_need(message):
             ctx = build_cfo_context(message)
             resp = build_cfo_response(message, ctx)
-            return format_cfo_response(resp)
+            result = format_cfo_response(resp)
+            if result:
+                return result
     except Exception:
         pass
     return None
+
+
+def build_clarification_response(message: str, context: dict) -> str:
+    """Fail-closed response: return structured clarification instead of evidence dump.
+
+    Used when CFO Brain cannot produce a confident answer. Prevents old LLM
+    fallback paths from emitting evidence dumps or quality-fallback text.
+    """
+    topic = context.get("current_topic") or "your question"
+    last_rec = context.get("last_recommendation")
+
+    parts = [
+        "I NEED CLARIFICATION",
+        "",
+        f"I understood your message about {topic.replace('_', ' ')}, "
+        "but I don't have enough context to give you a confident answer.",
+        "",
+        "What would help:",
+        "  1. Try a more specific command like 'show approval queue' or 'run daily operating cycle'",
+        "  2. Say 'how do we make money this week' for revenue options",
+        "  3. Say 'show research queue' for open questions",
+    ]
+    if last_rec:
+        parts += [
+            "",
+            f"My last recommendation was:",
+            f"  {last_rec[:150]}",
+        ]
+    parts += [
+        "",
+        "Approval boundary:",
+        f"  {_SAFETY_BOUNDARY}",
+    ]
+    return "\n".join(parts)
 
 
 # ── Context saving ────────────────────────────────────────────────────────────

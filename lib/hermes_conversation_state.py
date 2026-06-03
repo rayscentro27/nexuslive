@@ -121,11 +121,22 @@ def _summarize_response(text: str) -> str:
 
 
 def _extract_numbered_list(text: str) -> dict[int, str]:
-    """Extract numbered items from response text into {1: 'text', 2: 'text', ...}."""
+    """Extract numbered items from response text into {1: 'text', 2: 'text', ...}.
+
+    Matches all common formats:
+      1. Item text
+      1: Item text
+      Option 1: Item text
+      Task 1: Item text
+      * 1. Item text      (bullet-prefixed numbered, e.g. from approval queue output)
+    """
     result: dict[int, str] = {}
-    # Match "1. text", "1: text", "Option 1: text", "Task 1: text", "  1. text"
     patterns = [
+        # "* 1. text" or "- 1. text" — bullet-prefixed numbered items
+        re.compile(r'^\s*[\*\-•]\s+(\d+)[.:\)]\s+(.+)', re.IGNORECASE),
+        # "Option 1: text", "Task 1: text"
         re.compile(r'^\s*(?:option\s*|task\s*)?(\d+)[.:\)]\s+(.+)', re.IGNORECASE),
+        # "  1. text" — plain numbered
         re.compile(r'^\s*(\d+)\.\s+(.+)'),
     ]
     for line in text.splitlines():
@@ -134,25 +145,49 @@ def _extract_numbered_list(text: str) -> dict[int, str]:
             if m:
                 num = int(m.group(1))
                 txt = m.group(2).strip()
-                if 1 <= num <= 20 and txt:
+                # Strip trailing "—" and approval-queue meta-text
+                txt = re.sub(r'\s*—\s*\w.*$', '', txt).strip()
+                if 1 <= num <= 20 and len(txt) > 3:
                     result[num] = txt
                 break
     return result
 
 
 def _extract_recommendation(text: str) -> Optional[str]:
-    """Extract recommendation text from response."""
-    patterns = [
+    """Extract recommendation text from response.
+
+    Uses explicit markers first, then falls back to first numbered item.
+    Never returns the default footer text about approval boundaries.
+    """
+    # Explicit "My recommendation:" or similar
+    explicit_patterns = [
         re.compile(r'(?:my recommendation|recommendation)[:\s]+(.+)', re.IGNORECASE | re.DOTALL),
         re.compile(r'(?:i recommend|hermes recommends)[:\s]+(.+)', re.IGNORECASE | re.DOTALL),
+        re.compile(r'(?:best move|top move|priority)[:\s]+(.+)', re.IGNORECASE | re.DOTALL),
     ]
-    for pat in patterns:
+    for pat in explicit_patterns:
         m = pat.search(text)
         if m:
-            # Take first 2 lines of recommendation
             rec_text = m.group(1).strip()
-            rec_lines = [l.strip() for l in rec_text.splitlines() if l.strip()]
-            return " ".join(rec_lines[:2])[:400]
+            # Stop at the approval boundary line
+            rec_lines = []
+            for l in rec_text.splitlines():
+                if "approval boundary" in l.lower() or "i will not publish" in l.lower():
+                    break
+                if l.strip():
+                    rec_lines.append(l.strip())
+                if len(rec_lines) >= 2:
+                    break
+            candidate = " ".join(rec_lines)[:400]
+            # Don't return generic footer text
+            if candidate and "approval" not in candidate.lower()[:30]:
+                return candidate
+
+    # Fallback: first numbered item is the top recommendation
+    numbered = _extract_numbered_list(text)
+    if numbered:
+        return numbered.get(1) or next(iter(numbered.values()))
+
     return None
 
 

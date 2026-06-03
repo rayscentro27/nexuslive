@@ -3533,6 +3533,35 @@ class NexusTelegramBot:
         _norm_no_punct = normalized.rstrip('.?!')
         # Also strip "hermes, X" prefix — lstrip("hermes") strips individual chars from the set
         _normalized_strip = normalized.lstrip("hermes").lstrip(",").lstrip().rstrip(".?!")
+
+        # ── Phase 7C: Pre-continuity CFO Brain intercept ─────────────────────
+        # Catches option-selection, task-reference, simplify/explain, morning-summary,
+        # and failure-feedback BEFORE the continuity dict and TelegramRouter so that
+        # TASK_SELECTION_ALIASES and old LLM fallbacks never intercept them.
+        _PHASE7C_FORCED_INTENTS = {
+            "option_selection",
+            "task_reference",
+            "simplify_previous_response",
+            "explain_previous_response",
+            "morning_activity_question",
+            "failure_feedback",
+        }
+        try:
+            from lib.hermes_cfo_brain import (
+                classify_cfo_intent as _p7c_classify,
+                process_with_cfo_brain as _p7c_process,
+            )
+            _p7c_intent = _p7c_classify(normalized)
+            if _p7c_intent in _PHASE7C_FORCED_INTENTS:
+                _p7c_result = _p7c_process(text, normalized)
+                if _p7c_result:
+                    logger.info("telegram route=cfo_brain_p7c intent=%s", _p7c_intent)
+                    self._memory_command_pending = True
+                    self._memory_command_intent = "cfo_brain"
+                    return _p7c_result
+        except Exception as _p7c_exc:
+            logger.warning("telegram cfo_brain_p7c failed text=%r exc=%s", text[:60], _p7c_exc)
+
         if normalized in continuity:
             logger.info("telegram route=chat")
             return self._dispatch_continuity(continuity[normalized], normalized)
