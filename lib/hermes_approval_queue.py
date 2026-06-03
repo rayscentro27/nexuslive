@@ -248,6 +248,43 @@ def _infer_risk(title: str) -> str:
     return "low"
 
 
+def _load_revenue_packet_approvals() -> list[dict]:
+    """Load injected revenue asset packet approval candidates from existing state.
+
+    Revenue packet items are injected via inject_approval_candidates() and stored
+    in the state file. They must be re-loaded here so build_approval_queue() does
+    not drop them when rebuilding from standard source loaders.
+    """
+    try:
+        existing = _load_state()
+        result = []
+        for item in (existing.get("items") or []):
+            if item.get("source") != "revenue_asset_packet":
+                continue
+            # Re-wrap as a raw input so normalize_approval_item can process it
+            result.append({
+                "_source_type":           "revenue_packet",
+                "title":                  item.get("title", ""),
+                "summary":                item.get("summary", ""),
+                "category":               item.get("category", "internal_review"),
+                "source":                 "revenue_asset_packet",
+                "source_path":            item.get("source_path", ""),
+                "related_artifact":       item.get("related_artifact", ""),
+                "related_action_id":      item.get("related_action_id", ""),
+                "risk_level":             item.get("risk_level", "low"),
+                "approval_required_for":  item.get("approval_required_for", ""),
+                "if_approved":            item.get("if_approved", ""),
+                "if_rejected":            item.get("if_rejected", ""),
+                "safe_internal_next_step": item.get("safe_internal_next_step", ""),
+                "evidence_paths":         item.get("evidence_paths", []),
+                "created_at":             item.get("created_at", _now_iso()),
+            })
+        return result
+    except Exception as exc:
+        logger.debug("_load_revenue_packet_approvals error: %s", exc)
+        return []
+
+
 def load_approval_inputs() -> list[dict]:
     """Load all raw approval inputs from all sources. Never crashes."""
     items: list[dict] = []
@@ -256,6 +293,7 @@ def load_approval_inputs() -> list[dict]:
         _load_decision_log_approvals,
         _load_daily_cycle_approvals,
         _load_lesson_approvals,
+        _load_revenue_packet_approvals,
     ):
         try:
             items.extend(loader())

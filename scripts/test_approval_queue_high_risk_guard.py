@@ -31,8 +31,9 @@ print("=== test_approval_queue_high_risk_guard ===\n")
 from lib.hermes_approval_queue import (
     HIGH_RISK_CATEGORIES, _infer_category, _infer_risk,
     _save_state, normalize_approval_item, _load_state,
-    approve_approval_item,
+    approve_approval_item, build_approval_queue,
 )
+from lib.hermes_daily_cycle_state import save_daily_cycle_state
 from hermes_command_router.router import run_command
 
 # ── HIGH_RISK_CATEGORIES completeness ────────────────────────────────────────
@@ -61,26 +62,28 @@ check("'review content asset' → asset_review or internal_review",
 
 # ── bulk approve skips high-risk ──────────────────────────────────────────────
 print("\n-- bulk approve skips high-risk items --")
-high_risk_items = []
-for i, (title, cat) in enumerate([
-    ("Send newsletter", "subscriber_email"),
-    ("Deploy to production", "production_deploy"),
-    ("Run live trading", "live_trading"),
-], start=1):
-    raw = {
-        "_source_type": "daily_cycle", "title": title,
-        "summary": "", "category": cat, "source": "daily_cycle_state",
-        "source_path": "docs/test", "related_action_id": f"high_risk_{i:03d}",
-        "risk_level": "high", "approval_required_for": "High risk — Ray only.",
-        "if_approved": "Proceeds.", "if_rejected": "Stays blocked.",
-        "safe_internal_next_step": "Wait for Ray.", "evidence_paths": [],
-        "created_at": "2026-06-02T10:00:00+00:00",
-    }
-    item = normalize_approval_item(raw, index=i)
-    item["status"] = "pending"
-    high_risk_items.append(item)
+# Seed via daily cycle state so build_approval_queue() loads them from the source
+save_daily_cycle_state({
+    "date": "2026-06-02", "top_priority": "Test high-risk guard",
+    "blockers": [], "approval_items": [
+        {"item": "Send newsletter to subscribers",
+         "category": "subscriber_email",
+         "why": "High risk.", "next_if_approved": "Sent.",
+         "risk_if_skipped": "Not sent."},
+        {"item": "Deploy to production",
+         "category": "production_deploy",
+         "why": "High risk.", "next_if_approved": "Deployed.",
+         "risk_if_skipped": "Not deployed."},
+        {"item": "Run live trading",
+         "category": "live_trading",
+         "why": "High risk.", "next_if_approved": "Runs.",
+         "risk_if_skipped": "No trade."},
+    ], "safe_next_actions": [],
+    "memory_v2_count": 0, "goals_count": 0, "action_count": 0,
+})
+# Reset approval queue so we only see daily cycle items
+_save_state({"created_at": "2026-06-02T10:00:00+00:00", "items": [], "archived": []})
 
-_save_state({"created_at": "2026-06-02T10:00:00+00:00", "items": high_risk_items, "archived": []})
 resp = run_command("bulk approve", source="cli")
 check("starts with BULK APPROVE", resp.startswith("BULK APPROVE"))
 check("no safe items eligible",
@@ -88,16 +91,24 @@ check("no safe items eligible",
 
 state = _load_state()
 for item in state.get("items", []):
-    check(f"'{item['title']}' NOT bulk-approved (still pending)",
-          item.get("status") == "pending")
+    if item.get("category") in HIGH_RISK_CATEGORIES:
+        check(f"'{item['title'][:30]}' NOT bulk-approved (still pending)",
+              item.get("status") == "pending")
 
 # ── individual approve on high-risk works (Ray's explicit choice) ─────────────
 print("\n-- individual approve high-risk item allowed (explicit Ray decision) --")
-result = approve_approval_item(1)
-check("approve_approval_item success=True", result.get("success") == True)
-state2 = _load_state()
-first_item = state2["items"][0]
-check("first item now approved", first_item.get("status") == "approved")
+queue = build_approval_queue()
+pending_items = [i for i in queue if i.get("status") == "pending"]
+if pending_items:
+    fid = pending_items[0]["approval_id"]
+    result = approve_approval_item(fid)
+    check("approve_approval_item success=True", result.get("success") == True)
+    state2 = _load_state()
+    approved = [i for i in state2.get("items", []) if i.get("status") == "approved"]
+    check("item now approved in state", len(approved) >= 1)
+else:
+    check("pending items available to approve", False)
+    check("item now approved in state", False)
 
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(FAIL)

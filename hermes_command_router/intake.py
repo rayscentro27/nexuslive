@@ -234,6 +234,41 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "approve blocked internal items", "approve all internal items",
       "bulk approve blocked", "approve safe items"],                "bulk_approve_blocked",       "high",   True),
 
+    # ── Phase 6D: Revenue asset packet ───────────────────────────────────────
+    (["build revenue asset packet", "create revenue asset packet",
+      "generate revenue asset packet", "build revenue packet",
+      "create revenue packet"],                                     "build_revenue_asset_packet", "high",   False),
+
+    (["show revenue asset packet", "show latest revenue packet",
+      "show revenue packet", "revenue asset packet",
+      "revenue packet status", "show the revenue packet",
+      "what is in the revenue packet"],                             "show_revenue_asset_packet",  "high",   False),
+
+    (["show launch-ready assets", "show launch ready assets",
+      "launch ready assets", "what assets are launch ready",
+      "what is launch ready", "show ready assets"],                 "show_launch_ready_assets",   "high",   False),
+
+    (["show content awaiting approval", "content awaiting approval",
+      "what content needs approval", "show content pending approval",
+      "content pending review", "what is awaiting approval"],       "show_content_awaiting_approval", "high", False),
+
+    (["show cta options", "show cta", "cta options",
+      "what are the cta options", "show call to action",
+      "cta copy options"],                                          "show_cta_options",           "medium", False),
+
+    (["show launch checklist", "launch checklist",
+      "show the launch checklist", "what is on the launch checklist",
+      "pre-launch checklist", "pre launch checklist"],              "show_launch_checklist",      "medium", False),
+
+    (["show approval checklist", "approval checklist",
+      "show the approval checklist", "what is on the approval checklist"],
+                                                                    "show_approval_checklist",    "medium", False),
+
+    (["generate approval candidates", "create approval candidates",
+      "create approval items from packet", "generate approval items",
+      "create approval queue items from packet",
+      "generate candidates from packet"],                           "generate_approval_candidates", "high", False),
+
     (["next best move", "what should we do", "what's the next",
       "what is the next step", "what do you recommend", "recommend",
       "best move", "next move", "what now"],               "next_best_move",            "high",   False),

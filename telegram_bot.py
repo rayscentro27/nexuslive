@@ -958,6 +958,13 @@ class NexusTelegramBot:
             "approval needed", "what approvals are pending", "approval item",
             "approve item", "reject item", "approval impact", "if i approve",
             "if i reject", "clear stale approvals", "bulk approve",
+            # Phase 6D revenue asset packet
+            "build revenue asset packet", "create revenue asset packet",
+            "show revenue asset packet", "show latest revenue packet",
+            "revenue asset packet", "show launch-ready assets",
+            "show content awaiting approval", "show cta options",
+            "show launch checklist", "show approval checklist",
+            "generate approval candidates", "create approval items from packet",
         )
         if any(phrase in normalized for phrase in _PHASE6A_EXCLUSIONS):
             return False
@@ -3196,6 +3203,15 @@ class NexusTelegramBot:
         "approval_impact",
         "clear_stale_approvals",
         "bulk_approve_blocked",
+        # ── Revenue asset packet (Phase 6D) ───────────────────────────────────
+        "build_revenue_asset_packet",
+        "show_revenue_asset_packet",
+        "show_launch_ready_assets",
+        "show_content_awaiting_approval",
+        "show_cta_options",
+        "show_launch_checklist",
+        "show_approval_checklist",
+        "generate_approval_candidates",
     })
 
     def _try_memory_command(self, text: str) -> str | None:

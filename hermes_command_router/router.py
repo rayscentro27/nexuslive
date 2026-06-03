@@ -2583,6 +2583,224 @@ def _plain_bulk_approve_blocked() -> str:
         return f"BULK APPROVE\n\nCould not bulk approve items: {exc!s:.120}"
 
 
+# ── Phase 6D: Revenue Asset Packet ──────────────────────────────────────────
+
+def _plain_build_revenue_asset_packet() -> str:
+    """Handle 'build revenue asset packet', 'create revenue asset packet'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            build_revenue_asset_packet, save_revenue_asset_packet,
+            inject_approval_candidates,
+        )
+        packet = build_revenue_asset_packet()
+        save_revenue_asset_packet(packet)
+        result = inject_approval_candidates(packet.get("approval_candidates") or [])
+
+        score    = packet.get("readiness_score", 0)
+        ready    = packet.get("approval_ready_items") or []
+        needs_rev = packet.get("needs_revision_items") or []
+        candidates = packet.get("approval_candidates") or []
+        added    = result.get("added", 0)
+        skipped  = result.get("skipped", 0)
+
+        lines = ["REVENUE ASSET PACKET CREATED", ""]
+        lines += [
+            "Packet:",
+            "  Nexus Credit/Funding Readiness Asset Packet",
+            "",
+            f"Overall readiness: {score}/100",
+            "",
+        ]
+
+        if ready:
+            lines += [f"Launch-ready assets ({len(ready)}):", ""]
+            for a in ready:
+                lines.append(f"  - {a.get('category','').replace('_',' ')}: {a['filename']}")
+            lines.append("")
+
+        if needs_rev:
+            lines += [f"Needs revision ({len(needs_rev)}):", ""]
+            for a in needs_rev:
+                lines.append(f"  - {a.get('category','').replace('_',' ')}: {a['filename']}")
+            lines.append("")
+
+        if candidates:
+            lines += [f"Approval candidates created ({added} new, {skipped} already queued):", ""]
+            for c in candidates:
+                lines.append(f"  - {c['title']}")
+            lines.append("")
+
+        lines += [
+            "Safety: no content published, no emails sent, no money spent.",
+            "",
+            "Next:",
+            "  Say 'show revenue asset packet' to review the full packet.",
+            "  Say 'show approval queue' to review approval items.",
+            "",
+            "Evidence: docs/reports/revenue_packets/latest_revenue_asset_packet.json",
+        ]
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"REVENUE ASSET PACKET CREATED\n\nCould not build packet: {exc!s:.200}"
+
+
+def _plain_show_revenue_asset_packet() -> str:
+    """Handle 'show revenue asset packet', 'show latest revenue packet'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            load_latest_revenue_asset_packet, build_revenue_asset_packet,
+            format_revenue_asset_packet,
+        )
+        packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+        return format_revenue_asset_packet(packet)
+    except Exception as exc:
+        return f"REVENUE ASSET PACKET\n\nCould not load packet: {exc!s:.200}"
+
+
+def _plain_show_launch_ready_assets() -> str:
+    """Handle 'show launch-ready assets'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            load_latest_revenue_asset_packet, build_revenue_asset_packet,
+            format_launch_ready_assets,
+        )
+        packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+        return format_launch_ready_assets(packet)
+    except Exception as exc:
+        return f"LAUNCH-READY ASSETS\n\nCould not load assets: {exc!s:.200}"
+
+
+def _plain_show_content_awaiting_approval() -> str:
+    """Handle 'show content awaiting approval'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            load_latest_revenue_asset_packet, build_revenue_asset_packet,
+            format_content_awaiting_approval,
+        )
+        packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+        return format_content_awaiting_approval(packet)
+    except Exception as exc:
+        return f"CONTENT AWAITING APPROVAL\n\nCould not load content: {exc!s:.200}"
+
+
+def _plain_show_cta_options() -> str:
+    """Handle 'show CTA options'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            build_cta_options, load_latest_revenue_asset_packet,
+        )
+        packet = load_latest_revenue_asset_packet()
+        opts = build_cta_options(packet)
+        lines = ["CTA OPTIONS", ""]
+        lines += ["Current CTA options for Nexus lead magnet:", ""]
+        for label, text in opts.items():
+            lines.append(f"  [{label}]  {text}")
+        lines += [
+            "",
+            "These are internal drafts — not published.",
+            "Say 'build revenue asset packet' to regenerate options.",
+            "Say 'approve item N' to approve a CTA for use.",
+        ]
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"CTA OPTIONS\n\nCould not load CTA options: {exc!s:.200}"
+
+
+def _plain_show_launch_checklist() -> str:
+    """Handle 'show launch checklist'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            build_launch_checklist, load_latest_revenue_asset_packet,
+        )
+        packet = load_latest_revenue_asset_packet()
+        cl = build_launch_checklist(packet)
+
+        lines = ["LAUNCH CHECKLIST", "", "Before publishing:", ""]
+        for step in (cl.get("ray_approval_required") or []):
+            lines.append(f"  - {step}")
+        lines += [""]
+
+        lines += ["Safe internal work Hermes can do:", ""]
+        for step in (cl.get("safe_internal_work") or []):
+            lines.append(f"  - {step}")
+        lines += [""]
+
+        lines += ["Requires Ray approval (blocked until approved):", ""]
+        for step in (cl.get("blocked_until_ray_approves") or []):
+            lines.append(f"  - {step}")
+
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"LAUNCH CHECKLIST\n\nCould not load checklist: {exc!s:.200}"
+
+
+def _plain_show_approval_checklist() -> str:
+    """Handle 'show approval checklist'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            build_approval_checklist, load_latest_revenue_asset_packet,
+        )
+        packet = load_latest_revenue_asset_packet()
+        cl = build_approval_checklist(packet)
+
+        lines = ["APPROVAL CHECKLIST", ""]
+        for item in (cl.get("checklist") or []):
+            lines.append(f"  - {item}")
+        lines += [
+            "",
+            "Approval boundary:",
+            f"  {cl.get('approval_boundary', '')}",
+        ]
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"APPROVAL CHECKLIST\n\nCould not load checklist: {exc!s:.200}"
+
+
+def _plain_generate_approval_candidates() -> str:
+    """Handle 'generate approval candidates', 'create approval items from packet'."""
+    try:
+        from lib.hermes_revenue_asset_packet import (
+            load_latest_revenue_asset_packet, build_revenue_asset_packet,
+            generate_approval_candidates, inject_approval_candidates,
+        )
+        packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+        candidates = generate_approval_candidates(packet)
+        result = inject_approval_candidates(candidates)
+
+        added   = result.get("added", 0)
+        skipped = result.get("skipped", 0)
+        total   = result.get("total", 0)
+
+        lines = ["APPROVAL CANDIDATES GENERATED", ""]
+        if total == 0:
+            lines += [
+                "No approval candidates could be generated.",
+                "Run 'build revenue asset packet' first to discover assets.",
+            ]
+            return "\n".join(lines)
+
+        lines += [
+            f"{added} new approval item(s) added to queue.",
+            f"{skipped} already existed (no duplicates added).",
+            "",
+        ]
+        for c in candidates:
+            lines.append(f"  - {c['title']} [{c['category'].replace('_',' ')}]")
+        lines += [
+            "",
+            "Safety: no content published, no emails sent, no money spent.",
+            "",
+            "Next:",
+            "  Say 'show approval queue' to review and act on items.",
+            "  Say 'approve item N' to approve individual items.",
+            "",
+            "Evidence: docs/reports/approvals/hermes_approval_queue_state.json",
+        ]
+        return "\n".join(lines)
+    except Exception as exc:
+        return f"APPROVAL CANDIDATES GENERATED\n\nCould not generate candidates: {exc!s:.200}"
+
+
 def _plain_lesson_gap_generate() -> str:
     """Generate lesson proposals from open knowledge gaps."""
     from lib.hermes_learning_loop import generate_gap_lesson_proposals
@@ -2661,6 +2879,15 @@ _PLAIN_INTENTS: dict[str, object] = {
     "approval_impact":             _plain_approval_impact,
     "clear_stale_approvals":       _plain_clear_stale_approvals,
     "bulk_approve_blocked":        _plain_bulk_approve_blocked,
+    # ── Revenue asset packet (Phase 6D) ──────────────────────────────────────
+    "build_revenue_asset_packet":      _plain_build_revenue_asset_packet,
+    "show_revenue_asset_packet":       _plain_show_revenue_asset_packet,
+    "show_launch_ready_assets":        _plain_show_launch_ready_assets,
+    "show_content_awaiting_approval":  _plain_show_content_awaiting_approval,
+    "show_cta_options":                _plain_show_cta_options,
+    "show_launch_checklist":           _plain_show_launch_checklist,
+    "show_approval_checklist":         _plain_show_approval_checklist,
+    "generate_approval_candidates":    _plain_generate_approval_candidates,
     # ── Learning loop ─────────────────────────────────────────────────────────
     "lesson_record":               _plain_lesson_record,
     "lesson_pending":              _plain_lesson_pending,
@@ -2758,6 +2985,15 @@ _EVIDENCE_DUMP_BLOCKED_PHRASES = frozenset([
     "approve all", "approve all lessons", "approve all pending lessons",
     "approve these lessons", "approve pending lessons",
     "approve the pending lessons",
+    # ── Revenue asset packet (Phase 6D) ──────────────────────────────────────
+    "build revenue asset packet", "create revenue asset packet",
+    "show revenue asset packet", "show latest revenue packet",
+    "revenue asset packet", "show launch-ready assets", "launch ready assets",
+    "show content awaiting approval", "content awaiting approval",
+    "show cta options", "cta options", "show launch checklist", "launch checklist",
+    "show approval checklist", "approval checklist",
+    "generate approval candidates", "create approval candidates",
+    "create approval items from packet", "generate approval items",
 ])
 
 _INTENT_HANDLERS = {
