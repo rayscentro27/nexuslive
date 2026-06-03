@@ -15,15 +15,14 @@ from lib.hermes_cfo_loop_shadow import (
 # ── Primary mode is always blocked ────────────────────────────────────────────
 check("is_primary_mode_blocked() is True", is_primary_mode_blocked() is True)
 
-# ── HERMES_CFO_LOOP_MODE=primary falls back to shadow ────────────────────────
+# ── HERMES_CFO_LOOP_MODE=primary falls back to limited_primary (Phase 8C) ─────
 os.environ["HERMES_CFO_LOOP_MODE"] = "primary"
-check("primary mode falls back to shadow", get_cfo_loop_mode() == "shadow")
-check("primary mode: shadow still active (shadow fallback)", should_run_cfo_shadow("test message"))
+check("primary mode falls back to limited_primary", get_cfo_loop_mode() == "limited_primary")
+check("primary mode: shadow NOT active (limited_primary is the fallback)", not should_run_cfo_shadow("test message"))
 
-# ── format_shadow_status shows shadow when primary set ───────────────────────
+# ── format_shadow_status shows mode when primary set ─────────────────────────
 status = format_shadow_status()
-check("status with primary env: shows shadow mode", "shadow" in status.lower())
-check("status with primary env: NOT 'primary'", "mode: primary" not in status.lower())
+check("status with primary env: does not show 'mode: primary'", "mode: primary" not in status.lower())
 
 # ── off still works ───────────────────────────────────────────────────────────
 os.environ["HERMES_CFO_LOOP_MODE"] = "off"
@@ -34,7 +33,7 @@ check("off: should_run=False", not should_run_cfo_shadow("test message"))
 for val in ["primary", "PRIMARY", "Primary", " primary "]:
     os.environ["HERMES_CFO_LOOP_MODE"] = val
     result = get_cfo_loop_mode()
-    check(f"'{val}' blocked → shadow or off", result in ("shadow", "off"))
+    check(f"'{val}' blocked → limited_primary or off", result in ("limited_primary", "off"))
 
 os.environ.pop("HERMES_CFO_LOOP_MODE", None)
 

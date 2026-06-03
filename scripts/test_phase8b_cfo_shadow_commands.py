@@ -57,7 +57,7 @@ with tempfile.TemporaryDirectory() as tmpdir:
     check("comparison is string", isinstance(comparison, str))
     check("comparison has 'CFO LIVE VS SHADOW'", "CFO LIVE VS SHADOW" in comparison)
     check("comparison has 'Live response:'", "Live response:" in comparison)
-    check("comparison has 'Shadow would have:'", "Shadow would have:" in comparison)
+    check("comparison has CFO info section", "Shadow would have:" in comparison or "CFO Loop would have:" in comparison)
     check("comparison has approval boundary", "approval" in comparison.lower())
 
     # ── handle_cfo_shadow_command dispatches correctly ────────────────────────

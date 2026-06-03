@@ -1,15 +1,16 @@
 """
 hermes_cfo_loop_shadow.py
-Phase 8B — Hermes Agentic CFO Loop Shadow Mode.
+Phase 8B/8C — Hermes Agentic CFO Loop Shadow + Limited Primary Mode.
 
-Shadow mode: every Telegram message runs through the CFO loop in parallel.
-The live response is NEVER changed. Traces are written to JSONL for review.
+Shadow mode (8B): every message runs CFO loop in parallel. Live response never changed.
+Limited primary mode (8C): allowlisted intents with confidence >= threshold use CFO
+response as the live Telegram response.
 
 Environment:
-  HERMES_CFO_LOOP_MODE    off | shadow | primary (default: off)
+  HERMES_CFO_LOOP_MODE    off | shadow | limited_primary | primary (default: off)
   HERMES_CFO_LOOP_PROVIDER mock | openrouter | deepseek | local (default: mock)
 
-Primary mode is blocked in Phase 8B and falls back to shadow.
+Full primary mode is blocked and falls back to limited_primary.
 """
 from __future__ import annotations
 
@@ -33,10 +34,43 @@ SHADOW_TRACE_FILE = SHADOW_TRACE_DIR / "hermes_cfo_loop_shadow_traces.jsonl"
 
 # ── Valid config values ────────────────────────────────────────────────────────
 
-_VALID_MODES = ("off", "shadow", "primary")
+_VALID_MODES = ("off", "shadow", "limited_primary", "primary")
 _VALID_PROVIDERS = ("mock", "openrouter", "deepseek", "local")
 
-# ── Live-failure markers (responses that indicate the live system failed) ──────
+# ── Phase 8C: Limited primary config ──────────────────────────────────────────
+
+LIMITED_PRIMARY_CONFIDENCE_THRESHOLD = 0.80
+
+ALLOWLISTED_INTENTS = frozenset({
+    "implementation_prompt_request",
+    "acknowledgement_check",
+    "scout_status",
+    "approval_bulk_request",
+    "draft_comparison",
+    "plain_language_followup",
+    "simplify_previous_response",
+    "explain_previous_response",
+    "summary_of_day",
+    "implement_now",
+})
+
+HARD_BLOCKED_INTENTS = frozenset({
+    "publish_content",
+    "send_email",
+    "subscriber_email",
+    "social_posting",
+    "payment_activation",
+    "stripe_activation",
+    "affiliate_application",
+    "production_deploy",
+    "live_trading",
+    "client_facing_use",
+    "paid_tool_signup",
+    "external_purchase",
+    "database_migration",
+})
+
+# ── Live-failure markers ───────────────────────────────────────────────────────
 
 _LIVE_FAILURE_MARKERS = [
     "i wasn't able to generate a quality response",
@@ -55,13 +89,13 @@ _LIVE_FAILURE_MARKERS = [
 # ── Config ─────────────────────────────────────────────────────────────────────
 
 def get_cfo_loop_mode() -> str:
-    """Return current CFO loop mode. Primary mode falls back to shadow in Phase 8B."""
+    """Return current CFO loop mode. Full primary falls back to limited_primary."""
     raw = os.getenv("HERMES_CFO_LOOP_MODE", "off").lower().strip()
     if raw not in _VALID_MODES:
         return "off"
     if raw == "primary":
-        logger.warning("hermes_cfo_loop: primary mode is blocked in Phase 8B — falling back to shadow")
-        return "shadow"
+        logger.warning("hermes_cfo_loop: full primary mode is blocked — falling back to limited_primary")
+        return "limited_primary"
     return raw
 
 
@@ -77,22 +111,44 @@ def is_shadow_mode_active() -> bool:
     return get_cfo_loop_mode() == "shadow"
 
 
+def is_limited_primary_mode_active() -> bool:
+    return get_cfo_loop_mode() == "limited_primary"
+
+
 def is_primary_mode_blocked() -> bool:
-    """Always True in Phase 8B."""
+    """Full primary mode is always blocked."""
     return True
 
 
 # ── Should-run gate ────────────────────────────────────────────────────────────
 
+_CFO_STATUS_CMDS = (
+    "show cfo shadow", "compare cfo shadow", "clear cfo shadow",
+    "show cfo loop mode", "show cfo limited", "show cfo primary",
+    "rollback cfo",
+)
+
+
 def should_run_cfo_shadow(message: str) -> bool:
-    """True when shadow mode is active and message is meaningful."""
+    """True only in shadow mode (not limited_primary) when message is meaningful."""
     if get_cfo_loop_mode() != "shadow":
         return False
     if not message or len(message.strip()) < 2:
         return False
-    # Skip shadow commands themselves (avoid recursive shadow traces)
     msg_lower = message.strip().lower()
-    if any(cmd in msg_lower for cmd in ("show cfo shadow", "compare cfo shadow", "clear cfo shadow", "show cfo loop mode")):
+    if any(cmd in msg_lower for cmd in _CFO_STATUS_CMDS):
+        return False
+    return True
+
+
+def should_run_cfo_limited_primary(message: str) -> bool:
+    """True only in limited_primary mode when message is meaningful."""
+    if get_cfo_loop_mode() != "limited_primary":
+        return False
+    if not message or len(message.strip()) < 2:
+        return False
+    msg_lower = message.strip().lower()
+    if any(cmd in msg_lower for cmd in _CFO_STATUS_CMDS):
         return False
     return True
 
@@ -100,7 +156,7 @@ def should_run_cfo_shadow(message: str) -> bool:
 # ── State seeding ─────────────────────────────────────────────────────────────
 
 def _seed_state_from_current(state) -> None:
-    """Load live conversation state into CFO loop prototype state for seeding."""
+    """Load live conversation state into CFO loop prototype state."""
     try:
         from lib.hermes_conversation_state import load_conversation_state
         cs = load_conversation_state()
@@ -113,9 +169,11 @@ def _seed_state_from_current(state) -> None:
         state.current_topic = cs.get("current_topic")
         _lr = (cs.get("last_meaningful_response") or "").lower()
         state.last_response_was_approval_queue = "approval queue" in _lr
-        state.last_response_was_draft = (cs.get("current_topic") or "").startswith("lead_magnet") or "draft" in _lr
+        state.last_response_was_draft = (
+            (cs.get("current_topic") or "").startswith("lead_magnet") or "draft" in _lr
+        )
     except Exception:
-        pass  # state seeding failure must never affect shadow
+        pass
 
 
 # ── Core shadow runner ─────────────────────────────────────────────────────────
@@ -125,11 +183,7 @@ def run_cfo_shadow_for_message(
     live_response: Optional[str] = None,
     metadata: Optional[dict] = None,
 ) -> dict:
-    """
-    Run the CFO loop in shadow mode for a message.
-    Returns the trace dict (already saved to JSONL).
-    Never raises — all errors are captured in trace.
-    """
+    """Run the CFO loop in shadow mode. Returns trace dict (already saved). Never raises."""
     start = time.time()
     error: Optional[str] = None
     cfo_result: Optional[dict] = None
@@ -176,7 +230,124 @@ def run_cfo_shadow_async(
         logger.debug("hermes_cfo_shadow_async error: %s", exc)
 
 
-# ── Trace building ─────────────────────────────────────────────────────────────
+# ── Phase 8C: Limited primary runner ──────────────────────────────────────────
+
+def run_cfo_limited_primary(
+    message: str,
+    metadata: Optional[dict] = None,
+) -> tuple[Optional[str], bool]:
+    """
+    Run CFO loop in limited_primary mode.
+    Returns (cfo_response, primary_used).
+    - Allowlisted intent + confidence >= threshold → (response, True)
+    - Otherwise → (None, False); trace still saved
+    Never raises.
+    """
+    start = time.time()
+    error: Optional[str] = None
+    cfo_result: Optional[dict] = None
+    primary_used = False
+    fallback_reason: Optional[str] = None
+
+    try:
+        from prototypes.hermes_agentic_cfo_loop import HermesCFOLoop
+        loop = HermesCFOLoop()
+        _seed_state_from_current(loop.state)
+        cfo_response, trace_info = loop.process(message)
+        cfo_result = {"response": cfo_response, "trace": trace_info}
+
+        intent = trace_info.get("intent")
+        confidence = trace_info.get("confidence", 0.0)
+
+        if intent in HARD_BLOCKED_INTENTS:
+            fallback_reason = f"intent_{intent}_is_hard_blocked"
+        elif intent not in ALLOWLISTED_INTENTS:
+            fallback_reason = f"intent_{intent}_not_allowlisted"
+        elif confidence < LIMITED_PRIMARY_CONFIDENCE_THRESHOLD:
+            fallback_reason = f"confidence_{confidence:.2f}_below_threshold"
+        else:
+            primary_used = True
+
+    except Exception as exc:
+        error = str(exc)[:300]
+        fallback_reason = f"error:{error}"
+        logger.debug("hermes_cfo_limited_primary error: %s", error)
+
+    duration_ms = int((time.time() - start) * 1000)
+    trace = _build_primary_trace(
+        message=message,
+        cfo_result=cfo_result,
+        primary_used=primary_used,
+        fallback_reason=fallback_reason,
+        error=error,
+        duration_ms=duration_ms,
+        metadata=metadata,
+    )
+    save_shadow_trace(trace)
+
+    if primary_used and cfo_result:
+        return cfo_result["response"], True
+    return None, False
+
+
+def _build_primary_trace(
+    message: str,
+    cfo_result: Optional[dict],
+    primary_used: bool,
+    fallback_reason: Optional[str] = None,
+    error: Optional[str] = None,
+    duration_ms: int = 0,
+    metadata: Optional[dict] = None,
+) -> dict:
+    msg_lower = (message or "").strip().lower()
+    msg_hash = hashlib.md5(msg_lower.encode()).hexdigest()[:12]
+
+    cfo_intent = None
+    cfo_tool = None
+    cfo_confidence = None
+    cfo_response_preview = None
+    safety_flags: list = []
+
+    if cfo_result and not error:
+        t = cfo_result.get("trace", {})
+        cfo_intent = t.get("intent")
+        cfo_tool = t.get("tool")
+        cfo_confidence = t.get("confidence")
+        cfo_resp = cfo_result.get("response", "")
+        cfo_response_preview = _sanitize_for_log(cfo_resp[:250]) if cfo_resp else None
+
+        if cfo_resp:
+            resp_lower = cfo_resp.lower()
+            for r in ("activated payment", "published to", "sent to subscribers",
+                      "deployed to production", "ran live trade"):
+                if r in resp_lower:
+                    safety_flags.append(f"primary_response_mentions: {r}")
+
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "message_hash": msg_hash,
+        "normalized_message": msg_lower[:200],
+        "live_response_header": None,
+        "live_response_changed": primary_used,
+        "cfo_loop_mode": "limited_primary",
+        "cfo_provider": get_cfo_loop_provider(),
+        "cfo_intent": cfo_intent,
+        "cfo_selected_tool": cfo_tool,
+        "cfo_confidence": cfo_confidence,
+        "cfo_recommendation_summary": None,
+        "cfo_response_preview": cfo_response_preview,
+        "would_have_fixed_failure": False,
+        "evidence_keys_used": [],
+        "safety_flags": safety_flags,
+        "error": error,
+        "duration_ms": duration_ms,
+        "primary_used": primary_used,
+        "fallback_reason": fallback_reason,
+        "mode": "limited_primary",
+    }
+
+
+# ── Trace building (shadow) ────────────────────────────────────────────────────
 
 def build_shadow_trace(
     message: str,
@@ -208,19 +379,16 @@ def build_shadow_trace(
         cfo_tool = t.get("tool")
         cfo_confidence = t.get("confidence")
         cfo_resp = cfo_result.get("response", "")
-        # Sanitize preview: no secrets, no full raw content
         cfo_response_preview = _sanitize_for_log(cfo_resp[:250]) if cfo_resp else None
 
-        # Would this have fixed a live failure?
         if live_response:
             live_lower = live_response.lower()
             would_have_fixed = any(m in live_lower for m in _LIVE_FAILURE_MARKERS)
 
-        # Safety check on shadow response
         if cfo_resp:
             resp_lower = cfo_resp.lower()
-            risky = ["activated payment", "published to", "sent to subscribers", "deployed to production", "ran live trade"]
-            for r in risky:
+            for r in ("activated payment", "published to", "sent to subscribers",
+                      "deployed to production", "ran live trade"):
                 if r in resp_lower:
                     safety_flags.append(f"shadow_response_mentions: {r}")
 
@@ -246,15 +414,13 @@ def build_shadow_trace(
 
 
 def _sanitize_for_log(text: str) -> str:
-    """Strip any patterns that look like secrets from log text."""
     import re
-    secret_patterns = [
+    for p in (
         r"sk-[A-Za-z0-9]{20,}",
         r"Bearer\s+[A-Za-z0-9\-_\.]{20,}",
         r"SUPABASE_[A-Z_]+=\S+",
         r"[Aa][Pp][Ii]_?[Kk][Ee][Yy]=\S+",
-    ]
-    for p in secret_patterns:
+    ):
         text = re.sub(p, "[REDACTED]", text)
     return text
 
@@ -284,11 +450,10 @@ def load_shadow_traces(limit: int = 100) -> list[dict]:
 
 
 def clear_shadow_traces() -> int:
-    """Clear the shadow trace file. Returns number of traces cleared."""
     if not SHADOW_TRACE_FILE.exists():
         return 0
     lines = SHADOW_TRACE_FILE.read_text(encoding="utf-8").strip().splitlines()
-    count = len([l for l in lines if l.strip()])
+    count = len([ln for ln in lines if ln.strip()])
     SHADOW_TRACE_FILE.write_text("", encoding="utf-8")
     return count
 
@@ -311,23 +476,58 @@ def format_shadow_status() -> str:
         "CFO LOOP SHADOW STATUS\n",
         f"Mode: {mode}",
         f"Provider: {provider}",
-        f"Live response changed: NO",
-        f"",
+        "Live response changed: NO",
+        "",
         f"Recent traces: {n}",
         f"Last intent: {last_intent}",
         f"Last selected tool: {last_tool}",
         f"Would-have-fixed count: {fixed_count}/{n}" if n else "Would-have-fixed count: 0/0",
         f"Errors: {last_error_count}",
-        f"",
-        f"Safety:",
-        f"  Shadow mode does not change Telegram responses.",
-        f"  No Supabase writes.",
-        f"  No public/paid/client-facing actions.",
-        f"",
-        f"Approval boundary:",
-        f"  I will not publish, email, spend money, apply to affiliates,",
-        f"  activate payments, deploy production changes, or run live trading.",
+        "",
+        "Safety:",
+        "  Shadow mode does not change Telegram responses.",
+        "  No Supabase writes.",
+        "  No public/paid/client-facing actions.",
+        "",
+        "Approval boundary:",
+        "  I will not publish, email, spend money, apply to affiliates,",
+        "  activate payments, deploy production changes, or run live trading.",
     ]
+    return "\n".join(lines)
+
+
+def format_limited_primary_status() -> str:
+    mode = get_cfo_loop_mode()
+    provider = get_cfo_loop_provider()
+    traces = load_shadow_traces(limit=100)
+    primary_count = sum(1 for t in traces if t.get("primary_used"))
+    n = len(traces)
+
+    lines = [
+        "CFO LOOP LIMITED PRIMARY STATUS\n",
+        f"Mode: {mode}",
+        f"Provider: {provider}",
+        "",
+        "Allowlisted intents:",
+    ]
+    for intent in sorted(ALLOWLISTED_INTENTS):
+        lines.append(f"  - {intent}")
+    lines.extend([
+        "",
+        "Full primary: blocked",
+        "",
+        f"Traces: {n} total, {primary_count} used as primary response",
+        "",
+        "Safety:",
+        "  No publishing, email, payment, affiliate signup, deploy,",
+        "  Supabase writes, or live trading.",
+        "",
+        "Rollback:",
+        "  Set HERMES_CFO_LOOP_MODE=shadow and restart.",
+        "  Edit: ~/Library/LaunchAgents/com.raymonddavis.nexus.telegram.plist",
+        "  Then: launchctl unload ~/Library/LaunchAgents/com.raymonddavis.nexus.telegram.plist",
+        "  Then: launchctl load ~/Library/LaunchAgents/com.raymonddavis.nexus.telegram.plist",
+    ])
     return "\n".join(lines)
 
 
@@ -351,11 +551,12 @@ def format_recent_shadow_traces(limit: int = 10) -> str:
         conf = t.get("cfo_confidence")
         conf_str = f"{conf:.0%}" if conf is not None else "n/a"
         err = " [ERROR]" if t.get("error") else ""
+        primary = " [PRIMARY]" if t.get("primary_used") else ""
         lines.append(f"  {i}. Message: {msg}")
         lines.append(f"     Intent: {intent}")
         lines.append(f"     Tool: {tool}")
         lines.append(f"     Would have fixed live issue: {fixed}")
-        lines.append(f"     Confidence: {conf_str}{err}")
+        lines.append(f"     Confidence: {conf_str}{err}{primary}")
         lines.append("")
 
     lines.append("Approval boundary:")
@@ -363,8 +564,10 @@ def format_recent_shadow_traces(limit: int = 10) -> str:
     return "\n".join(lines)
 
 
-def compare_live_vs_shadow(live_response: Optional[str] = None, shadow_response: Optional[str] = None) -> str:
-    """Compare live response with the latest shadow response."""
+def compare_live_vs_shadow(
+    live_response: Optional[str] = None,
+    shadow_response: Optional[str] = None,
+) -> str:
     traces = load_shadow_traces(limit=10)
 
     if not traces:
@@ -383,30 +586,31 @@ def compare_live_vs_shadow(live_response: Optional[str] = None, shadow_response:
     cfo_tool = last.get("cfo_selected_tool", "unknown")
     msg = last.get("normalized_message", "")[:80]
     fixed = last.get("would_have_fixed_failure", False)
+    primary_used = last.get("primary_used", False)
 
-    # Compute a simple difference assessment
     if live_response and shadow_response:
         same = live_response.strip()[:100] == shadow_response.strip()[:100]
         diff_note = "Responses are similar." if same else "Shadow response would differ from live response."
     else:
-        diff_note = "Live response was: " + live_header
+        diff_note = "Live response was: " + (live_header or "unknown")
 
     lines = [
         "CFO LIVE VS SHADOW COMPARISON\n",
         f"Message: {msg}\n",
-        f"Live response:",
+        "Live response:",
         f"  {live_header}",
-        f"",
-        f"Shadow would have:",
+        "",
+        "CFO Loop would have:",
         f"  Intent: {cfo_intent}",
         f"  Tool: {cfo_tool}",
         f"  Preview: {(shadow_preview or 'n/a')[:150]}",
-        f"",
+        f"  Primary used: {'yes' if primary_used else 'no'}",
+        "",
         f"Difference: {diff_note}",
         f"Would have fixed a known live failure: {'yes' if fixed else 'no'}",
-        f"",
-        f"Approval boundary:",
-        f"  Shadow mode does not change live responses.",
+        "",
+        "Approval boundary:",
+        "  Shadow mode does not change live responses.",
     ]
     return "\n".join(lines)
 
@@ -428,14 +632,33 @@ def summarize_shadow_trace(trace: dict) -> str:
     return " | ".join(parts)
 
 
-# ── Telegram command handler (imported by telegram_bot.py) ────────────────────
+# ── Rollback ───────────────────────────────────────────────────────────────────
+
+def format_rollback_instructions() -> str:
+    return (
+        "CFO LOOP ROLLED BACK TO SHADOW\n\n"
+        "Manual rollback steps:\n\n"
+        "  1. Edit the plist:\n"
+        "     ~/Library/LaunchAgents/com.raymonddavis.nexus.telegram.plist\n\n"
+        "  2. Set HERMES_CFO_LOOP_MODE to: shadow\n\n"
+        "  3. Unload the service:\n"
+        "     launchctl unload ~/Library/LaunchAgents/com.raymonddavis.nexus.telegram.plist\n\n"
+        "  4. Reload the service:\n"
+        "     launchctl load ~/Library/LaunchAgents/com.raymonddavis.nexus.telegram.plist\n\n"
+        "Approval boundary:\n"
+        "  Cannot modify launchctl env from Telegram directly — plist edit required."
+    )
+
+
+# ── Telegram command handler ───────────────────────────────────────────────────
 
 def handle_cfo_shadow_command(normalized: str) -> Optional[str]:
     """
-    Handle CFO shadow Telegram commands. Returns response string or None.
+    Handle CFO shadow/primary Telegram commands. Returns response string or None.
     Called before Phase 7C intercept in telegram_bot.py.
     """
     cmd_map = {
+        # Phase 8B commands
         "show cfo shadow status": format_shadow_status,
         "cfo shadow status": format_shadow_status,
         "show cfo loop mode": format_shadow_status,
@@ -446,6 +669,13 @@ def handle_cfo_shadow_command(normalized: str) -> Optional[str]:
         "cfo shadow compare": compare_live_vs_shadow,
         "clear cfo shadow test traces": _handle_clear_traces,
         "clear cfo shadow traces": _handle_clear_traces,
+        # Phase 8C commands
+        "show cfo limited primary status": format_limited_primary_status,
+        "cfo limited primary status": format_limited_primary_status,
+        "show cfo primary status": format_limited_primary_status,
+        "cfo primary status": format_limited_primary_status,
+        "rollback cfo loop to shadow": format_rollback_instructions,
+        "rollback cfo to shadow": format_rollback_instructions,
     }
     cleaned = normalized.strip().rstrip(".?!").strip()
     if cleaned in cmd_map:
@@ -453,7 +683,10 @@ def handle_cfo_shadow_command(normalized: str) -> Optional[str]:
             return cmd_map[cleaned]()
         except Exception as exc:
             logger.warning("hermes_cfo_shadow_command error: %s", exc)
-            return f"CFO LOOP SHADOW STATUS\n\nError running shadow command: {str(exc)[:100]}\n\nApproval boundary:\n  Shadow mode does not change live responses."
+            return (
+                f"CFO LOOP STATUS\n\nError running command: {str(exc)[:100]}\n\n"
+                "Approval boundary:\n  Shadow mode does not change live responses."
+            )
     return None
 
 
@@ -462,6 +695,6 @@ def _handle_clear_traces() -> str:
     return (
         f"CFO LOOP SHADOW STATUS\n\n"
         f"Cleared {count} shadow test trace(s).\n\n"
-        f"Approval boundary:\n"
-        f"  Shadow mode does not change live responses."
+        "Approval boundary:\n"
+        "  Shadow mode does not change live responses."
     )

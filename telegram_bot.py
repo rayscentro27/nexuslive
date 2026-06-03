@@ -3547,6 +3547,26 @@ class NexusTelegramBot:
         except Exception as _shadow_cmd_exc:
             logger.warning("telegram cfo_shadow_command failed: %s", _shadow_cmd_exc)
 
+        # ── Phase 8C: CFO Loop limited primary intercept ─────────────────────
+        # Runs BEFORE Phase 7C. In limited_primary mode, allowlisted intents
+        # with confidence >= 0.80 use the CFO Loop response as the live response.
+        # Falls through on non-allowlisted intents, low confidence, or errors.
+        # Trace is always saved regardless of whether primary was used.
+        _cfo_8c_handled = False
+        try:
+            from lib.hermes_cfo_loop_shadow import (
+                should_run_cfo_limited_primary as _should_8c,
+                run_cfo_limited_primary as _run_8c,
+            )
+            if _should_8c(text):
+                _8c_response, _8c_used = _run_8c(message=text)
+                if _8c_used and _8c_response:
+                    logger.info("telegram route=cfo_limited_primary")
+                    _cfo_8c_handled = True
+                    return _8c_response
+        except Exception as _8c_exc:
+            logger.warning("telegram cfo_limited_primary failed text=%r exc=%s", text[:60], _8c_exc)
+
         # ── Phase 7C: Pre-continuity CFO Brain intercept ─────────────────────
         # Catches option-selection, task-reference, simplify/explain, morning-summary,
         # and failure-feedback BEFORE the continuity dict and TelegramRouter so that
@@ -3700,6 +3720,8 @@ class NexusTelegramBot:
             pass  # shadow errors must never affect live response
 
         # ── Phase 8B: CFO Loop shadow trace (fire-and-forget, never changes response) ──
+        # In limited_primary mode, Phase 8C already logged the trace — skip here.
+        # should_run_cfo_shadow returns True only in shadow mode.
         try:
             from lib.hermes_cfo_loop_shadow import should_run_cfo_shadow, run_cfo_shadow_async
             if should_run_cfo_shadow(text):

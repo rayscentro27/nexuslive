@@ -152,8 +152,9 @@ _MOCK_FIXTURES: dict[str, Any] = {
 
 _INTENT_PATTERNS = {
     "draft_comparison": [
-        r"what changed", r"what.s different", r"compare.*(draft|version)", r"draft.*change",
-        r"show.*change", r"what.s new in", r"how did.*change",
+        r"what changed", r"what.s different", r"what is different", r"compare.*(draft|version)",
+        r"draft.*change", r"show.*change", r"what.s new in", r"how did.*change",
+        r"what.{1,5}different", r"different.*version",
     ],
     "approval_bulk_request": [
         r"approve.*(all|them|everything)", r"bulk.?approv", r"i approve", r"approve all",
@@ -187,6 +188,16 @@ _INTENT_PATTERNS = {
     "acknowledgement_check": [
         r"do you understand", r"did you understand", r"you understand\?",
         r"understand my question", r"get what i.m", r"know what i mean",
+    ],
+    "summary_of_day": [
+        r"what did we work on today", r"what.+happened today",
+        r"summary.+today", r"what did we do today", r"daily summary",
+        r"today.+progress", r"what.+worked on today", r"catch me up on today",
+        r"what.+done today", r"recap.*today",
+    ],
+    "plain_language_followup": [
+        r"^in plain language$", r"plain english version",
+        r"dumb it down", r"make it less technical",
     ],
     "simplify_previous_response": [
         r"simplif", r"simpler", r"make.*simpler", r"plain.*english",
@@ -302,6 +313,7 @@ AVAILABLE_TOOLS = [
     {"name": "show_tool_status", "description": "Show status of Claude, Codex, or other tools", "safety": "read-only"},
     {"name": "create_research_assignment", "description": "Create a research task", "safety": "write (internal only)"},
     {"name": "plain_acknowledgement", "description": "Acknowledge and restate understood intent", "safety": "read-only"},
+    {"name": "show_daily_summary", "description": "Summarize today's work from verified local state and traces", "safety": "read-only"},
 ]
 
 
@@ -322,6 +334,8 @@ class CFOReasoningBrain:
         "implementation_prompt_request": "create_implementation_prompt",
         "implement_now": "create_implementation_prompt",
         "acknowledgement_check": "plain_acknowledgement",
+        "summary_of_day": "show_daily_summary",
+        "plain_language_followup": "simplify_last_response",
         "simplify_previous_response": "simplify_last_response",
         "explain_previous_response": "explain_recommendation",
         "task_reference": "select_option",
@@ -561,6 +575,17 @@ class ToolExecutor:
             "message": f"Understood: {args.get('message', 'your message')}",
         }
 
+    def _tool_show_daily_summary(self, args: dict, state: ConversationState) -> dict:
+        plan = _MOCK_FIXTURES.get("daily_plan", {})
+        return {
+            "status": "ok",
+            "tool": "show_daily_summary",
+            "plan": plan,
+            "evidence_source": "mock_daily_plan",
+            "verified": True,
+            "note": "Based on mock data — live traces not loaded in prototype",
+        }
+
 
 # ── PlainEnglishResponder ──────────────────────────────────────────────────────
 
@@ -745,6 +770,34 @@ class PlainEnglishResponder:
             f"\nIf that is not right, please rephrase and I will try again.",
             f"\nNext safe step: Confirm my understanding or correct me.",
         ]
+        return "\n".join(lines)
+
+    def _format_show_daily_summary(self, result: dict, reasoning: dict, message: str, state: ConversationState) -> str:
+        plan = result.get("plan", {})
+        date = plan.get("date", "today")
+        priority = plan.get("top_priority", "")
+        tasks = plan.get("tasks", [])
+        blocked = plan.get("blocked", [])
+        note = result.get("note", "")
+        lines = [
+            "PLAIN ANSWER\n",
+            f"Here is what we worked on today ({date}):\n",
+        ]
+        if priority:
+            lines.append(f"Top priority: {priority}")
+        if tasks:
+            lines.append("\nTasks:")
+            for t in tasks:
+                lines.append(f"  {t}")
+        if blocked:
+            lines.append(f"\nBlocked ({len(blocked)} item{'s' if len(blocked) > 1 else ''}):")
+            for b in blocked:
+                lines.append(f"  {b}")
+        else:
+            lines.append("\nNo blocked tasks.")
+        if note:
+            lines.append(f"\nNote: {note}")
+        lines.append("\nNext safe step: Review today's progress and confirm priorities for tomorrow.")
         return "\n".join(lines)
 
     def _format_default(self, result: dict, reasoning: dict, message: str, state: ConversationState) -> str:

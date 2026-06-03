@@ -18,7 +18,8 @@ importlib.reload(shadow_mod)
 
 from lib.hermes_cfo_loop_shadow import (
     get_cfo_loop_mode, get_cfo_loop_provider, is_shadow_mode_active,
-    is_primary_mode_blocked, should_run_cfo_shadow,
+    is_limited_primary_mode_active, is_primary_mode_blocked, should_run_cfo_shadow,
+    ALLOWLISTED_INTENTS, HARD_BLOCKED_INTENTS, LIMITED_PRIMARY_CONFIDENCE_THRESHOLD,
 )
 
 check("default mode is off", get_cfo_loop_mode() == "off")
@@ -32,10 +33,10 @@ check("shadow mode recognized", get_cfo_loop_mode() == "shadow")
 check("shadow mode is active", is_shadow_mode_active())
 check("should_run_cfo_shadow=True when shadow+message", should_run_cfo_shadow("how do we make money"))
 
-# ── primary mode is blocked ───────────────────────────────────────────────────
+# ── primary mode is blocked (falls back to limited_primary in Phase 8C) ──────
 os.environ["HERMES_CFO_LOOP_MODE"] = "primary"
-check("primary falls back to shadow", get_cfo_loop_mode() == "shadow")
-check("primary is blocked in Phase 8B", is_primary_mode_blocked())
+check("primary falls back to limited_primary", get_cfo_loop_mode() == "limited_primary")
+check("primary is blocked", is_primary_mode_blocked())
 
 # ── invalid value defaults to off ────────────────────────────────────────────
 os.environ["HERMES_CFO_LOOP_MODE"] = "invalid_value_xyz"
@@ -52,6 +53,16 @@ for provider in ("mock", "openrouter", "deepseek", "local"):
 
 os.environ["HERMES_CFO_LOOP_PROVIDER"] = "unknown_provider"
 check("invalid provider defaults to mock", get_cfo_loop_provider() == "mock")
+
+# ── limited_primary mode ─────────────────────────────────────────────────────
+os.environ["HERMES_CFO_LOOP_MODE"] = "limited_primary"
+check("limited_primary mode recognized", get_cfo_loop_mode() == "limited_primary")
+check("limited_primary is active", is_limited_primary_mode_active())
+check("shadow is NOT active in limited_primary", not is_shadow_mode_active())
+check("should_run_cfo_shadow is False in limited_primary", not should_run_cfo_shadow("any message"))
+check("allowlist is non-empty", len(ALLOWLISTED_INTENTS) >= 8)
+check("hard blocked list is non-empty", len(HARD_BLOCKED_INTENTS) >= 5)
+check("threshold is 0.80", LIMITED_PRIMARY_CONFIDENCE_THRESHOLD == 0.80)
 
 # ── shadow commands not shadow-traced (no recursive tracing) ──────────────────
 os.environ["HERMES_CFO_LOOP_MODE"] = "shadow"
