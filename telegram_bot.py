@@ -3290,6 +3290,14 @@ class NexusTelegramBot:
         Safety gates (policy check, TELEGRAM_ENABLED, approval rules) are still respected.
         """
         try:
+            from lib.hermes_cfo_loop_shadow import (
+                ALLOWLISTED_INTENTS as _CFO_8C_ALLOWLIST,
+                should_run_cfo_limited_primary as _should_run_cfo_8c,
+            )
+            from prototypes.hermes_agentic_cfo_loop import (
+                ConversationState as _CFO8CConversationState,
+                IntentBrain as _CFO8CIntentBrain,
+            )
             from hermes_command_router.intake import classify_intent
             from hermes_command_router.router import run_command
 
@@ -3298,6 +3306,12 @@ class NexusTelegramBot:
                 "knowledge_gap_research",
                 "knowledge_gap_archive",
             }
+            # In limited_primary mode, let Phase 8C handle its allowlisted intents
+            # before memory-command routing can collapse them into older handlers.
+            if _should_run_cfo_8c(text):
+                cfo_intent = _CFO8CIntentBrain().classify(text, _CFO8CConversationState())["intent"]
+                if cfo_intent in _CFO_8C_ALLOWLIST:
+                    return None
             intent, _, _ = classify_intent(text)
             if intent in MEMORY_INTENTS:
                 result = run_command(text, source="telegram")

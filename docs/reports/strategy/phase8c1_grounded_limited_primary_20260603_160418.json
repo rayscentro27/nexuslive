@@ -1,0 +1,75 @@
+{
+  "timestamp": "2026-06-03T16:04:18-07:00",
+  "report": "phase8c1_grounded_limited_primary",
+  "root_cause": [
+    "Limited primary needed a hard guard against mock/sample CFO output.",
+    "Telegram memory-command pre-routing could swallow allowlisted Phase 8C phrases before the limited-primary intercept.",
+    "Implementation prompt generation could reuse a stale generic selected option instead of a live active recommendation."
+  ],
+  "files_changed": [
+    "lib/hermes_cfo_loop_shadow.py",
+    "prototypes/hermes_agentic_cfo_loop.py",
+    "telegram_bot.py",
+    "scripts/test_phase8c_grounding_blocks_mock_primary.py",
+    "scripts/test_phase8c_summary_of_day_requires_real_state.py",
+    "scripts/test_phase8c_scout_status_requires_real_assignments.py",
+    "scripts/test_phase8c_approval_bulk_uses_real_queue.py",
+    "scripts/test_phase8c_implementation_prompt_uses_selected_option.py",
+    "scripts/test_phase8c_draft_comparison_context_or_clarify.py",
+    "scripts/test_phase8c_clarifying_question_primary.py",
+    "scripts/test_phase8c_existing_commands_still_work.py"
+  ],
+  "mock_output_guard": {
+    "blocked_markers": [
+      "Based on mock data",
+      "sample",
+      "mock",
+      "Mailchimp opt-in form",
+      "Build and publish lead magnet landing page",
+      "Connect affiliate offer link",
+      "research_scout_1",
+      "draft v2 approved"
+    ]
+  },
+  "grounded_data_paths": [
+    "docs/reports/strategy/hermes_conversation_state.json",
+    "docs/reports/operations/hermes_daily_cycle_state.json",
+    "docs/reports/actions/hermes_action_queue.jsonl",
+    "docs/reports/approvals/hermes_approval_queue_state.json",
+    "docs/reports/research_queue/hermes_research_queue.jsonl",
+    "docs/reports/research_queue/hermes_scout_assignments.jsonl",
+    "docs/reports/content/",
+    "docs/reports/strategy/",
+    "docs/reports/scouts/"
+  ],
+  "tests_run": [
+    "python3 scripts/test_phase8c_grounding_blocks_mock_primary.py",
+    "python3 scripts/test_phase8c_summary_of_day_requires_real_state.py",
+    "python3 scripts/test_phase8c_scout_status_requires_real_assignments.py",
+    "python3 scripts/test_phase8c_approval_bulk_uses_real_queue.py",
+    "python3 scripts/test_phase8c_implementation_prompt_uses_selected_option.py",
+    "python3 scripts/test_phase8c_draft_comparison_context_or_clarify.py",
+    "python3 scripts/test_phase8c_clarifying_question_primary.py",
+    "python3 scripts/test_phase8c_existing_commands_still_work.py"
+  ],
+  "live_validation_commands": [
+    "show cfo limited primary status",
+    "what did we work on today",
+    "what are all the scouts doing right now",
+    "i approve them all",
+    "create the implementation prompt now",
+    "what changed in the draft",
+    "ask me a better clarifying question",
+    "show memory v2 primary status",
+    "Hermes, run daily operating cycle"
+  ],
+  "telegram_restart": {
+    "label": "com.raymonddavis.nexus.telegram",
+    "pid": 44631
+  },
+  "supabase_changed": "NO",
+  "old_tables_changed": "NO",
+  "unsafe_actions_triggered": "NO",
+  "commit_hash": "PENDING",
+  "push_status": "not pushed"
+}

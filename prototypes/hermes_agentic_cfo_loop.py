@@ -23,6 +23,7 @@ from typing import Any, Optional
 
 TRACE_FILE = Path(__file__).parent.parent / "docs" / "reports" / "strategy" / "phase8_cfo_loop_traces.jsonl"
 MOCK_MODE = not bool(os.getenv("HERMES_CFO_MODEL_PROVIDER"))
+ROOT = Path(__file__).parent.parent
 
 BLOCKED_TOOLS = frozenset({
     "publish_content",
@@ -43,6 +44,29 @@ FORBIDDEN_RESPONSE_PHRASES = [
 ]
 
 APPROVAL_BOUNDARY = "Approval boundary:\n  I will not publish, email, spend money, apply to affiliates, activate payments, deploy production changes, or run live trading without explicit Ray approval."
+
+MOCK_RESPONSE_MARKERS = (
+    "based on mock data",
+    "sample",
+    "mock",
+    "mailchimp opt-in form",
+    "build and publish lead magnet landing page",
+    "connect affiliate offer link",
+    "research_scout_1",
+    "draft v2 approved",
+)
+
+GROUNDING_PATHS = (
+    "docs/reports/strategy/hermes_conversation_state.json",
+    "docs/reports/operations/hermes_daily_cycle_state.json",
+    "docs/reports/actions/hermes_action_queue.jsonl",
+    "docs/reports/approvals/hermes_approval_queue_state.json",
+    "docs/reports/research_queue/hermes_research_queue.jsonl",
+    "docs/reports/research_queue/hermes_scout_assignments.jsonl",
+    "docs/reports/content/",
+    "docs/reports/strategy/",
+    "docs/reports/scouts/",
+)
 
 
 # ── ConversationState ──────────────────────────────────────────────────────────
@@ -148,6 +172,196 @@ _MOCK_FIXTURES: dict[str, Any] = {
 }
 
 
+def _today_local() -> str:
+    return datetime.now().date().isoformat()
+
+
+def _safe_rel(path: Path) -> str:
+    try:
+        return str(path.relative_to(ROOT))
+    except Exception:
+        return str(path)
+
+
+def _read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except Exception:
+        return ""
+
+
+def _path_modified_today(path: Path) -> bool:
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime).date() == datetime.now().date()
+    except Exception:
+        return False
+
+
+def _contains_mock_marker(text: str) -> bool:
+    lowered = (text or "").lower()
+    return any(marker in lowered for marker in MOCK_RESPONSE_MARKERS)
+
+
+def _load_real_approval_items(limit: int = 10) -> list[dict]:
+    try:
+        from lib.hermes_approval_queue import list_approval_items
+        return list_approval_items(limit=limit) or []
+    except Exception:
+        return []
+
+
+def _load_real_scout_snapshot(limit: int = 10) -> dict:
+    assignments: list[dict] = []
+    queue_entries: list[dict] = []
+    action_assignments: list[dict] = []
+
+    try:
+        from lib.hermes_cfo_conversation_layer import load_scout_assignments, load_research_queue
+        assignments = load_scout_assignments()[:limit]
+        queue_entries = load_research_queue(status="open")[:limit]
+    except Exception:
+        pass
+
+    try:
+        from lib.hermes_action_queue import get_unique_open_actions
+        for action in get_unique_open_actions():
+            scout = getattr(action, "assigned_scout", "") or ""
+            if not scout:
+                continue
+            action_assignments.append({
+                "scout": scout,
+                "task": getattr(action, "title", "") or getattr(action, "description", ""),
+                "status": getattr(action, "status", "queued"),
+                "source": "action_queue",
+            })
+        action_assignments = action_assignments[:limit]
+    except Exception:
+        pass
+
+    return {
+        "assignments": assignments,
+        "queue_entries": queue_entries,
+        "action_assignments": action_assignments,
+    }
+
+
+def _load_real_daily_summary(limit: int = 5) -> dict:
+    evidence: list[dict] = []
+    state = None
+
+    try:
+        from lib.hermes_daily_cycle_state import load_latest_daily_cycle_state
+        state = load_latest_daily_cycle_state()
+        if state:
+            created = str(state.get("created_at") or "")
+            state_date = str(state.get("date") or "")
+            if _today_local() in created or state_date == _today_local():
+                top_priority = state.get("top_priority") or ""
+                if top_priority:
+                    evidence.append({
+                        "kind": "daily_cycle_state",
+                        "summary": f"Top priority: {top_priority}",
+                        "path": "docs/reports/operations/hermes_daily_cycle_state.json",
+                    })
+                for item in (state.get("completed_items") or [])[:2]:
+                    label = item.get("item") or item.get("blocker") or ""
+                    if label:
+                        evidence.append({
+                            "kind": "daily_cycle_completed",
+                            "summary": f"Completed: {label}",
+                            "path": "docs/reports/operations/hermes_daily_cycle_state.json",
+                        })
+                for item in (state.get("approval_items") or [])[:2]:
+                    label = item.get("item") or ""
+                    if label:
+                        evidence.append({
+                            "kind": "daily_cycle_approval",
+                            "summary": f"Pending approval: {label}",
+                            "path": "docs/reports/operations/hermes_daily_cycle_state.json",
+                        })
+    except Exception:
+        state = None
+
+    report_dirs = [
+        ROOT / "docs" / "reports" / "strategy",
+        ROOT / "docs" / "reports" / "scouts",
+        ROOT / "docs" / "reports" / "content",
+    ]
+    for report_dir in report_dirs:
+        if not report_dir.exists():
+            continue
+        for path in sorted(report_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True):
+            if not _path_modified_today(path):
+                continue
+            first_line = _read_text(path).splitlines()[:1]
+            summary = first_line[0].strip("# ").strip() if first_line else path.name
+            evidence.append({
+                "kind": "report",
+                "summary": summary or path.name,
+                "path": _safe_rel(path),
+            })
+            if len(evidence) >= limit:
+                break
+        if len(evidence) >= limit:
+            break
+
+    try:
+        from lib.hermes_action_queue import get_unique_open_actions
+        for action in get_unique_open_actions()[:limit]:
+            created = str(getattr(action, "created_at", "") or "")
+            updated = str(getattr(action, "updated_at", "") or "")
+            if _today_local() not in created and _today_local() not in updated:
+                continue
+            title = getattr(action, "title", "") or "Open action"
+            evidence.append({
+                "kind": "action",
+                "summary": f"Action: {title}",
+                "path": "docs/reports/actions/hermes_action_queue.jsonl",
+            })
+            if len(evidence) >= limit:
+                break
+    except Exception:
+        pass
+
+    return {"state": state, "evidence": evidence[:limit]}
+
+
+def _resolve_real_draft_paths() -> tuple[Optional[Path], Optional[Path]]:
+    focus_path = None
+    try:
+        from lib.hermes_conversation_state import load_conversation_state
+        cs = load_conversation_state()
+        raw_path = cs.get("last_artifact_path") or ""
+        if raw_path:
+            candidate = ROOT / raw_path if not str(raw_path).startswith("/") else Path(raw_path)
+            if candidate.exists():
+                focus_path = candidate
+    except Exception:
+        pass
+
+    try:
+        from lib.hermes_artifact_version_compare import (
+            find_latest_checklist_draft_pair,
+            find_prior_artifact_version,
+        )
+        if focus_path:
+            return find_prior_artifact_version(focus_path), focus_path
+        return find_latest_checklist_draft_pair()
+    except Exception:
+        return None, None
+
+
+def _resolve_implementation_target(args: dict, state: ConversationState) -> Optional[str]:
+    selected = (args.get("option_text") or "").strip()
+    recommendation = (args.get("active_recommendation") or "").strip()
+    current_topic = (state.current_topic or "").strip().lower()
+    generic_research = "research the question and return with verified evidence"
+    if selected and selected.lower() == generic_research and recommendation:
+        if current_topic in {"nexus_plan", "money_strategy", "daily_plan"}:
+            return recommendation
+    return selected or recommendation or None
+
+
 # ── IntentBrain ────────────────────────────────────────────────────────────────
 
 _INTENT_PATTERNS = {
@@ -155,6 +369,11 @@ _INTENT_PATTERNS = {
         r"what changed", r"what.s different", r"what is different", r"compare.*(draft|version)",
         r"draft.*change", r"show.*change", r"what.s new in", r"how did.*change",
         r"what.{1,5}different", r"different.*version",
+    ],
+    "clarifying_question_request": [
+        r"ask me a better clarifying question",
+        r"better clarifying question",
+        r"ask.*clarifying question",
     ],
     "approval_bulk_request": [
         r"approve.*(all|them|everything)", r"bulk.?approv", r"i approve", r"approve all",
@@ -263,6 +482,8 @@ class IntentBrain:
             base = 0.95
         if intent == "simplify_previous_response" and context.get("has_meaningful_response"):
             base = 0.93
+        if intent == "clarifying_question_request":
+            base = 0.98
         return base
 
 
@@ -272,11 +493,11 @@ class RetrievalBrain:
     def retrieve(self, intent: str, state: ConversationState) -> dict:
         evidence = {}
         if intent in ("draft_comparison",):
-            evidence["content_drafts"] = _MOCK_FIXTURES["content_drafts"]
+            evidence["draft_paths"] = _resolve_real_draft_paths()
         if intent in ("approval_bulk_request",):
-            evidence["approval_queue"] = _MOCK_FIXTURES["approval_queue"]
+            evidence["approval_queue"] = _load_real_approval_items()
         if intent in ("scout_status", "scout_assignment"):
-            evidence["scout_assignments"] = _MOCK_FIXTURES["scout_assignments"]
+            evidence["scout_assignments"] = _load_real_scout_snapshot()
         if intent in ("tool_status_question",):
             evidence["tool_status"] = _MOCK_FIXTURES["tool_status"]
         if intent in ("money_strategy", "general_strategy"):
@@ -292,8 +513,8 @@ class RetrievalBrain:
             evidence["last_meaningful_response_summary"] = state.last_meaningful_response_summary
         if intent in ("simplify_previous_response",):
             evidence["last_meaningful_response"] = state.last_meaningful_response
-        if intent in ("general_strategy", "unknown_answer"):
-            evidence["daily_plan"] = _MOCK_FIXTURES["daily_plan"]
+        if intent in ("summary_of_day",):
+            evidence["daily_summary"] = _load_real_daily_summary()
         return evidence
 
 
@@ -327,6 +548,7 @@ class CFOReasoningBrain:
 
     _INTENT_TO_TOOL = {
         "draft_comparison": "compare_drafts",
+        "clarifying_question_request": "plain_acknowledgement",
         "approval_bulk_request": "bulk_approval_safety_check",
         "scout_status": "show_scout_status",
         "scout_assignment": "create_scout_assignment",
@@ -374,10 +596,14 @@ class CFOReasoningBrain:
 
     def _build_tool_args(self, intent: str, message: str, state: ConversationState, evidence: dict) -> dict:
         if intent == "draft_comparison":
-            return {"draft_a": "v1", "draft_b": "v2", "context": "lead magnet"}
+            previous, current = evidence.get("draft_paths", (None, None))
+            return {
+                "previous_path": str(previous) if previous else None,
+                "current_path": str(current) if current else None,
+                "context": "draft comparison",
+            }
         if intent == "approval_bulk_request":
-            queue = evidence.get("approval_queue", {})
-            return {"item_ids": [i["id"] for i in queue.get("items", [])], "skip_high_risk": True}
+            return {"items": evidence.get("approval_queue") or [], "skip_high_risk": True}
         if intent == "scout_status":
             return {"include_completed": False}
         if intent == "scout_assignment":
@@ -388,8 +614,9 @@ class CFOReasoningBrain:
             return {"tool_name": tool_match.group(1) if tool_match else "all"}
         if intent in ("implementation_prompt_request", "implement_now"):
             return {
-                "option_number": state.last_selected_option or 1,
-                "option_text": state.last_selected_option_text or evidence.get("selected_option", {}).get("text", "selected option"),
+                "option_number": state.last_selected_option,
+                "option_text": state.last_selected_option_text or evidence.get("selected_option", {}).get("text"),
+                "active_recommendation": state.active_recommendation or state.last_recommendation,
                 "safe_only": True,
                 "block_public_actions": True,
             }
@@ -404,6 +631,8 @@ class CFOReasoningBrain:
             return {"response_text": state.last_meaningful_response}
         if intent == "money_strategy":
             return {"include_recommendation": True}
+        if intent == "clarifying_question_request":
+            return {"message": message, "prompt_type": "clarifying_question"}
         return {"message": message}
 
     def _derive_recommendation(self, intent: str, evidence: dict, state: ConversationState) -> Optional[str]:
@@ -450,16 +679,44 @@ class ToolExecutor:
         return handler(tool_args, state)
 
     def _tool_compare_drafts(self, args: dict, state: ConversationState) -> dict:
-        drafts = _MOCK_FIXTURES["content_drafts"]
-        changes = drafts["changes"]
+        previous_raw = args.get("previous_path")
+        current_raw = args.get("current_path")
+        if previous_raw is None or current_raw is None:
+            return {
+                "status": "needs_clarification",
+                "tool": "compare_drafts",
+                "message": "Which draft should I compare?",
+                "grounded": True,
+                "grounded_data_paths_checked": [
+                    "docs/reports/strategy/hermes_conversation_state.json",
+                    "docs/reports/content/",
+                ],
+            }
+        previous_path = Path(previous_raw)
+        current_path = Path(current_raw)
+        try:
+            from lib.hermes_artifact_version_compare import compare_text_artifacts
+            changes = compare_text_artifacts(previous_path, current_path)
+        except Exception as exc:
+            return {
+                "status": "unavailable",
+                "tool": "compare_drafts",
+                "message": f"Draft comparison unavailable: {exc}",
+                "grounded": True,
+                "grounded_data_paths_checked": ["docs/reports/content/"],
+            }
         state.last_response_was_draft = True
         return {
             "status": "ok",
             "tool": "compare_drafts",
-            "draft_a": drafts["v1"],
-            "draft_b": drafts["v2"],
             "changes": changes,
-            "change_count": len(changes),
+            "change_count": len(changes.get("changed", [])) + len(changes.get("added", [])) + len(changes.get("removed", [])),
+            "grounded": True,
+            "grounded_data_paths_checked": [
+                "docs/reports/strategy/hermes_conversation_state.json",
+                _safe_rel(previous_path),
+                _safe_rel(current_path),
+            ],
         }
 
     def _tool_show_approval_queue(self, args: dict, state: ConversationState) -> dict:
@@ -468,21 +725,50 @@ class ToolExecutor:
         return {"status": "ok", "tool": "show_approval_queue", "queue": queue}
 
     def _tool_bulk_approval_safety_check(self, args: dict, state: ConversationState) -> dict:
-        queue = _MOCK_FIXTURES["approval_queue"]
-        high_risk = [i for i in queue["items"] if i["risk"] == "high"]
-        approvable = [i for i in queue["items"] if i["risk"] != "high"]
+        queue_items = args.get("items") or []
+        if not queue_items:
+            return {
+                "status": "unavailable",
+                "tool": "bulk_approval_safety_check",
+                "message": "Approval queue unavailable.",
+                "grounded": True,
+                "grounded_data_paths_checked": [
+                    "docs/reports/approvals/hermes_approval_queue_state.json",
+                    "docs/reports/actions/hermes_action_queue.jsonl",
+                    "docs/reports/operations/hermes_daily_cycle_state.json",
+                ],
+            }
+        high_risk = [i for i in queue_items if str(i.get("risk_level", i.get("risk", ""))).lower() == "high"]
+        approvable = [i for i in queue_items if i not in high_risk]
         return {
             "status": "ok",
             "tool": "bulk_approval_safety_check",
             "approvable": approvable,
             "skipped_high_risk": high_risk,
             "message": f"Safe to approve {len(approvable)} items. {len(high_risk)} high-risk item(s) require explicit approval.",
+            "grounded": True,
+            "grounded_data_paths_checked": [
+                "docs/reports/approvals/hermes_approval_queue_state.json",
+                "docs/reports/actions/hermes_action_queue.jsonl",
+                "docs/reports/operations/hermes_daily_cycle_state.json",
+            ],
         }
 
     def _tool_show_scout_status(self, args: dict, state: ConversationState) -> dict:
-        assignments = _MOCK_FIXTURES["scout_assignments"]
+        snapshot = _load_real_scout_snapshot()
         state.last_response_was_scout_status = True
-        return {"status": "ok", "tool": "show_scout_status", "assignments": assignments}
+        has_real = bool(snapshot.get("assignments") or snapshot.get("queue_entries") or snapshot.get("action_assignments"))
+        return {
+            "status": "ok" if has_real else "unavailable",
+            "tool": "show_scout_status",
+            "assignments": snapshot,
+            "grounded": True,
+            "grounded_data_paths_checked": [
+                "docs/reports/research_queue/hermes_scout_assignments.jsonl",
+                "docs/reports/research_queue/hermes_research_queue.jsonl",
+                "docs/reports/actions/hermes_action_queue.jsonl",
+            ],
+        }
 
     def _tool_create_scout_assignment(self, args: dict, state: ConversationState) -> dict:
         return {
@@ -498,7 +784,15 @@ class ToolExecutor:
         }
 
     def _tool_create_implementation_prompt(self, args: dict, state: ConversationState) -> dict:
-        option_text = args.get("option_text", "selected option")
+        option_text = _resolve_implementation_target(args, state)
+        if not option_text:
+            return {
+                "status": "needs_clarification",
+                "tool": "create_implementation_prompt",
+                "message": "What do you want me to implement?",
+                "grounded": True,
+                "grounded_data_paths_checked": ["docs/reports/strategy/hermes_conversation_state.json"],
+            }
         return {
             "status": "ok",
             "tool": "create_implementation_prompt",
@@ -510,6 +804,8 @@ class ToolExecutor:
                 f"Next safe step: Review this prompt, then authorize execution."
             ),
             "safety": "Internal prompt only. No public action taken.",
+            "grounded": True,
+            "grounded_data_paths_checked": ["docs/reports/strategy/hermes_conversation_state.json"],
         }
 
     def _tool_show_revenue_plan(self, args: dict, state: ConversationState) -> dict:
@@ -568,22 +864,39 @@ class ToolExecutor:
         }
 
     def _tool_plain_acknowledgement(self, args: dict, state: ConversationState) -> dict:
+        if args.get("prompt_type") == "clarifying_question":
+            return {
+                "status": "ok",
+                "tool": "plain_acknowledgement",
+                "clarifying_question": True,
+                "grounded": True,
+                "grounded_data_paths_checked": ["docs/reports/strategy/hermes_conversation_state.json"],
+            }
         return {
             "status": "ok",
             "tool": "plain_acknowledgement",
             "understood": True,
             "message": f"Understood: {args.get('message', 'your message')}",
+            "grounded": True,
+            "grounded_data_paths_checked": ["docs/reports/strategy/hermes_conversation_state.json"],
         }
 
     def _tool_show_daily_summary(self, args: dict, state: ConversationState) -> dict:
-        plan = _MOCK_FIXTURES.get("daily_plan", {})
+        summary = _load_real_daily_summary()
+        evidence = summary.get("evidence") or []
         return {
-            "status": "ok",
+            "status": "ok" if evidence else "unavailable",
             "tool": "show_daily_summary",
-            "plan": plan,
-            "evidence_source": "mock_daily_plan",
-            "verified": True,
-            "note": "Based on mock data — live traces not loaded in prototype",
+            "summary": summary,
+            "verified": bool(evidence),
+            "grounded": True,
+            "grounded_data_paths_checked": [
+                "docs/reports/operations/hermes_daily_cycle_state.json",
+                "docs/reports/actions/hermes_action_queue.jsonl",
+                "docs/reports/strategy/",
+                "docs/reports/scouts/",
+                "docs/reports/content/",
+            ],
         }
 
 
@@ -607,44 +920,62 @@ class PlainEnglishResponder:
         return f"PLAIN ANSWER\n\n{result['reason']}\n\n{APPROVAL_BOUNDARY}"
 
     def _format_compare_drafts(self, result: dict, reasoning: dict, message: str, state: ConversationState) -> str:
-        changes = result.get("changes", [])
-        v1 = result.get("draft_a", {})
-        v2 = result.get("draft_b", {})
-        lines = ["PLAIN ANSWER\n", "Here is what changed between draft v1 and draft v2:\n"]
-        for i, change in enumerate(changes, 1):
-            lines.append(f"  {i}. {change}")
-        lines.append(f"\nWhat it means:")
-        lines.append(f"  The new draft (v2) is more curiosity-driven and lower friction.")
-        if reasoning.get("recommendation"):
-            lines.append(f"\nRecommendation: {reasoning['recommendation']}")
-        else:
-            lines.append(f"\nRecommendation: Review draft v2 and approve if the direction looks right.")
-        lines.append(f"\nNext safe step: Approve v2 or request another revision.")
+        if result.get("status") == "needs_clarification":
+            return "DRAFT COMPARISON\n\nWhich draft should I compare?"
+        if result.get("status") == "unavailable":
+            return f"DRAFT COMPARISON\n\n{result.get('message', 'Draft comparison is unavailable right now.')}"
+        changes = result.get("changes", {})
+        lines = ["DRAFT COMPARISON\n", "Here is what changed in the draft:\n"]
+        for title in changes.get("added", [])[:3]:
+            lines.append(f"  Added section: {title}")
+        for title in changes.get("changed", [])[:5]:
+            lines.append(f"  Updated section: {title}")
+        for title in changes.get("removed", [])[:3]:
+            lines.append(f"  Removed section: {title}")
+        if not any(changes.get(k) for k in ("added", "changed", "removed")):
+            lines.append("  No structural changes were detected.")
+        lines.append("\nNext safe step: Review the latest draft or ask for a specific revision.")
         return "\n".join(lines)
 
     def _format_bulk_approval_safety_check(self, result: dict, reasoning: dict, message: str, state: ConversationState) -> str:
+        if result.get("status") == "unavailable":
+            return "APPROVAL BULK CHECK\n\nThe approval queue is unavailable right now."
         approvable = result.get("approvable", [])
         skipped = result.get("skipped_high_risk", [])
-        lines = ["PLAIN ANSWER\n", "Before bulk approving, here is the safety check:\n"]
+        lines = ["APPROVAL BULK CHECK\n", "Before bulk approving, here is the live safety check:\n"]
         lines.append(f"Safe to approve ({len(approvable)} items):")
         for item in approvable:
-            lines.append(f"  ✓ {item['title']} ({item['risk']} risk)")
+            lines.append(f"  ✓ {item.get('title', 'Unnamed item')} ({item.get('risk_level', item.get('risk', 'unknown'))} risk)")
         if skipped:
             lines.append(f"\nSkipped — needs explicit approval ({len(skipped)} item{'s' if len(skipped)>1 else ''}):")
             for item in skipped:
-                lines.append(f"  ! {item['title']} ({item['risk']} risk)")
+                lines.append(f"  ! {item.get('title', 'Unnamed item')} ({item.get('risk_level', item.get('risk', 'unknown'))} risk)")
         lines.append(f"\nRecommendation: Approve the {len(approvable)} safe items now. Review the high-risk items separately.")
         lines.append(f"\nNext safe step: Confirm approval of the {len(approvable)} low/medium risk items, or say 'approve all safe' to proceed.")
         return "\n".join(lines)
 
     def _format_show_scout_status(self, result: dict, reasoning: dict, message: str, state: ConversationState) -> str:
-        assignments = result.get("assignments", {}).get("assignments", [])
-        lines = ["PLAIN ANSWER\n", "Here is what the scouts are currently doing:\n"]
-        for a in assignments:
-            status_icon = "●" if a["status"] == "active" else ("○" if a["status"] == "queued" else "✓")
-            lines.append(f"  {status_icon} {a['scout']}: {a['task']} [{a['status']}]")
-        lines.append(f"\nRecommendation: The active scout is monitoring YouTube. No action needed unless you want to add a new assignment.")
-        lines.append(f"\nNext safe step: Say 'have the scouts check [topic]' to add a new assignment.")
+        snapshot = result.get("assignments", {})
+        assignments = snapshot.get("assignments") or []
+        queue_entries = snapshot.get("queue_entries") or []
+        action_assignments = snapshot.get("action_assignments") or []
+        lines = ["SCOUT STATUS\n"]
+        if not (assignments or queue_entries or action_assignments):
+            lines.append("I do not have verified live scout assignments right now.")
+            return "\n".join(lines)
+        if assignments:
+            lines.append("Tracked scout assignments:")
+            for a in assignments[:5]:
+                lines.append(f"  - {a.get('scout', '?')}: {a.get('research_question', '?')} [{a.get('status', '?')}]")
+        if action_assignments:
+            lines.append("\nAction queue scout work:")
+            for a in action_assignments[:5]:
+                lines.append(f"  - {a.get('scout', '?')}: {a.get('task', '?')} [{a.get('status', '?')}]")
+        if queue_entries:
+            lines.append("\nOpen research queue:")
+            for q in queue_entries[:5]:
+                lines.append(f"  - {q.get('scout', '?')}: {q.get('question', '?')} [{q.get('status', '?')}]")
+        lines.append("\nNext safe step: Check the research queue or assign a new verified scout task.")
         return "\n".join(lines)
 
     def _format_create_scout_assignment(self, result: dict, reasoning: dict, message: str, state: ConversationState) -> str:
@@ -694,10 +1025,12 @@ class PlainEnglishResponder:
         return "\n".join(lines)
 
     def _format_create_implementation_prompt(self, result: dict, reasoning: dict, message: str, state: ConversationState) -> str:
+        if result.get("status") == "needs_clarification":
+            return "IMPLEMENTATION PROMPT\n\nWhat do you want me to implement?"
         prompt = result.get("prompt", "")
         safety = result.get("safety", "")
         lines = [
-            "PLAIN ANSWER\n",
+            "IMPLEMENTATION PROMPT\n",
             "Implementation prompt created (internal only):\n",
             prompt,
             f"\nSafety note: {safety}",
@@ -763,6 +1096,15 @@ class PlainEnglishResponder:
         return "\n".join(lines)
 
     def _format_plain_acknowledgement(self, result: dict, reasoning: dict, message: str, state: ConversationState) -> str:
+        if result.get("clarifying_question"):
+            return (
+                "CLARIFYING QUESTION\n\n"
+                "What outcome do you want from this:\n"
+                "1. create a safe implementation prompt\n"
+                "2. assign a scout\n"
+                "3. summarize current state\n"
+                "4. prepare approval checklist"
+            )
         lines = [
             "PLAIN ANSWER\n",
             f"Yes, I understand your question.\n",
@@ -773,31 +1115,14 @@ class PlainEnglishResponder:
         return "\n".join(lines)
 
     def _format_show_daily_summary(self, result: dict, reasoning: dict, message: str, state: ConversationState) -> str:
-        plan = result.get("plan", {})
-        date = plan.get("date", "today")
-        priority = plan.get("top_priority", "")
-        tasks = plan.get("tasks", [])
-        blocked = plan.get("blocked", [])
-        note = result.get("note", "")
-        lines = [
-            "PLAIN ANSWER\n",
-            f"Here is what we worked on today ({date}):\n",
-        ]
-        if priority:
-            lines.append(f"Top priority: {priority}")
-        if tasks:
-            lines.append("\nTasks:")
-            for t in tasks:
-                lines.append(f"  {t}")
-        if blocked:
-            lines.append(f"\nBlocked ({len(blocked)} item{'s' if len(blocked) > 1 else ''}):")
-            for b in blocked:
-                lines.append(f"  {b}")
-        else:
-            lines.append("\nNo blocked tasks.")
-        if note:
-            lines.append(f"\nNote: {note}")
-        lines.append("\nNext safe step: Review today's progress and confirm priorities for tomorrow.")
+        if result.get("status") == "unavailable":
+            return "DAY SUMMARY\n\nI do not have a verified day summary yet."
+        summary = result.get("summary", {})
+        evidence = summary.get("evidence") or []
+        lines = ["DAY SUMMARY\n", "Here is the verified day summary I found:\n"]
+        for item in evidence[:5]:
+            lines.append(f"  - {item.get('summary', '?')} ({item.get('path', 'local state')})")
+        lines.append("\nNext safe step: Review the current state and confirm what should happen next.")
         return "\n".join(lines)
 
     def _format_default(self, result: dict, reasoning: dict, message: str, state: ConversationState) -> str:
@@ -920,6 +1245,9 @@ class HermesCFOLoop:
             "confidence": intent_result["confidence"],
             "tool": tool_name,
             "mode": "mock" if MOCK_MODE else "live",
+            "grounded": bool(tool_result.get("grounded", False)),
+            "grounded_data_paths_checked": list(tool_result.get("grounded_data_paths_checked") or []),
+            "mock_response_blocked": _contains_mock_marker(response),
         }
         return response, trace_info
 

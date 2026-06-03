@@ -44,6 +44,7 @@ LIMITED_PRIMARY_CONFIDENCE_THRESHOLD = 0.80
 ALLOWLISTED_INTENTS = frozenset({
     "implementation_prompt_request",
     "acknowledgement_check",
+    "clarifying_question_request",
     "scout_status",
     "approval_bulk_request",
     "draft_comparison",
@@ -83,6 +84,29 @@ _LIVE_FAILURE_MARKERS = [
     "hermes report",
     "artifact_inventory",
     "i can answer from verified artifacts",
+]
+
+_MOCK_BLOCK_MARKERS = [
+    "based on mock data",
+    "sample",
+    "mock",
+    "mailchimp opt-in form",
+    "build and publish lead magnet landing page",
+    "connect affiliate offer link",
+    "research_scout_1",
+    "draft v2 approved",
+]
+
+_GROUNDED_DATA_PATHS = [
+    "docs/reports/strategy/hermes_conversation_state.json",
+    "docs/reports/operations/hermes_daily_cycle_state.json",
+    "docs/reports/actions/hermes_action_queue.jsonl",
+    "docs/reports/approvals/hermes_approval_queue_state.json",
+    "docs/reports/research_queue/hermes_research_queue.jsonl",
+    "docs/reports/research_queue/hermes_scout_assignments.jsonl",
+    "docs/reports/content/",
+    "docs/reports/strategy/",
+    "docs/reports/scouts/",
 ]
 
 
@@ -248,6 +272,9 @@ def run_cfo_limited_primary(
     cfo_result: Optional[dict] = None
     primary_used = False
     fallback_reason: Optional[str] = None
+    mock_blocked = False
+    grounded = False
+    grounded_data_paths_checked: list[str] = []
 
     try:
         from prototypes.hermes_agentic_cfo_loop import HermesCFOLoop
@@ -258,13 +285,22 @@ def run_cfo_limited_primary(
 
         intent = trace_info.get("intent")
         confidence = trace_info.get("confidence", 0.0)
+        grounded = bool(trace_info.get("grounded", False))
+        grounded_data_paths_checked = list(trace_info.get("grounded_data_paths_checked") or [])
+        response_text = cfo_response or ""
+        lowered_response = response_text.lower()
+        mock_blocked = any(marker in lowered_response for marker in _MOCK_BLOCK_MARKERS)
 
         if intent in HARD_BLOCKED_INTENTS:
             fallback_reason = f"intent_{intent}_is_hard_blocked"
+        elif mock_blocked:
+            fallback_reason = "mock_output_blocked"
         elif intent not in ALLOWLISTED_INTENTS:
             fallback_reason = f"intent_{intent}_not_allowlisted"
         elif confidence < LIMITED_PRIMARY_CONFIDENCE_THRESHOLD:
             fallback_reason = f"confidence_{confidence:.2f}_below_threshold"
+        elif not grounded:
+            fallback_reason = "response_not_grounded"
         else:
             primary_used = True
 
@@ -279,6 +315,9 @@ def run_cfo_limited_primary(
         cfo_result=cfo_result,
         primary_used=primary_used,
         fallback_reason=fallback_reason,
+        mock_blocked=mock_blocked,
+        grounded=grounded,
+        grounded_data_paths_checked=grounded_data_paths_checked,
         error=error,
         duration_ms=duration_ms,
         metadata=metadata,
@@ -295,6 +334,9 @@ def _build_primary_trace(
     cfo_result: Optional[dict],
     primary_used: bool,
     fallback_reason: Optional[str] = None,
+    mock_blocked: bool = False,
+    grounded: bool = False,
+    grounded_data_paths_checked: Optional[list[str]] = None,
     error: Optional[str] = None,
     duration_ms: int = 0,
     metadata: Optional[dict] = None,
@@ -343,6 +385,9 @@ def _build_primary_trace(
         "duration_ms": duration_ms,
         "primary_used": primary_used,
         "fallback_reason": fallback_reason,
+        "mock_blocked": mock_blocked,
+        "grounded": grounded,
+        "grounded_data_paths_checked": grounded_data_paths_checked or [],
         "mode": "limited_primary",
     }
 
@@ -501,12 +546,20 @@ def format_limited_primary_status() -> str:
     provider = get_cfo_loop_provider()
     traces = load_shadow_traces(limit=100)
     primary_count = sum(1 for t in traces if t.get("primary_used"))
+    mock_blocked_count = sum(1 for t in traces if t.get("mock_blocked"))
+    grounded_count = sum(1 for t in traces if t.get("grounded"))
+    fallback_count = sum(1 for t in traces if t.get("fallback_reason"))
     n = len(traces)
 
     lines = [
         "CFO LOOP LIMITED PRIMARY STATUS\n",
         f"Mode: {mode}",
         f"Provider: {provider}",
+        "",
+        f"Primary used count: {primary_count}",
+        f"Mock-blocked count: {mock_blocked_count}",
+        f"Grounded count: {grounded_count}",
+        f"Fallback count: {fallback_count}",
         "",
         "Allowlisted intents:",
     ]
@@ -517,6 +570,12 @@ def format_limited_primary_status() -> str:
         "Full primary: blocked",
         "",
         f"Traces: {n} total, {primary_count} used as primary response",
+        "",
+        "Grounded data paths checked:",
+    ])
+    for path in _GROUNDED_DATA_PATHS:
+        lines.append(f"  - {path}")
+    lines.extend([
         "",
         "Safety:",
         "  No publishing, email, payment, affiliate signup, deploy,",
