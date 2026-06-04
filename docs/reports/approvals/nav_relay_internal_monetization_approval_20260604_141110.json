@@ -1,0 +1,90 @@
+{
+  "approval_id": "apq_nav_relay_internal_20260604",
+  "created_at": "2026-06-04T14:11:10Z",
+  "approved_by": "Ray Davis",
+  "approval_context": "Ray said: 'ok lets do nav first and then relay' and 'i approve nav.com and relay' in Funding Readiness Funnel context.",
+  "approval_type": "internal_monetization_path_selection",
+  "status": "approved",
+  "decided_at": "2026-06-04T14:11:10Z",
+  "paths_approved": [
+    {
+      "order": 1,
+      "name": "Nav.com",
+      "affiliate_program": "Nav affiliate program",
+      "category": "business credit monitoring, funding-readiness tools",
+      "approval_scope": "internal_preparation_only",
+      "approved_actions": [
+        "Select Nav.com as the first monetization path to review for internal preparation",
+        "Prepare internal CTA copy using placeholders",
+        "Prepare affiliate placement options for Nav.com",
+        "Update approval records and funnel docs to reflect Ray's decision",
+        "Draft safe copy using placeholders (no live links)",
+        "Prepare next-step instructions for Ray"
+      ],
+      "not_approved_actions": [
+        "Apply to Nav.com affiliate program",
+        "Activate Nav.com affiliate links",
+        "Insert live affiliate links for Nav.com",
+        "Publish any Nav.com CTA to any channel",
+        "Email any Nav.com affiliate content to subscribers",
+        "Post Nav.com CTAs to social media",
+        "Make any client-facing claims about Nav.com",
+        "Make funding approval or credit improvement promises related to Nav.com"
+      ]
+    },
+    {
+      "order": 2,
+      "name": "Relay",
+      "affiliate_program": "Relay affiliate program",
+      "category": "business banking, operational readiness",
+      "approval_scope": "internal_preparation_only",
+      "approved_actions": [
+        "Select Relay as the second monetization path to review for internal preparation",
+        "Prepare internal CTA copy using placeholders",
+        "Prepare affiliate placement options for Relay",
+        "Update approval records and funnel docs to reflect Ray's decision",
+        "Draft safe copy using placeholders (no live links)",
+        "Prepare next-step instructions for Ray"
+      ],
+      "not_approved_actions": [
+        "Apply to Relay affiliate program",
+        "Activate Relay affiliate links",
+        "Insert live affiliate links for Relay",
+        "Publish any Relay CTA to any channel",
+        "Email any Relay affiliate content to subscribers",
+        "Post Relay CTAs to social media",
+        "Make any client-facing claims about Relay"
+      ]
+    }
+  ],
+  "paths_not_selected_yet": [
+    {
+      "name": "Dun & Bradstreet",
+      "status": "deferred_later_high_payout_high_compliance_review",
+      "reason": "Higher compliance review burden; Ray chose to start with Nav.com and Relay first"
+    },
+    {
+      "name": "Nexus internal readiness audit",
+      "status": "long_term_internal_offer_path",
+      "reason": "Long-term path; not part of current Funding Readiness Funnel monetization phase"
+    }
+  ],
+  "global_safety_gates": {
+    "affiliate_application_submitted": false,
+    "live_affiliate_links_inserted": false,
+    "publishing_occurred": false,
+    "email_sent": false,
+    "supabase_written": false,
+    "old_tables_modified": false,
+    "stripe_activated": false,
+    "production_deployed": false,
+    "client_facing_claims_made": false
+  },
+  "approval_boundary": "This approval authorizes INTERNAL PREPARATION ONLY. No affiliate applications, live links, publishing, emails, payments, production deployment, or client-facing use are authorized without a separate explicit Ray command.",
+  "related_files": [
+    "docs/reports/funnel/funding_readiness_affiliate_cta_options_20260603_152822.md",
+    "docs/reports/funnel/funding_readiness_approval_checklist_20260603_152822.md",
+    "docs/reports/scouts/monetization_affiliate_research_20260603_150622.md",
+    "docs/reports/funnel/funding_readiness_monetization_decision_20260604_141110.md"
+  ]
+}

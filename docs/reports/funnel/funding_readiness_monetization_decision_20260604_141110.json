@@ -1,0 +1,48 @@
+{
+  "decision_id": "funnel_monetization_decision_20260604",
+  "created_at": "2026-06-04T14:11:10Z",
+  "decided_by": "Ray Davis",
+  "context": "Funding Readiness Funnel — monetization path selection for affiliate CTA integration",
+  "decision": {
+    "first_review_path": {
+      "name": "Nav.com",
+      "type": "affiliate",
+      "category": "business credit monitoring, funding-readiness tools",
+      "status": "approved_for_internal_preparation",
+      "next_step": "Prepare CTA placement draft with placeholder link. Affiliate application requires separate Ray approval."
+    },
+    "second_review_path": {
+      "name": "Relay",
+      "type": "affiliate",
+      "category": "business banking, operational readiness",
+      "status": "approved_for_internal_preparation",
+      "next_step": "Prepare CTA placement draft with placeholder link. Affiliate application requires separate Ray approval."
+    },
+    "deferred_paths": [
+      {
+        "name": "Dun & Bradstreet",
+        "status": "deferred",
+        "reason": "Later review — high payout ($350/sale) but higher compliance review burden. Review after Nav and Relay are prepared."
+      },
+      {
+        "name": "Nexus internal readiness audit",
+        "status": "long_term",
+        "reason": "Long-term internal offer path. Not part of current Funding Readiness Funnel affiliate phase."
+      }
+    ]
+  },
+  "what_this_decision_does_not_authorize": [
+    "Affiliate applications for Nav.com or Relay",
+    "Activation of affiliate links",
+    "Publishing any content containing CTAs",
+    "Emailing subscribers",
+    "Social media posting",
+    "Stripe or payment activation",
+    "Production deployment",
+    "Supabase writes",
+    "Client-facing claims about funding outcomes"
+  ],
+  "supabase_changed": false,
+  "old_tables_changed": false,
+  "related_approval": "docs/reports/approvals/nav_relay_internal_monetization_approval_20260604_141110.md"
+}
