@@ -138,6 +138,130 @@ REPORT_PHRASES = {
     "weekly report",
 }
 
+TECHNICAL_EVIDENCE_PHRASES = {
+    "show raw evidence",
+    "raw evidence",
+    "show technical report",
+    "show full hermes report",
+    "show evidence dump",
+    "show source details",
+}
+
+LAUNCH_PACKET_REVIEW_PHRASES = {
+    "review the funding readiness launch packet and give me the approval decision summary",
+    "review launch packet",
+    "show funding readiness approval summary",
+    "what is ready to approve in the launch packet",
+    "what still needs approval for the funnel",
+}
+
+REVENUE_PACKET_SCORE_PHRASES = {
+    "what is the current revenue packet score",
+}
+
+CLOSEST_LAUNCH_READY_ASSET_PHRASES = {
+    "which asset is closest to launch ready",
+}
+
+SCOUT_STATUS_EXACT_PHRASES = {
+    "what are all the scouts doing right now",
+}
+
+SAFE_APPROVAL_REVIEW_PHRASES = {
+    "what should i approve first",
+}
+
+SAFE_CLARIFYING_QUESTION_PHRASES = {
+    "ask me a better clarifying question",
+}
+
+STRICT_MEMORY_INTENTS = frozenset({
+    "memory_sources",
+    "memory_sources_again",
+    "answer_source",
+    "active_operating_rules",
+    "memory_v2_preview",
+    "memory_v2_compare",
+    "memory_v2_rules",
+    "memory_v2_status",
+    "memory_v2_primary_status",
+    "memory_v2_shadow_status",
+    "memory_v2_live_check",
+    "lesson_pending",
+    "lesson_active",
+})
+
+LEARNING_LOOP_INTENTS = frozenset({
+    "lesson_record",
+    "lesson_pending",
+    "lesson_active",
+    "lesson_approve_all",
+    "lesson_approve",
+    "lesson_reject",
+    "lesson_deprecate",
+    "lesson_learned",
+    "lesson_source",
+    "lesson_gap_generate",
+})
+
+APPROVAL_EXACT_INTENTS = frozenset({
+    "show_approval_queue",
+    "show_approval_item",
+    "approve_item",
+    "reject_item",
+    "approval_impact",
+    "clear_stale_approvals",
+    "bulk_approve_blocked",
+})
+
+DAILY_EXACT_INTENTS = frozenset({
+    "daily_operating_cycle",
+    "daily_approval_needed",
+    "daily_continue_while_out",
+    "daily_top_revenue_move",
+    "daily_blockers",
+    "thirty_day_revenue_plan",
+    "show_last_daily_plan",
+    "while_out_summary",
+    "pending_daily_items",
+    "compare_since_last_plan",
+    "mark_daily_item_complete",
+})
+
+REVENUE_EXACT_INTENTS = frozenset({
+    "build_revenue_asset_packet",
+    "show_revenue_asset_packet",
+    "show_launch_ready_assets",
+    "show_content_awaiting_approval",
+    "show_cta_options",
+    "show_launch_checklist",
+    "show_approval_checklist",
+    "generate_approval_candidates",
+    "show_revenue_packet_gaps",
+    "improve_revenue_asset_packet",
+    "show_improved_cta_options",
+    "show_offer_bridge",
+    "show_packet_improvement_plan",
+    "rescore_revenue_packet",
+    "show_final_review_checklist",
+    "fix_revenue_packet_assets",
+    "show_asset_fix_report",
+    "rescore_after_fixes",
+    "funding_readiness_approval_summary",
+    "revenue_packet_score",
+    "closest_launch_ready_asset",
+})
+
+RESEARCH_EXACT_INTENTS = frozenset({
+    "show_research_queue",
+    "show_scout_assignments",
+    "show_unresolved_questions",
+    "create_implementation_prompt",
+    "show_cfo_notes",
+    "save_cfo_decision",
+    "dedupe_research_queue",
+})
+
 FUNDING_INSIGHT_PHRASES = {
     "what funding insights do we have",
     "funding insights",
@@ -911,10 +1035,13 @@ class NexusTelegramBot:
     def classify_message_route(self, raw: str) -> str:
         normalized = (raw or "").strip().lower()
         normalized = TASK_SELECTION_ALIASES.get(normalized, normalized)
+        normalized_key = normalized.rstrip(".?!")
         if normalized.startswith("/"):
             return "command"
-        if normalized in DIAGNOSTIC_PHRASES:
+        if normalized_key in DIAGNOSTIC_PHRASES:
             return "command"
+        if normalized_key in TECHNICAL_EVIDENCE_PHRASES:
+            return "technical_report"
         if any(phrase in normalized for phrase in REPORT_PHRASES):
             return "report_request"
         if any(phrase in normalized for phrase in FUNDING_INSIGHT_PHRASES):
@@ -2087,6 +2214,187 @@ class NexusTelegramBot:
         if result:
             return result.text
         return "Review the daily research review first: say 'show daily research review'."
+
+    def _cmd_technical_report(self) -> str:
+        evidence = self._cmd_raw_evidence()
+        return (
+            "TECHNICAL REPORT\n\n"
+            f"{evidence}\n\n"
+            "Technical-only output. This is evidence detail, not an operator summary."
+        )
+
+    def _cmd_funding_readiness_approval_summary(self) -> str:
+        from pathlib import Path
+        import json
+
+        root = Path(__file__).resolve().parent / "docs" / "reports" / "funnel"
+        packet_files = sorted(root.glob("funding_readiness_launch_packet_*.json"))
+        checklist_files = sorted(root.glob("funding_readiness_approval_checklist_*.md"))
+        cta_files = sorted(root.glob("funding_readiness_affiliate_cta_options_*.md"))
+        nurture_files = sorted(root.glob("funding_readiness_nurture_sequence_*.md"))
+        if not packet_files:
+            return "FUNDING READINESS APPROVAL SUMMARY\n\nI do not have verified state for that yet."
+
+        packet = json.loads(packet_files[-1].read_text(encoding="utf-8"))
+        checklist_text = checklist_files[-1].read_text(encoding="utf-8") if checklist_files else ""
+        cta_text = cta_files[-1].read_text(encoding="utf-8") if cta_files else ""
+        nurture_text = nurture_files[-1].read_text(encoding="utf-8") if nurture_files else ""
+
+        ready = [
+            "Landing-page-safe revisions drafted",
+            "3-email nurture draft prepared",
+            "Affiliate CTA placeholders prepared",
+            "Approval checklist drafted",
+        ]
+        not_ready = [
+            "Public publishing",
+            "Outbound email send",
+            "Affiliate link insertion",
+            "Affiliate program activation",
+            "Stripe/payment activation",
+        ]
+        affiliate_options = packet.get("affiliate_options", []) or []
+        monetization_candidates = []
+        for option in affiliate_options[:3]:
+            if isinstance(option, dict):
+                monetization_candidates.append(option.get("name") or "unknown")
+            elif option:
+                monetization_candidates.append(str(option))
+        monetization = ", ".join(monetization_candidates[:1] or ["Dun & Bradstreet"])
+        compliance = packet.get("compliance_notes", [])[:4] or [
+            "No guaranteed funding or approval claims",
+            "No credit repair guarantees",
+            "No implication that Nexus is a lender",
+        ]
+
+        lines = ["FUNDING READINESS APPROVAL SUMMARY", ""]
+        lines += ["Ready for internal approval:", ""]
+        for item in ready:
+            lines.append(f"  - {item}")
+        lines += ["", "Not ready for public approval:", ""]
+        for item in not_ready:
+            lines.append(f"  - {item}")
+        lines += [
+            "",
+            f"Recommended first monetization path:\n  {monetization}",
+            "",
+            "Compliance risks:",
+        ]
+        for item in compliance:
+            lines.append(f"  - {item}")
+        lines += [
+            "",
+            "What approval authorizes:",
+            "  - Internal use of the packet as an approval-ready operating draft",
+            "  - Review of CTA, nurture, and landing-copy drafts",
+            "",
+            "What approval does not authorize:",
+            "  - Publishing",
+            "  - Email sends",
+            "  - Affiliate activation or live links",
+            "  - Payment activation",
+            "  - Deployment",
+            "",
+            "Next safe step:",
+            "  Review the approval checklist and approve specific internal draft components.",
+            "",
+            "Evidence used:",
+            f"  - {packet_files[-1]}",
+        ]
+        if checklist_files:
+            lines.append(f"  - {checklist_files[-1]}")
+        if cta_files:
+            lines.append(f"  - {cta_files[-1]}")
+        if nurture_files:
+            lines.append(f"  - {nurture_files[-1]}")
+        if "[ ]" in checklist_text:
+            lines.append("  - approval checklist still contains unresolved items")
+        if "AFFILIATE_LINK_PENDING_RAY_APPROVAL" in cta_text:
+            lines.append("  - affiliate placeholders remain pending approval")
+        if "No send action" in nurture_text:
+            lines.append("  - nurture sequence remains internal-only draft")
+        return "\n".join(lines)
+
+    def _cmd_revenue_packet_score(self) -> str:
+        try:
+            from lib.hermes_revenue_asset_packet import load_latest_revenue_asset_packet, build_revenue_asset_packet
+            packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+            score = packet.get("readiness_score", "unknown")
+            next_step = packet.get("next_best_step", "Review remaining readiness gaps.")
+            return (
+                "REVENUE PACKET SCORE\n\n"
+                f"Current score: {score}/100\n\n"
+                f"Next safe step: {next_step}"
+            )
+        except Exception as exc:
+            return f"REVENUE PACKET SCORE\n\nI do not have verified state for that yet.\n\nDetail: {exc!s:.120}"
+
+    def _cmd_closest_launch_ready_asset(self) -> str:
+        try:
+            from lib.hermes_revenue_asset_packet import load_latest_revenue_asset_packet, build_revenue_asset_packet
+            packet = load_latest_revenue_asset_packet() or build_revenue_asset_packet()
+            assets = sorted(packet.get("assets") or [], key=lambda a: int(a.get("readiness_score", 0)), reverse=True)
+            if not assets:
+                return "LAUNCH-READY ASSET\n\nI do not have verified state for that yet."
+            top = assets[0]
+            return (
+                "LAUNCH-READY ASSET\n\n"
+                f"Closest asset: {top.get('filename', 'unknown')}\n"
+                f"Category: {top.get('category', 'unknown')}\n"
+                f"Readiness score: {top.get('readiness_score', 'unknown')}\n"
+                f"Status: {top.get('readiness_status', 'unknown')}\n\n"
+                "Next safe step: review the asset and remaining readiness flags before any approval."
+            )
+        except Exception as exc:
+            return f"LAUNCH-READY ASSET\n\nI do not have verified state for that yet.\n\nDetail: {exc!s:.120}"
+
+    def _safe_operator_fallback(self) -> str:
+        return "I do not have verified state for that yet."
+
+    def _cmd_safe_clarifying_question(self) -> str:
+        return (
+            "CLARIFYING QUESTION\n\n"
+            "What outcome do you want from this:\n"
+            "1. create a safe implementation prompt\n"
+            "2. assign a scout\n"
+            "3. summarize current state\n"
+            "4. prepare approval checklist"
+        )
+
+    def _is_operator_facing_question(self, normalized: str) -> bool:
+        if not normalized:
+            return False
+        prefixes = (
+            "what ",
+            "show ",
+            "review ",
+            "create ",
+            "implement",
+            "which ",
+            "who ",
+            "summarize ",
+            "compare ",
+            "ask ",
+            "approve ",
+            "i approve",
+        )
+        keywords = (
+            "draft",
+            "approval",
+            "launch packet",
+            "launch ready",
+            "revenue packet",
+            "scout",
+            "research",
+            "implementation prompt",
+            "work on today",
+            "daily operating cycle",
+            "funnel",
+            "checklist",
+        )
+        if normalized in SAFE_CLARIFYING_QUESTION_PHRASES:
+            return True
+        return normalized.startswith(prefixes) or any(keyword in normalized for keyword in keywords)
 
     # ── Follow-up context resolution ──────────────────────────────────────────
 
@@ -3301,20 +3609,17 @@ class NexusTelegramBot:
             from hermes_command_router.intake import classify_intent
             from hermes_command_router.router import run_command
 
-            MEMORY_INTENTS = self.SAFE_REPEATABLE_MEMORY_INTENTS | {
-                "knowledge_gap_review",
-                "knowledge_gap_research",
-                "knowledge_gap_archive",
-            }
+            normalized = (text or "").strip().lower()
+            MEMORY_INTENTS = STRICT_MEMORY_INTENTS
             # In limited_primary mode, let Phase 8C handle its allowlisted intents
             # before memory-command routing can collapse them into older handlers.
             if _should_run_cfo_8c(text):
                 cfo_intent = _CFO8CIntentBrain().classify(text, _CFO8CConversationState())["intent"]
                 if cfo_intent in _CFO_8C_ALLOWLIST:
                     return None
-            intent, _, _ = classify_intent(text)
+            intent, _, _ = classify_intent(normalized)
             if intent in MEMORY_INTENTS:
-                result = run_command(text, source="telegram")
+                result = run_command(normalized, source="telegram")
                 if result:
                     self._memory_command_pending = True
                     self._memory_command_intent = intent
@@ -3325,11 +3630,6 @@ class NexusTelegramBot:
         return None
 
     def handle_inbound_message(self, text: str) -> str:
-        # ── Memory command pre-check: route before TelegramRouter / LLM ──────
-        memory_reply = self._try_memory_command(text)
-        if memory_reply is not None:
-            return memory_reply
-
         # Multi-line command detection — process up to 3 lines as sequential commands
         _raw_lines = [l.strip() for l in (text or "").splitlines() if l.strip()]
         if len(_raw_lines) > 1:
@@ -3338,13 +3638,29 @@ class NexusTelegramBot:
         # Normalize before routing: strip smart quotes, bullets, em dash suffixes
         text = _normalize_telegram_command(text) if text else text
         normalized = (text or "").strip().lower()
+        normalized = TASK_SELECTION_ALIASES.get(normalized, normalized)
+        normalized_key = normalized.rstrip(".?!")
         if normalized:
             self.ops_memory["last_user_instruction"] = normalized[:300]
             self.ops_memory = hermes_ops_memory.save_memory(
                 self.ops_memory,
                 updated_by="telegram_user_instruction",
             )
+        from hermes_command_router.intake import classify_intent as _classify_intent
         from hermes_command_router.router import run_command as _run_command
+        intent, _, _ = _classify_intent(normalized_key or normalized)
+
+        # ── Safety pre-checks / exact critical system commands ───────────────
+        if normalized.startswith("/") or normalized in DIAGNOSTIC_PHRASES:
+            logger.info("telegram route=command exact_system")
+            return self._handle_command_mode(text)
+
+        # ── Exact memory commands only: after normalization, before legacy ───
+        memory_reply = self._try_memory_command(normalized_key or normalized)
+        if memory_reply is not None:
+            logger.info("telegram route=memory_exact intent=%s", self._memory_command_intent or "unknown")
+            return memory_reply
+
         continuity = {
             "run demo readiness check": self._cmd_demo_readiness_check,
             "demo ready?": self._cmd_demo_readiness_check,
@@ -3544,7 +3860,7 @@ class NexusTelegramBot:
             "we need to come up with a plan to make money in the next 30 days": lambda: _run_command("30 day revenue plan", source="telegram"),
         }
         # Strip trailing punctuation before continuity lookup (handles "Show it.", "Why?")
-        _norm_no_punct = normalized.rstrip('.?!')
+        _norm_no_punct = normalized_key
         # Also strip "hermes, X" prefix — lstrip("hermes") strips individual chars from the set
         _normalized_strip = normalized.lstrip("hermes").lstrip(",").lstrip().rstrip(".?!")
 
@@ -3608,6 +3924,41 @@ class NexusTelegramBot:
                     return _p7c_result
         except Exception as _p7c_exc:
             logger.warning("telegram cfo_brain_p7c failed text=%r exc=%s", text[:60], _p7c_exc)
+
+        # ── Learning loop and exact read-only operational commands ───────────
+        if intent in LEARNING_LOOP_INTENTS:
+            logger.info("telegram route=learning_loop intent=%s", intent)
+            return _run_command(normalized, source="telegram")
+        if intent in APPROVAL_EXACT_INTENTS:
+            logger.info("telegram route=approval_exact intent=%s", intent)
+            return _run_command(normalized, source="telegram")
+        if intent in DAILY_EXACT_INTENTS:
+            logger.info("telegram route=daily_exact intent=%s", intent)
+            return _run_command(normalized, source="telegram")
+        if normalized_key in SAFE_APPROVAL_REVIEW_PHRASES:
+            logger.info("telegram route=approval_review_safe")
+            return self._cmd_review_first()
+        if normalized_key in LAUNCH_PACKET_REVIEW_PHRASES:
+            logger.info("telegram route=launch_packet_approval_summary")
+            return self._cmd_funding_readiness_approval_summary()
+        if normalized_key in REVENUE_PACKET_SCORE_PHRASES:
+            logger.info("telegram route=revenue_packet_score")
+            return self._cmd_revenue_packet_score()
+        if normalized_key in CLOSEST_LAUNCH_READY_ASSET_PHRASES:
+            logger.info("telegram route=closest_launch_ready_asset")
+            return self._cmd_closest_launch_ready_asset()
+        if intent in REVENUE_EXACT_INTENTS:
+            logger.info("telegram route=revenue_exact intent=%s", intent)
+            return _run_command(normalized_key or normalized, source="telegram")
+        if normalized_key in SCOUT_STATUS_EXACT_PHRASES:
+            logger.info("telegram route=scout_status_exact")
+            return _run_command("show scout assignments", source="telegram")
+        if intent in RESEARCH_EXACT_INTENTS:
+            logger.info("telegram route=research_exact intent=%s", intent)
+            return _run_command(normalized_key or normalized, source="telegram")
+        if normalized_key in SAFE_CLARIFYING_QUESTION_PHRASES:
+            logger.info("telegram route=clarifying_question_safe")
+            return self._cmd_safe_clarifying_question()
 
         if normalized in continuity:
             logger.info("telegram route=chat")
@@ -3673,6 +4024,23 @@ class NexusTelegramBot:
                     return _brain_result
         except Exception as _brain_exc:
             logger.warning("telegram cfo_brain failed text=%r exc=%s", text[:60], _brain_exc)
+
+        route = self.classify_message_route(text)
+        if route == "technical_report":
+            logger.info("telegram route=technical_report")
+            if normalized_key in {"show technical report", "show full hermes report"}:
+                return self._cmd_technical_report()
+            return self._cmd_raw_evidence()
+
+        if route == "chat":
+            if self._is_operator_facing_question(normalized_key or normalized):
+                logger.info("telegram route=operator_safe_fallback")
+                return self._safe_operator_fallback()
+            if telegram_conversational_mode():
+                logger.info("telegram route=chat_conversational")
+                return self._conversational_reply(text)
+            logger.info("telegram route=chat_help")
+            return self.safe_help_text()
 
         router = TelegramRouter(
             classify_message_route=self.classify_message_route,
