@@ -175,6 +175,21 @@ SAFE_CLARIFYING_QUESTION_PHRASES = {
     "ask me a better clarifying question",
 }
 
+NAV_RELAY_APPROVAL_SUMMARY_PHRASES = {
+    "what did i approve for nav and relay",
+    "what did i approve for nav.com and relay",
+    "what did i approve for nav",
+    "what did i approve for relay",
+    "show nav relay approval",
+    "show nav and relay monetization decision",
+    "what is the nav relay decision",
+    "did i approve nav and relay",
+}
+
+NAV_RELAY_READINESS_PACKET_PHRASES = {
+    "prepare the nav and relay affiliate application readiness packet",
+}
+
 STRICT_MEMORY_INTENTS = frozenset({
     "memory_sources",
     "memory_sources_again",
@@ -2348,6 +2363,239 @@ class NexusTelegramBot:
         except Exception as exc:
             return f"LAUNCH-READY ASSET\n\nI do not have verified state for that yet.\n\nDetail: {exc!s:.120}"
 
+    def _cmd_nav_relay_approval_summary(self) -> str:
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent
+        approval_path = root / "docs" / "reports" / "approvals" / "nav_relay_internal_monetization_approval_20260604_141110.md"
+        decision_path = root / "docs" / "reports" / "funnel" / "funding_readiness_monetization_decision_20260604_141110.md"
+        cta_path = root / "docs" / "reports" / "funnel" / "nav_relay_cta_placement_draft_20260604_141110.md"
+        if not approval_path.exists() or not decision_path.exists():
+            return "NAV / RELAY APPROVAL SUMMARY\n\nI do not have verified state for that yet."
+
+        lines = [
+            "NAV / RELAY APPROVAL SUMMARY",
+            "",
+            "Ray approved:",
+            "",
+            "  - Nav.com as the first monetization path for internal preparation.",
+            "  - Relay as the second monetization path for internal preparation.",
+            "",
+            "This approval authorizes:",
+            "",
+            "  - internal CTA drafts",
+            "  - placement options",
+            "  - approval records",
+            "  - readiness packet preparation",
+            "  - compliance-safe draft copy with placeholder links only",
+            "",
+            "This approval does NOT authorize:",
+            "",
+            "  - affiliate applications",
+            "  - live affiliate links",
+            "  - publishing",
+            "  - email sends",
+            "  - social posting",
+            "  - Stripe/payment activation",
+            "  - deployment",
+            "  - client-facing use",
+            "",
+            "Evidence:",
+            "",
+            f"  - {approval_path}",
+            f"  - {decision_path}",
+        ]
+        if cta_path.exists():
+            lines.append(f"  - {cta_path}")
+        return "\n".join(lines)
+
+    def _cmd_nav_relay_readiness_packet(self) -> str:
+        from pathlib import Path
+        import json
+        from datetime import datetime
+
+        root = Path(__file__).resolve().parent
+        funnel_dir = root / "docs" / "reports" / "funnel"
+        approvals_dir = root / "docs" / "reports" / "approvals"
+        approval_path = approvals_dir / "nav_relay_internal_monetization_approval_20260604_141110.md"
+        decision_path = funnel_dir / "funding_readiness_monetization_decision_20260604_141110.md"
+        cta_path = funnel_dir / "nav_relay_cta_placement_draft_20260604_141110.md"
+        if not approval_path.exists() or not decision_path.exists():
+            return "NAV / RELAY AFFILIATE APPLICATION READINESS PACKET\n\nI do not have verified state for that yet."
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        md_path = funnel_dir / f"nav_relay_affiliate_application_readiness_packet_{timestamp}.md"
+        json_path = funnel_dir / f"nav_relay_affiliate_application_readiness_packet_{timestamp}.json"
+
+        payload = {
+            "report_type": "nav_relay_affiliate_application_readiness_packet",
+            "timestamp": timestamp,
+            "purpose": "Internal readiness packet only. No applications submitted.",
+            "ray_approved_decision": {
+                "nav_order": "first",
+                "relay_order": "second",
+                "scope": "internal preparation only",
+            },
+            "information_ray_likely_needs_before_applying": [
+                "business/company name",
+                "website URL",
+                "contact email",
+                "business description",
+                "audience description",
+                "traffic sources",
+                "estimated monthly traffic if available",
+                "newsletter/social channels if available",
+                "content categories",
+                "compliance-safe promotional plan",
+                "how affiliate offers would be placed",
+                "required disclosures",
+                "payout/payment details requested by affiliate networks if applicable",
+            ],
+            "website_social_channel_details_to_prepare": {
+                "website": "[WEBSITE_URL_PENDING_RAY_CONFIRMATION]",
+                "youtube": "[YOUTUBE_CHANNEL_PENDING_RAY_CONFIRMATION]",
+                "linkedin": "[LINKEDIN_PENDING_RAY_CONFIRMATION]",
+                "newsletter": "[NEWSLETTER_URL_PENDING_RAY_CONFIRMATION]",
+                "contact_email": "[CONTACT_EMAIL_PENDING_RAY_CONFIRMATION]",
+            },
+            "compliance_safe_program_description": (
+                "Nexus provides educational business funding readiness content for small business owners. "
+                "The Funding Readiness Checklist helps users identify potential business setup, documentation, "
+                "and preparedness gaps before applying for financing. Nexus does not guarantee funding, credit approval, "
+                "lender approval, or specific outcomes."
+            ),
+            "proposed_traffic_sources": [
+                "SEO article",
+                "LinkedIn educational posts",
+                "short educational videos",
+                "newsletter opt-in",
+                "Funding Readiness Checklist lead magnet",
+                "educational nurture sequence",
+            ],
+            "nav_placement_plan": [
+                "after checklist completion",
+                "after nurture Email 2",
+                "resource section on landing page after approval",
+                "[NAV_AFFILIATE_LINK_PENDING_RAY_APPROVAL]",
+            ],
+            "relay_placement_plan": [
+                "business banking/operations readiness section",
+                "after nurture Email 3",
+                "resource section after approval",
+                "[RELAY_AFFILIATE_LINK_PENDING_RAY_APPROVAL]",
+            ],
+            "what_ray_still_must_approve": [
+                "applying to Nav affiliate program",
+                "applying to Relay affiliate program",
+                "live affiliate links",
+                "public landing page",
+                "email send",
+                "social posts",
+                "publishing destination",
+                "disclosures",
+                "final CTA copy",
+            ],
+            "application_decision_checklist": [
+                "Is website ready?",
+                "Is the audience statement ready?",
+                "Are traffic sources credible?",
+                "Is compliance language safe?",
+                "Are disclosures prepared?",
+                "Are affiliate links still placeholders?",
+                "Has Ray approved application submission separately?",
+            ],
+            "recommended_next_step": "Prepare missing website/social/channel details, then Ray can choose whether to approve applying to Nav first.",
+            "safety_confirmation": {
+                "affiliate_applications_submitted": "NO",
+                "live_links_activated": "NO",
+                "publishing_occurred": "NO",
+                "email_sent": "NO",
+                "stripe_payment_activated": "NO",
+                "deployment_occurred": "NO",
+                "supabase_changed": "NO",
+                "old_tables_changed": "NO",
+            },
+            "evidence": [
+                str(approval_path),
+                str(decision_path),
+                str(cta_path),
+            ],
+        }
+
+        md_lines = [
+            "# Nav / Relay Affiliate Application Readiness Packet",
+            f"**Date:** {timestamp[:4]}-{timestamp[4:6]}-{timestamp[6:8]}",
+            "**Purpose:** Internal readiness packet only. No applications submitted.",
+            "",
+            "## Ray-Approved Decision",
+            "- Nav first",
+            "- Relay second",
+            "- Internal preparation only",
+            "",
+            "## Information Ray Likely Needs Before Applying",
+        ]
+        for item in payload["information_ray_likely_needs_before_applying"]:
+            md_lines.append(f"- {item}")
+        md_lines += [
+            "",
+            "## Website / Social / Channel Details to Prepare",
+            "- Website: [WEBSITE_URL_PENDING_RAY_CONFIRMATION]",
+            "- YouTube: [YOUTUBE_CHANNEL_PENDING_RAY_CONFIRMATION]",
+            "- LinkedIn: [LINKEDIN_PENDING_RAY_CONFIRMATION]",
+            "- Newsletter: [NEWSLETTER_URL_PENDING_RAY_CONFIRMATION]",
+            "- Contact email: [CONTACT_EMAIL_PENDING_RAY_CONFIRMATION]",
+            "",
+            "## Compliance-Safe Program Description",
+            payload["compliance_safe_program_description"],
+            "",
+            "## Proposed Traffic Sources",
+        ]
+        for item in payload["proposed_traffic_sources"]:
+            md_lines.append(f"- {item}")
+        md_lines += [
+            "",
+            "## Nav Placement Plan",
+            "- after checklist completion",
+            "- after nurture Email 2",
+            "- resource section on landing page after approval",
+            "- placeholder only: [NAV_AFFILIATE_LINK_PENDING_RAY_APPROVAL]",
+            "",
+            "## Relay Placement Plan",
+            "- business banking/operations readiness section",
+            "- after nurture Email 3",
+            "- resource section after approval",
+            "- placeholder only: [RELAY_AFFILIATE_LINK_PENDING_RAY_APPROVAL]",
+            "",
+            "## What Ray Still Must Approve",
+        ]
+        for item in payload["what_ray_still_must_approve"]:
+            md_lines.append(f"- {item}")
+        md_lines += [
+            "",
+            "## Application Decision Checklist",
+        ]
+        for item in payload["application_decision_checklist"]:
+            md_lines.append(f"- {item}")
+        md_lines += [
+            "",
+            "## Recommended Next Step",
+            payload["recommended_next_step"],
+            "",
+            "## Evidence",
+        ]
+        for item in payload["evidence"]:
+            md_lines.append(f"- {item}")
+
+        md_path.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+        json_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+        return (
+            "NAV / RELAY AFFILIATE APPLICATION READINESS PACKET\n\n"
+            "Internal readiness packet created. No applications were submitted.\n\n"
+            f"Markdown: {md_path}\n"
+            f"JSON: {json_path}"
+        )
+
     def _safe_operator_fallback(self) -> str:
         return "I do not have verified state for that yet."
 
@@ -3876,6 +4124,14 @@ class NexusTelegramBot:
                 return _shadow_cmd_result
         except Exception as _shadow_cmd_exc:
             logger.warning("telegram cfo_shadow_command failed: %s", _shadow_cmd_exc)
+
+        # ── Exact Nav / Relay monetization routes ────────────────────────────
+        if normalized_key in NAV_RELAY_APPROVAL_SUMMARY_PHRASES:
+            logger.info("telegram route=nav_relay_approval_summary")
+            return self._cmd_nav_relay_approval_summary()
+        if any(normalized_key.startswith(prefix) for prefix in NAV_RELAY_READINESS_PACKET_PHRASES):
+            logger.info("telegram route=nav_relay_readiness_packet")
+            return self._cmd_nav_relay_readiness_packet()
 
         # ── Phase 8C: CFO Loop limited primary intercept ─────────────────────
         # Runs BEFORE Phase 7C. In limited_primary mode, allowlisted intents
