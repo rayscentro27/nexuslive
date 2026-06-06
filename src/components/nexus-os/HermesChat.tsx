@@ -269,7 +269,10 @@ export function HermesChat() {
               disabled={sending}
               placeholder="Ask Hermes… (Enter to send, Shift+Enter for newline)"
               rows={2}
-              className="flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#5B7CFA]/20 focus:border-[#5B7CFA]/40 disabled:opacity-50 transition-all"
+              // Explicit dark text + caret so typing is visible on the light input in BOTH themes
+              // (without this, dark mode inherits white text from .nexus-canvas → invisible typing).
+              style={{ color: '#1a2244', caretColor: '#5B7CFA', backgroundColor: '#f8fafc' }}
+              className="flex-1 resize-none rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm font-medium placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5B7CFA]/20 focus:border-[#5B7CFA]/40 disabled:opacity-50 transition-all"
             />
             <button onClick={() => sendMessage()} disabled={sending || !input.trim()}
               className="h-11 w-11 shrink-0 rounded-xl bg-[#5B7CFA] text-white flex items-center justify-center shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] disabled:opacity-40 disabled:cursor-not-allowed transition-all">

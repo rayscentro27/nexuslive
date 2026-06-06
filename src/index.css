@@ -129,9 +129,11 @@
     @apply bg-clip-text text-transparent bg-gradient-to-r from-[#3d5af1] to-[#5b8ef5];
   }
 
-  /* Nexus OS modal/form input */
+  /* Nexus OS modal/form input — explicit dark text + caret so typing is visible
+     on the light input in both themes (dark mode would otherwise inherit white). */
   .input-base {
-    @apply w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#5B7CFA]/20 focus:border-[#5B7CFA]/40 transition-all;
+    @apply w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-[#1a2244] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5B7CFA]/20 focus:border-[#5B7CFA]/40 transition-all;
+    caret-color: #5B7CFA;
   }
 
   .nexus-button-primary {
