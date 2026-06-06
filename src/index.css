@@ -69,6 +69,11 @@
     @apply bg-clip-text text-transparent bg-gradient-to-r from-[#3d5af1] to-[#5b8ef5];
   }
 
+  /* Nexus OS modal/form input */
+  .input-base {
+    @apply w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#5B7CFA]/20 focus:border-[#5B7CFA]/40 transition-all;
+  }
+
   .nexus-button-primary {
     background: linear-gradient(135deg, #3d5af1 0%, #5b8ef5 100%);
     color: white;

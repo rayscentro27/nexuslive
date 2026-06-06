@@ -97,6 +97,52 @@ export interface HermesMessage {
   approval_needed?: boolean;
 }
 
+// Revenue Hub campaign (maps to nexus_os_revenue_campaigns + migration 000003 columns)
+export interface RevenueCampaign {
+  id: string;
+  program_name: string;
+  niche: string;
+  campaign_type: 'affiliate' | 'direct' | 'partnership' | 'content' | 'referral_program';
+  application_status: 'not_applied' | 'applied' | 'pending' | 'approved' | 'rejected' | 'paused';
+  link_status: 'none' | 'pending' | 'active' | 'expired';
+  affiliate_link?: string | null;      // stored in DB; never rendered in DOM
+  landing_page_status: 'none' | 'draft' | 'review' | 'ready';
+  landing_page_url?: string | null;
+  compliance_ok: boolean;
+  disclosure_ok: boolean;
+  traffic_source?: string | null;
+  content_queue_count: number;
+  clicks?: number | null;
+  conversions?: number | null;
+  revenue_usd?: number | null;
+  next_action?: string | null;
+  notes?: string | null;
+  offer_url?: string | null;
+  priority: 'high' | 'medium' | 'low';
+  estimated_value?: number | null;
+  approval_status: 'not_required' | 'pending_review' | 'approved' | 'blocked';
+  archived: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CampaignFormData = Omit<RevenueCampaign, 'id' | 'created_at' | 'updated_at'>;
+
+// Rules-based recommendation from the Next Best Revenue Action engine
+export interface RevenueRecommendation {
+  campaign_id: string;
+  campaign_name: string;
+  score: number;          // 0-100
+  next_action: string;
+  why: string;
+  blockers: string[];
+  approval_needed: boolean;
+  approval_action?: string;
+  confidence: 'high' | 'medium' | 'low';
+  source: 'rules_engine';
+  freshness: string;      // ISO timestamp
+}
+
 export type OsSection =
   | 'command-center'
   | 'hermes-chat'
