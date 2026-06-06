@@ -279,25 +279,27 @@ export function useNexusRecommendations() {
     return enrichWithGraph(baseRec, 'nexus_os_revenue_campaigns', c.id);
   }, [gather, enrichWithGraph]);
 
-  // Build a concise evidence string to hand to Hermes (no raw rows, no secrets)
+  // Build a concise evidence string to hand to Hermes (no raw rows, no secrets).
+  // Strict budget: each section capped, whole block capped ~1800 chars.
   const buildEvidenceContext = useCallback((rec: NexusRecommendation): string => {
-    return [
+    const cap = (s: string, n: number) => (s && s.length > n ? s.slice(0, n - 1) + '…' : s || '');
+    const block = [
       `NEXUS OS EVIDENCE (selective, summarized — not raw rows):`,
-      `- Topic: ${rec.title}`,
-      `- Computed recommendation: ${rec.recommendation}`,
-      `- Reasoning: ${rec.why}`,
-      `- Evidence: ${rec.evidence_summary}`,
-      rec.blockers.length ? `- Blockers: ${rec.blockers.slice(0, 4).join('; ')}` : `- Blockers: none`,
-      `- Suggested next action: ${rec.next_action}`,
-      `- Approval needed: ${rec.approval_needed ? 'yes' : 'no'}`,
-      `- Confidence: ${rec.confidence}`,
-      `- Sources: ${rec.source_tables.join(', ')}`,
+      `- Topic: ${cap(rec.title, 80)}`,
+      `- Recommendation: ${cap(rec.recommendation, 300)}`,
+      `- Reasoning: ${cap(rec.why, 320)}`,
+      `- Evidence: ${cap(rec.evidence_summary, 300)}`,
+      rec.blockers.length ? `- Blockers: ${cap(rec.blockers.slice(0, 4).join('; '), 300)}` : `- Blockers: none`,
+      `- Next action: ${cap(rec.next_action, 200)}`,
+      `- Approval needed: ${rec.approval_needed ? 'yes' : 'no'} · Confidence: ${rec.confidence}`,
       rec.graph_context_used
-        ? `- Graph context: ${rec.relationship_summary} (${rec.related_sources_count} sources, ${rec.related_content_count} content, ${rec.related_approvals_count} approvals linked in the knowledge graph)`
-        : `- Graph context: none yet (entity not synced to knowledge graph)`,
+        ? `- Graph: ${cap(rec.relationship_summary ?? '', 200)}`
+        : `- Graph: not synced`,
       ``,
-      `Use this as VERIFIED internal evidence. Answer in the Hermes Nexus voice: lead with the recommendation, give the why, name the blocker, state if approval is needed. Do not dump rows. Do not mention "Supabase data". Do not invent numbers beyond this evidence.`,
+      `Treat as VERIFIED internal evidence. Answer in the Hermes voice: recommendation first, then why, then blocker, then approval. No raw rows, no "Supabase", no invented numbers.`,
     ].join('\n');
+    // Hard ceiling so a recommendation request never balloons the context budget.
+    return block.length > 1800 ? block.slice(0, 1799) + '…' : block;
   }, []);
 
   return { recommend, classifyIntent, intentNeedsEvidence, buildEvidenceContext, gather, enrichWithGraph };

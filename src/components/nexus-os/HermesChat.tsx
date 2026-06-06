@@ -113,10 +113,21 @@ export function HermesChat() {
         .map(m => ({ role: m.role, content: m.content }));
 
       // ── Selective retrieval: only fetch internal evidence when the intent needs it ──
+      // Map engine intent → function intent key (drives compact prompt + skill summary + token budget)
+      const INTENT_MAP: Record<string, string> = {
+        revenue_recommendation: 'revenue',
+        content_recommendation: 'content',
+        next_step: 'next_step',
+        blocker_diagnosis: 'next_step',
+        approval_summary: 'approvals',
+        general: 'general',
+      };
       let userContent = content;
       let usedEvidence = false;
+      let fnIntent = 'general';
       try {
         const intent = engine.classifyIntent(content);
+        fnIntent = INTENT_MAP[intent] ?? 'general';
         if (engine.intentNeedsEvidence(intent)) {
           const rec = await engine.recommend(intent);
           const evidence = engine.buildEvidenceContext(rec);
@@ -129,11 +140,13 @@ export function HermesChat() {
       }
       setEvidenceUsed(usedEvidence);
 
+      // Function owns the compact system prompt + skill summary by intent — we no
+      // longer send a large system prompt, cutting our share of the context.
       const res = await fetch('/.netlify/functions/hermes-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system: SYSTEM_PROMPT,
+          intent: fnIntent,
           messages: [...history, { role: 'user', content: userContent }],
         }),
       });

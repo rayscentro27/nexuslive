@@ -13,6 +13,35 @@
  *   - No credentials stored or logged
  */
 
+// Compact Nexus production system prompt (~350 tokens) — preserves voice, evidence
+// behavior, and safety without sending full SOUL.md/skills through Netlify.
+const COMPACT_SYSTEM = [
+  "You are Hermes, Ray's Nexus OS executive operator and revenue-focused partner.",
+  'Voice: fluent, warm, direct — an operating partner briefing a founder. Never a database dump.',
+  'Never open with "Based on Supabase data". Give the why before the what. Be practical, not exhaustive.',
+  'Recommend: lead with ONE clear recommendation, then at most 2 options with tradeoffs. Name the blocker. State if approval is needed. Surface the fastest safe path to revenue.',
+  'Evidence: when a "NEXUS OS EVIDENCE" block is present, treat it as VERIFIED and answer from it; do not invent numbers. If no evidence and the question needs it, say what you would check.',
+  'Safety: no live trading, publishing, email/outreach, ad spend, deploys, or credential changes without explicit approval. No earnings/results claims without evidence.',
+].join(' ');
+
+// Short skill summaries (5–8 bullets) loaded ONLY for the detected intent —
+// full skill files stay local to Hermes; we never send them all per request.
+const SKILL_SUMMARIES = {
+  revenue: 'Revenue focus: rank campaigns by readiness-to-revenue (closest to launch, fewest blockers, highest priority). Name the single best campaign, its blocker, and the exact next action. Affiliate CTA needs disclosure before publish. Never claim projected/guaranteed earnings.',
+  content: 'Content focus: find the highest-priority campaign with the least content, or the item closest to approval. Recommend specific drafts/platforms. Disclosure required for affiliate content. No earnings claims or guarantees.',
+  approvals: 'Approval focus: report what is pending and what to act on first (urgent first). If nothing pending, say so plainly — do not invent items. Applying to programs needs no approval; publishing/outreach does.',
+  next_step: 'Next-step focus: weigh revenue campaigns, content state, and pending approvals. Recommend the single highest-impact next move: prioritize speed to revenue, safety, and clearing blockers.',
+  graph: 'Graph focus: use entity/relationship summaries to explain how sources, campaigns, content, and approvals connect. Summarize; never dump raw rows.',
+  trading_status: 'Trading focus: report paper/demo status only. Live trading is locked. Never recommend live execution or credential changes.',
+  tool_repo: 'Tool/repo focus: classify as core-now / later / personal / reference-only / ignore. Recommend adapt/fork/wrap/reference. Weigh Nexus fit, risk, cost, timing. No installs without approval.',
+};
+
+// Output-token budget per intent — generation time is the main latency lever.
+const MAX_TOKENS_BY_INTENT = {
+  general: 500, status: 500, approvals: 550, revenue: 700, content: 650,
+  graph: 600, trading_status: 500, next_step: 700, tool_repo: 700, design: 600,
+};
+
 exports.handler = async (event) => {
   const CORS_HEADERS = {
     'Access-Control-Allow-Origin': '*',
@@ -89,7 +118,7 @@ exports.handler = async (event) => {
     };
   }
 
-  const { messages, system, model } = body;
+  const { messages, system, model, intent } = body;
   if (!messages || !Array.isArray(messages)) {
     return {
       statusCode: 400,
@@ -98,17 +127,34 @@ exports.handler = async (event) => {
     };
   }
 
+  // ── Intent routing: compact prompt + only the relevant skill summary ──
+  const norm = String(intent || 'general').toLowerCase();
+  const skillSummary = SKILL_SUMMARIES[norm] || '';
+  // Function owns the compact prompt; client may still override with `system`.
+  const composedSystem = (system && system.length < 400 ? system : COMPACT_SYSTEM)
+    + (skillSummary ? `\n\nFocus for this request: ${skillSummary}` : '');
+  const maxTokens = Math.min(Number(body.max_tokens) || MAX_TOKENS_BY_INTENT[norm] || 600, 900);
+
+  // Rough server-side context estimate (logged, no secrets).
+  const approxContextChars = composedSystem.length + messages.reduce((n, m) => n + String(m.content || '').length, 0);
+  console.log(`hermes-chat intent=${norm} approx_ctx_chars=${approxContextChars} max_tokens=${maxTokens}`);
+
   // Build OpenAI-compatible payload.
   // Hermes injects a large (~20K-token) system context per call, so keep our
   // generation budget tight to stay under Netlify's ~10s function timeout.
   const payload = {
     model: model || 'gpt-5.5',
-    messages: system
-      ? [{ role: 'system', content: system }, ...messages]
-      : messages,
+    messages: [{ role: 'system', content: composedSystem }, ...messages],
     temperature: 0.6,
-    max_tokens: Math.min(Number(body.max_tokens) || 640, 900),
+    max_tokens: maxTokens,
     stream: false,
+  };
+
+  // Non-secret metadata headers for the client (intent, budget, evidence flag).
+  const META_HEADERS = {
+    'X-Nexus-Intent': norm,
+    'X-Nexus-Max-Tokens': String(maxTokens),
+    'X-Nexus-Evidence-Used': String(messages.some(m => String(m.content || '').includes('NEXUS OS EVIDENCE'))),
   };
 
   try {
@@ -135,7 +181,7 @@ exports.handler = async (event) => {
 
     return {
       statusCode: upstream.status,
-      headers: JSON_HEADERS,
+      headers: { ...JSON_HEADERS, ...META_HEADERS },
       body: responseText,
     };
   } catch (err) {
