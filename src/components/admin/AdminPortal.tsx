@@ -17,6 +17,7 @@ import { AdminSubscriptionSettings } from './AdminSubscriptionSettings';
 import { AdminInviteUsers } from './AdminInviteUsers';
 import { AdminGrantReviews } from './AdminGrantReviews';
 import { AdminCEOMode } from './AdminCEOMode';
+import { NexusOS } from './NexusOS';
 
 const ADMIN_DOCK = [
   { id: 'dashboard',     emoji: '🏠', label: 'Overview' },
@@ -35,6 +36,7 @@ const ADMIN_DOCK = [
   { id: 'subscriptions', emoji: '💳', label: 'Plans' },
   { id: 'grants-review', emoji: '🔬', label: 'Grants' },
   { id: 'ceo-mode',      emoji: '🧠', label: 'CEO Mode' },
+  { id: 'nexus-os',      emoji: '🖥️', label: 'Nexus OS' },
   { id: 'settings',      emoji: '⚙️', label: 'Settings' },
 ];
 
@@ -127,6 +129,7 @@ export function AdminPortal() {
           {activeTab === 'subscriptions' && <AdminSubscriptionSettings />}
           {activeTab === 'grants-review' && <AdminGrantReviews />}
           {activeTab === 'ceo-mode'      && <AdminCEOMode />}
+          {activeTab === 'nexus-os'      && <NexusOS />}
           {activeTab === 'settings'      && <AdminSettings onNavigate={setActiveTab} />}
         </div>
       </main>

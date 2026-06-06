@@ -27,6 +27,7 @@ import { Legal } from './components/Legal';
 import { Rewards } from './components/Rewards';
 import { AdminPortal } from './components/admin/AdminPortal';
 import { AdminDashboardPage } from './components/AdminDashboardPage';
+import { NexusOS } from './components/admin/NexusOS';
 import { Landing } from './components/Landing';
 import { PlanGate } from './components/PlanGate';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -482,6 +483,11 @@ export default function App() {
           <Route path="admin" element={
             <ProtectedRoute requireAdmin>
               <AdminDashboardPage />
+            </ProtectedRoute>
+          } />
+          <Route path="nexus-os" element={
+            <ProtectedRoute requireAdmin>
+              <NexusOS />
             </ProtectedRoute>
           } />
         </Route>

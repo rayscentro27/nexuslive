@@ -55,3 +55,6 @@ workflows/research_ingestion/transcripts/
 workflows/research_ingestion/summaries/
 research-engine/transcripts/
 research-engine/summaries/
+
+# Local Netlify folder
+.netlify

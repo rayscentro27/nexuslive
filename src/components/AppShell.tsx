@@ -8,7 +8,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Home, Zap, FileText, MessageSquare, CreditCard,
   TrendingUp, User, Settings, Building2, Shield,
-  Map, Trophy, Bot, Lock, LogOut, Menu, X, ShieldCheck,
+  Map, Trophy, Bot, Lock, LogOut, Menu, X, ShieldCheck, Monitor,
 } from 'lucide-react';
 import { useAuth } from './AuthProvider';
 import { usePlan, PlanTier } from '../hooks/usePlan';
@@ -38,6 +38,7 @@ const ROUTES: Array<{
   { path: '/app/account',    label: 'Account',         icon: User },
   { path: '/app/settings',   label: 'Settings',        icon: Settings },
   { path: '/app/admin',      label: 'Admin',           icon: ShieldCheck, adminOnly: true },
+  { path: '/app/nexus-os',  label: 'Nexus OS',        icon: Monitor,     adminOnly: true },
 ];
 
 function getInitials(user: { email?: string; user_metadata?: { full_name?: string } } | null) {
