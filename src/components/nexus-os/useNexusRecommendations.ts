@@ -38,6 +38,7 @@ export interface NexusRecommendation {
   related_content_count?: number;
   related_approvals_count?: number;
   relationship_summary?: string;
+  source_insight_summary?: string;
 }
 
 // ── Intent classification (keyword rules, no LLM) ──────────────────────────────
@@ -49,7 +50,9 @@ export function classifyIntent(prompt: string): RecIntent {
   // Content questions (incl. "what content is linked to X")
   if (/\b(content|post|draft|publish|video|newsletter|linkedin|youtube|tiktok|reel|script|linked to)\b/.test(p)) return 'content_recommendation';
   // Revenue/campaign questions — incl. named starter programs and "do we have / ready / status"
-  if (/\b(money|revenue|earn|monetize|income|paying|profit|cash|campaign|nav|beehiiv|legalzoom|paydex|affiliate|program|offer|do we have|ready)\b/.test(p)) return 'revenue_recommendation';
+  if (/\b(money|revenue|earn|monetize|income|paying|profit|cash|campaign|nav|beehiiv|legalzoom|paydex|business credit|affiliate|program|offer|do we have|ready)\b/.test(p)) return 'revenue_recommendation';
+  // Source / knowledge questions (Chase source, transcripts, what supports a campaign) → next_step (graph-enriched)
+  if (/\b(source|sources|transcript|insight|funding|chase|support|knowledge)\b/.test(p)) return 'next_step';
   // Graph questions route to next_step (which enriches with graph context)
   if (/\b(graph|entit|relationship|knowledge graph|connected|links?)\b/.test(p)) return 'next_step';
   if (/\b(next|today|what should|priorit|focus|do now|status|overview|summar)\b/.test(p)) return 'next_step';
@@ -130,10 +133,33 @@ export function useNexusRecommendations() {
       const all = [...out, ...inc];
       if (all.length === 0) return rec;
 
-      const sources = all.filter(r => r.relationship === 'generated_from_source' || r.relationship === 'derived_from').length;
+      const sources = all.filter(r => r.relationship === 'generated_from_source' || r.relationship === 'derived_from' || r.relationship === 'supports').length;
       const contentLinks = out.filter(r => r.relationship === 'belongs_to_campaign').length
         + inc.filter(r => r.relationship === 'belongs_to_campaign').length;
       const approvals = all.filter(r => r.relationship === 'requires_approval' || r.relationship === 'approved_by').length;
+      const supportingSourceIds = inc
+        .filter(r => r.relationship === 'supports')
+        .map(r => r.from_entity_id)
+        .filter(Boolean)
+        .slice(0, 4);
+      let sourceInsightSummary = '';
+      if (supportingSourceIds.length > 0) {
+        const { data: sourceEntities } = await supabase
+          .from('nexus_os_entities')
+          .select('name,title,summary')
+          .in('id', supportingSourceIds);
+        const labels = (sourceEntities ?? [])
+          .map(r => {
+            const name = String((r as { title?: string | null; name?: string | null }).title || (r as { name?: string | null }).name || '').trim();
+            const summary = String((r as { summary?: string | null }).summary || '').trim();
+            return summary ? `${name}: ${summary}` : name;
+          })
+          .filter(Boolean)
+          .slice(0, 3);
+        if (labels.length > 0) {
+          sourceInsightSummary = labels.join('; ');
+        }
+      }
 
       return {
         ...rec,
@@ -142,6 +168,7 @@ export function useNexusRecommendations() {
         related_content_count: contentLinks,
         related_approvals_count: approvals,
         relationship_summary: `${all.length} graph link(s): ${sources} source, ${contentLinks} content, ${approvals} approval.`,
+        source_insight_summary: sourceInsightSummary || undefined,
       };
     } catch {
       return rec;
@@ -304,6 +331,7 @@ export function useNexusRecommendations() {
       `- Reasoning: ${cap(rec.why, 320)}`,
       `- Evidence: ${cap(rec.evidence_summary, 300)}`,
       rec.roster ? `- Campaigns (VERIFIED from Revenue Hub): ${cap(rec.roster, 420)}` : '',
+      rec.source_insight_summary ? `- Source insights: ${cap(rec.source_insight_summary, 320)}` : '',
       rec.blockers.length ? `- Blockers: ${cap(rec.blockers.slice(0, 4).join('; '), 300)}` : `- Blockers: none`,
       `- Next action: ${cap(rec.next_action, 200)}`,
       `- Approval needed: ${rec.approval_needed ? 'yes' : 'no'} · Confidence: ${rec.confidence}`,
