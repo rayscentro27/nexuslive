@@ -138,9 +138,11 @@ export function NexusOS() {
           <span className="text-[10px] text-slate-400 ml-1">— {active.description}</span>
         </div>
 
-        {/* Section content */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 pb-20">
-          {renderSection()}
+        {/* Section content — centered, max-width 1280px so widgets never stretch edge-to-edge */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-24">
+            {renderSection()}
+          </div>
         </div>
       </div>
     </div>

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { getSystemHealth, getTradingStatus } from '../../services/nexusApi';
-import { OSSection, OSCard, StatusDot, Badge, MockLabel, timeAgo, NotConnectedLabel, EmptyState } from './shared';
+import { OSSection, OSCard, StatusDot, Badge, MockLabel, timeAgo, NotConnectedLabel, EmptyState, PageHeader, SafetyChips, WidgetGrid } from './shared';
 import { useApprovalNotifier } from './useApprovalNotifier';
 import { useNexusRecommendations, type NexusRecommendation } from './useNexusRecommendations';
 import type { SystemAlert, ApprovalItem, OsSection } from './types';
@@ -108,23 +108,23 @@ export function CommandCenter({ onNavigate }: CommandCenterProps) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-black text-[#1A2244]">Nexus OS <span className="text-[#5B7CFA]">Command Center</span></h1>
-          <p className="text-slate-400 text-sm mt-0.5">
-            Refreshed {timeAgo(lastRefresh.toISOString())} ·{' '}
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-          </p>
-        </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-all disabled:opacity-50"
-        >
-          {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-          Refresh
-        </button>
-      </div>
+      <PageHeader
+        title="Command Center"
+        subtitle={`Refreshed ${timeAgo(lastRefresh.toISOString())} · ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`}
+        action={
+          <button
+            onClick={load}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50 transition-all disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            Refresh
+          </button>
+        }
+      />
+
+      {/* Safety / guardrail status — compact, not alarmist */}
+      <SafetyChips />
 
       {/* "Needs Ray" banner — shown when there are urgent items */}
       {(pendingApprovals.length > 0 || urgentNotifCount > 0 || criticalAlerts.length > 0) && (
@@ -144,8 +144,8 @@ export function CommandCenter({ onNavigate }: CommandCenterProps) {
         <CrossModuleRecCard rec={topRec} onOpen={() => onNavigate('hermes-training')} />
       )}
 
-      {/* Status row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Status row — auto-fit so metric cards stay compact, never stretch */}
+      <WidgetGrid min={220}>
         <StatCard
           icon={AlertTriangle}
           label="Blockers"
@@ -177,7 +177,7 @@ export function CommandCenter({ onNavigate }: CommandCenterProps) {
           sub={latestUrgentNotif ? latestUrgentNotif.slice(0, 30) : 'None unread'}
           onClick={() => onNavigate('notifications')}
         />
-      </div>
+      </WidgetGrid>
 
       {/* Critical alerts */}
       {criticalAlerts.length > 0 && (
