@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Send, Loader2, Bot, User, AlertCircle, Info, ChevronRight, Sparkles,
+  Send, Loader2, Bot, User, AlertCircle, Info, RefreshCw, Sparkles,
 } from 'lucide-react';
-import { OSCard, Badge, timeAgo } from './shared';
+import { OSCard, Badge, StatusPill, timeAgo } from './shared';
 import { useNexusRecommendations } from './useNexusRecommendations';
 import type { HermesMessage } from './types';
 
@@ -57,19 +57,44 @@ export function HermesChat() {
   ]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'offline'>('unknown');
   const [evidenceUsed, setEvidenceUsed] = useState(false);
+  const [health, setHealth] = useState<{ status: 'checking' | 'live' | 'degraded' | 'offline'; detail: string }>({ status: 'checking', detail: 'Checking Hermes connection…' });
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // ── Health check (fast GET) drives the status pill — proves real connectivity ──
+  const checkHealth = useCallback(async () => {
+    setHealth({ status: 'checking', detail: 'Checking Hermes connection…' });
+    try {
+      const res = await fetch('/.netlify/functions/hermes-chat', { method: 'GET', signal: AbortSignal.timeout(9000) });
+      const data = await res.json();
+      const map: Record<string, string> = {
+        netlify_env_missing: 'Netlify env missing (HERMES_GATEWAY_URL).',
+        auth_key_missing: 'Netlify env missing (HERMES_API_KEY).',
+        origin_unhealthy: 'Gateway reachable but unhealthy.',
+        tunnel_timeout: 'Tunnel/origin timed out.',
+        tunnel_unreachable: 'Tunnel or local Hermes offline.',
+        ok: 'Hermes gateway live.',
+      };
+      setHealth({ status: data.status ?? 'offline', detail: map[data.reason] ?? data.detail ?? 'Unknown state.' });
+    } catch {
+      setHealth({ status: 'offline', detail: 'Connection check failed (function unreachable).' });
+    }
+  }, []);
+
+  useEffect(() => { checkHealth(); }, [checkHealth]);
   const engine = useNexusRecommendations();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const lastSentRef = useRef<string>('');
+
   async function sendMessage(text?: string) {
     const content = (text ?? input).trim();
     if (!content || sending) return;
+    lastSentRef.current = content;
     setInput('');
 
     const userMsg: HermesMessage = {
@@ -113,43 +138,39 @@ export function HermesChat() {
         }),
       });
 
-      if (res.status === 503) {
-        setConnectionStatus('offline');
-        const assistantMsg: HermesMessage = {
-          id: `a-${Date.now()}`,
-          role: 'assistant',
-          content:
-            '⚠️ Hermes gateway is not reachable. Make sure the gateway is running and `HERMES_GATEWAY_URL` is set in your Netlify env vars.\n\n**To connect:**\n1. Start Hermes: `launchctl load ~/Library/LaunchAgents/ai.hermes.gateway.plist`\n2. Set `HERMES_GATEWAY_URL=http://localhost:8642` in `.env`\n3. Set `HERMES_API_KEY=<key from ~/.hermes/config.yaml>`',
-          timestamp: new Date().toISOString(),
-        };
-        setMessages(prev => [...prev, assistantMsg]);
+      if (!res.ok) {
+        // Parse the specific reason the function returned (accurate, not generic)
+        let reason = '', detail = '';
+        try { const e = await res.json(); reason = e.reason || e.error || ''; detail = e.detail || ''; } catch { /* noop */ }
+        const friendly =
+          reason === 'model_timeout' || res.status === 504
+            ? '⏱️ Hermes origin timed out. It carries a large context (~20K tokens), so replies can be slow. Tap Retry, or ask a shorter question.'
+          : reason === 'auth_failed'
+            ? '🔑 Gateway auth failed — the API key was rejected. Check HERMES_API_KEY matches the gateway key.'
+          : reason === 'tunnel_unreachable'
+            ? '🔌 Hermes origin/tunnel is unreachable. The local Hermes process or Cloudflare tunnel may be down.'
+          : reason === 'netlify_env_missing'
+            ? '⚙️ Netlify env missing (HERMES_GATEWAY_URL).'
+            : `⚠️ Hermes error (${res.status}). ${detail}`;
+        setMessages(prev => [...prev, { id: `err-${Date.now()}`, role: 'assistant', content: friendly, timestamp: new Date().toISOString() }]);
+        setHealth({ status: res.status === 504 ? 'degraded' : 'offline', detail: detail || friendly });
         return;
       }
 
-      if (!res.ok) {
-        throw new Error(`Gateway error ${res.status}`);
-      }
-
-      setConnectionStatus('connected');
       const data = await res.json();
       const reply = data.choices?.[0]?.message?.content ?? 'No response from Hermes.';
-
-      const assistantMsg: HermesMessage = {
-        id: `a-${Date.now()}`,
-        role: 'assistant',
-        content: reply,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, assistantMsg]);
+      setHealth({ status: 'live', detail: 'Hermes gateway live.' });
+      setMessages(prev => [...prev, { id: `a-${Date.now()}`, role: 'assistant', content: reply, timestamp: new Date().toISOString() }]);
     } catch (err) {
-      const errMsg: HermesMessage = {
-        id: `err-${Date.now()}`,
-        role: 'assistant',
-        content: `Error reaching Hermes: ${String(err)}`,
+      const isTimeout = String(err).includes('Timeout') || String(err).includes('abort');
+      setMessages(prev => [...prev, {
+        id: `err-${Date.now()}`, role: 'assistant',
+        content: isTimeout
+          ? '⏱️ Request timed out before Hermes replied. Tap Retry or ask a shorter question.'
+          : `⚠️ Could not reach Hermes: ${String(err)}`,
         timestamp: new Date().toISOString(),
-      };
-      setMessages(prev => [...prev, errMsg]);
-      setConnectionStatus('offline');
+      }]);
+      setHealth({ status: 'degraded', detail: 'Last request did not complete.' });
     } finally {
       setSending(false);
     }
@@ -162,107 +183,95 @@ export function HermesChat() {
     }
   }
 
+  const pillTone = health.status === 'live' ? 'ok' : health.status === 'degraded' ? 'warn' : health.status === 'offline' ? 'danger' : 'muted';
+  const pillLabel = health.status === 'live' ? 'Hermes Live' : health.status === 'degraded' ? 'Hermes Degraded' : health.status === 'offline' ? 'Hermes Offline' : 'Checking…';
+
   return (
-    <div className="flex flex-col h-[calc(100vh-220px)] min-h-[500px]">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+    // Centered, compact chat column — never edge-to-edge. Bottom padding clears the dock.
+    <div className="mx-auto w-full max-w-[1000px] flex flex-col h-[calc(100vh-260px)] min-h-[460px]">
+      {/* Status row */}
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
         <div>
-          <h2 className="text-xl font-black text-[#1A2244]">
+          <h2 className="text-lg sm:text-xl font-black text-[#1A2244] leading-tight">
             Hermes <span className="text-[#5B7CFA]">Chat</span>
           </h2>
-          <p className="text-slate-400 text-xs mt-0.5">
-            Routes to Hermes gateway (OpenRouter/Ollama) via local proxy
-          </p>
+          <p className="text-slate-400 text-xs mt-0.5">gpt-5.5 via Cloudflare Tunnel · {health.detail}</p>
         </div>
         <div className="flex items-center gap-2">
           {evidenceUsed && <Badge label="Evidence used" variant="success" />}
-          <ConnectionBadge status={connectionStatus} />
+          <StatusPill label={pillLabel} tone={pillTone} />
+          <button onClick={checkHealth} title="Retry connection"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-500 text-[11px] font-bold hover:bg-slate-50 transition-all">
+            <RefreshCw className={`w-3 h-3 ${health.status === 'checking' ? 'animate-spin' : ''}`} /> Retry
+          </button>
         </div>
       </div>
 
-      {/* Not-connected notice */}
-      {connectionStatus === 'offline' && (
-        <div className="mb-3 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2">
-          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-          <div className="text-xs text-amber-700">
-            <p className="font-bold">Hermes gateway not reachable</p>
-            <p className="mt-0.5">Set <code className="bg-amber-100 px-1 rounded">HERMES_GATEWAY_URL</code> and <code className="bg-amber-100 px-1 rounded">HERMES_API_KEY</code> in Netlify env vars.</p>
+      {/* Offline/degraded actionable banner — accurate, never generic */}
+      {(health.status === 'offline' || health.status === 'degraded') && (
+        <div className={`mb-3 p-3 rounded-xl border flex items-start gap-2 ${health.status === 'offline' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
+          <AlertCircle className={`w-4 h-4 shrink-0 mt-0.5 ${health.status === 'offline' ? 'text-red-500' : 'text-amber-500'}`} />
+          <div className={`text-xs ${health.status === 'offline' ? 'text-red-700' : 'text-amber-700'}`}>
+            <p className="font-bold">{health.status === 'offline' ? 'Hermes offline' : 'Hermes degraded'}</p>
+            <p className="mt-0.5">{health.detail}</p>
           </div>
         </div>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-3 pr-1">
-        {messages.map(msg => (
-          <MessageBubble key={msg.id} msg={msg} />
-        ))}
-        {sending && (
-          <div className="flex items-center gap-2 p-3">
-            <div className="w-7 h-7 rounded-full bg-[#5B7CFA] flex items-center justify-center shrink-0">
-              <Bot className="w-3.5 h-3.5 text-white" />
+      {/* Chat panel */}
+      <OSCard className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {messages.map(msg => <MessageBubble key={msg.id} msg={msg} />)}
+          {sending && (
+            <div className="flex items-center gap-2 p-1">
+              <div className="w-7 h-7 rounded-full bg-[#5B7CFA] flex items-center justify-center shrink-0">
+                <Bot className="w-3.5 h-3.5 text-white" />
+              </div>
+              <div className="flex gap-1">
+                {[0, 1, 2].map(i => (
+                  <div key={i} className="w-1.5 h-1.5 rounded-full bg-slate-300 animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+                ))}
+              </div>
             </div>
-            <div className="flex gap-1">
-              {[0, 1, 2].map(i => (
-                <div
-                  key={i}
-                  className="w-1.5 h-1.5 rounded-full bg-slate-300 animate-bounce"
-                  style={{ animationDelay: `${i * 0.15}s` }}
-                />
-              ))}
-            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Prompt chips + input grouped inside the panel */}
+        <div className="border-t border-slate-100 p-3 space-y-2.5">
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide">
+            {QUICK_PROMPTS.map(p => (
+              <button key={p} onClick={() => sendMessage(p)} disabled={sending}
+                className="shrink-0 px-2.5 py-1 rounded-full bg-slate-100 hover:bg-blue-50 hover:text-[#5B7CFA] border border-slate-200 text-[11px] font-semibold text-slate-600 transition-all disabled:opacity-40">
+                {p}
+              </button>
+            ))}
           </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
+          <div className="flex items-end gap-2">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              disabled={sending}
+              placeholder="Ask Hermes… (Enter to send, Shift+Enter for newline)"
+              rows={2}
+              className="flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#5B7CFA]/20 focus:border-[#5B7CFA]/40 disabled:opacity-50 transition-all"
+            />
+            <button onClick={() => sendMessage()} disabled={sending || !input.trim()}
+              className="h-11 w-11 shrink-0 rounded-xl bg-[#5B7CFA] text-white flex items-center justify-center shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] disabled:opacity-40 disabled:cursor-not-allowed transition-all">
+              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+      </OSCard>
 
-      {/* Quick prompts */}
-      <div className="mt-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-        {QUICK_PROMPTS.map(p => (
-          <button
-            key={p}
-            onClick={() => sendMessage(p)}
-            disabled={sending}
-            className="shrink-0 px-3 py-1.5 rounded-full bg-slate-100 hover:bg-blue-50 hover:text-[#5B7CFA] border border-slate-200 text-[11px] font-semibold text-slate-600 transition-all disabled:opacity-40"
-          >
-            {p}
-          </button>
-        ))}
-      </div>
-
-      {/* Input */}
-      <div className="mt-3 flex items-end gap-2">
-        <textarea
-          ref={inputRef}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKey}
-          disabled={sending}
-          placeholder="Ask Hermes anything... (Enter to send, Shift+Enter for new line)"
-          rows={2}
-          className="flex-1 resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[#5B7CFA]/20 focus:border-[#5B7CFA]/40 disabled:opacity-50 transition-all"
-        />
-        <button
-          onClick={() => sendMessage()}
-          disabled={sending || !input.trim()}
-          className="h-12 w-12 shrink-0 rounded-2xl bg-[#5B7CFA] text-white flex items-center justify-center shadow-lg shadow-blue-500/20 hover:bg-[#4A6BEB] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-        >
-          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        </button>
-      </div>
-
-      {/* Setup info */}
-      <div className="mt-3 flex items-center gap-1.5 text-[10px] text-slate-400">
+      <p className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-400">
         <Info className="w-3 h-3 shrink-0" />
-        <span>Hermes uses OpenRouter (meta-llama/llama-3.3-70b). Set <code>HERMES_GATEWAY_URL</code> + <code>HERMES_API_KEY</code> to connect.</span>
-      </div>
+        Recommendation prompts pull summarized Nexus evidence; large context means replies can take a few seconds.
+      </p>
     </div>
   );
-}
-
-function ConnectionBadge({ status }: { status: 'unknown' | 'connected' | 'offline' }) {
-  if (status === 'connected') return <Badge label="Hermes Connected" variant="success" />;
-  if (status === 'offline') return <Badge label="Not Connected" variant="danger" />;
-  return <Badge label="Checking..." variant="default" />;
 }
 
 function MessageBubble({ msg }: { msg: HermesMessage }) {
