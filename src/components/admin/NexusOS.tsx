@@ -8,10 +8,11 @@
 import React, { useState } from 'react';
 import {
   Home, MessageSquare, CheckCircle2, Bell, Cpu,
-  DollarSign, Video, TrendingUp, BookOpen, ChevronRight,
+  DollarSign, Video, TrendingUp, BookOpen, ChevronRight, Brain,
 } from 'lucide-react';
 import { CommandCenter } from '../nexus-os/CommandCenter';
 import { HermesChat } from '../nexus-os/HermesChat';
+import { HermesTraining } from '../nexus-os/HermesTraining';
 import { ApprovalCenter } from '../nexus-os/ApprovalCenter';
 import { NotificationCenter } from '../nexus-os/NotificationCenter';
 import { ToolRegistry } from '../nexus-os/ToolRegistry';
@@ -31,6 +32,7 @@ interface NavItem {
 const NAV: NavItem[] = [
   { id: 'command-center', label: 'Command Center', icon: Home, description: 'System status overview' },
   { id: 'hermes-chat', label: 'Hermes Chat', icon: MessageSquare, description: 'Talk to Nexus AI' },
+  { id: 'hermes-training', label: 'Hermes Training', icon: Brain, description: 'Voice, skills & recommendations' },
   { id: 'approvals', label: 'Approvals', icon: CheckCircle2, description: 'Pending actions inbox' },
   { id: 'notifications', label: 'Notifications', icon: Bell, description: 'System notifications' },
   { id: 'tools', label: 'Tool Registry', icon: Cpu, description: 'Agents & services' },
@@ -47,6 +49,7 @@ export function NexusOS() {
     switch (activeSection) {
       case 'command-center': return <CommandCenter onNavigate={setActiveSection} />;
       case 'hermes-chat':    return <HermesChat />;
+      case 'hermes-training': return <HermesTraining />;
       case 'approvals':      return <ApprovalCenter />;
       case 'notifications':  return <NotificationCenter />;
       case 'tools':          return <ToolRegistry />;

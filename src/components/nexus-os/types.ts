@@ -229,6 +229,7 @@ export interface ContentRecommendation {
 export type OsSection =
   | 'command-center'
   | 'hermes-chat'
+  | 'hermes-training'
   | 'approvals'
   | 'notifications'
   | 'tools'

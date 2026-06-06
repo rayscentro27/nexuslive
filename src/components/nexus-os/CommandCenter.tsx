@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import {
   Activity, AlertTriangle, CheckCircle2, Clock, DollarSign,
   TrendingUp, MessageSquare, Zap, Cpu, FileText, RefreshCw, Loader2,
-  Bell, ShieldAlert,
+  Bell, ShieldAlert, Brain, ChevronRight,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { getSystemHealth, getTradingStatus } from '../../services/nexusApi';
 import { OSSection, OSCard, StatusDot, Badge, MockLabel, timeAgo, NotConnectedLabel, EmptyState } from './shared';
 import { useApprovalNotifier } from './useApprovalNotifier';
+import { useNexusRecommendations, type NexusRecommendation } from './useNexusRecommendations';
 import type { SystemAlert, ApprovalItem, OsSection } from './types';
 
 interface CommandCenterProps {
@@ -41,9 +42,13 @@ export function CommandCenter({ onNavigate }: CommandCenterProps) {
   const [trading, setTrading] = useState<TradingStatusResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [topRec, setTopRec] = useState<NexusRecommendation | null>(null);
+  const recEngine = useNexusRecommendations();
 
   async function load() {
     setLoading(true);
+    // Cross-module recommendation (non-blocking, best-effort)
+    recEngine.recommend('next_step').then(setTopRec).catch(() => setTopRec(null));
     try {
       const [alertsRes, approvalsRes] = await Promise.all([
         supabase
@@ -132,6 +137,11 @@ export function CommandCenter({ onNavigate }: CommandCenterProps) {
           onApprovals={() => onNavigate('approvals')}
           onNotifications={() => onNavigate('notifications')}
         />
+      )}
+
+      {/* Cross-module Hermes recommendation */}
+      {topRec && (
+        <CrossModuleRecCard rec={topRec} onOpen={() => onNavigate('hermes-training')} />
       )}
 
       {/* Status row */}
@@ -494,6 +504,32 @@ function NeedsRayCard({
             </button>
           )}
         </div>
+      </div>
+    </OSCard>
+  );
+}
+
+function CrossModuleRecCard({ rec, onOpen }: { rec: NexusRecommendation; onOpen: () => void }) {
+  const confColor = rec.confidence === 'high' ? 'text-green-600' : rec.confidence === 'medium' ? 'text-amber-500' : 'text-slate-400';
+  return (
+    <OSCard className="border-2 border-[#5B7CFA]/30 bg-blue-50/20" onClick={onOpen}>
+      <div className="p-4 flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-[#5B7CFA]/10 flex items-center justify-center shrink-0">
+          <Brain className="w-5 h-5 text-[#5B7CFA]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-[10px] font-black text-[#5B7CFA] uppercase tracking-widest">Hermes Recommends</p>
+            <span className={`text-[10px] font-bold uppercase ${confColor}`}>{rec.confidence}</span>
+            {rec.approval_needed && <Badge label="Approval needed" variant="warn" />}
+          </div>
+          <p className="text-sm font-bold text-[#1A2244] mt-1">{rec.recommendation}</p>
+          <p className="text-xs text-slate-600 mt-0.5 line-clamp-2">{rec.why}</p>
+          <p className="text-[10px] text-slate-400 mt-1.5">
+            Next: {rec.next_action} · Sources: {rec.source_tables.length} tables · {timeAgo(rec.freshness)}
+          </p>
+        </div>
+        <ChevronRight className="w-4 h-4 text-slate-400 shrink-0 mt-1" />
       </div>
     </OSCard>
   );

@@ -3,6 +3,7 @@ import {
   Send, Loader2, Bot, User, AlertCircle, Info, ChevronRight, Sparkles,
 } from 'lucide-react';
 import { OSCard, Badge, timeAgo } from './shared';
+import { useNexusRecommendations } from './useNexusRecommendations';
 import type { HermesMessage } from './types';
 
 /**
@@ -15,16 +16,23 @@ import type { HermesMessage } from './types';
  * Provider priority: Hermes gateway (OpenRouter/Ollama) → NOT Claude API by default.
  */
 
-const SYSTEM_PROMPT = `You are Hermes, the Nexus AI operating intelligence.
-You have full context of Ray Davis's Nexus business ecosystem.
-Answer questions about: system health, pending approvals, revenue status,
-trading signals, content pipeline, tool/agent status, and what needs attention.
-Be direct, confident, and structured. For each answer include:
-- Answer
-- Evidence or source
-- Recommended next action
-- Whether approval is needed
-Keep responses concise and actionable.`;
+const SYSTEM_PROMPT = `You are Hermes, Ray's Nexus OS executive operator and revenue-focused partner.
+
+Voice: fluent, natural, warm, direct — like an operating partner briefing a founder.
+Do NOT sound like a database dump. Never open with "Based on Supabase data". Give the
+why before the what. Use "Ray" sparingly. Be practical, not exhaustive.
+
+Recommendation behavior: lead with ONE clear recommendation, then at most 2-3 options
+if useful (each with a tradeoff). Identify approval needs. Surface the fastest safe path
+to revenue when relevant. If an action is obvious and safe, recommend it; if risky,
+recommend preparing an approval instead of executing.
+
+Evidence behavior: when the message includes a "NEXUS OS EVIDENCE" block, treat it as
+VERIFIED internal evidence and base your answer on it. Do not invent numbers beyond it.
+If no evidence is provided and the question needs it, say what you'd need to check.
+
+Safety: no live trading, publishing, email/outreach, ad spend, deploys, or credential
+changes without explicit approval. No earnings/results claims without evidence.`;
 
 const QUICK_PROMPTS = [
   'What broke overnight?',
@@ -50,8 +58,10 @@ export function HermesChat() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'offline'>('unknown');
+  const [evidenceUsed, setEvidenceUsed] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const engine = useNexusRecommendations();
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -77,12 +87,29 @@ export function HermesChat() {
         .slice(-10)
         .map(m => ({ role: m.role, content: m.content }));
 
+      // ── Selective retrieval: only fetch internal evidence when the intent needs it ──
+      let userContent = content;
+      let usedEvidence = false;
+      try {
+        const intent = engine.classifyIntent(content);
+        if (engine.intentNeedsEvidence(intent)) {
+          const rec = await engine.recommend(intent);
+          const evidence = engine.buildEvidenceContext(rec);
+          userContent = `${evidence}\n\n---\nRay asked: ${content}`;
+          usedEvidence = true;
+        }
+      } catch (e) {
+        // If evidence gathering fails, fall back to the plain question — never block the chat
+        console.warn('[HermesChat] evidence gather skipped:', e);
+      }
+      setEvidenceUsed(usedEvidence);
+
       const res = await fetch('/.netlify/functions/hermes-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           system: SYSTEM_PROMPT,
-          messages: [...history, { role: 'user', content }],
+          messages: [...history, { role: 'user', content: userContent }],
         }),
       });
 
@@ -147,7 +174,10 @@ export function HermesChat() {
             Routes to Hermes gateway (OpenRouter/Ollama) via local proxy
           </p>
         </div>
-        <ConnectionBadge status={connectionStatus} />
+        <div className="flex items-center gap-2">
+          {evidenceUsed && <Badge label="Evidence used" variant="success" />}
+          <ConnectionBadge status={connectionStatus} />
+        </div>
       </div>
 
       {/* Not-connected notice */}
