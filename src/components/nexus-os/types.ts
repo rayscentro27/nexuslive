@@ -226,6 +226,63 @@ export interface ContentRecommendation {
   freshness: string;
 }
 
+// ── Knowledge Graph types ────────────────────────────────────────────────────
+
+export type GraphEntityType =
+  | 'source' | 'artifact' | 'revenue_campaign' | 'content_item' | 'approval'
+  | 'notification' | 'decision' | 'lesson' | 'tool' | 'provider'
+  | 'trading_strategy' | 'transcript' | 'repo_reference'
+  // legacy values still valid
+  | 'task' | 'agent' | 'workflow' | 'skill' | 'rule' | 'client' | 'campaign'
+  | 'blocker' | 'failure' | 'metric' | 'output' | 'prompt' | 'sop';
+
+export type GraphRelationshipType =
+  | 'derived_from' | 'supports' | 'blocks' | 'related_to' | 'created_content_for'
+  | 'requires_approval' | 'approved_by' | 'resulted_in' | 'learned_from'
+  | 'references' | 'belongs_to_campaign' | 'generated_from_source'
+  | 'recommended_by_hermes'
+  // legacy values still valid
+  | 'produced_by' | 'belongs_to' | 'depends_on' | 'blocked_by' | 'tested_by'
+  | 'improves' | 'replaces' | 'contradicts' | 'deployed_to';
+
+export interface GraphEntity {
+  id: string;
+  type: GraphEntityType;
+  name: string;
+  title?: string | null;
+  description?: string | null;
+  summary?: string | null;
+  source_table?: string | null;
+  source_id?: string | null;
+  status?: string | null;
+  confidence?: number | null;
+  archived: boolean;
+  metadata: Record<string, unknown>;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GraphRelationship {
+  id: string;
+  from_entity_id: string;
+  to_entity_id: string;
+  relationship: GraphRelationshipType;
+  weight?: number | null;
+  evidence_summary?: string | null;
+  source_table?: string | null;
+  source_id?: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface GraphSyncResult {
+  table: string;
+  created: number;
+  skipped: number;
+  relationships_created: number;
+}
+
 export type OsSection =
   | 'command-center'
   | 'hermes-chat'
@@ -236,4 +293,5 @@ export type OsSection =
   | 'revenue'
   | 'content'
   | 'trading'
-  | 'knowledge';
+  | 'knowledge'
+  | 'graph';

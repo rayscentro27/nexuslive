@@ -31,6 +31,12 @@ export interface NexusRecommendation {
   confidence: 'high' | 'medium' | 'low';
   source_tables: string[];
   freshness: string;
+  // ── graph context (optional; graceful fallback when graph is empty) ──
+  graph_context_used?: boolean;
+  related_sources_count?: number;
+  related_content_count?: number;
+  related_approvals_count?: number;
+  relationship_summary?: string;
 }
 
 // ── Intent classification (keyword rules, no LLM) ──────────────────────────────
@@ -91,6 +97,50 @@ export function useNexusRecommendations() {
       content: (contentRes.data ?? []) as ContentItem[],
       approvals: approvalsRes.data ?? [],
     };
+  }, []);
+
+  // Enrich a recommendation with graph context for a specific source row.
+  // Graceful: if the graph is empty or the entity isn't synced, returns unchanged.
+  const enrichWithGraph = useCallback(async (
+    rec: NexusRecommendation,
+    sourceTable: string,
+    sourceId: string,
+  ): Promise<NexusRecommendation> => {
+    try {
+      const { data: ent } = await supabase
+        .from('nexus_os_entities')
+        .select('id')
+        .eq('source_table', sourceTable)
+        .eq('source_id', sourceId)
+        .maybeSingle();
+      if (!ent) return rec; // not synced to graph yet — fall back silently
+
+      const entId = (ent as { id: string }).id;
+      const [outRes, inRes] = await Promise.all([
+        supabase.from('nexus_os_relationships').select('relationship,to_entity_id').eq('from_entity_id', entId),
+        supabase.from('nexus_os_relationships').select('relationship,from_entity_id').eq('to_entity_id', entId),
+      ]);
+      const out = outRes.data ?? [];
+      const inc = inRes.data ?? [];
+      const all = [...out, ...inc];
+      if (all.length === 0) return rec;
+
+      const sources = all.filter(r => r.relationship === 'generated_from_source' || r.relationship === 'derived_from').length;
+      const contentLinks = out.filter(r => r.relationship === 'belongs_to_campaign').length
+        + inc.filter(r => r.relationship === 'belongs_to_campaign').length;
+      const approvals = all.filter(r => r.relationship === 'requires_approval' || r.relationship === 'approved_by').length;
+
+      return {
+        ...rec,
+        graph_context_used: true,
+        related_sources_count: sources,
+        related_content_count: contentLinks,
+        related_approvals_count: approvals,
+        relationship_summary: `${all.length} graph link(s): ${sources} source, ${contentLinks} content, ${approvals} approval.`,
+      };
+    } catch {
+      return rec;
+    }
   }, []);
 
   // Build the structured recommendation for a given intent
@@ -212,7 +262,7 @@ export function useNexusRecommendations() {
     else if (top.contentCount === 0) next_action = `Draft 3 content pieces for ${c.program_name} (LinkedIn, YouTube Short, newsletter).`;
     else { next_action = `Request approval to publish ${c.program_name} content.`; approval_needed = true; }
 
-    return {
+    const baseRec: NexusRecommendation = {
       title: intent === 'revenue_recommendation' ? 'Next Revenue Move' : 'Highest-Impact Next Step',
       recommendation: `${c.program_name} is the strongest next move${blockers.length ? `, but it is blocked by: ${blockers[0]}` : ' — it is ready to push'}.`,
       why: `${c.program_name} is a ${c.priority}-priority ${c.niche} campaign at ${top.score}% launch readiness with ${top.contentCount} linked content item(s). It's the closest safe path to revenue.`,
@@ -224,7 +274,10 @@ export function useNexusRecommendations() {
       source_tables: ['nexus_os_revenue_campaigns', 'nexus_os_content_items', 'owner_approval_queue'],
       freshness: now,
     };
-  }, [gather]);
+
+    // Enrich with graph context if this campaign is synced to the graph (graceful fallback)
+    return enrichWithGraph(baseRec, 'nexus_os_revenue_campaigns', c.id);
+  }, [gather, enrichWithGraph]);
 
   // Build a concise evidence string to hand to Hermes (no raw rows, no secrets)
   const buildEvidenceContext = useCallback((rec: NexusRecommendation): string => {
@@ -239,12 +292,15 @@ export function useNexusRecommendations() {
       `- Approval needed: ${rec.approval_needed ? 'yes' : 'no'}`,
       `- Confidence: ${rec.confidence}`,
       `- Sources: ${rec.source_tables.join(', ')}`,
+      rec.graph_context_used
+        ? `- Graph context: ${rec.relationship_summary} (${rec.related_sources_count} sources, ${rec.related_content_count} content, ${rec.related_approvals_count} approvals linked in the knowledge graph)`
+        : `- Graph context: none yet (entity not synced to knowledge graph)`,
       ``,
       `Use this as VERIFIED internal evidence. Answer in the Hermes Nexus voice: lead with the recommendation, give the why, name the blocker, state if approval is needed. Do not dump rows. Do not mention "Supabase data". Do not invent numbers beyond this evidence.`,
     ].join('\n');
   }, []);
 
-  return { recommend, classifyIntent, intentNeedsEvidence, buildEvidenceContext, gather };
+  return { recommend, classifyIntent, intentNeedsEvidence, buildEvidenceContext, gather, enrichWithGraph };
 }
 
 // ── helper ────────────────────────────────────────────────────────────────────

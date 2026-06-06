@@ -8,7 +8,7 @@
 import React, { useState } from 'react';
 import {
   Home, MessageSquare, CheckCircle2, Bell, Cpu,
-  DollarSign, Video, TrendingUp, BookOpen, ChevronRight, Brain,
+  DollarSign, Video, TrendingUp, BookOpen, ChevronRight, Brain, Network,
 } from 'lucide-react';
 import { CommandCenter } from '../nexus-os/CommandCenter';
 import { HermesChat } from '../nexus-os/HermesChat';
@@ -20,6 +20,7 @@ import { RevenueHub } from '../nexus-os/RevenueHub';
 import { ContentStudio } from '../nexus-os/ContentStudio';
 import { TradingOps } from '../nexus-os/TradingOps';
 import { ArtifactHub } from '../nexus-os/ArtifactHub';
+import { KnowledgeGraph } from '../nexus-os/KnowledgeGraph';
 import type { OsSection } from '../nexus-os/types';
 
 interface NavItem {
@@ -40,6 +41,7 @@ const NAV: NavItem[] = [
   { id: 'content', label: 'Content Studio', icon: Video, description: 'Creative pipeline' },
   { id: 'trading', label: 'Trading Ops', icon: TrendingUp, description: 'Paper trading & signals' },
   { id: 'knowledge', label: 'Artifact Hub', icon: BookOpen, description: 'Knowledge & artifacts' },
+  { id: 'graph', label: 'Knowledge Graph', icon: Network, description: 'Entities & relationships' },
 ];
 
 export function NexusOS() {
@@ -57,6 +59,7 @@ export function NexusOS() {
       case 'content':        return <ContentStudio />;
       case 'trading':        return <TradingOps />;
       case 'knowledge':      return <ArtifactHub />;
+      case 'graph':          return <KnowledgeGraph />;
       default:               return null;
     }
   }
