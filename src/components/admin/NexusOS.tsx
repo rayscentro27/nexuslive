@@ -8,8 +8,10 @@
 import React, { useState } from 'react';
 import {
   Home, MessageSquare, CheckCircle2, Bell, Cpu,
-  DollarSign, Video, TrendingUp, BookOpen, ChevronRight, Brain, Network,
+  DollarSign, Video, TrendingUp, BookOpen, ChevronRight, Brain, Network, LayoutDashboard,
 } from 'lucide-react';
+import { NexusOverview } from '../nexus-os/NexusOverview';
+import { ThemeToggle } from '../nexus-os/ThemeToggle';
 import { CommandCenter } from '../nexus-os/CommandCenter';
 import { HermesChat } from '../nexus-os/HermesChat';
 import { HermesTraining } from '../nexus-os/HermesTraining';
@@ -31,6 +33,7 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard, description: 'Premium dashboard' },
   { id: 'command-center', label: 'Command Center', icon: Home, description: 'System status overview' },
   { id: 'hermes-chat', label: 'Hermes Chat', icon: MessageSquare, description: 'Talk to Nexus AI' },
   { id: 'hermes-training', label: 'Hermes Training', icon: Brain, description: 'Voice, skills & recommendations' },
@@ -45,10 +48,11 @@ const NAV: NavItem[] = [
 ];
 
 export function NexusOS() {
-  const [activeSection, setActiveSection] = useState<OsSection>('command-center');
+  const [activeSection, setActiveSection] = useState<OsSection>('overview');
 
   function renderSection() {
     switch (activeSection) {
+      case 'overview':       return <NexusOverview onNavigate={setActiveSection} />;
       case 'command-center': return <CommandCenter onNavigate={setActiveSection} />;
       case 'hermes-chat':    return <HermesChat />;
       case 'hermes-training': return <HermesTraining />;
@@ -67,17 +71,17 @@ export function NexusOS() {
   const active = NAV.find(n => n.id === activeSection)!;
 
   return (
-    <div className="flex h-full min-h-[600px]" style={{ background: '#f4f5fb' }}>
+    <div className="flex h-full min-h-[600px] nexus-canvas">
       {/* Sidebar nav — hidden on small screens */}
-      <aside className="hidden md:flex flex-col w-52 shrink-0 bg-white border-r border-slate-200 py-4 gap-0.5">
-        <div className="px-4 pb-3 border-b border-slate-100 mb-1">
+      <aside className="hidden md:flex flex-col w-52 shrink-0 py-4 gap-0.5" style={{ background: 'var(--nexus-bg-soft)', borderRight: '1px solid var(--nexus-border)' }}>
+        <div className="px-4 pb-3 mb-1" style={{ borderBottom: '1px solid var(--nexus-border)' }}>
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-[#5B7CFA] flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center nexus-accent-grad">
               <Home className="w-3.5 h-3.5 text-white" />
             </div>
             <div>
-              <p className="text-[11px] font-black text-[#1A2244] leading-none">NEXUS OS</p>
-              <p className="text-[9px] text-slate-400 mt-0.5">Unified Control Layer</p>
+              <p className="text-[11px] font-black leading-none nexus-ink">NEXUS OS</p>
+              <p className="text-[9px] nexus-muted mt-0.5">Unified Control Layer</p>
             </div>
           </div>
         </div>
@@ -88,19 +92,16 @@ export function NexusOS() {
             <button
               key={item.id}
               onClick={() => setActiveSection(item.id)}
-              className={`mx-2 flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all group ${
-                isActive
-                  ? 'bg-[#5B7CFA] text-white shadow-sm shadow-blue-500/20'
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
+              className="mx-2 flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all"
+              style={isActive
+                ? { backgroundImage: 'linear-gradient(135deg, var(--nexus-purple), var(--nexus-blue))', color: '#fff' }
+                : { color: 'var(--nexus-text-muted)' }}
             >
-              <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-[#5B7CFA]'}`} />
+              <Icon className="w-4 h-4 shrink-0" style={{ color: isActive ? '#fff' : 'var(--nexus-text-muted)' }} />
               <div className="flex-1 min-w-0">
-                <p className={`text-[11px] font-bold truncate ${isActive ? 'text-white' : 'text-[#1A2244]'}`}>
-                  {item.label}
-                </p>
+                <p className="text-[11px] font-bold truncate" style={{ color: isActive ? '#fff' : 'var(--nexus-text)' }}>{item.label}</p>
               </div>
-              {isActive && <ChevronRight className="w-3 h-3 text-white/70 shrink-0" />}
+              {isActive && <ChevronRight className="w-3 h-3 shrink-0" style={{ color: 'rgba(255,255,255,0.7)' }} />}
             </button>
           );
         })}
@@ -109,7 +110,7 @@ export function NexusOS() {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile top nav */}
-        <div className="md:hidden flex overflow-x-auto gap-1.5 px-4 py-2 bg-white border-b border-slate-200 scrollbar-hide">
+        <div className="md:hidden flex overflow-x-auto gap-1.5 px-4 py-2 scrollbar-hide" style={{ background: 'var(--nexus-bg-soft)', borderBottom: '1px solid var(--nexus-border)' }}>
           {NAV.map(item => {
             const Icon = item.icon;
             const isActive = activeSection === item.id;
@@ -117,11 +118,10 @@ export function NexusOS() {
               <button
                 key={item.id}
                 onClick={() => setActiveSection(item.id)}
-                className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all ${
-                  isActive
-                    ? 'bg-[#5B7CFA] text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
+                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold whitespace-nowrap transition-all"
+                style={isActive
+                  ? { backgroundImage: 'linear-gradient(135deg, var(--nexus-purple), var(--nexus-blue))', color: '#fff' }
+                  : { background: 'var(--nexus-surface-strong)', color: 'var(--nexus-text-muted)', border: '1px solid var(--nexus-border)' }}
               >
                 <Icon className="w-3 h-3" />
                 {item.label}
@@ -130,12 +130,13 @@ export function NexusOS() {
           })}
         </div>
 
-        {/* Breadcrumb */}
-        <div className="px-6 py-3 flex items-center gap-2 bg-white border-b border-slate-100">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nexus OS</p>
-          <ChevronRight className="w-3 h-3 text-slate-300" />
-          <p className="text-[10px] font-black text-[#1A2244] uppercase tracking-widest">{active.label}</p>
-          <span className="text-[10px] text-slate-400 ml-1">— {active.description}</span>
+        {/* Breadcrumb + theme toggle */}
+        <div className="px-6 py-3 flex items-center gap-2" style={{ background: 'var(--nexus-bg-soft)', borderBottom: '1px solid var(--nexus-border)' }}>
+          <p className="text-[10px] font-black uppercase tracking-widest nexus-muted">Nexus OS</p>
+          <ChevronRight className="w-3 h-3 nexus-muted" />
+          <p className="text-[10px] font-black uppercase tracking-widest nexus-ink">{active.label}</p>
+          <span className="text-[10px] nexus-muted ml-1 hidden sm:inline">— {active.description}</span>
+          <div className="ml-auto"><ThemeToggle /></div>
         </div>
 
         {/* Section content — centered, max-width 1280px so widgets never stretch edge-to-edge */}

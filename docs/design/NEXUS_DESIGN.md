@@ -74,3 +74,13 @@ No random margins — use the wrappers (`NexusPage`, `NexusSection`, `WidgetGrid
 - [ ] Mobile: single column, no unintended horizontal scroll.
 - [ ] Safety/locked status visible but not alarmist.
 - [ ] No business logic, CRUD, chat, or approval flow changed.
+
+## Theme System (dark default + light)
+- Tokens live in `src/index.css` as CSS variables: `:root`/`[data-nexus-theme="dark"]` (default) and `[data-nexus-theme="light"]`.
+- `useTheme` (src/components/nexus-os/useTheme.ts) reads/writes `localStorage["nexus-os-theme"]`, applies `data-nexus-theme` to `<html>`, defaults to dark, restores on load.
+- `ThemeToggle` lives in the Nexus OS breadcrumb bar.
+- Layout is identical between themes — only color tokens change.
+- Token-driven primitives: `.nexus-canvas`, `.nexus-glass`, `.nexus-glass-strong`, `.nexus-ink`, `.nexus-muted`, `.nexus-accent-grad`, `.nexus-accent-text`.
+- Premium dark: deep navy `#050816`, glassy translucent surfaces, blue/purple accents.
+- Light: soft off-white `#f6f8fb`, frosted white cards, same accents, dark text.
+- The Overview dashboard + shell chrome (sidebar/breadcrumb/mobile-nav) are fully tokenized. Existing module pages keep white cards (readable in both themes; render as elevated widgets on the dark canvas) — full per-module token recolor is a future incremental pass.

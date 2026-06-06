@@ -20,6 +20,66 @@
   --color-nexus-950: #1A2244;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   NEXUS OS THEME TOKENS — dark (default) + light. Drives the Overview
+   dashboard + shell chrome. Toggle persists in localStorage via useTheme.
+   ───────────────────────────────────────────────────────────────────────── */
+:root, [data-nexus-theme="dark"] {
+  --nexus-bg: #050816;
+  --nexus-bg-soft: #080d1f;
+  --nexus-surface: rgba(15, 23, 42, 0.72);
+  --nexus-surface-strong: rgba(17, 24, 39, 0.92);
+  --nexus-border: rgba(148, 163, 184, 0.16);
+  --nexus-text: #f8fafc;
+  --nexus-text-muted: #94a3b8;
+  --nexus-purple: #7c3aed;
+  --nexus-blue: #3b82f6;
+  --nexus-cyan: #06b6d4;
+  --nexus-success: #22c55e;
+  --nexus-warning: #f59e0b;
+  --nexus-danger: #ef4444;
+  --nexus-glow: 0 0 0 1px rgba(124,58,237,0.10), 0 18px 48px -12px rgba(59,130,246,0.28);
+}
+[data-nexus-theme="light"] {
+  --nexus-bg: #f6f8fb;
+  --nexus-bg-soft: #eef2f7;
+  --nexus-surface: rgba(255, 255, 255, 0.88);
+  --nexus-surface-strong: #ffffff;
+  --nexus-border: rgba(15, 23, 42, 0.10);
+  --nexus-text: #0f172a;
+  --nexus-text-muted: #64748b;
+  --nexus-purple: #7c3aed;
+  --nexus-blue: #3b82f6;
+  --nexus-cyan: #06b6d4;
+  --nexus-success: #16a34a;
+  --nexus-warning: #d97706;
+  --nexus-danger: #dc2626;
+  --nexus-glow: 0 1px 3px rgba(15,23,42,0.06), 0 16px 40px -16px rgba(59,130,246,0.18);
+}
+
+/* Nexus OS premium primitives (token-driven, theme-aware) */
+.nexus-canvas { background: var(--nexus-bg); color: var(--nexus-text); }
+.nexus-glass {
+  background: var(--nexus-surface);
+  border: 1px solid var(--nexus-border);
+  border-radius: 20px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: var(--nexus-glow);
+}
+.nexus-glass-strong {
+  background: var(--nexus-surface-strong);
+  border: 1px solid var(--nexus-border);
+  border-radius: 20px;
+}
+.nexus-ink { color: var(--nexus-text); }
+.nexus-muted { color: var(--nexus-text-muted); }
+.nexus-accent-grad { background: linear-gradient(135deg, var(--nexus-purple), var(--nexus-blue)); }
+.nexus-accent-text {
+  background: linear-gradient(135deg, var(--nexus-purple), var(--nexus-cyan));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
 @layer base {
   body {
     margin: 0;

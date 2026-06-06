@@ -284,6 +284,7 @@ export interface GraphSyncResult {
 }
 
 export type OsSection =
+  | 'overview'
   | 'command-center'
   | 'hermes-chat'
   | 'hermes-training'
