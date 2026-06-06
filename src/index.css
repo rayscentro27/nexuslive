@@ -80,6 +80,45 @@
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   DARK-THEME MODULE RECOLOR (scoped to Nexus OS shell only).
+   Recolors the 11 module internals via the exact Tailwind utilities they use,
+   as surface+text PAIRS so nothing goes dark-on-dark. Only applies in dark
+   theme and only inside .nexus-canvas (client portal + light mode untouched).
+   Inputs (.input-base / inline-styled textarea) keep their own light bg + dark
+   text and are intentionally not overridden here.
+   ───────────────────────────────────────────────────────────────────────── */
+[data-nexus-theme="dark"] .nexus-canvas .bg-white {
+  background-color: var(--nexus-surface-strong) !important;
+}
+[data-nexus-theme="dark"] .nexus-canvas .bg-slate-50,
+[data-nexus-theme="dark"] .nexus-canvas .bg-slate-50\/50,
+[data-nexus-theme="dark"] .nexus-canvas .bg-slate-100 {
+  background-color: rgba(148, 163, 184, 0.08) !important;
+}
+[data-nexus-theme="dark"] .nexus-canvas .text-\[\#1A2244\],
+[data-nexus-theme="dark"] .nexus-canvas .text-\[\#1a2244\],
+[data-nexus-theme="dark"] .nexus-canvas .text-slate-900,
+[data-nexus-theme="dark"] .nexus-canvas .text-slate-800,
+[data-nexus-theme="dark"] .nexus-canvas .text-slate-700 {
+  color: var(--nexus-text) !important;
+}
+[data-nexus-theme="dark"] .nexus-canvas .text-slate-600,
+[data-nexus-theme="dark"] .nexus-canvas .text-slate-500,
+[data-nexus-theme="dark"] .nexus-canvas .text-slate-400 {
+  color: var(--nexus-text-muted) !important;
+}
+[data-nexus-theme="dark"] .nexus-canvas .border-slate-200,
+[data-nexus-theme="dark"] .nexus-canvas .border-slate-100,
+[data-nexus-theme="dark"] .nexus-canvas .border-slate-100\/50 {
+  border-color: var(--nexus-border) !important;
+}
+/* Keep the .input-base form fields light with dark text even inside dark canvas */
+[data-nexus-theme="dark"] .nexus-canvas .input-base {
+  background-color: #f8fafc !important;
+  color: #1a2244 !important;
+}
+
 @layer base {
   body {
     margin: 0;

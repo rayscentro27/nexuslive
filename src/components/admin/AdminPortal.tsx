@@ -134,7 +134,8 @@ export function AdminPortal() {
         </div>
       </main>
 
-      <AdminBottomDock activeTab={activeTab} setActiveTab={setActiveTab} />
+      {/* Nexus OS has its own premium glass dock — hide the admin emoji dock there to avoid a double dock */}
+      {activeTab !== 'nexus-os' && <AdminBottomDock activeTab={activeTab} setActiveTab={setActiveTab} />}
     </div>
   );
 }

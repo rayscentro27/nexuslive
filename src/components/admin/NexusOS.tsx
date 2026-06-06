@@ -11,6 +11,7 @@ import {
   DollarSign, Video, TrendingUp, BookOpen, ChevronRight, Brain, Network, LayoutDashboard,
 } from 'lucide-react';
 import { NexusOverview } from '../nexus-os/NexusOverview';
+import { NexusDock } from '../nexus-os/NexusDock';
 import { ThemeToggle } from '../nexus-os/ThemeToggle';
 import { CommandCenter } from '../nexus-os/CommandCenter';
 import { HermesChat } from '../nexus-os/HermesChat';
@@ -139,13 +140,17 @@ export function NexusOS() {
           <div className="ml-auto"><ThemeToggle /></div>
         </div>
 
-        {/* Section content — centered, max-width 1280px so widgets never stretch edge-to-edge */}
+        {/* Section content — centered, max-width 1280px so widgets never stretch edge-to-edge.
+            pb-32 clears the premium bottom dock. */}
         <div className="flex-1 overflow-y-auto">
-          <div className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-24">
+          <div className="w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-32">
             {renderSection()}
           </div>
         </div>
       </div>
+
+      {/* Premium glass section dock */}
+      <NexusDock active={activeSection} onNavigate={setActiveSection} />
     </div>
   );
 }
