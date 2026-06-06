@@ -31,6 +31,7 @@ export interface NexusRecommendation {
   confidence: 'high' | 'medium' | 'low';
   source_tables: string[];
   freshness: string;
+  roster?: string;   // compact campaign roster (names + readiness + content) for specific Q&A
   // ── graph context (optional; graceful fallback when graph is empty) ──
   graph_context_used?: boolean;
   related_sources_count?: number;
@@ -44,10 +45,14 @@ export interface NexusRecommendation {
 export function classifyIntent(prompt: string): RecIntent {
   const p = prompt.toLowerCase();
   if (/\b(approv|review today|sign off|pending)\b/.test(p)) return 'approval_summary';
-  if (/\b(block|stuck|blocked|why can.?t|what.?s stopping)\b/.test(p)) return 'blocker_diagnosis';
-  if (/\b(money|revenue|earn|monetize|income|paying|profit|cash)\b/.test(p)) return 'revenue_recommendation';
-  if (/\b(content|post|draft|publish|video|newsletter|linkedin|youtube)\b/.test(p)) return 'content_recommendation';
-  if (/\b(next|today|what should|priorit|focus|do now)\b/.test(p)) return 'next_step';
+  if (/\b(block|stuck|blocked|why can.?t|what.?s stopping|publish[- ]?ready|not ready|ready to publish)\b/.test(p)) return 'blocker_diagnosis';
+  // Content questions (incl. "what content is linked to X")
+  if (/\b(content|post|draft|publish|video|newsletter|linkedin|youtube|tiktok|reel|script|linked to)\b/.test(p)) return 'content_recommendation';
+  // Revenue/campaign questions — incl. named starter programs and "do we have / ready / status"
+  if (/\b(money|revenue|earn|monetize|income|paying|profit|cash|campaign|nav|beehiiv|legalzoom|paydex|affiliate|program|offer|do we have|ready)\b/.test(p)) return 'revenue_recommendation';
+  // Graph questions route to next_step (which enriches with graph context)
+  if (/\b(graph|entit|relationship|knowledge graph|connected|links?)\b/.test(p)) return 'next_step';
+  if (/\b(next|today|what should|priorit|focus|do now|status|overview|summar)\b/.test(p)) return 'next_step';
   return 'general';
 }
 
@@ -181,6 +186,13 @@ export function useNexusRecommendations() {
 
     const top = ranked[0] ?? null;
 
+    // Compact campaign roster (names + readiness + content + status) so specific
+    // questions like "do we have Nav ready?" / "what content is linked to Nav?"
+    // can be answered precisely from VERIFIED Nexus data.
+    const roster = ranked.slice(0, 6)
+      .map(r => `${r.c.program_name} [${r.score}% ready, ${r.contentCount} content, ${r.c.application_status}]`)
+      .join('; ');
+
     // ── Content recommendation ──
     if (intent === 'content_recommendation') {
       // Highest-priority campaign with the least content
@@ -207,6 +219,7 @@ export function useNexusRecommendations() {
         confidence: blockers.length <= 1 ? 'high' : 'medium',
         source_tables: ['nexus_os_revenue_campaigns', 'nexus_os_content_items'],
         freshness: now,
+        roster,
       };
     }
 
@@ -273,6 +286,7 @@ export function useNexusRecommendations() {
       confidence: blockers.length <= 1 ? 'high' : blockers.length <= 2 ? 'medium' : 'low',
       source_tables: ['nexus_os_revenue_campaigns', 'nexus_os_content_items', 'owner_approval_queue'],
       freshness: now,
+      roster,
     };
 
     // Enrich with graph context if this campaign is synced to the graph (graceful fallback)
@@ -289,6 +303,7 @@ export function useNexusRecommendations() {
       `- Recommendation: ${cap(rec.recommendation, 300)}`,
       `- Reasoning: ${cap(rec.why, 320)}`,
       `- Evidence: ${cap(rec.evidence_summary, 300)}`,
+      rec.roster ? `- Campaigns (VERIFIED from Revenue Hub): ${cap(rec.roster, 420)}` : '',
       rec.blockers.length ? `- Blockers: ${cap(rec.blockers.slice(0, 4).join('; '), 300)}` : `- Blockers: none`,
       `- Next action: ${cap(rec.next_action, 200)}`,
       `- Approval needed: ${rec.approval_needed ? 'yes' : 'no'} · Confidence: ${rec.confidence}`,
@@ -299,7 +314,7 @@ export function useNexusRecommendations() {
       `Treat as VERIFIED internal evidence. Answer in the Hermes voice: recommendation first, then why, then blocker, then approval. No raw rows, no "Supabase", no invented numbers.`,
     ].join('\n');
     // Hard ceiling so a recommendation request never balloons the context budget.
-    return block.length > 1800 ? block.slice(0, 1799) + '…' : block;
+    return block.length > 2400 ? block.slice(0, 2399) + '…' : block;
   }, []);
 
   return { recommend, classifyIntent, intentNeedsEvidence, buildEvidenceContext, gather, enrichWithGraph };
