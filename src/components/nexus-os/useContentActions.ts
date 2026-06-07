@@ -9,7 +9,7 @@
  *   - Risky publishing actions insert into owner_approval_queue only.
  *   - Affiliate CTAs require disclosure_added=true before requestApproval.
  */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useApprovalNotifier } from './useApprovalNotifier';
 import type { ContentItem, ContentItemFormData, ContentSource, ContentRecommendation, RevenueCampaign } from './types';
@@ -340,7 +340,9 @@ export function useContentActions() {
     return approvalId;
   }, [notify]);
 
-  return {
+  // Memoized so consumers' useEffect/useCallback deps stay stable (prevents
+  // an infinite re-fetch loop that left Content Studio stuck on the spinner).
+  return useMemo(() => ({
     fetchItems,
     fetchSources,
     fetchCampaigns,
@@ -351,5 +353,5 @@ export function useContentActions() {
     requestApproval,
     buildContentRecommendation,
     scoreContentItem,
-  };
+  }), [fetchItems, fetchSources, fetchCampaigns, createItem, updateItem, archiveItem, createSource, requestApproval]);
 }

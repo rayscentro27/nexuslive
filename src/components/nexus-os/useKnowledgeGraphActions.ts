@@ -9,7 +9,7 @@
  *     (from,to,relationship) on edges.
  *   - No external data import, no scraping, no executors.
  */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { GraphEntity, GraphRelationship, GraphSyncResult, GraphEntityType, GraphRelationshipType } from './types';
 
@@ -328,12 +328,13 @@ export function useKnowledgeGraphActions() {
     };
   }, [fetchEntities]);
 
-  return {
+  // Memoized so consumer effects don't re-fetch every render (stuck-spinner fix).
+  return useMemo(() => ({
     fetchEntities, fetchRelationships,
     createEntity, updateEntity, archiveEntity,
     createRelationship, deleteRelationship, linkEntities,
     findEntityBySource, ensureEntity,
     syncCampaigns, syncContent, syncSources, syncApprovals,
     getGraphForEntity, findOrphans,
-  };
+  }), [fetchEntities, fetchRelationships, createEntity, updateEntity, archiveEntity, createRelationship, deleteRelationship, linkEntities, findEntityBySource, ensureEntity, syncCampaigns, syncContent, syncSources, syncApprovals, getGraphForEntity, findOrphans]);
 }

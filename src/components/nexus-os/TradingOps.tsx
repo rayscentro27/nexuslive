@@ -32,9 +32,16 @@ interface TradingStatusData {
   signal_review_tail?: string[];
 }
 
+interface RankedStrategy {
+  id: string; source_channel?: string | null; strategy_text?: string | null;
+  rank_score?: number | null; instruments?: string | null; paper_tested?: boolean | null;
+}
+
 export function TradingOps() {
   const [status, setStatus] = useState<TradingStatusData | null>(null);
   const [paperTrades, setPaperTrades] = useState<PaperTrade[]>([]);
+  const [strategies, setStrategies] = useState<RankedStrategy[]>([]);
+  const [strategyCount, setStrategyCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -59,6 +66,17 @@ export function TradingOps() {
         .order('entry_date', { ascending: false })
         .limit(20);
       if (data) setPaperTrades(data as unknown as PaperTrade[]);
+    } catch (_) {}
+
+    // Read-only: Ray's stored strategy library (ranked_strategies)
+    try {
+      const { data, count } = await supabase
+        .from('ranked_strategies')
+        .select('id,source_channel,strategy_text,rank_score,instruments,paper_tested', { count: 'exact' })
+        .order('rank_score', { ascending: false })
+        .limit(8);
+      if (data) setStrategies(data as RankedStrategy[]);
+      if (typeof count === 'number') setStrategyCount(count);
     } catch (_) {}
 
     setLoading(false);
@@ -240,10 +258,52 @@ export function TradingOps() {
         <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2">
           <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
           <p className="text-[10px] text-amber-700 font-medium">
-            API key in trading_config.json is labeled ROTATE_THIS_KEY. Rotate before any real use.
-            Do not enable live_trading without a full review and explicit approval.
+            API key in trading_config.json is labeled ROTATE_THIS_KEY (placeholder) — broker connect
+            fails until a practice key is set. Receiver stays down (demo only, no live risk). Rotate
+            before any real use. Do not enable live_trading without a full review and explicit approval.
           </p>
         </div>
+      </OSSection>
+
+      {/* Strategy Library (read-only) — Ray's stored ranked strategies */}
+      <OSSection title="Strategy Library" icon={BarChart3} action={
+        strategyCount !== null ? <Badge label={`${strategyCount} stored`} variant="info" /> : undefined
+      }>
+        {loading ? <LoadingRow /> : strategies.length === 0 ? (
+          <EmptyState icon={BarChart3} message="No ranked strategies accessible" />
+        ) : (
+          <div className="space-y-2">
+            {strategies.map(s => (
+              <div key={s.id} className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center shrink-0">
+                  <span className="text-[10px] font-black text-purple-600">{s.rank_score != null ? Math.round(s.rank_score) : '—'}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-[#1A2244] truncate">{(s.strategy_text ?? 'Strategy').slice(0, 80)}</p>
+                  <p className="text-[10px] text-slate-400">{s.source_channel ?? 'unknown'}{s.instruments ? ` · ${s.instruments}` : ''}</p>
+                </div>
+                {s.paper_tested && <Badge label="paper tested" variant="success" />}
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="text-[10px] text-slate-400 mt-3 italic">
+          Read-only view of ranked_strategies. Top 8 by rank score. Research/paper only — no execution.
+        </p>
+      </OSSection>
+
+      {/* Vibe Trading status (read-only) */}
+      <OSSection title="Vibe Trading" icon={Activity}>
+        <div className="space-y-2">
+          <StatRow label="Installed" value="Yes (CLI + MCP in integrations/vibe_trading)" />
+          <StatRow label="Connected to Hermes" value="No — local/CLI only (integration planned)" />
+          <StatRow label="Mode" value="Research / backtest (education)" />
+          <StatRow label="Live execution" value="Disabled" color="green" />
+        </div>
+        <p className="text-[10px] text-slate-400 mt-3 italic">
+          Vibe Trading is installed locally for research/backtests; it is not wired into the live
+          Nexus OS trading flow. Strategies above are from Supabase ranked_strategies.
+        </p>
       </OSSection>
     </div>
   );

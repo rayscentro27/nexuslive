@@ -8,7 +8,7 @@
  *
  * Safety: read-only. Never executes, publishes, or schedules anything.
  */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { RevenueCampaign, ContentItem } from './types';
 
@@ -345,7 +345,9 @@ export function useNexusRecommendations() {
     return block.length > 2400 ? block.slice(0, 2399) + '…' : block;
   }, []);
 
-  return { recommend, classifyIntent, intentNeedsEvidence, buildEvidenceContext, gather, enrichWithGraph };
+  // Memoized so consumer effects don't re-run every render (stuck-spinner / loop fix).
+  return useMemo(() => ({ recommend, classifyIntent, intentNeedsEvidence, buildEvidenceContext, gather, enrichWithGraph }),
+    [recommend, buildEvidenceContext, gather, enrichWithGraph]);
 }
 
 // ── helper ────────────────────────────────────────────────────────────────────

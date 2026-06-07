@@ -2,7 +2,7 @@
 // Safe caching: static shell only.
 // NEVER cached: Supabase, auth endpoints, Stripe, API routes, Netlify functions.
 
-const CACHE_VERSION = 'nexus-v2';
+const CACHE_VERSION = 'nexus-v3';
 
 const NEVER_CACHE = [
   'supabase.co',

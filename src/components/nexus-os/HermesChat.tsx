@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  Send, Loader2, Bot, User, AlertCircle, Info, RefreshCw, Sparkles,
+  Send, Loader2, Bot, User, AlertCircle, Info, RefreshCw, Sparkles, Trash2,
 } from 'lucide-react';
 import { OSCard, Badge, StatusPill, timeAgo } from './shared';
 import { useNexusRecommendations } from './useNexusRecommendations';
@@ -45,16 +45,28 @@ const QUICK_PROMPTS = [
   'What content should we publish next?',
 ];
 
+const HISTORY_KEY = 'nexus-os-hermes-history';
+const WELCOME_MSG: HermesMessage = {
+  id: 'welcome',
+  role: 'assistant',
+  content:
+    "I'm Hermes, your Nexus OS intelligence layer. Ask me anything about system status, approvals, revenue, trading, or what needs your attention right now.",
+  timestamp: new Date().toISOString(),
+};
+
+// Load persisted history (role/content/timestamp only — no secrets, no raw evidence).
+function loadHistory(): HermesMessage[] {
+  try {
+    const raw = window.localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [WELCOME_MSG];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(-50);
+  } catch { /* ignore */ }
+  return [WELCOME_MSG];
+}
+
 export function HermesChat() {
-  const [messages, setMessages] = useState<HermesMessage[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content:
-        "I'm Hermes, your Nexus OS intelligence layer. Ask me anything about system status, approvals, revenue, trading, or what needs your attention right now.",
-      timestamp: new Date().toISOString(),
-    },
-  ]);
+  const [messages, setMessages] = useState<HermesMessage[]>(loadHistory);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [evidenceUsed, setEvidenceUsed] = useState(false);
@@ -88,6 +100,22 @@ export function HermesChat() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Persist chat history (last 50, safe fields only) so it survives section
+  // switches and refresh. Never wiped by health checks/retry/evidence changes.
+  useEffect(() => {
+    try {
+      const safe = messages.slice(-50).map(m => ({
+        id: m.id, role: m.role, content: m.content, timestamp: m.timestamp,
+      }));
+      window.localStorage.setItem(HISTORY_KEY, JSON.stringify(safe));
+    } catch { /* ignore quota errors */ }
+  }, [messages]);
+
+  function clearChat() {
+    setMessages([WELCOME_MSG]);
+    try { window.localStorage.removeItem(HISTORY_KEY); } catch { /* ignore */ }
+  }
 
   const lastSentRef = useRef<string>('');
 
@@ -216,6 +244,10 @@ export function HermesChat() {
           <button onClick={checkHealth} title="Retry connection"
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-500 text-[11px] font-bold hover:bg-slate-50 transition-all">
             <RefreshCw className={`w-3 h-3 ${health.status === 'checking' ? 'animate-spin' : ''}`} /> Retry
+          </button>
+          <button onClick={clearChat} title="Clear chat history"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-500 text-[11px] font-bold hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-all">
+            <Trash2 className="w-3 h-3" /> Clear
           </button>
         </div>
       </div>

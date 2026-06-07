@@ -9,7 +9,7 @@
  *   - Risky actions (publish, activate link, run ads) insert into owner_approval_queue
  *     and call the approval-notify Netlify function. Nothing executes.
  */
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../AuthProvider';
 import { useApprovalNotifier } from './useApprovalNotifier';
@@ -270,12 +270,14 @@ export function useCampaignActions() {
     return { inserted, skipped };
   }, []);
 
-  return {
+  // Memoized so consumers' deps stay stable (prevents the infinite re-fetch
+  // loop that left Revenue Hub stuck on the spinner).
+  return useMemo(() => ({
     fetchCampaigns,
     createCampaign,
     updateCampaign,
     archiveCampaign,
     requestApproval,
     seedStarterCampaigns,
-  };
+  }), [fetchCampaigns, createCampaign, updateCampaign, archiveCampaign, requestApproval, seedStarterCampaigns]);
 }
