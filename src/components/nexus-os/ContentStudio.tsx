@@ -86,6 +86,20 @@ export function ContentStudio() {
   const published = items.filter(i => i.status === 'published').length;
   const linkedCampaigns = new Set(items.filter(i => i.related_campaign_id).map(i => i.related_campaign_id)).size;
 
+  // ── Action Plan buckets — tells Ray exactly what to do, not just shows cards ──
+  const active = items.filter(i => !i.archived && i.status !== 'published');
+  const plan = {
+    readyToReview: active.filter(i => i.status === 'needs_review'),
+    needsDisclosure: active.filter(i => i.disclosure_required && !i.disclosure_added),
+    needsLink: active.filter(i => !i.related_campaign_id),
+    readyForApproval: active.filter(i => i.status === 'needs_review' && i.disclosure_added && i.related_campaign_id),
+    awaitingPublish: active.filter(i => i.status === 'approved' || i.status === 'approval_requested'),
+  };
+  // Strongest 3 by recommendation score, among items that still need review
+  const top3 = recommendations
+    .filter(r => { const it = items.find(x => x.id === r.item_id); return it && it.status === 'needs_review'; })
+    .slice(0, 3);
+
   async function handleSave(data: ContentItemFormData) {
     if (modal?.mode === 'create') {
       const created = await actions.createItem(data);
@@ -196,6 +210,47 @@ export function ContentStudio() {
         <MiniKPI label="Scheduled" value={scheduled} color="info" />
         <MiniKPI label="Published" value={published} color="green" />
       </div>
+
+      {/* Action Plan — tells Ray what to do, not just shows cards */}
+      {active.length > 0 && (
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap className="w-4 h-4 text-indigo-500" />
+            <h3 className="text-sm font-bold text-[#1A2244]">Content Studio Action Plan</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3 text-center">
+            {([
+              ['Ready to review', plan.readyToReview.length, 'text-amber-600'],
+              ['Needs disclosure', plan.needsDisclosure.length, 'text-red-600'],
+              ['Needs campaign link', plan.needsLink.length, 'text-red-600'],
+              ['Ready for approval', plan.readyForApproval.length, 'text-green-600'],
+              ['Awaiting publish', plan.awaitingPublish.length, 'text-blue-600'],
+            ] as Array<[string, number, string]>).map(([label, n, cls]) => (
+              <div key={label} className="rounded-lg bg-white border border-slate-100 py-2">
+                <p className={`text-lg font-black ${n ? cls : 'text-slate-300'}`}>{n}</p>
+                <p className="text-[10px] text-slate-500 leading-tight">{label}</p>
+              </div>
+            ))}
+          </div>
+          {top3.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Review these 3 first</p>
+              {top3.map((r, i) => (
+                <div key={r.item_id} className="flex items-start gap-2 text-xs">
+                  <span className="font-black text-indigo-400">{i + 1}</span>
+                  <div>
+                    <span className="font-semibold text-[#1A2244]">{r.item_title.slice(0, 60)}</span>
+                    <span className="text-slate-500"> — {r.next_action}</span>
+                  </div>
+                </div>
+              ))}
+              <p className="text-[10px] text-slate-400 mt-2 italic">
+                Nothing here is published or scheduled. Add disclosure, then use “Request Approval” on a card.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

@@ -149,6 +149,7 @@ export function HermesChat() {
         blocker_diagnosis: 'next_step',
         approval_summary: 'approvals',
         routing: 'tool_repo',
+        money_research: 'revenue',
         general: 'general',
       };
       let userContent = content;

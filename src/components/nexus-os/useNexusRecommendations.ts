@@ -19,6 +19,7 @@ export type RecIntent =
   | 'blocker_diagnosis'
   | 'approval_summary'
   | 'routing'
+  | 'money_research'
   | 'general';
 
 export interface NexusRecommendation {
@@ -67,6 +68,9 @@ export function classifyIntent(prompt: string): RecIntent {
   if (/\b(which|what|who)\b/.test(p) && /\b(tool|cli|repo|repository|agent|provider|model|process|service|owns?)\b/.test(p)) return 'routing';
   if (/\b(which ai|what ai|cheapest|route this|handle this task|requires? approval|safe to automate|owns the|own the)\b/.test(p)) return 'routing';
   if (/\b(approv|review today|sign off|pending)\b/.test(p)) return 'approval_summary';
+  // ── Money / research questions: what did we discover, what to monetize/publish,
+  // is recurring research running, what should I do today to make money ──
+  if (/\b(research|discover|discovered|opportunit|monetiz|make money|making money|recurring|next run|scout|topics? did|what did nexus|publish next|what should we publish|to make money)\b/.test(p)) return 'money_research';
   if (/\b(block|stuck|blocked|why can.?t|what.?s stopping|publish[- ]?ready|not ready|ready to publish)\b/.test(p)) return 'blocker_diagnosis';
   // Content questions (incl. "what content is linked to X")
   if (/\b(content|post|draft|publish|video|newsletter|linkedin|youtube|tiktok|reel|script|linked to)\b/.test(p)) return 'content_recommendation';
@@ -218,6 +222,41 @@ export function useNexusRecommendations() {
     };
   }, []);
 
+  // Read compact slices of the research pipeline + money loop (read-only).
+  // Proposed/draft = NOT approved/published — clearly labeled as such.
+  const gatherMoneyResearch = useCallback(async () => {
+    const [kiRes, seRes, wrRes, draftRes, campRes, apprRes] = await Promise.all([
+      supabase.from('knowledge_items')
+        .select('title,quality_score,quality_label,source_url,metadata,created_at')
+        .eq('domain', 'monetization').eq('status', 'proposed')
+        .order('quality_score', { ascending: false }).limit(8),
+      supabase.from('source_extractions')
+        .select('video_title,confidence_score,created_at', { count: 'exact', head: false })
+        .eq('scout_id', 'monetization_search_scout')
+        .order('created_at', { ascending: false }).limit(1),
+      supabase.from('worker_recommendations')
+        .select('title,category,priority,estimated_value,status')
+        .eq('status', 'open').order('created_at', { ascending: false }).limit(5),
+      supabase.from('nexus_os_content_items')
+        .select('id,title,content_type,status,related_campaign_id', { count: 'exact', head: false })
+        .eq('status', 'needs_review').eq('archived', false).limit(8),
+      supabase.from('nexus_os_revenue_campaigns')
+        .select('program_name,priority,affiliate_link,link_status,disclosure_ok').eq('archived', false),
+      supabase.from('owner_approval_queue')
+        .select('action_type', { count: 'exact', head: true }).eq('status', 'pending'),
+    ]);
+    return {
+      proposed: kiRes.data ?? [],
+      latestDiscovery: (seRes.data?.[0] as { created_at?: string } | undefined)?.created_at ?? null,
+      extractionCount: seRes.count ?? null,
+      workerRecs: wrRes.data ?? [],
+      drafts: draftRes.data ?? [],
+      draftCount: draftRes.count ?? (draftRes.data?.length ?? 0),
+      campaigns: campRes.data ?? [],
+      pendingApprovals: apprRes.count ?? 0,
+    };
+  }, []);
+
   // Build the structured recommendation for a given intent.
   // `prompt` is used only by the routing intent for keyword matching.
   const recommend = useCallback(async (intent: RecIntent, prompt = ''): Promise<NexusRecommendation> => {
@@ -229,22 +268,76 @@ export function useNexusRecommendations() {
       return buildRoutingRec(prompt, map, now);
     }
 
+    // ── Money / research: what did Nexus discover + what to do next ──
+    if (intent === 'money_research') {
+      const m = await gatherMoneyResearch();
+      const topTopics = m.proposed.slice(0, 5)
+        .map(t => `${String(t.title).replace(/^\[Proposed\]\s*/, '').slice(0, 60)} (${t.quality_label ?? '?'})`)
+        .join('; ');
+      const discoveryAge = m.latestDiscovery
+        ? `last discovery ${timeAgoShort(m.latestDiscovery)}` : 'no discovery runs yet';
+      const navCamp = m.campaigns.find(c => /nav/i.test(String(c.program_name)) && c.affiliate_link);
+      const recParts: string[] = [];
+      if (m.draftCount > 0) recParts.push(`review the ${m.draftCount} draft${m.draftCount > 1 ? 's' : ''} in Content Studio (none are published)`);
+      if (navCamp) recParts.push('Nav has its affiliate link stored — add disclosure, then approve Nav content');
+      const recommendation = recParts.length
+        ? `Fastest money move: ${recParts.join('; then ')}.`
+        : 'Run a research cycle, then review the proposed topics in Content Studio.';
+      return {
+        title: 'Monetization Research',
+        recommendation,
+        why: `Recurring research is scheduled every 6h (free YouTube discovery); ${discoveryAge}. `
+          + `${m.extractionCount ?? 0} discovery extractions and ${m.proposed.length} proposed topics are waiting for review — all proposed/draft, nothing published.`,
+        evidence_summary: `Proposed topics: ${m.proposed.length}; drafts needing review: ${m.draftCount}; `
+          + `pending approvals: ${m.pendingApprovals}; open worker recs: ${m.workerRecs.length}.`,
+        roster: topTopics ? `Top discovered topics (PROPOSED, not approved): ${topTopics}` : undefined,
+        blockers: m.proposed.length === 0 ? ['No proposed research yet — run a cycle'] : [],
+        next_action: m.draftCount > 0
+          ? 'Open Content Studio, review the strongest 3 drafts, add disclosure, then approve publishing.'
+          : 'Open Content Studio and turn the top proposed topics into drafts.',
+        approval_needed: true,
+        confidence: 'high',
+        source_tables: ['knowledge_items', 'source_extractions', 'worker_recommendations', 'nexus_os_content_items', 'owner_approval_queue'],
+        freshness: now,
+      };
+    }
+
     const { campaigns, content, approvals } = await gather();
 
-    // ── Approval summary ──
+    // ── Approval summary (reads REAL owner_approval_queue records) ──
     if (intent === 'approval_summary') {
+      if (approvals.length === 0) {
+        return {
+          title: 'Pending Approvals',
+          recommendation: 'No pending approval records right now.',
+          why: 'The owner_approval_queue has no pending items.',
+          evidence_summary: 'owner_approval_queue: 0 pending.',
+          blockers: [],
+          next_action: 'If you want to move on revenue, the next item to create is publishing approval for reviewed drafts.',
+          approval_needed: false,
+          confidence: 'high',
+          source_tables: ['owner_approval_queue'],
+          freshness: now,
+        };
+      }
       const urgent = approvals.filter(a => a.priority === 'urgent');
+      // Real, itemized list with an approve command per item (id shortened for readability).
+      const list = approvals.slice(0, 6).map((a, i) => {
+        const id = String(a.id);
+        return `${i + 1}. ${a.action_type} — ${String(a.description || '').slice(0, 90)} `
+          + `[approve: "Approve approval_id ${id.slice(0, 8)}"]`;
+      }).join(' || ');
       return {
         title: 'Pending Approvals',
-        recommendation: approvals.length === 0
-          ? 'Nothing needs your approval right now.'
-          : `You have ${approvals.length} item${approvals.length > 1 ? 's' : ''} awaiting approval${urgent.length ? `, ${urgent.length} urgent` : ''}. Start with the urgent ones.`,
-        why: approvals.length === 0
-          ? 'The owner_approval_queue has no pending items.'
-          : `Oldest pending: "${approvals[approvals.length - 1].action_type}" requested by ${approvals[approvals.length - 1].requested_by}.`,
+        recommendation: `You have ${approvals.length} real pending approval${approvals.length > 1 ? 's' : ''}`
+          + `${urgent.length ? `, ${urgent.length} urgent` : ''}. Top: ${approvals[0].action_type}.`,
+        why: `These are actual owner_approval_queue records — internal/free items are safe to approve; `
+          + `publishing, affiliate submission, and credential changes carry external/real-world impact.`,
         evidence_summary: `${approvals.length} pending in owner_approval_queue (${urgent.length} urgent).`,
+        roster: `PENDING APPROVALS: ${list}`,
         blockers: [],
-        next_action: approvals.length === 0 ? 'No action needed.' : 'Open the Approval Center and clear urgent items first.',
+        next_action: 'Approve the internal/free items first (e.g. recurring research, draft review); '
+          + 'keep publishing/affiliate/credential items pending until you decide. Reply "Approve approval_id <id>".',
         approval_needed: false,
         confidence: 'high',
         source_tables: ['owner_approval_queue'],
@@ -369,7 +462,7 @@ export function useNexusRecommendations() {
 
     // Enrich with graph context if this campaign is synced to the graph (graceful fallback)
     return enrichWithGraph(baseRec, 'nexus_os_revenue_campaigns', c.id);
-  }, [gather, enrichWithGraph, gatherSystemMap]);
+  }, [gather, enrichWithGraph, gatherSystemMap, gatherMoneyResearch]);
 
   // Build a concise evidence string to hand to Hermes (no raw rows, no secrets).
   // Strict budget: each section capped, whole block capped ~1800 chars.
@@ -397,8 +490,8 @@ export function useNexusRecommendations() {
   }, []);
 
   // Memoized so consumer effects don't re-run every render (stuck-spinner / loop fix).
-  return useMemo(() => ({ recommend, classifyIntent, intentNeedsEvidence, buildEvidenceContext, gather, gatherSystemMap, enrichWithGraph }),
-    [recommend, buildEvidenceContext, gather, gatherSystemMap, enrichWithGraph]);
+  return useMemo(() => ({ recommend, classifyIntent, intentNeedsEvidence, buildEvidenceContext, gather, gatherSystemMap, gatherMoneyResearch, enrichWithGraph }),
+    [recommend, buildEvidenceContext, gather, gatherSystemMap, gatherMoneyResearch, enrichWithGraph]);
 }
 
 // ── Routing recommendation (read-only; recommends tool/repo/CLI/AI, never executes) ──
@@ -420,6 +513,16 @@ const RULE_HINTS: Array<[RegExp, string]> = [
 
 function tok(s: string): string[] {
   return (s || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+function timeAgoShort(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return 'recently';
+  const mins = Math.max(0, Math.round((Date.now() - then) / 60000));
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.round(hrs / 24)}d ago`;
 }
 
 function buildRoutingRec(prompt: string, map: SystemMap, now: string): NexusRecommendation {

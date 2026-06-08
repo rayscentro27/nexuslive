@@ -340,6 +340,8 @@ def main():
         (REPORT_DIR / f"monetization_research_{stamp}.json").write_text(json.dumps(scored, indent=2, default=str))
 
     top = sorted(scored, key=lambda x: x["confidence"], reverse=True)
+    records_created = 0  # updated in apply branch
+    se_written = ki_written = 0
     print(f"\nMode: {'APPLY (writing review rows)' if apply else 'DRY-RUN (no writes)'}")
     print(f"Provider: yt-dlp ytsearch (free, no API key){' · web skipped (no free provider)' if skipped_web else ''}")
     print(f"Keywords: {len(keywords)} · discovered: {len(scored)}")
@@ -360,6 +362,8 @@ def main():
                     se_rows.append(to_source_extraction(it, False))
             ok1, m1 = sb_insert("source_extractions", se_rows, on_conflict="source_id,video_id")
             print(f"  [{'OK' if ok1 else 'SKIP'}] {m1}")
+            if ok1:
+                se_written = len(se_rows)
             # knowledge_items: dedupe against existing monetization rows by source_url
             existing = sb_get_existing_urls("knowledge_items", "source_url", {"domain": "eq.monetization"})
             ki = [to_knowledge_item(it, False) for it in top
@@ -368,14 +372,41 @@ def main():
             if ki:
                 ok2, m2 = sb_insert("knowledge_items", ki)
                 print(f"  [{'OK' if ok2 else 'SKIP'}] {m2}")
+                if ok2:
+                    ki_written = len(ki)
             else:
                 print("  [SKIP] knowledge_items: no new items (all already proposed or gated)")
+            records_created = se_written + ki_written
         else:
             print("  [SKIP] nothing discovered")
     else:
         print("\n(no writes — re-run with --apply to persist review rows)")
         print("Would write: source_extractions (all) + knowledge_items status='proposed' "
               "(risk<50 & conf>=30). review_required; no Nexus OS bridge until reviewed.")
+
+    # ── Status file (for scheduler + Hermes visibility) ──
+    from datetime import timedelta
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    status = {
+        "last_run": now_iso(),
+        "next_run_estimate": (datetime.now(timezone.utc) + timedelta(hours=6)).isoformat(),
+        "cadence": "every 6h (launchd/cron)",
+        "mode": "apply" if apply else "dry-run",
+        "keywords_count": len(keywords),
+        "topics_discovered": len(scored),
+        "records_created": records_created,
+        "source_extractions_written": se_written,
+        "knowledge_items_written": ki_written,
+        "drafts_created": 0,            # content drafts are created during review, not discovery
+        "approval_items_created": 0,
+        "errors": [],
+        "paid_tools_used": False,
+        "provider": "yt-dlp ytsearch (free)",
+        "report": str(md),
+        "log_path": "logs/monetization_research.log",
+    }
+    (REPORT_DIR / "status.json").write_text(json.dumps(status, indent=2))
+    print(f"Status: {REPORT_DIR / 'status.json'}")
 
 
 if __name__ == "__main__":
