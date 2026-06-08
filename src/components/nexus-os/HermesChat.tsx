@@ -148,6 +148,7 @@ export function HermesChat() {
         next_step: 'next_step',
         blocker_diagnosis: 'next_step',
         approval_summary: 'approvals',
+        routing: 'tool_repo',
         general: 'general',
       };
       let userContent = content;
@@ -157,7 +158,7 @@ export function HermesChat() {
         const intent = engine.classifyIntent(content);
         fnIntent = INTENT_MAP[intent] ?? 'general';
         if (engine.intentNeedsEvidence(intent)) {
-          const rec = await engine.recommend(intent);
+          const rec = await engine.recommend(intent, content);
           const evidence = engine.buildEvidenceContext(rec);
           userContent = `${evidence}\n\n---\nRay asked: ${content}`;
           usedEvidence = true;

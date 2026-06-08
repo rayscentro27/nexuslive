@@ -18,6 +18,7 @@ export type RecIntent =
   | 'next_step'
   | 'blocker_diagnosis'
   | 'approval_summary'
+  | 'routing'
   | 'general';
 
 export interface NexusRecommendation {
@@ -41,10 +42,30 @@ export interface NexusRecommendation {
   source_insight_summary?: string;
 }
 
+// ── System-map row shapes (read-only, from Phase 1 inventory tables) ───────────
+interface RoutingRule {
+  task_type: string; preferred_tool: string | null; fallback_tool: string | null;
+  preferred_repo: string | null; required_context: string | null;
+  safety_gate: string | null; approval_required: boolean; notes: string | null; active: boolean;
+}
+interface RepoRow { name: string; purpose: string | null; module: string | null; active_state: string | null; risk_level: string | null; }
+interface ProcessRow { name: string; status: string | null; purpose: string | null; can_restart: boolean; approval_required: boolean; risk_level: string | null; port: string | null; }
+interface CliRow { cli_key: string; command_name: string | null; description: string | null; risk_level: string | null; requires_approval: boolean; cost_risk: string | null; network_risk: string | null; can_run_locally: boolean | null; installed: boolean | null; }
+interface ProviderRow { name: string; cost_tier: string | null; is_healthy: boolean | null; priority: number | null; }
+interface SystemMap { rules: RoutingRule[]; repos: RepoRow[]; processes: ProcessRow[]; clis: CliRow[]; providers: ProviderRow[]; }
+
 // ── Intent classification (keyword rules, no LLM) ──────────────────────────────
 
 export function classifyIntent(prompt: string): RecIntent {
   const p = prompt.toLowerCase();
+  // ── Routing / system-map questions (checked first so "content studio bug" routes
+  // to tooling, not content recommendations). Recommend-only; never executes. ──
+  if (/\b(restart|reboot|relaunch|kill|stop the|start the|turn (on|off)|bring (up|down))\b/.test(p)
+      && /\b(service|process|receiver|worker|tunnel|engine|bot|gateway|trading|ollama|scheduler|router|poller)\b/.test(p)) {
+    return 'routing';
+  }
+  if (/\b(which|what|who)\b/.test(p) && /\b(tool|cli|repo|repository|agent|provider|model|process|service|owns?)\b/.test(p)) return 'routing';
+  if (/\b(which ai|what ai|cheapest|route this|handle this task|requires? approval|safe to automate|owns the|own the)\b/.test(p)) return 'routing';
   if (/\b(approv|review today|sign off|pending)\b/.test(p)) return 'approval_summary';
   if (/\b(block|stuck|blocked|why can.?t|what.?s stopping|publish[- ]?ready|not ready|ready to publish)\b/.test(p)) return 'blocker_diagnosis';
   // Content questions (incl. "what content is linked to X")
@@ -175,10 +196,40 @@ export function useNexusRecommendations() {
     }
   }, []);
 
-  // Build the structured recommendation for a given intent
-  const recommend = useCallback(async (intent: RecIntent): Promise<NexusRecommendation> => {
-    const { campaigns, content, approvals } = await gather();
+  // Read compact slices of the system-map tables (read-only) for routing answers.
+  // Reuses existing model_providers for AI cost ranking. Graceful: returns empty
+  // arrays if a table is unavailable so routing never blocks the chat.
+  const gatherSystemMap = useCallback(async (): Promise<SystemMap> => {
+    const [rulesRes, reposRes, procRes, cliRes, provRes] = await Promise.all([
+      supabase.from('nexus_task_routing_rules')
+        .select('task_type,preferred_tool,fallback_tool,preferred_repo,required_context,safety_gate,approval_required,notes,active')
+        .eq('active', true),
+      supabase.from('nexus_system_repos').select('name,purpose,module,active_state,risk_level'),
+      supabase.from('nexus_system_processes').select('name,status,purpose,can_restart,approval_required,risk_level,port'),
+      supabase.from('nexus_cli_tools').select('cli_key,command_name,description,risk_level,requires_approval,cost_risk,network_risk,can_run_locally,installed'),
+      supabase.from('model_providers').select('name,cost_tier,is_healthy,priority').order('priority', { ascending: true }),
+    ]);
+    return {
+      rules: (rulesRes.data ?? []) as RoutingRule[],
+      repos: (reposRes.data ?? []) as RepoRow[],
+      processes: (procRes.data ?? []) as ProcessRow[],
+      clis: (cliRes.data ?? []) as CliRow[],
+      providers: (provRes.data ?? []) as ProviderRow[],
+    };
+  }, []);
+
+  // Build the structured recommendation for a given intent.
+  // `prompt` is used only by the routing intent for keyword matching.
+  const recommend = useCallback(async (intent: RecIntent, prompt = ''): Promise<NexusRecommendation> => {
     const now = new Date().toISOString();
+
+    // ── Routing: recommend tool / repo / CLI / AI provider, recommend-only ──
+    if (intent === 'routing') {
+      const map = await gatherSystemMap();
+      return buildRoutingRec(prompt, map, now);
+    }
+
+    const { campaigns, content, approvals } = await gather();
 
     // ── Approval summary ──
     if (intent === 'approval_summary') {
@@ -318,7 +369,7 @@ export function useNexusRecommendations() {
 
     // Enrich with graph context if this campaign is synced to the graph (graceful fallback)
     return enrichWithGraph(baseRec, 'nexus_os_revenue_campaigns', c.id);
-  }, [gather, enrichWithGraph]);
+  }, [gather, enrichWithGraph, gatherSystemMap]);
 
   // Build a concise evidence string to hand to Hermes (no raw rows, no secrets).
   // Strict budget: each section capped, whole block capped ~1800 chars.
@@ -346,8 +397,177 @@ export function useNexusRecommendations() {
   }, []);
 
   // Memoized so consumer effects don't re-run every render (stuck-spinner / loop fix).
-  return useMemo(() => ({ recommend, classifyIntent, intentNeedsEvidence, buildEvidenceContext, gather, enrichWithGraph }),
-    [recommend, buildEvidenceContext, gather, enrichWithGraph]);
+  return useMemo(() => ({ recommend, classifyIntent, intentNeedsEvidence, buildEvidenceContext, gather, gatherSystemMap, enrichWithGraph }),
+    [recommend, buildEvidenceContext, gather, gatherSystemMap, enrichWithGraph]);
+}
+
+// ── Routing recommendation (read-only; recommends tool/repo/CLI/AI, never executes) ──
+
+const RULE_HINTS: Array<[RegExp, string]> = [
+  [/\b(migrat|schema|sql|db table|database table)\b/, 'supabase_migration'],
+  [/\b(bug|fix|broken|error|crash|spinner|not working|render|blank)\b/, 'frontend_ui_fix'],
+  [/\b(deploy|ship it|go live|netlify|publish (the )?(site|app|nexus))\b/, 'design_polish'],
+  [/\b(source intake|intake|transcript)\b/, 'source_intake'],
+  [/\b(draft|write.*content|caption|post copy|content piece)\b/, 'content_draft'],
+  [/\b(classif|categor|tag|label|cheap)\b/, 'cheap_classification'],
+  [/\byoutube\b/, 'youtube_research'],
+  [/\b(research|scrape|web search)\b/, 'web_research'],
+  [/\b(backtest|strategy test|paper trade)\b/, 'trading_strategy_backtest'],
+  [/\b(live trad|real trad|place (a )?trade|broker order)\b/, 'live_trading'],
+  [/\b(trading status|receiver status|trade status)\b/, 'trading_status'],
+  [/\b(ui|frontend|component|page|react|typescript|css|design)\b/, 'frontend_ui_fix'],
+];
+
+function tok(s: string): string[] {
+  return (s || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+function buildRoutingRec(prompt: string, map: SystemMap, now: string): NexusRecommendation {
+  const p = prompt.toLowerCase();
+  const ptoks = new Set(tok(prompt));
+  const ruleByType = (t: string) => map.rules.find(r => r.task_type === t) || null;
+  const gateLine = (r: RoutingRule | null) =>
+    r ? `${r.approval_required ? 'Requires your approval' : 'No approval needed'}${r.safety_gate ? ` (${r.safety_gate})` : ''}` : '';
+
+  // ── A. Restart / start / stop a service → recommend only, never execute ──
+  if (/\b(restart|reboot|relaunch|kill|stop|start|turn (on|off)|bring (up|down))\b/.test(p)) {
+    let best: ProcessRow | null = null, bestScore = 0;
+    for (const pr of map.processes) {
+      const score = tok(`${pr.name} ${pr.purpose ?? ''}`).filter(t => ptoks.has(t)).length;
+      if (score > bestScore) { bestScore = score; best = pr; }
+    }
+    if (best && bestScore > 0) {
+      const proc = best;
+      return {
+        title: `Service control: ${proc.name}`,
+        recommendation: `I won't restart ${proc.name} myself — I only recommend service actions, I don't execute them. It's a ${proc.risk_level ?? 'medium'}-risk process, so you (or an approved operator) should run the restart.`,
+        why: `${proc.name} — ${proc.purpose ?? 'service'}. Current status: ${proc.status ?? 'unknown'}${proc.port ? `, port ${proc.port}` : ''}. Restart policy: ${proc.can_restart ? 'auto-allowed' : 'recommend-only'}, approval ${proc.approval_required ? 'required' : 'not required'}.`,
+        evidence_summary: `From nexus_system_processes: ${proc.name} (${proc.status ?? 'unknown'}), risk=${proc.risk_level ?? 'medium'}, can_restart=${proc.can_restart}.`,
+        blockers: ['Service restarts are recommend-only — I never execute service control, deploys, or trading actions'],
+        next_action: `If you want it restarted, run the restart yourself and I'll confirm status. I will not execute it.`,
+        approval_needed: true,
+        confidence: 'high',
+        source_tables: ['nexus_system_processes'],
+        freshness: now,
+      };
+    }
+    return {
+      title: 'Service control',
+      recommendation: `I can tell you a service's status and the safe restart command, but I won't restart, deploy, or run trading actions myself — those are recommend-only.`,
+      why: 'Service control is gated for safety; Hermes recommends, you execute.',
+      evidence_summary: 'No specific process matched the request in nexus_system_processes.',
+      blockers: ['Recommend-only — no execution'],
+      next_action: 'Tell me which service (e.g. trading engine, gateway, scheduler) and I\'ll give its status + safe command.',
+      approval_needed: true,
+      confidence: 'medium',
+      source_tables: ['nexus_system_processes'],
+      freshness: now,
+    };
+  }
+
+  // ── B. Cheapest AI / provider / model ──
+  if ((/\b(cheap|cheapest|low ?cost|free|local|inexpensive)\b/.test(p) && /\b(ai|model|provider|llm|classif|inference|categor)\b/.test(p))
+      || /\b(which ai|what ai|which provider|which model)\b/.test(p)) {
+    const order: Record<string, number> = { free: 0, low: 1, medium: 2, high: 3 };
+    const ranked = [...map.providers].sort((a, b) => (order[a.cost_tier ?? ''] ?? 9) - (order[b.cost_tier ?? ''] ?? 9));
+    const rule = ruleByType('cheap_classification');
+    const preferred = rule?.preferred_tool || (ranked[0] ? ranked[0].name : 'Ollama (local)');
+    const fallback = rule?.fallback_tool || (ranked[1]?.name ?? 'Groq');
+    const tierList = ranked.slice(0, 3).map(r => `${r.name}(${r.cost_tier ?? '?'})`).join(', ') || 'Ollama(free), Groq(low)';
+    return {
+      title: 'Cheapest AI route',
+      recommendation: `Use ${preferred} for the cheapest path — it's local/free and ideal for classification-style work. ${fallback} is the cloud fallback if you need more capability.`,
+      why: `Routing rule "cheap_classification" prefers local Ollama, then Groq (low cost). Keeping it local means zero cost and no network risk.`,
+      evidence_summary: `nexus_task_routing_rules + model_providers cheapest-first: ${tierList}.`,
+      blockers: [],
+      next_action: `Run it on ${preferred} locally; only escalate to ${fallback} if quality needs it. No approval needed for local inference.`,
+      approval_needed: false,
+      confidence: 'high',
+      source_tables: ['nexus_task_routing_rules', 'model_providers'],
+      freshness: now,
+    };
+  }
+
+  // ── C. Deploy CLI question → netlify, approval-gated ──
+  if (/\b(deploy|ship it|go live|netlify|publish (the )?(site|app|nexus))\b/.test(p) && /\b(cli|tool|command|how do i|which)\b/.test(p)) {
+    const cli = map.clis.find(c => c.cli_key === 'netlify');
+    const rule = ruleByType('design_polish');
+    return {
+      title: 'Deploy route',
+      recommendation: `Use the ${cli?.cli_key ?? 'netlify'} CLI to deploy the web app (\`netlify deploy --prod\`). I'll recommend it but won't run a production deploy without your approval.`,
+      why: `Deploying is a network/prod action (cost=${cli?.cost_risk ?? 'free'}, network=${cli?.network_risk ?? 'high'}); the routing rule gates it behind approval. Build first, then deploy.`,
+      evidence_summary: `nexus_cli_tools: netlify (deploy, approval required). For DB changes, supabase CLI is the counterpart (also approval-gated).`,
+      blockers: ['Production deploy requires your approval — recommend-only'],
+      next_action: `npm run build, then (with your go-ahead) netlify deploy --prod. ${gateLine(rule)}.`,
+      approval_needed: true,
+      confidence: 'high',
+      source_tables: ['nexus_cli_tools', 'nexus_task_routing_rules'],
+      freshness: now,
+    };
+  }
+
+  // ── D. Which repo owns X ──
+  if (/\b(repo|repository|owns?|which (project|codebase)|where (is|does|do)|lives?)\b/.test(p)) {
+    let best: RepoRow | null = null, bestScore = 0;
+    for (const r of map.repos) {
+      const score = tok(`${r.name} ${r.purpose ?? ''} ${r.module ?? ''}`).filter(t => ptoks.has(t)).length;
+      if (score > bestScore) { bestScore = score; best = r; }
+    }
+    if (!best || bestScore === 0) {
+      if (/\b(intake|router|worker|trading|telegram|migration|scanner|python|signal|research|bot|gateway)\b/.test(p)) best = map.repos.find(r => r.name === 'nexus-ai') ?? best;
+      else if (/\b(ui|frontend|page|component|content studio|revenue hub|dashboard|web|react|nexus os)\b/.test(p)) best = map.repos.find(r => r.name === 'nexuslive') ?? best;
+      else if (/\b(mobile|expo|app store)\b/.test(p)) best = map.repos.find(r => r.name === 'nexus-mobile') ?? best;
+    }
+    if (best) {
+      const repo = best;
+      return {
+        title: `Repo owner: ${repo.name}`,
+        recommendation: `That lives in **${repo.name}** (${repo.module ?? 'module'}). ${repo.purpose ?? ''}`.trim(),
+        why: `Matched against nexus_system_repos by purpose/module. ${repo.name} is ${repo.active_state ?? 'active'} (risk: ${repo.risk_level ?? 'low'}).`,
+        evidence_summary: `nexus_system_repos: ${repo.name} — ${repo.purpose ?? 'n/a'} [${repo.active_state ?? 'active'}].`,
+        blockers: repo.risk_level === 'secrets-present' ? ['Repo holds secrets — never commit .env/credentials'] : [],
+        next_action: `Work in ${repo.name}. Changes that deploy or migrate still need your approval.`,
+        approval_needed: false,
+        confidence: bestScore > 0 ? 'high' : 'medium',
+        source_tables: ['nexus_system_repos'],
+        freshness: now,
+      };
+    }
+  }
+
+  // ── E. Default: match a task routing rule for "which tool / CLI / agent" ──
+  let matchedType: string | null = null;
+  for (const [re, t] of RULE_HINTS) { if (re.test(p)) { matchedType = t; break; } }
+  const rule = matchedType ? ruleByType(matchedType) : null;
+  if (rule) {
+    return {
+      title: `Routing: ${rule.task_type.replace(/_/g, ' ')}`,
+      recommendation: `I'd route this to ${rule.preferred_tool}${rule.preferred_repo ? ` in ${rule.preferred_repo}` : ''}. ${rule.fallback_tool && rule.fallback_tool !== 'none' ? `Fallback: ${rule.fallback_tool}.` : ''}`.trim(),
+      why: `Task type "${rule.task_type}" — ${rule.notes ?? 'matched by routing rules'}.${rule.required_context ? ` Needs: ${rule.required_context}.` : ''}`,
+      evidence_summary: `nexus_task_routing_rules: ${rule.task_type} → ${rule.preferred_tool} (fallback ${rule.fallback_tool ?? 'none'}, repo ${rule.preferred_repo ?? 'n/a'}).`,
+      blockers: rule.task_type === 'live_trading' ? ['Live trading is DISABLED by default — explicit approval required, nothing executes'] : [],
+      next_action: `Use ${rule.preferred_tool}. ${gateLine(rule)}.`,
+      approval_needed: rule.approval_required,
+      confidence: 'high',
+      source_tables: ['nexus_task_routing_rules'],
+      freshness: now,
+    };
+  }
+
+  // ── Fallback: general routing guidance ──
+  const examples = map.rules.slice(0, 4).map(r => `${r.task_type}→${r.preferred_tool}`).join('; ');
+  return {
+    title: 'Task routing',
+    recommendation: `Tell me the task and I'll route it to the right tool/repo with its approval gate. I recommend only — I don't execute, deploy, or trade.`,
+    why: 'Routing is rules-based from the system map (repos, processes, CLIs, AI providers).',
+    evidence_summary: `nexus_task_routing_rules available${examples ? `: ${examples}` : ''}.`,
+    blockers: [],
+    next_action: 'Describe the task (e.g. "fix a UI bug", "apply a migration", "cheap classification") for a specific route.',
+    approval_needed: false,
+    confidence: 'medium',
+    source_tables: ['nexus_task_routing_rules'],
+    freshness: now,
+  };
 }
 
 // ── helper ────────────────────────────────────────────────────────────────────
