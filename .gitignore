@@ -58,3 +58,9 @@ research-engine/summaries/
 
 # Local Netlify folder
 .netlify
+.venv-yt/
+*.token.json
+youtube_token*.json
+token.json
+*_oauth_cache*
+client_secret*.json
