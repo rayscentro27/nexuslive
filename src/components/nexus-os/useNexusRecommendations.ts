@@ -53,7 +53,8 @@ interface RepoRow { name: string; purpose: string | null; module: string | null;
 interface ProcessRow { name: string; status: string | null; purpose: string | null; can_restart: boolean; approval_required: boolean; risk_level: string | null; port: string | null; }
 interface CliRow { cli_key: string; command_name: string | null; description: string | null; risk_level: string | null; requires_approval: boolean; cost_risk: string | null; network_risk: string | null; can_run_locally: boolean | null; installed: boolean | null; }
 interface ProviderRow { name: string; cost_tier: string | null; is_healthy: boolean | null; priority: number | null; }
-interface SystemMap { rules: RoutingRule[]; repos: RepoRow[]; processes: ProcessRow[]; clis: CliRow[]; providers: ProviderRow[]; }
+interface ToolRow { name: string; type: string | null; best_use: string | null; cost_level: string | null; approval_required: boolean | null; notes: string | null; }
+interface SystemMap { rules: RoutingRule[]; repos: RepoRow[]; processes: ProcessRow[]; clis: CliRow[]; providers: ProviderRow[]; tools: ToolRow[]; }
 
 // ── Intent classification (keyword rules, no LLM) ──────────────────────────────
 
@@ -66,6 +67,8 @@ export function classifyIntent(prompt: string): RecIntent {
     return 'routing';
   }
   if (/\b(which|what|who)\b/.test(p) && /\b(tool|cli|repo|repository|agent|provider|model|process|service|owns?)\b/.test(p)) return 'routing';
+  // Bare repo/tool/github mentions route to tooling (so "repo to make videos" isn't treated as content).
+  if (/\b(repo|repository|github)\b/.test(p)) return 'routing';
   if (/\b(which ai|what ai|cheapest|route this|handle this task|requires? approval|safe to automate|owns the|own the)\b/.test(p)) return 'routing';
   if (/\b(approv|review today|sign off|pending)\b/.test(p)) return 'approval_summary';
   // ── Money / research questions: what did we discover, what to monetize/publish,
@@ -204,7 +207,7 @@ export function useNexusRecommendations() {
   // Reuses existing model_providers for AI cost ranking. Graceful: returns empty
   // arrays if a table is unavailable so routing never blocks the chat.
   const gatherSystemMap = useCallback(async (): Promise<SystemMap> => {
-    const [rulesRes, reposRes, procRes, cliRes, provRes] = await Promise.all([
+    const [rulesRes, reposRes, procRes, cliRes, provRes, toolRes] = await Promise.all([
       supabase.from('nexus_task_routing_rules')
         .select('task_type,preferred_tool,fallback_tool,preferred_repo,required_context,safety_gate,approval_required,notes,active')
         .eq('active', true),
@@ -212,6 +215,7 @@ export function useNexusRecommendations() {
       supabase.from('nexus_system_processes').select('name,status,purpose,can_restart,approval_required,risk_level,port'),
       supabase.from('nexus_cli_tools').select('cli_key,command_name,description,risk_level,requires_approval,cost_risk,network_risk,can_run_locally,installed'),
       supabase.from('model_providers').select('name,cost_tier,is_healthy,priority').order('priority', { ascending: true }),
+      supabase.from('nexus_os_tool_registry').select('name,type,best_use,cost_level,approval_required,notes'),
     ]);
     return {
       rules: (rulesRes.data ?? []) as RoutingRule[],
@@ -219,6 +223,7 @@ export function useNexusRecommendations() {
       processes: (procRes.data ?? []) as ProcessRow[],
       clis: (cliRes.data ?? []) as CliRow[],
       providers: (provRes.data ?? []) as ProviderRow[],
+      tools: (toolRes.data ?? []) as ToolRow[],
     };
   }, []);
 
@@ -607,6 +612,48 @@ function buildRoutingRec(prompt: string, map: SystemMap, now: string): NexusReco
       source_tables: ['nexus_cli_tools', 'nexus_task_routing_rules'],
       freshness: now,
     };
+  }
+
+  // ── C2. External tool/repo recommendation (registered GitHub repo ideas) ──
+  // e.g. "which repo for cost control", "repo to make social videos", "replace NotebookLM".
+  if (map.tools.length > 0 && /\b(repo|tool|github|library|project|use for|help|replace|switch|video|notebook|cost|voice|avatar|design|review)\b/.test(p)) {
+    const scored = map.tools.map(t => {
+      const hay = tok(`${t.name} ${t.best_use ?? ''} ${t.notes ?? ''}`);
+      const hayset = new Set(hay);
+      let score = tok(prompt).filter(w => hayset.has(w)).length;
+      // capability synonyms → boost
+      const cap: Array<[RegExp, RegExp]> = [
+        [/cost|cheap|rate.?limit|budget|spend/, /cost|rate.?limit|headroom/],
+        [/video|short|reel|tiktok/, /video|short/],
+        [/notebook|research brain|notebooklm/, /notebook/],
+        [/switch|provider|model swap/, /switch|cc-switch/],
+        [/voice|tts|speak/, /voice/],
+        [/avatar|vtuber|persona|desktop/, /avatar|vtuber/],
+        [/design|ui|ux|premium|look/, /design|ui|ux/],
+        [/code review|review code|pr review/, /code-review|review/],
+        [/social|schedul|post/, /postiz|social|schedul/],
+        [/architecture|system design/, /system-design/],
+      ];
+      for (const [q, h] of cap) { if (q.test(p) && h.test(`${t.name} ${t.best_use ?? ''} ${t.notes ?? ''}`.toLowerCase())) score += 3; }
+      return { t, score };
+    }).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+    if (scored.length > 0) {
+      const top = scored[0].t;
+      const prio = (top.notes?.match(/priority=(\w+)/) || [])[1] ?? 'later';
+      const others = scored.slice(1, 3).map(x => x.t.name).join(', ');
+      return {
+        title: `Tool/repo: ${top.name}`,
+        recommendation: `For that, look at **${top.name}** — ${top.best_use ?? 'registered tool idea'}.${others ? ` Alternatives: ${others}.` : ''}`,
+        why: `From the Tool Registry (registered repo ideas, not installed). Priority: ${prio}. ${top.notes ?? ''}`.slice(0, 320),
+        evidence_summary: `nexus_os_tool_registry match: ${top.name} (${top.cost_level ?? 'free'}, priority ${prio}).`,
+        blockers: ['Not installed — installing/adopting a repo needs your approval'],
+        next_action: `Evaluate ${top.name} (read-only). I won't install or run it without your go-ahead.`,
+        approval_needed: true,
+        confidence: scored[0].score >= 3 ? 'high' : 'medium',
+        source_tables: ['nexus_os_tool_registry'],
+        freshness: now,
+      };
+    }
   }
 
   // ── D. Which repo owns X ──
