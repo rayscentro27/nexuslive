@@ -1,0 +1,131 @@
+{
+  "content_id": "fcf087ea-cf90-43cd-85fe-40bd96d58e3f",
+  "title": "3 Business Credit Myths That Cost You Time",
+  "fps": 30,
+  "width": 1080,
+  "height": 1920,
+  "totalFrames": 1102,
+  "audio": "voiceover.mp3",
+  "disclosure": "This content may include affiliate links. If you use a link, Nexus/GoClearOnline may earn a commission at no extra cost to you.",
+  "brand": "Nexus \u00b7 GoClearOnline",
+  "youtube": {
+    "title": "3 Business Credit Myths That Cost You Time #Shorts",
+    "description": "Three business credit myths that quietly cost people time and money \u2014 and what actually works.\n\nEducational only \u2014 not financial advice. No guarantees.\n\nThis content may include affiliate links. If you use a link, Nexus/GoClearOnline may earn a commission at no extra cost to you.\n\n#businesscredit #businessfunding #smallbusiness #entrepreneur #credittips",
+    "hashtags": [
+      "Shorts",
+      "businesscredit",
+      "businessfunding",
+      "smallbusiness",
+      "entrepreneur",
+      "credittips",
+      "paydex",
+      "fundingreadiness"
+    ]
+  },
+  "scenes": [
+    {
+      "id": 1,
+      "label": "HOOK",
+      "onscreen": "3 BUSINESS CREDIT MYTHS",
+      "caption": "3 myths that cost you time",
+      "vo": "Three business credit myths that are quietly costing you time and money.",
+      "visual": "Bold title card, Nexus blue underline, small stickman pointing up",
+      "motion": "zoom_in",
+      "bg": "navy",
+      "accent": "blue",
+      "from": 0,
+      "durationInFrames": 120
+    },
+    {
+      "id": 2,
+      "label": "MYTH 1",
+      "onscreen": "MYTH: \"You need revenue first\"",
+      "caption": "Myth 1: revenue first",
+      "vo": "Myth one: you need revenue first.",
+      "visual": "Red myth card, stickman shrugging, big X stamp",
+      "motion": "slide_left",
+      "bg": "maroon",
+      "accent": "red",
+      "from": 120,
+      "durationInFrames": 73
+    },
+    {
+      "id": 3,
+      "label": "TRUTH 1",
+      "onscreen": "TRUTH: Structure first",
+      "caption": "Truth: structure first",
+      "vo": "Truth: you need structure first. Entity, business bank account, and accounts that actually report.",
+      "visual": "Green truth card, checkmark, 3 mini icons: entity, bank, report",
+      "motion": "zoom_in",
+      "bg": "green",
+      "accent": "green",
+      "from": 193,
+      "durationInFrames": 203
+    },
+    {
+      "id": 4,
+      "label": "MYTH 2",
+      "onscreen": "MYTH: \"One card builds it\"",
+      "caption": "Myth 2: one card",
+      "vo": "Myth two: one credit card builds your business credit.",
+      "visual": "Single card icon with X, stickman confused",
+      "motion": "slide_left",
+      "bg": "maroon",
+      "accent": "red",
+      "from": 396,
+      "durationInFrames": 105
+    },
+    {
+      "id": 5,
+      "label": "TRUTH 2",
+      "onscreen": "TRUTH: Bureaus want a pattern",
+      "caption": "Truth: a pattern, not one account",
+      "vo": "Truth: bureaus want a pattern, not a single account. A few reporting accounts paid early beats one card.",
+      "visual": "Multiple cards forming a rising bar chart",
+      "motion": "zoom_in",
+      "bg": "green",
+      "accent": "green",
+      "from": 501,
+      "durationInFrames": 208
+    },
+    {
+      "id": 6,
+      "label": "MYTH 3",
+      "onscreen": "MYTH: \"It's fast\"",
+      "caption": "Myth 3: it's fast",
+      "vo": "Myth three: it's fast.",
+      "visual": "Stopwatch with X, stickman tapping foot",
+      "motion": "slide_left",
+      "bg": "maroon",
+      "accent": "red",
+      "from": 709,
+      "durationInFrames": 66
+    },
+    {
+      "id": 7,
+      "label": "TRUTH 3",
+      "onscreen": "TRUTH: It takes cycles",
+      "caption": "Truth: it takes reporting cycles",
+      "vo": "Truth: real reporting takes cycles. Anyone promising instant results is selling something.",
+      "visual": "Calendar pages flipping, steady upward arrow",
+      "motion": "zoom_in",
+      "bg": "green",
+      "accent": "green",
+      "from": 775,
+      "durationInFrames": 187
+    },
+    {
+      "id": 8,
+      "label": "CTA",
+      "onscreen": "Save this. Build it right.",
+      "caption": "Educational only \u2014 not advice",
+      "vo": "Save this, and build it the boring, correct way. Follow for more.",
+      "visual": "Nexus wordmark, bookmark icon, disclosure in small text",
+      "motion": "zoom_out",
+      "bg": "navy",
+      "accent": "blue",
+      "from": 962,
+      "durationInFrames": 140
+    }
+  ]
+}
