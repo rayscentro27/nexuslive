@@ -1,0 +1,66 @@
+name: Render Remotion Short (artifact only)
+
+# Manual only. Renders the Nexus Remotion short on a Linux runner (the local Mac is
+# macOS 12 and can't run Remotion's headless browser). Produces an MP4 ARTIFACT only.
+# It NEVER uploads to YouTube, never posts, never schedules, needs NO repo secrets.
+
+on:
+  workflow_dispatch:
+    inputs:
+      content_id:
+        description: "Content id (for naming/reference)"
+        required: false
+        default: "fcf087ea"
+      remotion_data_file:
+        description: "Remotion data json (relative to repo)"
+        required: false
+        default: "tool-lab/remotion-shorts/src/data/fcf087ea.json"
+      output_name:
+        description: "Output MP4 filename"
+        required: false
+        default: "fcf087ea_business_credit_myths_v3_remotion.mp4"
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Show inputs (no secrets)
+        run: |
+          echo "content_id=${{ github.event.inputs.content_id }}"
+          echo "data_file=${{ github.event.inputs.remotion_data_file }}"
+          echo "output_name=${{ github.event.inputs.output_name }}"
+
+      - name: Install Remotion deps
+        working-directory: tool-lab/remotion-shorts
+        run: npm install --no-audit --no-fund
+
+      - name: Render NexusShort composition
+        working-directory: tool-lab/remotion-shorts
+        run: |
+          mkdir -p out
+          npx remotion render NexusShort "out/${{ github.event.inputs.output_name }}"
+
+      - name: Verify output exists
+        working-directory: tool-lab/remotion-shorts
+        run: |
+          test -s "out/${{ github.event.inputs.output_name }}" || (echo "render produced no file" && exit 1)
+          ls -la out/
+
+      - name: Upload MP4 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-remotion-short-${{ github.event.inputs.content_id }}
+          path: tool-lab/remotion-shorts/out/${{ github.event.inputs.output_name }}
+          retention-days: 14
+          if-no-files-found: error
