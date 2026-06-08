@@ -161,7 +161,22 @@ def main():
             print("  (first render downloads a headless Chromium — heavy; evaluate before relying on it)")
             print("No fake output produced. Use --engine local for a working draft now.")
             return 3
-        print("Remotion project found — (render wiring TODO). Use --engine local for now.")
+        if not (proj/"node_modules").exists():
+            print("Remotion deps not installed. Run: cd tool-lab/remotion-shorts && npm install")
+            return 3
+        out_mp4 = OUT/f"{stem}_remotion.mp4"
+        OUT.mkdir(parents=True, exist_ok=True)
+        print(f"Rendering via Remotion (npx remotion render NexusShort) → {out_mp4}")
+        cmd = ["npx","remotion","render","NexusShort", str((OUT/f"{stem}_remotion.mp4").resolve())]
+        r = subprocess.run(cmd, cwd=str(proj), capture_output=True, text=True, timeout=1200)
+        ok = out_mp4.exists()
+        print((r.stdout or "")[-500:])
+        if not ok:
+            print("! Remotion render did not produce output:", (r.stderr or "")[-600:])
+            print("  (First render downloads a headless Chromium — may be the blocker.) Use --engine local meanwhile.")
+            return 4
+        print(f"\n✓ Remotion draft: {out_mp4} ({out_mp4.stat().st_size//1024} KB)")
+        print("DRAFT for review. Nothing uploaded or posted.")
         return 0
 
     if not have("ffmpeg"):
