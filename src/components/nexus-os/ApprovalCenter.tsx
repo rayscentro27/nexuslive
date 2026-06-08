@@ -34,8 +34,22 @@ const ACTION_TYPE_RISK: Record<string, string> = {
   client_message:    'medium',
 };
 
+// Keyword fallback so naming variants (publish_content vs content_publish,
+// apply_affiliate_program vs affiliate_activate, update_broker_credentials vs
+// credential_change, …) are still classified correctly — not silently 'low'.
 function riskLevel(actionType: string): string {
-  return ACTION_TYPE_RISK[actionType] ?? 'low';
+  if (ACTION_TYPE_RISK[actionType]) return ACTION_TYPE_RISK[actionType];
+  const a = (actionType || '').toLowerCase();
+  if (/live[_-]?trad|broker|ad[_-]?spend|outreach|credential|rls|payment|stripe|wire|charge/.test(a)) return 'critical';
+  if (/publish|post|affiliate|deploy|schema|migrat|budget|email|newsletter|social|submit|client/.test(a)) return 'high';
+  if (/content|draft|message|review/.test(a)) return 'medium';
+  return 'low';
+}
+
+// External / real-world impact → require an explicit confirm before approving.
+function needsConfirm(actionType: string): boolean {
+  const r = riskLevel(actionType);
+  return r === 'high' || r === 'critical';
 }
 
 export function ApprovalCenter() {
@@ -46,6 +60,7 @@ export function ApprovalCenter() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [historyOpen, setHistoryOpen] = useState<Set<string>>(new Set());
   const [acting, setActing] = useState<string | null>(null);
+  const [confirmApprove, setConfirmApprove] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, string>>({});
   const [notifyResults, setNotifyResults] = useState<Record<string, string>>({});
   const { notify } = useApprovalNotifier();
@@ -117,6 +132,14 @@ export function ApprovalCenter() {
   }
 
   async function act(item: ApprovalItem, status: 'approved' | 'rejected' | 'needs_edits') {
+    // Two-step confirm for external/real-world-impact approvals. First click on a
+    // high/critical item arms the confirm; it must be clicked again to proceed.
+    // Internal/free (low/medium) items stay one-click.
+    if (status === 'approved' && needsConfirm(item.action_type) && confirmApprove !== item.id) {
+      setConfirmApprove(item.id);
+      return;
+    }
+    setConfirmApprove(null);
     setActing(item.id);
     const { error } = await supabase
       .from('owner_approval_queue')
@@ -240,6 +263,7 @@ export function ApprovalCenter() {
               onToggle={() => toggleExpand(item)}
               onToggleHistory={() => toggleHistory(item.id)}
               acting={acting === item.id}
+              confirmArmed={confirmApprove === item.id}
               comment={comments[item.id] ?? ''}
               onCommentChange={v => setComments(prev => ({ ...prev, [item.id]: v }))}
               onApprove={() => act(item, 'approved')}
@@ -280,7 +304,7 @@ function TelegramStatusBanner() {
 
 function ApprovalCard({
   item, itemEvents, expanded, historyOpen, onToggle, onToggleHistory,
-  acting, comment, onCommentChange, onApprove, onReject, onNeedsChanges, notifyResult,
+  acting, confirmArmed, comment, onCommentChange, onApprove, onReject, onNeedsChanges, notifyResult,
 }: {
   item: ApprovalItem;
   itemEvents: ApprovalEvent[];
@@ -289,6 +313,7 @@ function ApprovalCard({
   onToggle: () => void;
   onToggleHistory: () => void;
   acting: boolean;
+  confirmArmed: boolean;
   comment: string;
   onCommentChange: (v: string) => void;
   onApprove: () => void;
@@ -389,11 +414,21 @@ function ApprovalCard({
               <button
                 onClick={onApprove}
                 disabled={acting}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-green-500 text-white text-xs font-black hover:bg-green-600 disabled:opacity-50 transition-all shadow-sm"
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-xs font-black disabled:opacity-50 transition-all shadow-sm ${
+                  confirmArmed ? 'bg-red-600 hover:bg-red-700 ring-2 ring-red-300' : 'bg-green-500 hover:bg-green-600'
+                }`}
+                title={confirmArmed ? 'External/real-world impact — click again to confirm' : undefined}
               >
-                {acting ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-                Approve
+                {acting ? <Loader2 className="w-3 h-3 animate-spin" />
+                  : confirmArmed ? <AlertTriangle className="w-3 h-3" />
+                  : <CheckCircle2 className="w-3 h-3" />}
+                {confirmArmed ? 'Confirm approve (external impact)' : 'Approve'}
               </button>
+              {confirmArmed && (
+                <span className="text-[10px] text-red-600 font-semibold">
+                  This {risk}-risk action has real-world impact — click again to approve.
+                </span>
+              )}
               <button
                 onClick={onReject}
                 disabled={acting}
