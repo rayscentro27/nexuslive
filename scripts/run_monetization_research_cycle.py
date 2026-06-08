@@ -182,7 +182,28 @@ def sb_creds():
     return url, key
 
 
-def sb_insert(table, rows):
+def sb_get_existing_urls(table, column, match):
+    """Return set of existing values for `column` matching `match` filters (idempotency)."""
+    try:
+        import requests
+    except Exception:
+        return set()
+    url, key = sb_creds()
+    if not (url and key):
+        return set()
+    import requests
+    h = {"apikey": key, "Authorization": f"Bearer {key}"}
+    params = {"select": column, **match}
+    try:
+        r = requests.get(f"{url}/rest/v1/{table}", headers=h, params=params, timeout=30)
+        if r.status_code in (200, 206):
+            return {row.get(column) for row in r.json() if row.get(column)}
+    except Exception:
+        pass
+    return set()
+
+
+def sb_insert(table, rows, on_conflict=None):
     try:
         import requests
     except Exception:
@@ -191,10 +212,12 @@ def sb_insert(table, rows):
     if not (url and key):
         return False, "Supabase creds not found"
     import requests
+    prefer = "return=minimal" + (",resolution=merge-duplicates" if on_conflict else "")
     h = {"apikey": key, "Authorization": f"Bearer {key}",
-         "Content-Type": "application/json", "Prefer": "return=minimal"}
+         "Content-Type": "application/json", "Prefer": prefer}
+    params = {"on_conflict": on_conflict} if on_conflict else None
     try:
-        r = requests.post(f"{url}/rest/v1/{table}", headers=h, data=json.dumps(rows), timeout=40)
+        r = requests.post(f"{url}/rest/v1/{table}", headers=h, params=params, data=json.dumps(rows), timeout=40)
         if r.status_code in (200, 201, 204):
             return True, f"{len(rows)} rows -> {table}"
         return False, f"{table}: HTTP {r.status_code} {r.text[:140]}"
@@ -328,16 +351,25 @@ def main():
     if apply:
         print("\n-- Supabase writes (review tables only) --")
         if scored:
-            ok1, m1 = sb_insert("source_extractions", [to_source_extraction(it, False) for it in top])
+            # source_extractions: dedupe batch by video_id, then upsert (idempotent)
+            seen_vid, se_rows = set(), []
+            for it in top:
+                vid = it.get("video_id")
+                if vid and vid not in seen_vid:
+                    seen_vid.add(vid)
+                    se_rows.append(to_source_extraction(it, False))
+            ok1, m1 = sb_insert("source_extractions", se_rows, on_conflict="source_id,video_id")
             print(f"  [{'OK' if ok1 else 'SKIP'}] {m1}")
-            # only the cleaner, higher-confidence items become proposed knowledge
+            # knowledge_items: dedupe against existing monetization rows by source_url
+            existing = sb_get_existing_urls("knowledge_items", "source_url", {"domain": "eq.monetization"})
             ki = [to_knowledge_item(it, False) for it in top
-                  if it["compliance_risk_score"] < 50 and it["confidence"] >= 30]
+                  if it["compliance_risk_score"] < 50 and it["confidence"] >= 30
+                  and it.get("url") not in existing]
             if ki:
                 ok2, m2 = sb_insert("knowledge_items", ki)
                 print(f"  [{'OK' if ok2 else 'SKIP'}] {m2}")
             else:
-                print("  [SKIP] knowledge_items: no items passed risk/confidence gate")
+                print("  [SKIP] knowledge_items: no new items (all already proposed or gated)")
         else:
             print("  [SKIP] nothing discovered")
     else:
