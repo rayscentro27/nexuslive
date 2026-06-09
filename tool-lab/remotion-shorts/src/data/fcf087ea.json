@@ -4,8 +4,8 @@
   "fps": 30,
   "width": 1080,
   "height": 1920,
-  "totalFrames": 1102,
-  "audio": "voiceover.mp3",
+  "totalFrames": 1157,
+  "audio": "voiceover_v4.mp3",
   "disclosure": "This content may include affiliate links. If you use a link, Nexus/GoClearOnline may earn a commission at no extra cost to you.",
   "brand": "Nexus \u00b7 GoClearOnline",
   "youtube": {
@@ -34,7 +34,7 @@
       "bg": "navy",
       "accent": "blue",
       "from": 0,
-      "durationInFrames": 120
+      "durationInFrames": 125
     },
     {
       "id": 2,
@@ -46,8 +46,8 @@
       "motion": "slide_left",
       "bg": "maroon",
       "accent": "red",
-      "from": 120,
-      "durationInFrames": 73
+      "from": 125,
+      "durationInFrames": 81
     },
     {
       "id": 3,
@@ -59,8 +59,8 @@
       "motion": "zoom_in",
       "bg": "green",
       "accent": "green",
-      "from": 193,
-      "durationInFrames": 203
+      "from": 206,
+      "durationInFrames": 206
     },
     {
       "id": 4,
@@ -72,8 +72,8 @@
       "motion": "slide_left",
       "bg": "maroon",
       "accent": "red",
-      "from": 396,
-      "durationInFrames": 105
+      "from": 412,
+      "durationInFrames": 110
     },
     {
       "id": 5,
@@ -85,8 +85,8 @@
       "motion": "zoom_in",
       "bg": "green",
       "accent": "green",
-      "from": 501,
-      "durationInFrames": 208
+      "from": 522,
+      "durationInFrames": 221
     },
     {
       "id": 6,
@@ -98,7 +98,7 @@
       "motion": "slide_left",
       "bg": "maroon",
       "accent": "red",
-      "from": 709,
+      "from": 743,
       "durationInFrames": 66
     },
     {
@@ -111,8 +111,8 @@
       "motion": "zoom_in",
       "bg": "green",
       "accent": "green",
-      "from": 775,
-      "durationInFrames": 187
+      "from": 809,
+      "durationInFrames": 204
     },
     {
       "id": 8,
@@ -124,8 +124,8 @@
       "motion": "zoom_out",
       "bg": "navy",
       "accent": "blue",
-      "from": 962,
-      "durationInFrames": 140
+      "from": 1013,
+      "durationInFrames": 144
     }
   ]
 }
