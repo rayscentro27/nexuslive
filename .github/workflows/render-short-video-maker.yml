@@ -48,15 +48,13 @@ jobs:
       - name: Clone Short Video Maker (MIT)
         run: git clone --depth 1 https://github.com/gyoridavid/short-video-maker svm
 
-      - name: Install deps (pnpm via corepack)
+      - name: Install deps (npm — runs native build scripts)
         working-directory: svm
-        run: |
-          corepack enable
-          pnpm install --frozen-lockfile || pnpm install
+        run: npm install --no-audit --no-fund
 
       - name: Build
         working-directory: svm
-        run: pnpm build
+        run: npm run build
 
       - name: Start server + render one short
         working-directory: svm
