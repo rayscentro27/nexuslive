@@ -43,7 +43,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Clone Short Video Maker (MIT)
         run: git clone --depth 1 https://github.com/gyoridavid/short-video-maker svm
