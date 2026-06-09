@@ -8,12 +8,29 @@ from flask.cli import show_server_banner
 class SignalReceiver:
     """Trading Signal Receiver - Accepts signals from TradingView and other sources"""
 
-    def __init__(self, port=5000):
+    def __init__(self, port=5000, signal_handler=None, status_provider=None, recent_trades_provider=None):
         self.port = port
         self.app = Flask(__name__)
         self.signals = []
         self.started_at = datetime.now().isoformat()
+        self.signal_handler = signal_handler
+        self.status_provider = status_provider
+        self.recent_trades_provider = recent_trades_provider
         self.setup_routes()
+
+    def _dispatch_signal(self, signal):
+        self.signals.append(signal)
+        if not self.signal_handler:
+            return None
+        try:
+            result = self.signal_handler(signal)
+            signal['processed_immediately'] = True
+            signal['engine_result'] = result
+            return result
+        except Exception as e:
+            signal['processed_immediately'] = False
+            signal['engine_error'] = str(e)
+            raise
 
     def setup_routes(self):
         """Set up Flask routes for signal reception"""
@@ -27,39 +44,72 @@ class SignalReceiver:
                     return jsonify({'error': 'No data received'}), 400
 
                 signal = self.parse_tradingview_signal(data)
-                self.signals.append(signal)
+                result = self._dispatch_signal(signal)
 
                 print(f"📈 TradingView Signal Received: {signal}")
 
-                return jsonify({'status': 'signal_received', 'signal': signal}), 200
+                return jsonify({'status': 'signal_received', 'signal': signal, 'engine_result': result}), 200
 
             except Exception as e:
                 print(f"Error processing TradingView signal: {e}")
                 return jsonify({'error': str(e)}), 500
 
+        @self.app.route('/signal', methods=['POST'])
         @self.app.route('/signal/manual', methods=['POST'])
         def manual_signal():
             """Accept manual trading signals"""
             try:
-                data = request.get_json()
+                data = request.get_json() or {}
                 signal = {
                     'source': 'manual',
                     'timestamp': datetime.now().isoformat(),
                     'symbol': data.get('symbol', 'EURUSD'),
                     'action': data.get('action', 'BUY'),
+                    'asset_class': data.get('asset_class', 'forex'),
                     'entry_price': data.get('entry_price'),
                     'stop_loss': data.get('stop_loss'),
                     'take_profit': data.get('take_profit'),
+                    'position_size': data.get('position_size', 0.01),
+                    'units': data.get('units', 1),
+                    'strategy_id': data.get('strategy_id', data.get('strategy', 'manual')),
+                    'entry_reason': data.get('entry_reason', 'manual_signal'),
                     'timeframe': data.get('timeframe', 'H1'),
                     'strategy': data.get('strategy', 'manual'),
                     'confidence': data.get('confidence', 50)
                 }
 
-                self.signals.append(signal)
+                result = self._dispatch_signal(signal)
                 print(f"📊 Manual Signal Received: {signal}")
 
-                return jsonify({'status': 'signal_received', 'signal': signal}), 200
+                return jsonify({'status': 'signal_received', 'signal': signal, 'engine_result': result}), 200
 
+            except Exception as e:
+                return jsonify({'error': str(e)}), 500
+
+        @self.app.route('/test-signal', methods=['POST'])
+        def test_signal():
+            """Generate and process a safe local paper test signal."""
+            try:
+                data = request.get_json(silent=True) or {}
+                signal = {
+                    'source': data.get('source', 'test_signal'),
+                    'timestamp': datetime.now().isoformat(),
+                    'symbol': data.get('symbol', 'EURUSD'),
+                    'action': data.get('action', 'BUY'),
+                    'asset_class': data.get('asset_class', 'forex'),
+                    'entry_price': data.get('entry_price', 1.1000),
+                    'stop_loss': data.get('stop_loss', 1.0950),
+                    'take_profit': data.get('take_profit', 1.1100),
+                    'position_size': data.get('position_size', 0.01),
+                    'units': data.get('units', 1),
+                    'strategy_id': data.get('strategy_id', data.get('strategy', 'receiver_test')),
+                    'entry_reason': data.get('entry_reason', 'safe_receiver_test'),
+                    'timeframe': data.get('timeframe', 'H1'),
+                    'strategy': data.get('strategy', 'receiver_test'),
+                    'confidence': data.get('confidence', 75),
+                }
+                result = self._dispatch_signal(signal)
+                return jsonify({'status': 'test_signal_processed', 'signal': signal, 'engine_result': result}), 200
             except Exception as e:
                 return jsonify({'error': str(e)}), 500
 
@@ -74,22 +124,41 @@ class SignalReceiver:
         @self.app.route('/health', methods=['GET'])
         def health_check():
             """Health check endpoint"""
+            provider_status = self.status_provider() if self.status_provider else {}
             return jsonify({
                 'status': 'healthy',
                 'timestamp': datetime.now().isoformat(),
-                'signals_received': len(self.signals)
+                'configured_port': self.port,
+                'signals_received': len(self.signals),
+                'safe_mode_active': provider_status.get('safe_mode_active'),
+                'live_trading': provider_status.get('live_trading'),
+                'broker_mode': provider_status.get('broker_mode'),
+                'logger_available': provider_status.get('logger_available'),
             })
 
         @self.app.route('/status', methods=['GET'])
         def status():
             """Detailed status endpoint for operator tooling."""
+            provider_status = self.status_provider() if self.status_provider else {}
             return jsonify({
                 'status': 'healthy',
                 'timestamp': datetime.now().isoformat(),
                 'started_at': self.started_at,
                 'signals_received': len(self.signals),
                 'last_signal': self.signals[-1] if self.signals else None,
+                'receiver': {
+                    'port': self.port,
+                    'started_at': self.started_at,
+                },
+                'engine': provider_status,
             })
+
+        @self.app.route('/trades/recent', methods=['GET'])
+        def recent_trades():
+            """Return recent trade log entries if available."""
+            limit = int(request.args.get('limit', 10))
+            trades = self.recent_trades_provider(limit) if self.recent_trades_provider else []
+            return jsonify({'trades': trades, 'count': len(trades)})
 
     def parse_tradingview_signal(self, data):
         """Parse TradingView webhook data into standardized signal format"""

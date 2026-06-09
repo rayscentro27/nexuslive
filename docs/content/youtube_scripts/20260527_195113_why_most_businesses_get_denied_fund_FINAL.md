@@ -1,0 +1,9 @@
+**HOOK (0:00-0:30)**
+Are rejection letters making you feel like your business doesn't stand a chance? Discover how AI uncovers the 3 vital data points banks prioritize—each one revealing the hidden pathways to your next funding opportunity in just 90 seconds.
+
+**(Visual: Rapid montage of a determined small business owner, rejection stamps flying, real-time data flowing, engaging AI graphics)**
+
+**PROBLEM (0:30-2:00)**
+Those rejection letters don’t just feel disheartening; they’re often rooted in misunderstandings about what lenders really want to see. Many small business owners toil endlessly on their vision, only to fall flat when it comes to securing critical growth capital. What if you could leverage data to turn those setbacks into stepping stones? Let’s explore how you can finally break through the funding barrier and turn your dream into a reality.
+
+Don't gamble with another funding rejection. Right now, Nexus's AI scanner will diagnose your exact application weaknesses – from financial ratios to pitch deck gaps – in under 7 minutes. Lenders have hard quarterly deadlines, and applications submitted in the final weeks face 3x higher denial rates. Your free audit at [nexus-link] not only identifies your gaps but immediately matches you with lenders actively seeking businesses at your readiness level. We partner directly with 200+ lenders who fast-track high-scoring applications. Want ongoing advantage? Subscribe to our Funding Insider newsletter for lender rate alerts. For critical fixes, book a 1:1 funding strategist session through your audit dashboard. Serious about funding? Upgrade to Nexus Pro for perpetual AI optimization of financials and pitch materials. Act now – quarterly cycles wait for no one.

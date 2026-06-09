@@ -10,6 +10,7 @@ import os
 import json
 import time
 import threading
+import hashlib
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from datetime import datetime
 from pathlib import Path
@@ -22,7 +23,8 @@ except ImportError:
 
 # GLOBAL SAFETY FLAG
 # Keep paper mode as the default until live execution is explicitly re-approved.
-DRY_RUN = os.getenv('NEXUS_DRY_RUN', 'true').lower() == 'true'
+LIVE_EXECUTION_ENABLED = os.getenv('TRADING_LIVE_EXECUTION_ENABLED', 'false').lower() == 'true'
+DRY_RUN = os.getenv('NEXUS_DRY_RUN', 'true').lower() == 'true' or not LIVE_EXECUTION_ENABLED
 ROOT = Path(__file__).resolve().parent.parent
 STATUS_FILE = ROOT / "logs" / "trading_engine_status.json"
 HALT_FLAG   = ROOT / "logs" / "trading_engine_halt.flag"
@@ -35,6 +37,10 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from hermes.trade_reviewer  import review_signal as hermes_review_signal
 from hermes.command_handler import HermesCommandHandler
+from integrations.oanda_demo import OandaDemoAdapter
+from integrations.oanda_demo.oanda_demo_adapter import OandaSafetyError
+from lib.trading_fallback_logger import append_jsonl
+from lib.trading_safety_gate import evaluate_trading_safety
 
 
 # ── Telegram Notifier ─────────────────────────────────────────────────────────
@@ -127,6 +133,7 @@ class NexusTradingEngine:
             print("⚠️ DRY_RUN is active - forcing demo mode and disabling live trading")
             self.config['live_trading'] = False
             self.config['broker_type'] = 'demo'
+            self.config['auto_trading'] = os.getenv('NEXUS_PAPER_AUTO_TRADING', 'false').lower() == 'true'
 
         # Initialize only the components required for startup.
         # Strategy analysis is loaded lazily on first signal so the receiver can
@@ -137,7 +144,12 @@ class NexusTradingEngine:
             broker_type=self.config.get('broker_type', 'demo'),
             config=self.config.get('broker_config')
         )
-        self.signal_receiver = SignalReceiver(port=self.config.get('signal_port', 5000))
+        self.signal_receiver = SignalReceiver(
+            port=self.config.get('signal_port', 5000),
+            signal_handler=self.process_signal,
+            status_provider=self.get_runtime_status,
+            recent_trades_provider=self.get_recent_trades,
+        )
 
         # Trading state
         self.is_running = False
@@ -146,6 +158,22 @@ class NexusTradingEngine:
         self.last_signal = None
         self.last_result = None
         self.receiver_started = False
+        self.last_execution_mode = None
+        self.last_oanda_practice_order_at = None
+        self.last_local_paper_trade_at = None
+        self.last_oanda_order_id = None
+        self.last_trade_record = None
+        self.oanda_practice_default_enabled = os.getenv('OANDA_PRACTICE_DEFAULT_ENABLED', 'true').lower() == 'true'
+        self.local_paper_fallback_enabled = True
+        self.max_oanda_units = int(os.getenv("OANDA_MAX_UNITS", "1"))
+        self.max_oanda_trades_per_run = int(os.getenv("OANDA_MAX_DAILY_ORDERS", "3"))
+        self.signal_cooldown_seconds = int(os.getenv("NEXUS_SIGNAL_COOLDOWN_SECONDS", "300"))
+        self.signal_dedupe_window = int(os.getenv("NEXUS_SIGNAL_DEDUPE_WINDOW", "50"))
+        self.signal_timestamps = {}
+        self.signal_keys = []
+        self.oanda_practice_trades_this_run = 0
+        self.oanda_practice_available = False
+        self.execution_blockers = []
 
         # Hermes integration
         self.halted          = False   # set True via /halt command
@@ -220,11 +248,15 @@ class NexusTradingEngine:
                     'updated_at': datetime.now().isoformat(),
                     'stage': stage,
                     'dry_run': DRY_RUN,
+                    'paper_only': DRY_RUN and not self.config.get('live_trading', False),
+                    'live_execution_enabled': LIVE_EXECUTION_ENABLED,
                     'auto_trading': self.config.get('auto_trading', False),
                     'broker_type': self.broker_api.broker_type if hasattr(self, 'broker_api') else self.config.get('broker_type'),
                     'live_trading': self.config.get('live_trading', False),
                     'broker_connected': self.broker_api.connected if hasattr(self, 'broker_api') else False,
                     'receiver_started': self.receiver_started,
+                    'signal_port': self.config.get('signal_port', 5000),
+                    'receiver_health_url': f"http://127.0.0.1:{self.config.get('signal_port', 5000)}/health",
                     'is_running': self.is_running,
                     'active_positions': len(self.active_positions),
                     'signals_processed': len(self.trading_log),
@@ -259,8 +291,131 @@ class NexusTradingEngine:
             return True
         else:
             print("❌ Failed to connect to broker")
-            self.write_status("broker_connect_failed")
+            self.write_status("broker_connect_failed", {
+                "broker_error": getattr(self.broker_api, "last_error", None),
+                "signal_port": self.config.get('signal_port', 5000),
+            })
             return False
+
+    def _signal_asset_class(self, signal: dict) -> str:
+        asset_class = str(signal.get("asset_class") or "").strip().lower()
+        if asset_class:
+            return asset_class
+        symbol = str(signal.get("symbol") or "").upper()
+        if any(token in symbol for token in ("BTC", "ETH", "SOL", "XRP", "DOGE", "ADA")):
+            return "crypto"
+        if any(token in symbol for token in ("SPY", "QQQ", "AAPL", "TSLA", "NVDA")):
+            return "equity"
+        return "forex"
+
+    def _signal_key(self, signal: dict) -> str:
+        base = {
+            "symbol": signal.get("symbol"),
+            "action": signal.get("action"),
+            "timeframe": signal.get("timeframe"),
+            "strategy_id": signal.get("strategy_id") or signal.get("strategy"),
+            "entry_price": signal.get("entry_price"),
+            "stop_loss": signal.get("stop_loss"),
+            "take_profit": signal.get("take_profit"),
+        }
+        raw = json.dumps(base, sort_keys=True, default=str)
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def _receiver_trade_limits(self) -> dict:
+        return {
+            "max_units": self.max_oanda_units,
+            "max_trades_per_run": self.max_oanda_trades_per_run,
+            "cooldown_seconds": self.signal_cooldown_seconds,
+        }
+
+    def _mark_signal_seen(self, signal_key: str, strategy_symbol_key: str, now_ts: float) -> None:
+        self.signal_timestamps[signal_key] = now_ts
+        self.signal_timestamps[strategy_symbol_key] = now_ts
+        self.signal_keys.append(signal_key)
+        if len(self.signal_keys) > self.signal_dedupe_window:
+            stale = self.signal_keys.pop(0)
+            self.signal_timestamps.pop(stale, None)
+
+    def _signal_block_reason(self, signal: dict) -> str | None:
+        now_ts = time.time()
+        signal_key = self._signal_key(signal)
+        strategy_symbol_key = f"{signal.get('symbol')}::{signal.get('strategy_id') or signal.get('strategy')}"
+        if signal_key in self.signal_timestamps:
+            return "duplicate_signal"
+        last_ts = self.signal_timestamps.get(strategy_symbol_key)
+        if last_ts and (now_ts - last_ts) < self.signal_cooldown_seconds:
+            return f"cooldown_active_{int(self.signal_cooldown_seconds - (now_ts - last_ts))}s"
+        self._mark_signal_seen(signal_key, strategy_symbol_key, now_ts)
+        return None
+
+    def _normalize_instrument(self, symbol: str) -> str:
+        if "_" in symbol:
+            return symbol.upper()
+        if len(symbol) == 6:
+            return f"{symbol[:3].upper()}_{symbol[3:].upper()}"
+        return symbol.upper()
+
+    def _oanda_practice_safety(self) -> dict:
+        api_url = os.getenv("OANDA_API_URL", "")
+        safety = evaluate_trading_safety(broker_mode="oanda_practice", api_url=api_url)
+        blockers = list(safety.get("blockers") or [])
+        if not self.oanda_practice_default_enabled:
+            blockers.append("OANDA_PRACTICE_DEFAULT_ENABLED=false")
+        if self.oanda_practice_trades_this_run >= self.max_oanda_trades_per_run:
+            blockers.append("max_oanda_practice_trades_per_run_reached")
+        return {**safety, "blockers": blockers, "safe": len(blockers) == 0 and safety.get("effective_dry_run", False)}
+
+    def _try_oanda_practice_execution(self, signal: dict) -> tuple[dict | None, str | None]:
+        units = min(abs(int(signal.get("units") or 1)), self.max_oanda_units)
+        if self._signal_asset_class(signal) != "forex":
+            return None, "non_forex_signal"
+        if units < 1:
+            units = 1
+
+        safety = self._oanda_practice_safety()
+        if not safety["safe"]:
+            return None, "; ".join(safety["blockers"]) or "oanda_practice_blocked"
+
+        try:
+            os.environ["OANDA_DEMO_ENABLED"] = "true"
+            adapter = OandaDemoAdapter()
+            conn = adapter.connection_status()
+            if not conn.get("ok"):
+                return None, conn.get("error") or "oanda_connection_failed"
+            order = adapter.place_demo_order(
+                instrument=self._normalize_instrument(str(signal.get("symbol") or "EURUSD")),
+                side=str(signal.get("action") or "BUY").lower(),
+                units=units,
+                reason=f"receiver_signal:{signal.get('strategy_id') or signal.get('strategy') or 'manual'}",
+            )
+            if not order.get("ok"):
+                return None, order.get("error") or "oanda_practice_order_failed"
+            self.oanda_practice_available = True
+            self.oanda_practice_trades_this_run += 1
+            self.last_oanda_practice_order_at = order.get("placed_at") or datetime.now().isoformat()
+            fill = order.get("order_fill") or {}
+            order_id = fill.get("id") or fill.get("orderID")
+            self.last_oanda_order_id = order_id
+            return {
+                "status": "executed_oanda_practice",
+                "message": "Oanda practice order placed",
+                "execution_mode": "oanda_practice",
+                "broker_mode": "oanda_practice",
+                "safety_status": "safe",
+                "trade_id": order_id,
+                "order_id": order_id,
+                "fallback_used": False,
+                "order_summary": {
+                    "instrument": order.get("instrument"),
+                    "side": order.get("side"),
+                    "units": order.get("units"),
+                    "placed_at": order.get("placed_at"),
+                },
+            }, None
+        except OandaSafetyError as exc:
+            return None, str(exc)
+        except Exception as exc:
+            return None, str(exc)
 
     def start_signal_receiver(self, background: bool = True):
         """Start the signal receiver.
@@ -343,6 +498,29 @@ class NexusTradingEngine:
         risk_assessment = self.risk_manager.validate_signal(risk_input)
         print(f"⚠️ Risk assessment: {'Approved' if risk_assessment['approved'] else 'Rejected'}")
 
+        dedupe_reason = self._signal_block_reason(signal)
+        if dedupe_reason:
+            result = {
+                'status': 'rejected',
+                'issues': [dedupe_reason],
+                'execution_mode': 'blocked',
+                'broker_mode': self.broker_api.broker_type,
+                'safety_status': 'blocked',
+                'fallback_used': False,
+                'rejection_reason': dedupe_reason,
+            }
+            self.log_trade({
+                'signal': signal,
+                'status': 'rejected',
+                'reason': [dedupe_reason],
+                'result': result,
+                'timestamp': datetime.now().isoformat()
+            })
+            self.last_result = result
+            self.last_execution_mode = 'blocked'
+            self.write_status("signal_rejected", {"execution_blockers": [dedupe_reason]})
+            return result
+
         if not risk_assessment['approved']:
             self.notifier.signal_rejected(
                 signal.get('symbol', '?'),
@@ -402,60 +580,65 @@ class NexusTradingEngine:
 
         self.pending_signal = None
 
-        # Step 4: Execute Trade (if live trading enabled)
-        if self.config.get('live_trading', False):
-            order = {
-                'symbol': signal['symbol'],
-                'side': signal['action'].lower(),
-                'size': 0.01,  # Would be calculated by risk manager
-                'stop_loss': signal.get('stop_loss'),
-                'take_profit': signal.get('take_profit')
-            }
-
-            execution_result = self.broker_api.place_order(order)
-            print(f"📈 Order executed: {execution_result}")
+        # Step 4: Execute Trade (Oanda practice preferred, local paper fallback)
+        execution_blockers: list[str] = []
+        result = None
+        oanda_result, oanda_blocker = self._try_oanda_practice_execution(signal)
+        if oanda_result:
+            result = oanda_result
             self.notifier.trade_executed(
                 signal['symbol'],
                 signal['action'],
-                order['size'],
-                execution_result.get('entry_price', 0),
+                int(signal.get('units') or 1),
+                signal.get('entry_price') or 0,
                 signal.get('stop_loss'),
                 signal.get('take_profit'),
             )
-
-            # Step 4: Risk Manager - Record Position
-            if 'order_id' in execution_result:
-                position_approval = self.risk_manager.approve_trade({
-                    'symbol': signal['symbol'],
-                    'entry_price': execution_result.get('entry_price'),
-                    'stop_loss': signal.get('stop_loss'),
-                    'take_profit': signal.get('take_profit'),
-                    'position_size': order['size']
-                })
-
+            if result.get("order_id"):
                 self.active_positions.append({
-                    'order_id': execution_result['order_id'],
+                    'order_id': result['order_id'],
                     'symbol': signal['symbol'],
-                    'entry_price': execution_result.get('entry_price'),
-                    'position_size': order['size']
+                    'entry_price': signal.get('entry_price'),
+                    'position_size': int(signal.get('units') or 1),
                 })
-
-            result = {'status': 'executed', 'execution': execution_result}
         else:
-            # Demo mode - just approve and log
+            if oanda_blocker:
+                execution_blockers.append(oanda_blocker)
             self.notifier.trade_demo(signal.get('symbol', '?'), signal.get('action', '?'))
-            result = {'status': 'approved_demo', 'message': 'Demo mode - no real execution'}
+            self.last_local_paper_trade_at = datetime.now().isoformat()
+            result = {
+                'status': 'approved_demo',
+                'message': 'Local paper fallback - no broker execution',
+                'execution_mode': 'local_paper',
+                'broker_mode': 'demo',
+                'safety_status': 'safe',
+                'fallback_used': True,
+                'rejection_reason': oanda_blocker,
+            }
 
         # Log the trade
-        self.log_trade({
+        trade_record = {
             'signal': signal,
             'strategy_analysis': strategy_signal,
             'risk_assessment': risk_assessment,
             'result': result,
+            'execution_blockers': execution_blockers,
             'timestamp': datetime.now().isoformat()
-        })
+        }
+        self.log_trade(trade_record)
+        self.last_trade_record = trade_record
         self.last_result = result
-        self.write_status("signal_processed")
+        self.last_execution_mode = result.get('execution_mode')
+        self.execution_blockers = execution_blockers
+        self.write_status("signal_processed", {
+            "last_execution_mode": self.last_execution_mode,
+            "last_oanda_practice_order_at": self.last_oanda_practice_order_at,
+            "last_local_paper_trade_at": self.last_local_paper_trade_at,
+            "execution_blockers": execution_blockers,
+            "oanda_practice_available": self.oanda_practice_available,
+            "oanda_practice_default_enabled": self.oanda_practice_default_enabled,
+            "local_paper_fallback_enabled": self.local_paper_fallback_enabled,
+        })
 
         return result
 
@@ -577,6 +760,30 @@ class NexusTradingEngine:
         # Persist to Supabase so paper trades appear in the dashboard
         if 'signal' in trade_data:
             self._supabase_log_paper_trade(trade_data)
+            signal = trade_data.get("signal") or {}
+            result = trade_data.get("result") or {}
+            append_jsonl("trades", {
+                "created_at": trade_data.get("timestamp") or datetime.now().isoformat(),
+                "trade_id": result.get("trade_id") or result.get("order_id"),
+                "strategy_id": signal.get("strategy_id") or signal.get("strategy"),
+                "symbol": signal.get("symbol"),
+                "asset_class": self._signal_asset_class(signal),
+                "direction": signal.get("action"),
+                "entry_price": signal.get("entry_price"),
+                "stop_loss": signal.get("stop_loss"),
+                "take_profit": signal.get("take_profit"),
+                "position_size": signal.get("position_size"),
+                "units": signal.get("units", 1),
+                "broker_mode": result.get("broker_mode", self.broker_api.broker_type),
+                "execution_mode": result.get("execution_mode", "local_paper"),
+                "status": result.get("status"),
+                "failure_reason": result.get("rejection_reason"),
+                "metadata": {
+                    "fallback_used": result.get("fallback_used"),
+                    "safety_status": result.get("safety_status"),
+                    "execution_blockers": trade_data.get("execution_blockers") or [],
+                },
+            })
 
     def start_automated_trading(self):
         """Start automated trading loop"""
@@ -600,6 +807,8 @@ class NexusTradingEngine:
                 # Check for new signals
                 signals = self.signal_receiver.get_latest_signals(limit=1)
                 for signal in signals:
+                    if signal.get('processed_immediately'):
+                        continue
                     if signal not in [log.get('signal') for log in self.trading_log[-10:]]:  # Avoid duplicates
                         self.process_signal(signal)
 
@@ -641,6 +850,51 @@ class NexusTradingEngine:
             'risk_status': self.risk_manager.get_risk_status(),
             'broker_connected': self.broker_api.connected,
             'account_info': self.broker_api.get_account_info() if self.broker_api.connected else None
+        }
+
+    def get_recent_trades(self, limit: int = 10):
+        """Return recent trade log entries for operator endpoints."""
+        return self.trading_log[-limit:]
+
+    def get_runtime_status(self):
+        """Build verified status for health/status reporting."""
+        last_trade_time = None
+        if self.trading_log:
+            last_trade_time = self.trading_log[-1].get('timestamp')
+        safety = evaluate_trading_safety(
+            broker_mode='oanda_practice' if self.oanda_practice_default_enabled else self.broker_api.broker_type,
+            api_url=os.getenv("OANDA_API_URL", ""),
+        )
+        return {
+            'receiver_status': 'healthy' if self.receiver_started else 'starting',
+            'port': self.config.get('signal_port', 5000),
+            'service_name': 'com.nexus.trading-engine',
+            'safe_mode_active': DRY_RUN and not self.config.get('live_trading', False),
+            'safety_status': 'safe' if safety.get('safe') else 'blocked',
+            'live_trading': self.config.get('live_trading', False),
+            'live_trading_enabled': self.config.get('live_trading', False),
+            'auto_trading': self.config.get('auto_trading', False),
+            'broker_mode': self.broker_api.broker_type,
+            'execution_mode': self.last_execution_mode or 'idle',
+            'oanda_practice_available': self.oanda_practice_available,
+            'oanda_practice_default_enabled': self.oanda_practice_default_enabled,
+            'local_paper_fallback_enabled': self.local_paper_fallback_enabled,
+            'broker_connected': self.broker_api.connected,
+            'broker_error': getattr(self.broker_api, 'last_error', None),
+            'strategy_runner_status': 'paper_fast_mode' if DRY_RUN and PAPER_FAST_MODE else 'lazy_load',
+            'supabase_logging_status': 'enabled' if os.getenv('SUPABASE_URL') and os.getenv('SUPABASE_KEY') else 'disabled',
+            'telegram_status_path': str(ROOT / "logs" / "trading_engine_status.json"),
+            'logger_available': True,
+            'receiver_port': self.config.get('signal_port', 5000),
+            'paper_only': True,
+            'dry_run': DRY_RUN,
+            'last_signal_time': (self.last_signal or {}).get('timestamp') if self.last_signal else None,
+            'last_execution_mode': self.last_execution_mode,
+            'last_oanda_practice_order_at': self.last_oanda_practice_order_at,
+            'last_local_paper_trade_at': self.last_local_paper_trade_at,
+            'last_trade_time': last_trade_time,
+            'signals_processed': len(self.trading_log),
+            'blockers': list((safety.get('blockers') or [])) + list(self.execution_blockers or []),
         }
 
 def main():

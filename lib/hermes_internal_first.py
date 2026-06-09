@@ -71,6 +71,50 @@ class InternalFirstReply:
     matched_topic: str
 
 
+def _load_trading_engine_status() -> dict[str, Any]:
+    status_path = Path(__file__).resolve().parent.parent / "logs" / "trading_engine_status.json"
+    if not status_path.exists():
+        return {}
+    try:
+        data = json.loads(status_path.read_text())
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _load_trading_strategy_candidates() -> dict[str, Any]:
+    path = Path(__file__).resolve().parent.parent / "logs" / "hermes_supabase_strategy_candidates_latest.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _load_latest_live_watch() -> dict[str, Any]:
+    path = Path(__file__).resolve().parent.parent / "logs" / "live_watch" / "trading_watch_session_latest.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _load_latest_strategy_discovery() -> dict[str, Any]:
+    path = Path(__file__).resolve().parent.parent / "logs" / "trading_strategy_discovery_latest.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
 def _build_operational_context_brief() -> str:
     """Build greeting context from verified evidence files only. No unsourced claims."""
     from pathlib import Path as _Path
@@ -673,10 +717,23 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         )
 
     if topic == "trading":
+        engine_status = _load_trading_engine_status()
+        strategy_memory = _load_trading_strategy_candidates()
+        live_watch = _load_latest_live_watch()
+        strategy_discovery = _load_latest_strategy_discovery()
         nexus_dry_run = os.getenv("NEXUS_DRY_RUN", "true").lower() == "true"
         live_trading  = os.getenv("LIVE_TRADING", "false").lower() == "true"
         trading_live  = os.getenv("TRADING_LIVE_EXECUTION_ENABLED", "false").lower() == "true"
         auto_trading  = os.getenv("NEXUS_AUTO_TRADING", "false").lower() == "true"
+        effective_dry_run = bool(engine_status.get("dry_run", nexus_dry_run))
+        effective_live_trading = bool(engine_status.get("live_trading", live_trading))
+        effective_auto_trading = bool(engine_status.get("auto_trading", auto_trading))
+        engine_stage = engine_status.get("stage", "unknown")
+        engine_broker = engine_status.get("broker_type", "unknown")
+        engine_port = engine_status.get("signal_port", 5000)
+        engine_updated_at = engine_status.get("updated_at", "")
+        broker_error = engine_status.get("broker_error")
+        receiver_started = bool(engine_status.get("receiver_started", False))
         cb_active_count = 0
         cb_status = "unknown"
         try:
@@ -687,8 +744,8 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         except Exception:
             cb_status = "module unavailable"
 
-        safe = nexus_dry_run and not live_trading and not trading_live and not auto_trading
-        phase_note = ("Paper trading phase. NEXUS_DRY_RUN=true. No live execution."
+        safe = effective_dry_run and not effective_live_trading and not trading_live and not effective_auto_trading
+        phase_note = ("Paper trading phase. Verified dry-run/paper mode. No live execution."
                       if safe
                       else "⚠️ WARNING: unsafe flag detected — operator action needed.")
 
@@ -699,6 +756,8 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
         is_safe_query     = any(k in text_lower for k in ["is demo safe", "is paper safe", "safety status", "is it safe"])
         is_paused_query   = any(k in text_lower for k in ["why paused", "why halted", "why stopped", "what paused"])
         is_strategy_query = any(k in text_lower for k in ["active strategy", "what strategy", "which strategy", "strategy running"])
+        is_replay_query   = any(k in text_lower for k in ["trade replay", "last trade replay", "show me the last trade replay", "show me the usdjpy pullback trade", "show me the latest chart", "latest chart"])
+        is_watch_query    = any(k in text_lower for k in ["what is nexus watching", "what happened during london open", "show me the new york open watch", "show me the new york open setup", "why did nexus reject that setup"])
 
         if is_results_query:
             # Read paper trading journal from disk if available
@@ -768,18 +827,24 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
 
         if is_safe_query:
             flags = {
-                "NEXUS_DRY_RUN":                  ("true ✓" if nexus_dry_run   else "false ⚠️"),
-                "LIVE_TRADING":                   ("false ✓" if not live_trading else "true ⚠️"),
+                "NEXUS_DRY_RUN":                  ("true ✓" if effective_dry_run   else "false ⚠️"),
+                "LIVE_TRADING":                   ("false ✓" if not effective_live_trading else "true ⚠️"),
                 "TRADING_LIVE_EXECUTION_ENABLED": ("false ✓" if not trading_live else "true ⚠️"),
-                "NEXUS_AUTO_TRADING":             ("false ✓" if not auto_trading  else "true ⚠️"),
+                "NEXUS_AUTO_TRADING":             ("false ✓" if not effective_auto_trading  else "true ⚠️"),
                 "Circuit breakers":               (f"none active ✓" if cb_active_count == 0 else f"{cb_active_count} active ⚠️"),
+                "Receiver":                       (f"ready on :{engine_port} ✓" if receiver_started else f"not ready ({engine_stage}) ⚠️"),
             }
             flag_lines = "\n".join(f"  {k}: {v}" for k, v in flags.items())
             verdict = "✅ Demo platform is safe." if safe and cb_active_count == 0 else "⚠️ One or more safety flags need attention."
             return InternalFirstReply(
-                text=f"{verdict}\n\nSafety flags:\n{flag_lines}",
+                text=(
+                    f"{verdict}\n\nSafety flags:\n{flag_lines}"
+                    + (f"\n  Broker: {engine_broker}" if engine_broker else "")
+                    + (f"\n  Last update: {engine_updated_at}" if engine_updated_at else "")
+                    + (f"\n  Broker error: {broker_error}" if broker_error else "")
+                ),
                 confidence=CONF_INTERNAL_CONFIRMED,
-                source="env_config + circuit_breaker",
+                source="trading_engine_status.json + env_config + circuit_breaker",
                 matched_topic=topic,
             )
 
@@ -809,6 +874,27 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
             )
 
         if is_strategy_query:
+            candidates = strategy_memory.get("candidates") or []
+            tested = [c for c in candidates if c.get("test_status") == "tested"]
+            if candidates:
+                top = candidates[0]
+                lines = [
+                    "Nexus trading is using Supabase-first strategy search with local fallback.",
+                    f"Top candidate: {top.get('strategy_name', top.get('strategy_id', 'unknown'))}",
+                    f"Source: {top.get('strategy_source', 'unknown')}",
+                    f"Asset class: {top.get('asset_class', 'unknown')} · Symbol: {top.get('symbol', 'unknown')} · TF: {top.get('timeframe', 'H1')}",
+                    f"Test status: {top.get('test_status', 'unknown')} · Score: {top.get('score', 'n/a')}",
+                    f"Promotion decision: {top.get('promotion_decision', 'needs_review')}",
+                    f"Verified candidates: {len(candidates)} total · {len(tested)} tested",
+                ]
+                if strategy_memory.get("fallback_used"):
+                    lines.append("Supabase is currently blocked, so Hermes is using local verified fallback strategy memory.")
+                return InternalFirstReply(
+                    text="\n".join(lines),
+                    confidence=CONF_INTERNAL_CONFIRMED,
+                    source="hermes_supabase_strategy_candidates_latest.json",
+                    matched_topic=topic,
+                )
             return InternalFirstReply(
                 text=(
                     "No live strategy is executing — NEXUS_DRY_RUN=true, paper mode only.\n"
@@ -817,14 +903,69 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
                     "To activate: approve strategy in StrategyApproval UI → signals feed into paper_trade_executor.py."
                 ),
                 confidence=CONF_INTERNAL_CONFIRMED,
-                source="env_config + strategy_registry",
-                matched_topic=topic,
-            )
+                    source="env_config + strategy_registry",
+                    matched_topic=topic,
+                )
+
+        if is_replay_query:
+            replay_path = Path(__file__).resolve().parent.parent / "logs" / "charts" / "trade_replay_latest.html"
+            dashboard_path = Path(__file__).resolve().parent.parent / "logs" / "charts" / "trading_dashboard_latest.html"
+            if replay_path.exists():
+                watch_checks = live_watch.get("strategy_checks") or []
+                latest = watch_checks[-1] if watch_checks else {}
+                return InternalFirstReply(
+                    text=(
+                        "Latest replay artifact is ready.\n"
+                        f"Replay chart: {replay_path}\n"
+                        f"Dashboard: {dashboard_path if dashboard_path.exists() else 'not_generated'}\n"
+                        f"Data quality: {latest.get('data_quality') or 'see chart'}\n"
+                        f"Reason: {latest.get('reason') or latest.get('rejection_reason') or 'see chart'}\n"
+                        f"Safety: {'paper/demo only' if safe else 'check safety flags'}.\n"
+                        "Refresh with `python3 scripts/generate_trade_replay_chart.py --latest --data-source oanda_practice`."
+                    ),
+                    confidence=CONF_INTERNAL_CONFIRMED,
+                    source="logs/charts/trade_replay_latest.html",
+                    matched_topic=topic,
+                )
+
+        if is_watch_query:
+            if live_watch:
+                checks = live_watch.get("strategy_checks") or []
+                latest = checks[-1] if checks else {}
+                return InternalFirstReply(
+                    text=(
+                        f"Nexus is watching session `{live_watch.get('session_name', 'unknown')}` on {', '.join(live_watch.get('symbols') or [])}.\n"
+                        f"Latest setup: {'detected' if latest.get('setup_detected') else 'rejected'} for `{latest.get('strategy_id', 'unknown')}` on `{latest.get('symbol', 'unknown')}`.\n"
+                        f"Reason: {latest.get('reason') or latest.get('rejection_reason') or 'n/a'}.\n"
+                        f"Data quality: {latest.get('data_quality') or 'unknown'}.\n"
+                        f"Chart: {live_watch.get('chart_path') or 'not_generated'}\n"
+                        f"Safety: {'paper/demo only' if safe else 'check safety flags'}.\n"
+                        "Refresh with `python3 scripts/start_trading_watch_session.py --session new_york_open --symbols EURUSD,USDJPY,GBPUSD --mode paper --dry-run --data-source oanda_practice`."
+                    ),
+                    confidence=CONF_INTERNAL_CONFIRMED,
+                    source="logs/live_watch/trading_watch_session_latest.json",
+                    matched_topic=topic,
+                )
+            if strategy_discovery:
+                return InternalFirstReply(
+                    text=(
+                        "No live watch session is running right now.\n"
+                        f"Latest discovery candidates: {strategy_discovery.get('candidates_discovered', 'unknown')} total, "
+                        f"{strategy_discovery.get('candidates_testable', 'unknown')} testable.\n"
+                        "Start a watch with `python3 scripts/start_trading_watch_session.py --session new_york_open --symbols EURUSD,USDJPY,GBPUSD --mode paper --dry-run`."
+                    ),
+                    confidence=CONF_INTERNAL_CONFIRMED,
+                    source="logs/trading_strategy_discovery_latest.json",
+                    matched_topic=topic,
+                )
 
         # Generic trading status
         lines = [
             "Nexus Trading Intelligence — Phase 2: Paper Trading + Demo Platform",
             f"Safety: {phase_note}",
+            f"Engine stage: {engine_stage}",
+            f"Broker mode: {engine_broker}",
+            f"Receiver: {'ready' if receiver_started else 'not ready'} on :{engine_port}",
             f"Circuit breakers: {cb_status}",
             f"TRADING_LIVE_EXECUTION_ENABLED: {'true ⚠️' if trading_live else 'false ✓'}",
             "",
@@ -834,10 +975,12 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
             "",
             "Ask: 'paper results', 'best session', 'why paused', 'active strategy', 'is demo safe'.",
         ]
+        if broker_error:
+            lines.insert(5, f"Broker error: {broker_error}")
         return InternalFirstReply(
             text="\n".join(lines),
             confidence=CONF_INTERNAL_CONFIRMED,
-            source="env_config + circuit_breaker + ops_memory",
+            source="trading_engine_status.json + env_config + circuit_breaker + ops_memory",
             matched_topic=topic,
         )
 
@@ -1253,6 +1396,7 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
     if topic == "goals_30_day":
         from pathlib import Path as _Path
         root = _Path(__file__).resolve().parent.parent
+        strategy_memory = _load_trading_strategy_candidates()
         mono_dir = root / "docs" / "reports" / "monetization"
         plan_files = sorted(mono_dir.glob("30_day_revenue_plan_*.md"), reverse=True) if mono_dir.exists() else []
         if plan_files:
@@ -1480,6 +1624,16 @@ def try_internal_first(raw: str) -> InternalFirstReply | None:
             else:
                 lines.append("Recommendation: Positive backtest result — run extended paper trade before any live consideration.")
                 lines.append("Next test: 6 months paper trading with position sizing limits.")
+
+        if strategy_memory.get("candidates"):
+            top = strategy_memory["candidates"][0]
+            lines.append("")
+            lines.append("Supabase-first strategy memory:")
+            lines.append(f"  Top candidate: {top.get('strategy_name', top.get('strategy_id', 'unknown'))}")
+            lines.append(f"  Source: {top.get('strategy_source', 'unknown')} · Data quality: {top.get('data_quality', 'unknown')}")
+            lines.append(f"  Promotion: {top.get('promotion_decision', 'needs_review')}")
+            if strategy_memory.get("fallback_used"):
+                lines.append("  Supabase currently blocked — using local fallback candidates.")
 
         if oanda_data:
             strat = oanda_data.get("strategy", {})

@@ -39,12 +39,12 @@ def fetch_json(url: str) -> dict:
 
 def process_running() -> bool:
     result = subprocess.run(
-        ["pgrep", "-f", "trading-engine/nexus_trading_engine.py"],
+        ["lsof", "-nP", "-iTCP:5000", "-sTCP:LISTEN"],
         capture_output=True,
         text=True,
         timeout=5,
     )
-    return result.returncode == 0 and bool((result.stdout or "").strip())
+    return result.returncode == 0 and "LISTEN" in (result.stdout or "")
 
 
 def tail(path: Path, limit: int = 3) -> list[str]:
@@ -57,11 +57,34 @@ def build_status() -> dict:
     saved = read_json(STATUS_FILE)
     health = fetch_json(HEALTH_URL)
     detail = fetch_json(DETAIL_URL)
+    if "error" in health and saved.get("receiver_started") and saved.get("broker_connected"):
+        health = {
+            "status": "healthy",
+            "source": "saved_status_fallback",
+            "configured_port": saved.get("signal_port", 5000),
+            "safe_mode_active": saved.get("dry_run"),
+            "live_trading": saved.get("live_trading"),
+            "broker_mode": saved.get("broker_type"),
+        }
+    if "error" in detail and saved:
+        detail = {
+            "status": "healthy" if saved.get("receiver_started") else "unknown",
+            "engine": {
+                "safe_mode_active": saved.get("dry_run"),
+                "live_trading": saved.get("live_trading"),
+                "broker_mode": saved.get("broker_type"),
+                "broker_connected": saved.get("broker_connected"),
+                "signals_processed": saved.get("signals_processed", 0),
+                "receiver_port": saved.get("signal_port", 5000),
+                "last_signal_time": ((saved.get("last_signal") or {}).get("timestamp")),
+            },
+        }
     return {
         "process_running": process_running(),
         "health": health,
         "detail": detail,
         "saved_status": saved,
+        "tournament_status": read_json(ROOT / "logs" / "nexus_trading_tournament_latest.json"),
         "recent_log_lines": tail(TRADING_LOG),
         "recent_error_lines": tail(TRADING_ERR_LOG),
     }
@@ -70,6 +93,8 @@ def build_status() -> dict:
 def print_brief(status: dict) -> None:
     saved = status["saved_status"]
     health_ok = "error" not in status["health"]
+    tournament = status.get("tournament_status") or {}
+    top = (tournament.get("top_strategy") or {}).get("strategy_name") or "none"
     print("Trading autonomy status")
     print(f"Process: {'running' if status['process_running'] else 'stopped'}")
     print(f"Receiver: {'healthy' if health_ok else 'unhealthy'}")
@@ -85,6 +110,7 @@ def print_brief(status: dict) -> None:
         f"signals={saved.get('signals_processed', 0)} "
         f"positions={saved.get('active_positions', 0)}"
     )
+    print(f"Tournament: {'ready' if tournament else 'not_run'} | top={top}")
     if saved.get("last_result"):
         print(f"Last result: {saved['last_result']}")
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import ssl
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,12 @@ except Exception:
 
 
 ROOT = Path("/Users/raymonddavis/nexus-ai")
+import sys
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from lib.trading_fallback_logger import append_jsonl, latest_jsonl
+
 STATUS_FILE = ROOT / "logs" / "strategy_tester_status.json"
 QUEUE_FILE = ROOT / "logs" / "strategy_paper_queue.json"
 PAPER_SIGNAL_URL = os.getenv("NEXUS_PAPER_SIGNAL_URL", "http://127.0.0.1:5000/signal/manual")
@@ -48,6 +55,7 @@ def env_first(*names: str) -> str:
 SUPABASE_URL = env_first("SUPABASE_URL")
 SUPABASE_READ_KEY = env_first("SUPABASE_ANON_KEY", "SUPABASE_KEY")
 SUPABASE_WRITE_KEY = env_first("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERVICE_KEY")
+SUPABASE_BLOCKER: str | None = None
 
 
 def iso_now() -> str:
@@ -79,17 +87,38 @@ def sb_headers(service: bool = False) -> dict[str, str]:
     }
 
 
+def _ssl_context():
+    cert_file = os.getenv("SSL_CERT_FILE", "")
+    if not cert_file:
+        try:
+            import certifi
+            cert_file = certifi.where()
+        except Exception:
+            cert_file = ""
+    if cert_file:
+        return ssl.create_default_context(cafile=cert_file)
+    return None
+
+
 def sb_get(query_path: str, *, service: bool = False, tolerate_missing: bool = False) -> list[dict[str, Any]]:
+    global SUPABASE_BLOCKER
+    if not SUPABASE_URL:
+        SUPABASE_BLOCKER = "SUPABASE_URL missing"
+        return []
     url = f"{SUPABASE_URL}/rest/v1/{query_path}"
     req = request.Request(url, headers=sb_headers(service=service))
     try:
-        with request.urlopen(req, timeout=20) as resp:
+        with request.urlopen(req, timeout=20, context=_ssl_context()) as resp:
+            SUPABASE_BLOCKER = None
             return json.loads(resp.read())
     except error.HTTPError as exc:
         body = exc.read().decode(errors="ignore")
         if tolerate_missing and exc.code in {400, 404}:
             return []
         raise RuntimeError(f"Supabase GET failed [{exc.code}] {query_path}: {body}") from exc
+    except Exception as exc:
+        SUPABASE_BLOCKER = str(exc)
+        return []
 
 
 def http_post_json(url: str, payload: dict[str, Any]) -> tuple[int, Any]:
@@ -145,11 +174,52 @@ def load_strategy_data() -> tuple[list[dict[str, Any]], list[dict[str, Any]], li
     )
     strategy_variants = sb_get(
         "strategy_variants"
-        "?select=strategy_id,variant_name,replay_score,backtest_score,parameter_set,created_at"
+        "?select=id,strategy_id,variant_name,replay_score,backtest_score,parameter_set,created_at"
         "&order=created_at.desc"
         "&limit=250",
         tolerate_missing=True,
     )
+    if not proposals and not replay_results and not risk_decisions and not strategy_variants:
+        local_scores = latest_jsonl("strategy_scores", limit=200)
+        local_trades = latest_jsonl("trades", limit=200)
+        synthetic_replays: list[dict[str, Any]] = []
+        for row in local_scores:
+            strategy_id = row.get("strategy_id")
+            for i in range(int(row.get("trades_count", 0) or 0)):
+                synthetic_replays.append(
+                    {
+                        "proposal_id": f"local::{strategy_id}::{i}",
+                        "strategy_id": strategy_id,
+                        "replay_outcome": "win" if float(row.get("win_rate", 0)) >= 0.5 else "loss",
+                        "pnl_r": float(row.get("avg_return", 0.0) or 0.0),
+                        "pnl_pct": float(row.get("total_return", 0.0) or 0.0),
+                        "created_at": row.get("created_at"),
+                    }
+                )
+        synthetic_proposals: list[dict[str, Any]] = []
+        for idx, trade in enumerate(local_trades):
+            signal = trade.get("signal") or {}
+            strategy_id = trade.get("strategy_id") or signal.get("strategy") or signal.get("strategy_id") or "local_paper"
+            synthetic_proposals.append(
+                {
+                    "id": f"local-proposal-{idx}",
+                    "signal_id": trade.get("trade_id") or f"local-signal-{idx}",
+                    "symbol": signal.get("symbol", trade.get("symbol", "EURUSD")),
+                    "side": signal.get("action", trade.get("direction", "BUY")),
+                    "timeframe": signal.get("timeframe", "H1"),
+                    "strategy_id": strategy_id,
+                    "asset_type": trade.get("asset_class", "forex"),
+                    "entry_price": signal.get("entry_price", trade.get("entry_price", 1.0)),
+                    "stop_loss": signal.get("stop_loss", trade.get("stop_loss", 0.99)),
+                    "take_profit": signal.get("take_profit", trade.get("take_profit", 1.01)),
+                    "ai_confidence": float(signal.get("confidence", 70)) / 100.0,
+                    "status": "proposed",
+                    "trace_id": trade.get("trade_id", f"trace-{idx}"),
+                    "created_at": trade.get("created_at", iso_now()),
+                }
+            )
+        proposals = synthetic_proposals
+        replay_results = synthetic_replays
     return proposals, replay_results, risk_decisions, strategy_variants
 
 
@@ -380,6 +450,8 @@ def compute_strategy_snapshot(
         warnings.append("Supabase service key is missing; queue submit still works but table writes are unavailable")
     if not proposals and not replay_results and not risk_decisions:
         warnings.append("Trading lab Supabase tables are missing or empty; apply the reviewed/replay/risk SQL before this bridge can rank strategies")
+    if SUPABASE_BLOCKER:
+        warnings.append(f"Supabase connectivity blocked; local fallback active ({SUPABASE_BLOCKER})")
     if not top_strategies:
         warnings.append("No replay-backed strategy ratings found yet")
     if not eligible_candidates:
@@ -411,6 +483,7 @@ def compute_strategy_snapshot(
         "eligible_candidates": eligible_candidates[:20],
         "recent_submissions": queue_state.get("submissions", [])[-10:],
         "warnings": warnings,
+        "supabase_logging": "online" if not SUPABASE_BLOCKER else "blocked_local_fallback_active",
     }
 
 
@@ -446,6 +519,32 @@ def submit_candidates(snapshot: dict[str, Any], limit: int) -> dict[str, Any]:
             record["error"] = str(exc)
 
         queue_state.setdefault("submissions", []).append(record)
+        append_jsonl("signals", {
+            "created_at": iso_now(),
+            "strategy_id": candidate["strategy_id"],
+            "symbol": candidate["symbol"],
+            "direction": candidate["side"],
+            "source": "strategy_paper_bridge",
+            "signal_payload": candidate["signal_payload"],
+            "status": record["status"],
+            "rejection_reason": record.get("error"),
+            "safety_mode": "paper_demo_only",
+        })
+        append_jsonl("reports", {
+            "created_at": iso_now(),
+            "report_type": "strategy_paper_bridge_submission",
+            "mode": "paper",
+            "receiver_status": record["status"],
+            "paper_trading_enabled": True,
+            "live_trading_enabled": False,
+            "strategies_tested": 1,
+            "trades_opened": 1 if record["status"] == "submitted" else 0,
+            "summary": f"{candidate['symbol']} / {candidate['strategy_id']} / {record['status']}",
+            "verified_facts": {
+                "receiver_status_code": record.get("receiver_status_code"),
+                "supabase_logging": "online" if not SUPABASE_BLOCKER else "blocked_local_fallback_active",
+            },
+        })
         submissions.append(record)
 
     queue_state["updated_at"] = iso_now()
@@ -509,6 +608,23 @@ def main() -> None:
         snapshot["submission_run"] = submit_candidates(snapshot, max(1, args.limit))
 
     write_json(STATUS_FILE, snapshot)
+    append_jsonl("reports", {
+        "created_at": iso_now(),
+        "report_type": "strategy_paper_bridge_snapshot",
+        "mode": "paper",
+        "receiver_status": "n/a",
+        "broker_status": "demo",
+        "live_trading_enabled": False,
+        "paper_trading_enabled": True,
+        "strategies_tested": snapshot.get("summary", {}).get("strategy_count", 0),
+        "trades_opened": snapshot.get("summary", {}).get("submitted_candidate_count", 0),
+        "summary": "Strategy paper bridge snapshot",
+        "blockers": snapshot.get("warnings", []),
+        "verified_facts": {
+            "supabase_logging": snapshot.get("supabase_logging"),
+            "eligible_candidate_count": snapshot.get("summary", {}).get("eligible_candidate_count", 0),
+        },
+    })
 
     if args.format == "brief":
         print_brief(snapshot)

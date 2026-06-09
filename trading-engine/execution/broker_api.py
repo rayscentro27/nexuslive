@@ -4,8 +4,11 @@ import json
 import time
 from datetime import datetime
 
+from lib.trading_safety_gate import evaluate_trading_safety
+
 # Keep broker execution aligned with the engine's safety posture.
-DRY_RUN = os.getenv('NEXUS_DRY_RUN', 'true').lower() == 'true'
+LIVE_EXECUTION_ENABLED = os.getenv('TRADING_LIVE_EXECUTION_ENABLED', 'false').lower() == 'true'
+DRY_RUN = os.getenv('NEXUS_DRY_RUN', 'true').lower() == 'true' or not LIVE_EXECUTION_ENABLED
 
 class BrokerAPI:
     """Unified Broker API Interface - Supports multiple brokers"""
@@ -15,11 +18,17 @@ class BrokerAPI:
         self.config = config or self.get_default_config()
         self.session = None
         self.connected = False
+        self.last_error = None
 
     def get_default_config(self):
         """Get default configuration for different brokers"""
         configs = {
             'oanda': {
+                'api_url': os.getenv('OANDA_API_URL', 'https://api-fxpractice.oanda.com'),
+                'account_id': os.getenv('OANDA_ACCOUNT_ID', ''),
+                'api_key': os.getenv('OANDA_API_KEY', '')
+            },
+            'oanda_practice': {
                 'api_url': os.getenv('OANDA_API_URL', 'https://api-fxpractice.oanda.com'),
                 'account_id': os.getenv('OANDA_ACCOUNT_ID', ''),
                 'api_key': os.getenv('OANDA_API_KEY', '')
@@ -40,10 +49,38 @@ class BrokerAPI:
     def connect(self):
         """Connect to broker API"""
         try:
-            if self.broker_type == 'demo':
-                print("⚠️ DRY_RUN enabled - skipping real broker connection")
+            self.last_error = None
+            safety = evaluate_trading_safety(
+                broker_mode=self.broker_type,
+                api_url=self.config.get("api_url", ""),
+            )
+            if not safety["safe"] and not DRY_RUN:
+                self.last_error = " ; ".join(safety["blockers"])
+                self.connected = False
+                return False
+            if DRY_RUN:
+                print("⚠️ NEXUS_DRY_RUN enabled - using simulated broker connection")
                 self.connected = True
-            elif self.broker_type == 'oanda':
+            elif self.broker_type == 'demo':
+                print("⚠️ Demo broker selected - skipping real broker connection")
+                self.connected = True
+            elif self.broker_type in {'oanda', 'oanda_practice'}:
+                api_url = self.config.get("api_url", "")
+                if (
+                    os.getenv("OANDA_ENVIRONMENT", "practice").lower() == "live"
+                    or "api-fxtrade.oanda.com" in api_url
+                    or os.getenv("LIVE_TRADING", "false").lower() == "true"
+                ) and not LIVE_EXECUTION_ENABLED:
+                    self.last_error = (
+                        "Live OANDA execution is blocked unless "
+                        "TRADING_LIVE_EXECUTION_ENABLED=true."
+                    )
+                    self.connected = False
+                    return False
+                if not self.config.get("account_id") or not self.config.get("api_key"):
+                    self.last_error = "Missing OANDA_ACCOUNT_ID or OANDA_API_KEY."
+                    self.connected = False
+                    return False
                 self.session = requests.Session()
                 self.session.headers.update({
                     'Authorization': f'Bearer {self.config["api_key"]}',
@@ -51,12 +88,16 @@ class BrokerAPI:
                 })
                 response = self.session.get(f'{self.config["api_url"]}/v3/accounts/{self.config["account_id"]}')
                 self.connected = response.status_code == 200
+                if not self.connected:
+                    self.last_error = f"OANDA connect failed with HTTP {response.status_code}."
             elif self.broker_type == 'metatrader':
+                self.last_error = 'MetaTrader bridge is not configured.'
                 self.connected = False  # Placeholder
             else:  # demo
                 self.connected = True
             return self.connected
         except Exception as e:
+            self.last_error = str(e)
             print(f"Connection error: {e}")
             return False
 
@@ -76,7 +117,7 @@ class BrokerAPI:
                 'leverage': leverage,
             }
 
-        elif self.broker_type == 'oanda':
+        elif self.broker_type in {'oanda', 'oanda_practice'}:
             try:
                 response = self.session.get(f'{self.config["api_url"]}/v3/accounts/{self.config["account_id"]}')
                 if response.status_code == 200:
@@ -108,7 +149,7 @@ class BrokerAPI:
                 'timestamp': datetime.now().isoformat()
             }
 
-        elif self.broker_type == 'oanda':
+        elif self.broker_type in {'oanda', 'oanda_practice'}:
             try:
                 # Get latest price
                 response = self.session.get(
@@ -164,7 +205,7 @@ class BrokerAPI:
                 'timestamp': datetime.now().isoformat()
             }
 
-        elif self.broker_type == 'oanda':
+        elif self.broker_type in {'oanda', 'oanda_practice'}:
             try:
                 # Oanda requires underscore format: EURUSD → EUR_USD
                 raw_symbol = order_data['symbol']
