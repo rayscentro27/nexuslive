@@ -141,6 +141,15 @@ def main() -> int:
         if strategy_search_status == "online" and promotion_created and top_candidate
         else "STRATEGY_PIPELINE_PARTIAL"
     )
+    blocker_items = list(safety.get("blockers") or [])
+    if not blocker_items:
+        if oanda_status != "OANDA_PRACTICE_READY":
+            blocker_items.append(str(oanda.get("blocker") or "oanda_not_ready"))
+        if strategy_search_status not in {"online", "fallback_active"}:
+            blocker_items.append("strategy_search_unavailable")
+        if supabase_logging not in {"online", "blocked_local_fallback_active"}:
+            blocker_items.append("supabase_logging_unavailable")
+    blocker_summary = ", ".join(dict.fromkeys(item for item in blocker_items if item)) or "none"
 
     next_cap_reset_command = "python3 scripts/run_nexus_demo_trading_loop.py --mode paper"
 
@@ -192,7 +201,7 @@ def main() -> int:
         f"Trading dashboard: {dashboard_path if dashboard_path.exists() else 'not_generated'}",
         f"Vibe review: {vibe_status}",
         f"Oanda daily cap remaining: {loop_oanda.get('daily_cap_remaining', 'unknown')}",
-        f"Blockers: {', '.join(safety.get('blockers') or ([oanda.get('blocker')] if oanda.get('blocker') else ['none']))}",
+        f"Blockers: {blocker_summary}",
         f"Next command after cap reset: {next_cap_reset_command}",
         "Safety confirmation: LIVE_TRADING=false · PAPER_ONLY=true · DRY_RUN=true",
         "Recommendation: Keep receiver in paper/demo mode, do not force trades while capped, and use the next-cap-reset command to test the strongest Supabase-native candidate.",

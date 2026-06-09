@@ -1,0 +1,37 @@
+{
+  "approval_id": "content_20260527_195541_470543a7",
+  "title": "Why most businesses get denied funding and how AI can help fix readiness gaps",
+  "platform": "newsletter",
+  "hook": "Banks don't care about your business idea. AI reveals the 3 data points they actually check first in 90 seconds.",
+  "scores": {
+    "hook_score": 95.0,
+    "novelty_score": 60.0,
+    "copy_intensity": 50.0,
+    "clarity_score": 70.0,
+    "monetization_score": 100,
+    "cta_score": 85,
+    "nexus_fit_score": 84.0
+  },
+  "overall_score": 79.5,
+  "status": "needs_revision",
+  "word_count": 97,
+  "rewrites": 1,
+  "artifacts": [
+    "/Users/raymonddavis/nexus-ai/docs/content/research_briefs/20260527_194112_why_most_businesses_get_denied_funding_a.md",
+    "/Users/raymonddavis/nexus-ai/docs/content/hooks/20260527_194452_why_most_businesses_get_denied_fund_hook_scores.md",
+    "/Users/raymonddavis/nexus-ai/docs/content/newsletters/20260527_195213_why_most_businesses_get_denied_fund_newsletter.md",
+    "/Users/raymonddavis/nexus-ai/docs/content/newsletters/20260527_195541_why_most_businesses_get_denied_fund_FINAL.md"
+  ],
+  "primary_cta": "Stop guessing why lenders say no. Scan your business for free with Nexus AI in 90 seconds and pinpoint your exact funding roadblocks. Get your personalized gap report now at [nexus-link] to fix weaknesses before your next application window closes.",
+  "monetization_paths": [
+    "funding_audit",
+    "lendio_affiliate",
+    "nav_credit",
+    "newsletter_capture",
+    "membership_offer",
+    "consulting"
+  ],
+  "created": "2026-05-28T02:55:41.804147+00:00",
+  "text_with_cta": "**SUBJECT LINE**  \nUnlock Your Growth Potential: Why Your Loan Got Denied and How AI Can Fix It in 90 Seconds!  \n\n**PREVIEW TEXT**  \nDid you know 82% of small business loans are denied? It\u2019s time to uncover the 3 critical data points banks look at first\u2014and how our AI tools can instantly bridge the gap for you!  \n\n**HOOK PARAGRAPH**  \nForget your exceptional ideas and hardworking hustle. Banks are indifferent to your passion\u2014they only care about numbers. Let our AI technology shine a light on the crucial metrics that can transform your funding prospects, all in under 90 seconds.\n\nDon't waste hours guessing why lenders rejected you or risk another costly denial. Your next funding opportunity could close soon. Use Nexus's free AI Funding Readiness Scanner right now: [nexus-link]. In under 2 minutes, our AI cross-references your financials, pitch materials, and business model against lender criteria, giving you a precise, prioritized list of weaknesses to fix \u2013 not generic advice. Businesses using our scanner see 70% better approval rates on their next try. Get your actionable gap report instantly and start fixing what matters most today. Ready to go deeper? Nexus Pro members get unlimited financial health scoring, AI-powered pitch deck refinements, and exclusive lender matching. If your scan reveals complex issues, book a 1-on-1 Nexus Funding Audit for expert strategy. Subscribe to Nexus Weekly below for ongoing insights to stay ahead!",
+  "final_artifact_path": "/Users/raymonddavis/nexus-ai/docs/content/newsletters/20260527_195541_why_most_businesses_get_denied_fund_FINAL.md"
+}

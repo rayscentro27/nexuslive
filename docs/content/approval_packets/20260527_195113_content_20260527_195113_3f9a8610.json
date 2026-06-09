@@ -1,0 +1,37 @@
+{
+  "approval_id": "content_20260527_195113_3f9a8610",
+  "title": "Why most businesses get denied funding and how AI can help fix readiness gaps",
+  "platform": "youtube",
+  "hook": "Banks don't care about your business idea. AI reveals the 3 data points they actually check first in 90 seconds.",
+  "scores": {
+    "hook_score": 95.0,
+    "novelty_score": 60.0,
+    "copy_intensity": 50.0,
+    "clarity_score": 70.0,
+    "monetization_score": 100,
+    "cta_score": 85,
+    "nexus_fit_score": 84.0
+  },
+  "overall_score": 79.5,
+  "status": "needs_revision",
+  "word_count": 131,
+  "rewrites": 1,
+  "artifacts": [
+    "/Users/raymonddavis/nexus-ai/docs/content/research_briefs/20260527_194112_why_most_businesses_get_denied_funding_a.md",
+    "/Users/raymonddavis/nexus-ai/docs/content/hooks/20260527_194452_why_most_businesses_get_denied_fund_hook_scores.md",
+    "/Users/raymonddavis/nexus-ai/docs/content/youtube_scripts/20260527_194649_why_most_businesses_get_denied_fund_youtube.md",
+    "/Users/raymonddavis/nexus-ai/docs/content/youtube_scripts/20260527_195113_why_most_businesses_get_denied_fund_FINAL.md"
+  ],
+  "primary_cta": "Stop getting denied funding. Run your free Nexus Funding Readiness Audit now at [nexus-link] to instantly uncover your specific application gaps. Lenders have quarterly deadlines \u2013 complete your audit today to get matched before the next cutoff.",
+  "monetization_paths": [
+    "funding_audit",
+    "lendio_affiliate",
+    "nav_credit",
+    "newsletter_capture",
+    "membership_offer",
+    "consulting"
+  ],
+  "created": "2026-05-28T02:51:13.268093+00:00",
+  "text_with_cta": "**HOOK (0:00-0:30)**\nAre rejection letters making you feel like your business doesn't stand a chance? Discover how AI uncovers the 3 vital data points banks prioritize\u2014each one revealing the hidden pathways to your next funding opportunity in just 90 seconds.\n\n**(Visual: Rapid montage of a determined small business owner, rejection stamps flying, real-time data flowing, engaging AI graphics)**\n\n**PROBLEM (0:30-2:00)**\nThose rejection letters don\u2019t just feel disheartening; they\u2019re often rooted in misunderstandings about what lenders really want to see. Many small business owners toil endlessly on their vision, only to fall flat when it comes to securing critical growth capital. What if you could leverage data to turn those setbacks into stepping stones? Let\u2019s explore how you can finally break through the funding barrier and turn your dream into a reality.\n\nDon't gamble with another funding rejection. Right now, Nexus's AI scanner will diagnose your exact application weaknesses \u2013 from financial ratios to pitch deck gaps \u2013 in under 7 minutes. Lenders have hard quarterly deadlines, and applications submitted in the final weeks face 3x higher denial rates. Your free audit at [nexus-link] not only identifies your gaps but immediately matches you with lenders actively seeking businesses at your readiness level. We partner directly with 200+ lenders who fast-track high-scoring applications. Want ongoing advantage? Subscribe to our Funding Insider newsletter for lender rate alerts. For critical fixes, book a 1:1 funding strategist session through your audit dashboard. Serious about funding? Upgrade to Nexus Pro for perpetual AI optimization of financials and pitch materials. Act now \u2013 quarterly cycles wait for no one.",
+  "final_artifact_path": "/Users/raymonddavis/nexus-ai/docs/content/youtube_scripts/20260527_195113_why_most_businesses_get_denied_fund_FINAL.md"
+}

@@ -1,0 +1,6 @@
+# One YouTube URL per line.
+# Optional format:
+# https://www.youtube.com/watch?v=VIDEO_ID | Custom title
+#
+# This file is used by:
+# python3 scripts/run_youtube_strategy_research_scout.py --source urls --dry-run

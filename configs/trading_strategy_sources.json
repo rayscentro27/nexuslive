@@ -1,0 +1,384 @@
+[
+  {
+    "source_id": "supabase_trading_artifacts",
+    "source_type": "supabase",
+    "name": "Supabase trading artifacts",
+    "url_or_query": "reviewed_signal_proposals,strategy_variants,replay_results,risk_decisions,research_artifacts",
+    "asset_class": "forex",
+    "symbols": [
+      "EURUSD",
+      "USDJPY",
+      "GBPUSD"
+    ],
+    "keywords": [
+      "strategy",
+      "forex",
+      "replay",
+      "research"
+    ],
+    "enabled": true,
+    "priority": 1,
+    "last_checked_at": null,
+    "notes": "Primary discovery source. Prefer existing Supabase-backed local artifacts before any external lookup."
+  },
+  {
+    "source_id": "local_vibe_reports",
+    "source_type": "vibe_report",
+    "name": "Vibe Trading reports",
+    "url_or_query": "integrations/vibe_trading/reports",
+    "asset_class": "forex",
+    "symbols": [
+      "EURUSD",
+      "USDJPY",
+      "GBPUSD"
+    ],
+    "keywords": [
+      "vibe review",
+      "backtest",
+      "variant"
+    ],
+    "enabled": true,
+    "priority": 2,
+    "last_checked_at": null,
+    "notes": "Use for rule improvement and zero-trade analysis."
+  },
+  {
+    "source_id": "local_tournament_memory",
+    "source_type": "local_file",
+    "name": "Tournament and local memory",
+    "url_or_query": "logs/nexus_trading_tournament_latest.json",
+    "asset_class": "forex",
+    "symbols": [
+      "EURUSD",
+      "USDJPY",
+      "GBPUSD"
+    ],
+    "keywords": [
+      "tournament",
+      "paper trades",
+      "market scan"
+    ],
+    "enabled": true,
+    "priority": 3,
+    "last_checked_at": null,
+    "notes": "Promote testable local memory into candidate discovery."
+  },
+  {
+    "source_id": "youtube_search_eurusd_scalping",
+    "source_type": "youtube_search",
+    "name": "YouTube search EURUSD scalping strategy",
+    "url_or_query": "EURUSD scalping strategy",
+    "asset_class": "forex",
+    "symbols": [
+      "EURUSD"
+    ],
+    "keywords": [
+      "EURUSD scalping strategy"
+    ],
+    "enabled": true,
+    "priority": 4,
+    "last_checked_at": null,
+    "notes": "Adapter seed only. Use local registry/transcript artifacts unless safe search support exists."
+  },
+  {
+    "source_id": "youtube_channel_tradernick",
+    "source_type": "youtube_channel",
+    "name": "TraderNick channel placeholder",
+    "url_or_query": "https://www.youtube.com/@TraderNick",
+    "asset_class": "forex",
+    "symbols": [
+      "EURUSD",
+      "USDJPY",
+      "GBPUSD"
+    ],
+    "keywords": [
+      "forex",
+      "usd",
+      "macro"
+    ],
+    "enabled": true,
+    "priority": 4,
+    "last_checked_at": null,
+    "notes": "Approved channel placeholder. Confirm the exact public handle if Ray wants a different channel URL."
+  },
+  {
+    "source_id": "youtube_channel_scarface_trades",
+    "source_type": "youtube_channel",
+    "name": "Scarface Trades channel placeholder",
+    "url_or_query": "https://www.youtube.com/@ScarfaceTrades",
+    "asset_class": "forex",
+    "symbols": [
+      "EURUSD",
+      "USDJPY",
+      "GBPUSD"
+    ],
+    "keywords": [
+      "scalping",
+      "liquidity sweep",
+      "open strategy"
+    ],
+    "enabled": true,
+    "priority": 5,
+    "last_checked_at": null,
+    "notes": "Approved channel placeholder. Prefer local transcript artifacts unless live collection is explicitly enabled."
+  },
+  {
+    "source_id": "youtube_channel_smb_capital",
+    "source_type": "youtube_channel",
+    "name": "SMB Capital channel placeholder",
+    "url_or_query": "https://www.youtube.com/@SMBCapital",
+    "asset_class": "options",
+    "symbols": [
+      "SPY",
+      "QQQ"
+    ],
+    "keywords": [
+      "options",
+      "opening range breakout",
+      "mean reversion"
+    ],
+    "enabled": true,
+    "priority": 6,
+    "last_checked_at": null,
+    "notes": "Approved channel placeholder for options strategy research."
+  },
+  {
+    "source_id": "youtube_channel_techconversations",
+    "source_type": "youtube_channel",
+    "name": "TechConversations channel placeholder",
+    "url_or_query": "https://www.youtube.com/@TechConversations",
+    "asset_class": "options",
+    "symbols": [
+      "SPY",
+      "QQQ"
+    ],
+    "keywords": [
+      "options",
+      "SPY",
+      "QQQ"
+    ],
+    "enabled": true,
+    "priority": 7,
+    "last_checked_at": null,
+    "notes": "Approved channel placeholder for options and stock strategy research."
+  },
+  {
+    "source_id": "youtube_channel_no_nonsense_forex",
+    "source_type": "youtube_channel",
+    "name": "No Nonsense Forex channel placeholder",
+    "url_or_query": "https://www.youtube.com/@NoNonsenseForex",
+    "asset_class": "forex",
+    "symbols": [
+      "EURUSD",
+      "USDJPY",
+      "GBPUSD"
+    ],
+    "keywords": [
+      "trend following",
+      "indicator",
+      "forex"
+    ],
+    "enabled": true,
+    "priority": 8,
+    "last_checked_at": null,
+    "notes": "Approved channel placeholder for technical indicator research."
+  },
+  {
+    "source_id": "youtube_search_london_breakout",
+    "source_type": "youtube_search",
+    "name": "YouTube search London breakout forex strategy",
+    "url_or_query": "London breakout forex strategy",
+    "asset_class": "forex",
+    "symbols": [
+      "EURUSD",
+      "GBPUSD"
+    ],
+    "keywords": [
+      "London breakout forex strategy"
+    ],
+    "enabled": true,
+    "priority": 5,
+    "last_checked_at": null,
+    "notes": "Adapter seed only. No paid API required."
+  },
+  {
+    "source_id": "youtube_search_usdjpy_pullback",
+    "source_type": "youtube_search",
+    "name": "YouTube search USDJPY pullback strategy",
+    "url_or_query": "USDJPY pullback strategy",
+    "asset_class": "forex",
+    "symbols": [
+      "USDJPY"
+    ],
+    "keywords": [
+      "USDJPY pullback strategy"
+    ],
+    "enabled": true,
+    "priority": 6,
+    "last_checked_at": null,
+    "notes": "Adapter seed only. Prefer existing local outputs."
+  },
+  {
+    "source_id": "youtube_search_new_york_open",
+    "source_type": "youtube_search",
+    "name": "YouTube search New York open forex strategy",
+    "url_or_query": "New York open forex strategy",
+    "asset_class": "forex",
+    "symbols": [
+      "EURUSD",
+      "USDJPY",
+      "GBPUSD"
+    ],
+    "keywords": [
+      "New York open forex strategy"
+    ],
+    "enabled": true,
+    "priority": 9,
+    "last_checked_at": null,
+    "notes": "Adapter seed only. Use local research/transcripts first."
+  },
+  {
+    "source_id": "youtube_search_nfp",
+    "source_type": "youtube_search",
+    "name": "YouTube search NFP forex strategy",
+    "url_or_query": "NFP forex strategy",
+    "asset_class": "forex",
+    "symbols": [
+      "EURUSD",
+      "USDJPY",
+      "GBPUSD"
+    ],
+    "keywords": [
+      "NFP forex strategy"
+    ],
+    "enabled": true,
+    "priority": 10,
+    "last_checked_at": null,
+    "notes": "Adapter seed only. Use local/Supabase artifacts first."
+  },
+  {
+    "source_id": "youtube_search_cpi",
+    "source_type": "youtube_search",
+    "name": "YouTube search CPI forex strategy",
+    "url_or_query": "CPI forex strategy",
+    "asset_class": "forex",
+    "symbols": [
+      "EURUSD",
+      "USDJPY",
+      "GBPUSD"
+    ],
+    "keywords": [
+      "CPI forex strategy"
+    ],
+    "enabled": true,
+    "priority": 11,
+    "last_checked_at": null,
+    "notes": "Adapter seed only. Use local/Supabase artifacts first."
+  },
+  {
+    "source_id": "youtube_search_forex_news",
+    "source_type": "youtube_search",
+    "name": "YouTube search forex news trading strategy",
+    "url_or_query": "forex news trading strategy",
+    "asset_class": "forex",
+    "symbols": [
+      "EURUSD",
+      "USDJPY",
+      "GBPUSD"
+    ],
+    "keywords": [
+      "forex news trading strategy"
+    ],
+    "enabled": true,
+    "priority": 12,
+    "last_checked_at": null,
+    "notes": "Adapter seed only. Use local/Supabase artifacts first."
+  },
+  {
+    "source_id": "youtube_search_forex_liquidity_sweep",
+    "source_type": "youtube_search",
+    "name": "YouTube search forex liquidity sweep strategy",
+    "url_or_query": "forex liquidity sweep strategy",
+    "asset_class": "forex",
+    "symbols": [
+      "EURUSD",
+      "USDJPY",
+      "GBPUSD"
+    ],
+    "keywords": [
+      "forex liquidity sweep strategy"
+    ],
+    "enabled": true,
+    "priority": 13,
+    "last_checked_at": null,
+    "notes": "Adapter seed only. Use local/Supabase artifacts first."
+  },
+  {
+    "source_id": "youtube_search_spy_orb",
+    "source_type": "youtube_search",
+    "name": "YouTube search SPY options opening range breakout",
+    "url_or_query": "SPY options opening range breakout",
+    "asset_class": "options",
+    "symbols": [
+      "SPY"
+    ],
+    "keywords": [
+      "SPY options opening range breakout"
+    ],
+    "enabled": true,
+    "priority": 14,
+    "last_checked_at": null,
+    "notes": "Adapter seed only. Use local/Supabase artifacts first."
+  },
+  {
+    "source_id": "youtube_search_qqq_mean_reversion",
+    "source_type": "youtube_search",
+    "name": "YouTube search QQQ options mean reversion strategy",
+    "url_or_query": "QQQ options mean reversion strategy",
+    "asset_class": "options",
+    "symbols": [
+      "QQQ"
+    ],
+    "keywords": [
+      "QQQ options mean reversion strategy"
+    ],
+    "enabled": true,
+    "priority": 15,
+    "last_checked_at": null,
+    "notes": "Adapter seed only. Use local/Supabase artifacts first."
+  },
+  {
+    "source_id": "youtube_search_btc_trend_following",
+    "source_type": "youtube_search",
+    "name": "YouTube search BTC trend following strategy",
+    "url_or_query": "BTC trend following strategy",
+    "asset_class": "crypto",
+    "symbols": [
+      "BTC"
+    ],
+    "keywords": [
+      "BTC trend following strategy"
+    ],
+    "enabled": true,
+    "priority": 16,
+    "last_checked_at": null,
+    "notes": "Adapter seed only. Use local/Supabase artifacts first."
+  },
+  {
+    "source_id": "youtube_search_eth_mean_reversion",
+    "source_type": "youtube_search",
+    "name": "YouTube search ETH mean reversion strategy",
+    "url_or_query": "ETH mean reversion strategy",
+    "asset_class": "crypto",
+    "symbols": [
+      "ETH"
+    ],
+    "keywords": [
+      "ETH mean reversion strategy"
+    ],
+    "enabled": true,
+    "priority": 17,
+    "last_checked_at": null,
+    "notes": "Adapter seed only. Use local/Supabase artifacts first."
+  }
+]

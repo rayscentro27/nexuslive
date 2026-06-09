@@ -1,0 +1,37 @@
+{
+  "approval_id": "content_20260527_204647_ba5496ca",
+  "title": "Why most businesses get denied funding and how Nexus helps fix readiness gaps",
+  "platform": "youtube",
+  "hook": "5 hidden gaps that kill 90% of funding applications (and how Nexus fixes them all in 30 days).",
+  "scores": {
+    "hook_score": 93.0,
+    "novelty_score": 60.0,
+    "copy_intensity": 50.0,
+    "clarity_score": 70.0,
+    "monetization_score": 100,
+    "cta_score": 85,
+    "nexus_fit_score": 93.0
+  },
+  "overall_score": 80.1,
+  "status": "needs_revision",
+  "word_count": 93,
+  "rewrites": 1,
+  "artifacts": [
+    "/Users/raymonddavis/nexus-ai/docs/content/research_briefs/20260527_203840_why_most_businesses_get_denied_funding_a.md",
+    "/Users/raymonddavis/nexus-ai/docs/content/hooks/20260527_204249_why_most_businesses_get_denied_fund_hook_scores.md",
+    "/Users/raymonddavis/nexus-ai/docs/content/youtube_scripts/20260527_204336_why_most_businesses_get_denied_fund_youtube.md",
+    "/Users/raymonddavis/nexus-ai/docs/content/youtube_scripts/20260527_204647_why_most_businesses_get_denied_fund_FINAL.md"
+  ],
+  "primary_cta": "Go to goclearonline.cc right now and run your free Funding Readiness Audit. In 5 minutes, AI will scan your business profile and show you exactly what's stopping lenders from saying yes \u2014 and how to fix it before you apply.",
+  "monetization_paths": [
+    "funding_audit",
+    "lendio_affiliate",
+    "nav_credit",
+    "newsletter_capture",
+    "membership_offer",
+    "consulting"
+  ],
+  "created": "2026-05-28T03:46:47.241012+00:00",
+  "text_with_cta": "# HOOK\n\n5 hidden gaps that kill 90% of funding applications (and how Nexus fixes them all in 30 days).\n\n# PROBLEM\n\nYou've survived the startup grind. Your revenue's growing ($250k+), your customers love you. But when you apply for growth capital? Silence. Or worse: 'We regret to inform you...' for reasons you can't decipher. It's not your vision that's flawed\u2014it's how you're forced to present it through generic templates and banker jargon while drowning in paperwork. That sinking feeling? It's knowing investors are rejecting you over fixable technicalities you can't even identify.\n\n---\n## Your Next Step\n\nIf any of this sounded familiar \u2014 if you've been denied, ignored, or just unsure whether your business is even fundable right now \u2014 don't guess.\n\nGo to goclearonline.cc and run your free Funding Readiness Audit. Our AI analyzes your business profile against 12 lender criteria in under 5 minutes. You'll see exactly where you stand, what's blocking approvals, and what to fix first.\n\nNo sales pitch. No fake urgency. Just a real picture of where your business stands with lenders right now.\n\n\ud83d\udc49 goclearonline.cc \u2014 Free Funding Readiness Audit\n\ud83d\udc49 Build business credit first: nav.com (free profile)\n\ud83d\udc49 Subscribe: Nexus Weekly business finance newsletter",
+  "final_artifact_path": "/Users/raymonddavis/nexus-ai/docs/content/youtube_scripts/20260527_204647_why_most_businesses_get_denied_fund_FINAL.md"
+}

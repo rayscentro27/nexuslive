@@ -17,6 +17,7 @@
 | Task | Script | Target | Safety | Approval Req | Screenshots |
 |------|--------|--------|--------|-------------|-------------|
 | beehiiv_setup_assist | scripts/browser_tasks/beehiiv_setup_assist.py | app.beehiiv.com | LOW_RISK | Publish: YES | artifacts/browser_tasks/beehiiv/ |
+| youtube_studio_setup | scripts/browser_tasks/youtube_studio_setup.py | studio.youtube.com | LOW_RISK | Channel profile Publish: AUTO (saves links only) | artifacts/browser_tasks/youtube/ |
 
 ---
 
