@@ -42,11 +42,19 @@ jobs:
             -e PEXELS_API_KEY="$PEXELS_API_KEY" \
             -e LOG_LEVEL=info \
             gyoridavid/short-video-maker:latest-tiny
+          echo "container state:"; docker ps -a
           echo "waiting for /health ..."
+          UP=0
           for i in $(seq 1 90); do
-            if curl -fsS "http://localhost:3123/health" >/dev/null 2>&1; then echo "server up"; break; fi
+            if curl -fsS "http://localhost:3123/health" >/dev/null 2>&1; then echo "server up"; UP=1; break; fi
             sleep 5
           done
+          if [ "$UP" != "1" ]; then
+            echo "=== server did NOT come up — diagnostics ==="
+            docker ps -a
+            echo "--- docker logs (tail 120) ---"; docker logs svm 2>&1 | tail -120
+            exit 1
+          fi
 
       - name: Render one short
         run: |
