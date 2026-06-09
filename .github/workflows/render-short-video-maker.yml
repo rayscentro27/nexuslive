@@ -1,0 +1,99 @@
+name: Render Short Video Maker (artifact only)
+
+# Manual only. Clones Short Video Maker (MIT), runs it locally on a Linux runner with the
+# free PEXELS_API_KEY secret, renders one short from a Nexus request JSON, and uploads the
+# MP4 as an ARTIFACT. NO YouTube, NO posting, NO scheduling. Uses Kokoro (local TTS) +
+# Whisper (local captions) + Pexels (free b-roll) + Remotion.
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_file:
+        description: "Nexus SVM request JSON (in repo)"
+        required: false
+        default: "ci/svm-requests/fcf087ea.json"
+      output_name:
+        description: "Output MP4 filename"
+        required: false
+        default: "fcf087ea_business_credit_myths_v5_short_video_maker.mp4"
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      LOG_LEVEL: info
+      WHISPER_MODEL: tiny.en
+      KOKORO_MODEL_PRECISION: q4
+      PORT: "3123"
+      DATA_DIR_PATH: ${{ github.workspace }}/svm-data
+    steps:
+      - name: Checkout (for request JSON)
+        uses: actions/checkout@v4
+
+      - name: Guard — Pexels secret present
+        run: |
+          if [ -z "$PEXELS_API_KEY" ]; then echo "PEXELS_API_KEY secret missing"; exit 1; fi
+          echo "Pexels key present (value hidden)."
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Clone Short Video Maker (MIT)
+        run: git clone --depth 1 https://github.com/gyoridavid/short-video-maker svm
+
+      - name: Install deps (pnpm via corepack)
+        working-directory: svm
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile || pnpm install
+
+      - name: Build
+        working-directory: svm
+        run: pnpm build
+
+      - name: Start server + render one short
+        working-directory: svm
+        run: |
+          mkdir -p "$DATA_DIR_PATH"
+          node dist/index.js > server.log 2>&1 &
+          SVR=$!
+          echo "waiting for /health ..."
+          for i in $(seq 1 60); do
+            if curl -fsS "http://localhost:3123/health" >/dev/null 2>&1; then echo "server up"; break; fi
+            sleep 5
+          done
+          REQ="${{ github.workspace }}/${{ github.event.inputs.request_file }}"
+          echo "POSTing request: $REQ"
+          VID=$(curl -fsS -X POST "http://localhost:3123/api/short-video" -H "Content-Type: application/json" --data @"$REQ" | python3 -c "import sys,json;print(json.load(sys.stdin).get('videoId',''))")
+          echo "videoId=$VID"
+          if [ -z "$VID" ]; then echo "no videoId returned"; tail -50 server.log; exit 1; fi
+          echo "polling status (models download on first run; may take a while) ..."
+          for i in $(seq 1 120); do
+            ST=$(curl -fsS "http://localhost:3123/api/short-video/$VID/status" | python3 -c "import sys,json;print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
+            echo "  status=$ST"
+            [ "$ST" = "ready" ] && break
+            [ "$ST" = "failed" ] && { echo "render failed"; tail -80 server.log; exit 1; }
+            sleep 10
+          done
+          mkdir -p "${{ github.workspace }}/out"
+          curl -fsS "http://localhost:3123/api/short-video/$VID" -o "${{ github.workspace }}/out/${{ github.event.inputs.output_name }}"
+          kill $SVR 2>/dev/null || true
+          ls -la "${{ github.workspace }}/out/"
+
+      - name: Verify output
+        run: test -s "out/${{ github.event.inputs.output_name }}" || (echo "no output mp4" && exit 1)
+
+      - name: Upload MP4 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nexus-svm-short-fcf087ea
+          path: out/${{ github.event.inputs.output_name }}
+          retention-days: 14
+          if-no-files-found: error

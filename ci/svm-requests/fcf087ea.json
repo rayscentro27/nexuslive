@@ -1,0 +1,77 @@
+{
+  "scenes": [
+    {
+      "text": "Three business credit myths that are quietly costing you time and money.",
+      "searchTerms": [
+        "business meeting",
+        "office",
+        "confused"
+      ]
+    },
+    {
+      "text": "Myth one: you need revenue first.",
+      "searchTerms": [
+        "business meeting",
+        "office",
+        "confused"
+      ]
+    },
+    {
+      "text": "Truth: you need structure first. Entity, business bank account, and accounts that actually report.",
+      "searchTerms": [
+        "business growth",
+        "finance",
+        "documents"
+      ]
+    },
+    {
+      "text": "Myth two: one credit card builds your business credit.",
+      "searchTerms": [
+        "business meeting",
+        "office",
+        "confused"
+      ]
+    },
+    {
+      "text": "Truth: bureaus want a pattern, not a single account. A few reporting accounts paid early beats one card.",
+      "searchTerms": [
+        "business growth",
+        "finance",
+        "documents"
+      ]
+    },
+    {
+      "text": "Myth three: it's fast.",
+      "searchTerms": [
+        "business meeting",
+        "office",
+        "confused"
+      ]
+    },
+    {
+      "text": "Truth: real reporting takes cycles. Anyone promising instant results is selling something.",
+      "searchTerms": [
+        "business growth",
+        "finance",
+        "documents"
+      ]
+    },
+    {
+      "text": "Save this, and build it the boring, correct way. Follow for more.",
+      "searchTerms": [
+        "entrepreneur",
+        "laptop",
+        "city"
+      ]
+    }
+  ],
+  "config": {
+    "orientation": "portrait",
+    "voice": "bm_lewis",
+    "captionPosition": "center",
+    "captionBackgroundColor": "#1A2244",
+    "music": "uneasy",
+    "musicVolume": "low",
+    "paddingBack": 1500
+  }
+}
