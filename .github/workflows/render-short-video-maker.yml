@@ -50,7 +50,7 @@ jobs:
 
       - name: Install deps (npm — runs native build scripts)
         working-directory: svm
-        run: npm install --no-audit --no-fund
+        run: npm install --no-audit --no-fund --legacy-peer-deps
 
       - name: Build
         working-directory: svm
