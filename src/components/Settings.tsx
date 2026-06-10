@@ -25,6 +25,7 @@ import { BotAvatar } from './BotAvatar';
 import { useAuth } from './AuthProvider';
 import { getProfile, updateProfile, getSettings, updateSettings, getBusinessEntity, UserProfile, UserSettings, BusinessEntity } from '../lib/db';
 import { supabase } from '../lib/supabase';
+import { ClientPageShell, NexusWidget } from './client/ClientDesignSystem';
 
 const tabs = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -145,7 +146,12 @@ export function Settings({ onNavigate }: { onNavigate?: (tab: string) => void })
   const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url;
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto h-full flex flex-col">
+    <ClientPageShell
+      title="Settings"
+      subtitle="Manage profile, security, notifications, and business preferences."
+      rail={<NexusWidget title="Profile Health"><p style={{ margin: 0, fontSize: 12, color: '#627294' }}>Keep legal and communication settings current for better operational trust.</p></NexusWidget>}
+    >
+    <div className="space-y-6 h-full flex flex-col">
       <div className="space-y-0.5 shrink-0">
         <h2 className="text-2xl font-bold text-[#1A2244]">Settings</h2>
         <p className="text-xs text-slate-500 font-medium">Manage your profile, security, billing, and business information.</p>
@@ -458,5 +464,6 @@ export function Settings({ onNavigate }: { onNavigate?: (tab: string) => void })
         </div>
       )}
     </div>
+    </ClientPageShell>
   );
 }

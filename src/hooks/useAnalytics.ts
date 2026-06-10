@@ -14,6 +14,7 @@ type EventType =
   | 'cta_click'
   | 'grant_viewed'
   | 'opportunity_viewed'
+  | 'opportunity_action_clicked'
   | 'trade_started'
   | 'invite_sent'
   | 'funding_applied'
@@ -33,7 +34,8 @@ type Feature =
   | 'referral'
   | 'settings'
   | 'admin'
-  | 'chat';
+  | 'chat'
+  | 'opportunities';
 
 interface EmitOptions {
   event_name: string;

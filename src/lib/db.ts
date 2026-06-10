@@ -191,6 +191,16 @@ export async function updateProfile(userId: string, updates: Partial<UserProfile
   return { data: data as UserProfile | null, error };
 }
 
+// Atomic profile completion: persists onboarding_complete + readiness_score + updated_at
+// via the complete_user_profile RPC (self-only, uses auth.uid()). The DB trigger
+// creates exactly one portal notification (idempotent) — do not insert one client-side.
+export async function completeProfile(readinessScore?: number) {
+  const { data, error } = await supabase.rpc('complete_user_profile', {
+    p_readiness_score: readinessScore ?? null,
+  });
+  return { data: data as UserProfile | null, error };
+}
+
 // ─── Tasks ─────────────────────────────────────────────────────────────────────
 
 export async function getTasks(userId: string) {

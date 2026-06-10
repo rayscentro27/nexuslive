@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { BotAvatar } from './BotAvatar';
+import { ClientPageShell, NexusWidget } from './client/ClientDesignSystem';
 import { GrantResearchRequest } from './GrantResearchRequest';
 import { supabase } from '../lib/supabase';
 import { useAnalytics } from '../hooks/useAnalytics';
@@ -81,7 +82,20 @@ export function GrantsFinder() {
     status: 'In-Progress' as const,
   }));
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto h-full flex flex-col">
+    <ClientPageShell
+      title="Grant Opportunity Suite"
+      subtitle="Featured grants, eligibility guidance, and AI research requests."
+      rail={
+        <NexusWidget title="Eligibility Booster" subtitle="Improve match score">
+          <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: '#627294', lineHeight: 1.45 }}>
+            <li>Complete business profile fields</li>
+            <li>Upload required compliance documents</li>
+            <li>Use custom grant research for niche programs</li>
+          </ul>
+        </NexusWidget>
+      }
+    >
+    <div className="space-y-6 h-full flex flex-col">
       <div className="flex items-center justify-between shrink-0">
         <div className="space-y-0.5">
           <h2 className="text-2xl font-bold text-[#1A2244]">Grants Finder</h2>
@@ -324,5 +338,6 @@ export function GrantsFinder() {
         )}
       </div>
     </div>
+    </ClientPageShell>
   );
 }

@@ -342,7 +342,7 @@ export function CreditBoostEngine() {
   };
 
   const filtered = filter === 'all' ? opportunities : opportunities.filter(o => o.category === filter);
-  const categories = ['all', ...Array.from(new Set(opportunities.map(o => o.category)))];
+  const categories: string[] = ['all', ...Array.from(new Set<string>(opportunities.map(o => o.category)))];
   const categoryLabels: Record<string, string> = {
     all: 'All', rent_reporting: 'Rent', authorized_user: 'Auth User',
     utilization: 'Utilization', credit_builder: 'Credit Builder',

@@ -10,12 +10,12 @@ interface ClientDetail {
   tasks: { id: string; title: string; status: string; priority: number }[];
 }
 
-const PLANS = ['free', 'pilot', 'pro', 'elite'];
+const PLANS: UserProfile['subscription_plan'][] = ['free', 'pro', 'elite'];
 
 function ManagePanel({ client, onClose, onPlanChange }: {
   client: UserProfile;
   onClose: () => void;
-  onPlanChange: (id: string, plan: string) => void;
+  onPlanChange: (id: string, plan: UserProfile['subscription_plan']) => void;
 }) {
   const [detail, setDetail] = useState<ClientDetail>({ entity: null, credit: null, tasks: [] });
   const [loading, setLoading] = useState(true);
@@ -70,7 +70,7 @@ function ManagePanel({ client, onClose, onPlanChange }: {
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <select
                   value={plan}
-                  onChange={e => setPlan(e.target.value)}
+                  onChange={e => setPlan(e.target.value as UserProfile['subscription_plan'])}
                   style={{ flex: 1, padding: '8px 12px', borderRadius: 10, border: '1.5px solid #e8e9f2', fontSize: 14, fontWeight: 700, color: '#1a1c3a', outline: 'none' }}
                 >
                   {PLANS.map(p => <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>)}

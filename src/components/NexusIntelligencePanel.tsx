@@ -13,6 +13,7 @@ interface KnowledgeItem {
   domain: string;
   title: string;
   quality_score: number;
+  status: string;
   approved_at: string | null;
   created_at: string;
 }

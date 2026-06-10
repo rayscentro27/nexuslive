@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { User, Mail, Building2, Shield, CreditCard, Bell, Globe, LogOut, ChevronRight, CheckCircle2, Pencil, Save, X, Loader2, Star } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from './AuthProvider';
-import { getProfile, updateProfile, getBusinessEntity, UserProfile, BusinessEntity } from '../lib/db';
+import { getProfile, updateProfile, completeProfile, getBusinessEntity, UserProfile, BusinessEntity } from '../lib/db';
 import { supabase } from '../lib/supabase';
+import { ClientPageShell, NexusWidget } from './client/ClientDesignSystem';
 
 export function Account({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user, signOut } = useAuth();
@@ -33,8 +34,17 @@ export function Account({ onNavigate }: { onNavigate?: (tab: string) => void }) 
   const handleSaveName = async () => {
     if (!user || !nameInput.trim()) return;
     setSaving(true);
-    const { data } = await updateProfile(user.id, { full_name: nameInput.trim() });
-    if (data) setProfile(data);
+    const { data, error } = await updateProfile(user.id, { full_name: nameInput.trim() });
+    if (error || !data) {
+      // Do not mark complete in the UI unless the backend save succeeded.
+      setSaving(false);
+      return;
+    }
+    setProfile(data);
+    // Persist onboarding completion atomically (idempotent; DB trigger creates one
+    // portal notification). No client-side notification insert — avoids duplicates.
+    const { data: completed } = await completeProfile(data.readiness_score || undefined);
+    if (completed) setProfile(completed); // refresh local state from the persisted row
     setSaving(false);
     setEditing(false);
   };
@@ -52,7 +62,12 @@ export function Account({ onNavigate }: { onNavigate?: (tab: string) => void }) 
   };
 
   return (
-    <div className="p-4 max-w-6xl mx-auto space-y-4 h-full flex flex-col overflow-y-auto no-scrollbar">
+    <ClientPageShell
+      title="Account Center"
+      subtitle="Manage profile identity and completion progress."
+      rail={<NexusWidget title="Profile Completion" subtitle="Trust signal"> <p style={{ margin: 0, fontSize: 12, color: '#627294' }}>Complete business and profile fields to improve lender and grant trust scores.</p></NexusWidget>}
+    >
+    <div className="space-y-4 h-full flex flex-col overflow-y-auto no-scrollbar">
       <div className="flex flex-col space-y-1 shrink-0">
         <h1 className="text-xl font-black text-[#1A2244]">Review Profile</h1>
         <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Manage your personal and professional identity.</p>
@@ -261,5 +276,6 @@ export function Account({ onNavigate }: { onNavigate?: (tab: string) => void }) 
         </div>
       )}
     </div>
+    </ClientPageShell>
   );
 }

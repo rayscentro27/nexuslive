@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { ClientPageShell, NexusWidget } from './client/ClientDesignSystem';
 import { useAuth } from './AuthProvider';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { ChevronDown, ChevronUp, ArrowRight, ShieldCheck, Clock, Zap } from 'lucide-react';
@@ -267,7 +268,16 @@ export function OpportunityDashboard({ onNavigate, limit = 7 }: Props) {
   const validated = opportunities.filter(o => o.nexus_status === 'validated' || o.tested_by_nexus).length;
 
   return (
-    <div style={{ padding: '16px 20px' }}>
+    <ClientPageShell
+      title="Opportunity Command"
+      subtitle="AI-ranked opportunities with feasibility and impact confidence."
+      rail={
+        <NexusWidget title="Opportunity Intelligence" subtitle="How to prioritize">
+          <p style={{ margin: 0, fontSize: 12, color: '#627294' }}>Start with high feasibility and high funding-impact opportunities first, then validate timeline and risk before execution.</p>
+        </NexusWidget>
+      }
+    >
+    <div>
       {/* Header */}
       <div style={{ marginBottom: 16 }}>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1a1c3a', marginBottom: 3 }}>
@@ -369,5 +379,6 @@ export function OpportunityDashboard({ onNavigate, limit = 7 }: Props) {
         </div>
       </div>
     </div>
+    </ClientPageShell>
   );
 }
