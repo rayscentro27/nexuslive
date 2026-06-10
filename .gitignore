@@ -52,3 +52,6 @@ workflows/research_ingestion/transcripts/
 workflows/research_ingestion/summaries/
 research-engine/transcripts/
 research-engine/summaries/
+.netlify/
+test-results/
+outputs/
