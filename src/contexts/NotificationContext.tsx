@@ -5,7 +5,7 @@ import { useAuth } from '../components/AuthProvider';
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'action' | 'system' | 'ai' | 'urgent' | 'message' | 'funding' | 'grant' | 'trading' | 'subscription';
+  type: 'action' | 'system' | 'ai' | 'urgent' | 'message' | 'funding' | 'grant' | 'trading' | 'subscription' | 'onboarding';
   title: string;
   body: string | null;
   action_url: string | null;

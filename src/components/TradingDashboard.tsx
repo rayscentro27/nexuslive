@@ -8,6 +8,7 @@ import { useAuth } from './AuthProvider';
 import { supabase } from '../lib/supabase';
 import { getTradingStatus, NexusTradingStatusResponse, PaperTrade } from '../services/nexusApi';
 import { usePlan } from '../hooks/usePlan';
+import { ClientPageShell, NexusWidget } from './client/ClientDesignSystem';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -138,7 +139,12 @@ export function TradingDashboard() {
   const logTail = status?.signal_review_tail ?? [];
 
   return (
-    <div className="p-4 space-y-5 max-w-7xl mx-auto">
+    <ClientPageShell
+      title="Trading Lab"
+      subtitle="Education mode and paper trading only. No live trading execution."
+      rail={<NexusWidget title="Safety Mode"><p style={{ margin: 0, fontSize: 12, color: '#627294' }}>This environment is strictly demo/paper mode for learning and strategy testing.</p></NexusWidget>}
+    >
+    <div className="space-y-5">
 
       {/* header */}
       <div className="flex items-start justify-between">
@@ -335,5 +341,6 @@ export function TradingDashboard() {
         </p>
       </div>
     </div>
+    </ClientPageShell>
   );
 }

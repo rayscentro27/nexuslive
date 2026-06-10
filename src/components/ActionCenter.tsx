@@ -4,6 +4,7 @@ import { cn } from '../lib/utils';
 import { useAuth } from './AuthProvider';
 import { getTasks, updateTaskStatus, getBusinessEntity, Task, BusinessEntity } from '../lib/db';
 import { supabase } from '../lib/supabase';
+import { ClientPageShell, EmptyStateUpgrade, NexusWidget } from './client/ClientDesignSystem';
 
 interface Notification {
   id: string;
@@ -99,7 +100,22 @@ export function ActionCenter({ onNavigate }: { onNavigate?: (tab: string) => voi
   const setupPct = Math.round((setupDone / setupSteps.length) * 100);
 
   return (
-    <div style={{ padding: '16px 20px', background: '#eaebf6' }}>
+    <ClientPageShell
+      title="Action Center"
+      subtitle="AI-prioritized execution tasks across setup, credit, funding, and grants."
+      rail={
+        <>
+          <NexusWidget title="AI Advisor" subtitle="Next best action">
+            <p style={{ margin: 0, fontSize: 12, color: '#627294', fontWeight: 600 }}>
+              Focus your highest readiness-impact task first, then clear one document blocker to unlock stronger approval odds.
+            </p>
+          </NexusWidget>
+          <NexusWidget title="Progress Journey">
+            <p style={{ margin: 0, fontSize: 12, color: '#627294' }}>{completedTasks.length} complete · {allPending.length} remaining</p>
+          </NexusWidget>
+        </>
+      }
+    >
 
       {/* Page header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -321,12 +337,7 @@ export function ActionCenter({ onNavigate }: { onNavigate?: (tab: string) => voi
                   );
                 })}
 
-                {allPending.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                    <CheckCircle2 size={32} color="#22c55e" style={{ margin: '0 auto 8px' }} />
-                    <p style={{ fontSize: 14, fontWeight: 600, color: '#22c55e' }}>All tasks complete!</p>
-                  </div>
-                )}
+                {allPending.length === 0 && <EmptyStateUpgrade title="All tasks complete" body="Great momentum. Ask Nexus to generate your next execution sprint." />}
               </div>
 
               {/* Completed tasks collapsible */}
@@ -466,6 +477,6 @@ export function ActionCenter({ onNavigate }: { onNavigate?: (tab: string) => voi
           </div>
         </div>
       )}
-    </div>
+    </ClientPageShell>
   );
 }

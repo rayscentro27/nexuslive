@@ -3,6 +3,7 @@ import { CheckCircle2, XCircle, TrendingUp, DollarSign, Award, Percent, Loader2,
 import { useAuth } from './AuthProvider';
 import { getProfile, getFundingApplications, getTasks, UserProfile, FundingApplication, Task } from '../lib/db';
 import { supabase } from '../lib/supabase';
+import { ClientPageShell, NexusWidget } from './client/ClientDesignSystem';
 
 function statusColors(status: string): { text: string; color: string } {
   switch (status.toLowerCase()) {
@@ -322,7 +323,29 @@ export function Funding() {
   const readinessRiskColor = readiness >= 80 ? '#22c55e' : readiness >= 50 ? '#f59e0b' : '#ef4444';
 
   return (
-    <div className="p-6 max-w-6xl mx-auto h-full flex flex-col overflow-y-auto no-scrollbar" style={{ gap: 20 }}>
+    <ClientPageShell
+      title="Capital Readiness Suite"
+      subtitle="Track funding confidence, lender matches, and application pipeline in one workspace."
+      rail={
+        <>
+          <NexusWidget title="Approval Confidence">
+            <p style={{ margin: 0, fontSize: 12, color: '#627294' }}>{readinessLabel}</p>
+            <p style={{ margin: '6px 0 0', fontSize: 11, color: '#7a8aab' }}>{readinessDesc}</p>
+          </NexusWidget>
+          <NexusWidget title="Relationship Readiness" subtitle="Bank signals">
+            <div style={{ display: 'grid', gap: 6 }}>
+              {oddsItems.slice(0, 4).map((item) => (
+                <div key={item.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
+                  <span style={{ color: '#5f6f90' }}>{item.label}</span>
+                  <span style={{ color: item.ok ? '#16a34a' : '#d97706', fontWeight: 700 }}>{item.ok ? 'Good' : 'Needs work'}</span>
+                </div>
+              ))}
+            </div>
+          </NexusWidget>
+        </>
+      }
+    >
+    <div className="h-full flex flex-col overflow-y-auto no-scrollbar" style={{ gap: 20 }}>
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
@@ -636,5 +659,6 @@ export function Funding() {
         </div>
       )}
     </div>
+    </ClientPageShell>
   );
 }

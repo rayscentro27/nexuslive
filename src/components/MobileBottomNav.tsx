@@ -3,13 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Home, TrendingUp, CreditCard, MessageSquare, Zap,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { usePlan, PlanTier } from '../hooks/usePlan';
 
 type NavItem = {
   path: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   requiredPlan?: PlanTier;
 };
 
@@ -21,14 +22,19 @@ const NAV_ITEMS: NavItem[] = [
   { path: '/app/actions',   label: 'Actions', icon: Zap },
 ];
 
+const BADGES: Record<string, string> = {
+  '/app/messages': '3',
+  '/app/actions': '2',
+};
+
 export function MobileBottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAtLeast } = usePlan();
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-100 safe-area-bottom">
-      <div className="flex items-center justify-around px-2 pt-2 pb-safe">
+    <nav className="dock-nav md:hidden safe-area-bottom" aria-label="Primary navigation dock">
+      <div className="flex items-center justify-around gap-0.5 px-1 pt-1 pb-safe">
         {NAV_ITEMS.map(item => {
           const locked = item.requiredPlan ? !isAtLeast(item.requiredPlan) : false;
           const isActive = location.pathname === item.path ||
@@ -39,7 +45,7 @@ export function MobileBottomNav() {
               key={item.path}
               onClick={() => !locked && navigate(item.path)}
               className={cn(
-                'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all min-w-[56px]',
+                'group relative flex flex-col items-center gap-0.5 px-2.5 py-1.5 rounded-2xl transition-all min-w-[54px] hover:-translate-y-1',
                 isActive
                   ? 'text-[#3d5af1]'
                   : locked
@@ -49,7 +55,7 @@ export function MobileBottomNav() {
             >
               <div className={cn(
                 'w-8 h-8 flex items-center justify-center rounded-xl transition-all',
-                isActive ? 'bg-[#eef0fd]' : ''
+                isActive ? 'bg-[#eef0fd] shadow-[0_0_0_3px_rgba(91,124,250,0.18)]' : 'group-hover:bg-white/80'
               )}>
                 <item.icon
                   size={18}
@@ -62,6 +68,11 @@ export function MobileBottomNav() {
               )}>
                 {item.label}
               </span>
+              {!isActive && BADGES[item.path] ? (
+                <span className="absolute right-1 top-1 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center border border-white">
+                  {BADGES[item.path]}
+                </span>
+              ) : null}
             </button>
           );
         })}

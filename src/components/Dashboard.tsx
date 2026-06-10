@@ -20,6 +20,7 @@ import { useAnalytics } from '../hooks/useAnalytics';
 import { ProgressionSystem } from './ProgressionSystem';
 import { LiveActivityFeed } from './LiveActivityFeed';
 import { NexusIntelligencePanel } from './NexusIntelligencePanel';
+import { ClientPageShell, MetricTile, ReadinessHero } from './client/ClientDesignSystem';
 
 export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }) {
   const { user } = useAuth();
@@ -111,7 +112,16 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
   }
 
   return (
-    <div style={{ padding: '10px 12px', background: '#eaebf6', minHeight: '100%' }}>
+    <ClientPageShell
+      title={`Welcome back, ${userName}`}
+      subtitle="Your AI workforce is actively helping your business every day."
+      rail={
+        <>
+          <NexusIntelligencePanel compact />
+          <LiveActivityFeed />
+        </>
+      }
+    >
       {/* Page header — compact, elegant */}
       <motion.div
         initial={{ opacity: 0, y: -6 }}
@@ -142,6 +152,22 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
           <span style={{ fontSize: 10, fontWeight: 700, color: '#7b9bf8' }}>LIVE</span>
         </div>
       </motion.div>
+
+      <ReadinessHero
+        score={readinessScore}
+        level={fundingLevel}
+        range={fundingMin !== null && fundingMax !== null ? `${(fundingMin / 1000).toFixed(0)}k - ${(fundingMax / 1000).toFixed(0)}k estimated funding range` : 'Upload your credit report to unlock funding range intelligence'}
+        nextAction={nextStep}
+        cta={<button onClick={() => onNavigate?.('credit')} className="nexus-button-primary" style={{ borderRadius: 12, padding: '8px 14px', fontSize: 12 }}>Upload Credit Report</button>}
+      />
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 8, marginBottom: 10 }}>
+        <MetricTile label="Credit Score" value={creditScore ?? '—'} hint="Current" />
+        <MetricTile label="Funding Level" value={`L${fundingLevel}`} hint="Readiness path" />
+        <MetricTile label="Tasks Left" value={pendingTasks.length} hint="Action center" />
+        <MetricTile label="Grants" value={(profile as any)?.grants_available ?? 0} hint="Available" />
+        <MetricTile label="Opportunities" value={(profile as any)?.opportunities_found ?? 0} hint="Matched" />
+      </div>
 
       {/* Three-column layout: main | intelligence | sidebar */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'flex-start' }}>
@@ -518,6 +544,6 @@ export function Dashboard({ onNavigate }: { onNavigate?: (tab: string) => void }
           </div>
         </div>
       </div>
-    </div>
+    </ClientPageShell>
   );
 }

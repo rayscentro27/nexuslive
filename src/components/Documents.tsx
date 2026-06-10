@@ -19,6 +19,7 @@ import { cn } from '../lib/utils';
 import { useAuth } from './AuthProvider';
 import { getDocuments, Document } from '../lib/db';
 import { supabase } from '../lib/supabase';
+import { ClientPageShell, NexusWidget } from './client/ClientDesignSystem';
 
 const categoryConfig = [
   { id: 'all',      label: 'All',             icon: FileText },
@@ -143,7 +144,16 @@ export function Documents() {
   const storageUsedPct = Math.min((usedGB / totalGB) * 100, 100);
 
   return (
-    <div className="p-6 max-w-6xl mx-auto h-full flex flex-col overflow-y-auto no-scrollbar" style={{ gap: 20 }}>
+    <ClientPageShell
+      title="Document Intelligence"
+      subtitle="Smart verification tracking and readiness impact by document class."
+      rail={
+        <NexusWidget title="Missing Documents" subtitle="High-impact uploads">
+          <p style={{ margin: 0, fontSize: 12, color: '#627294' }}>Upload missing compliance and banking docs first to accelerate funding and grant approvals.</p>
+        </NexusWidget>
+      }
+    >
+    <div className="h-full flex flex-col overflow-y-auto no-scrollbar" style={{ gap: 20 }}>
       {/* ── Header ── */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
@@ -428,5 +438,6 @@ export function Documents() {
         </div>
       </div>
     </div>
+    </ClientPageShell>
   );
 }

@@ -7,6 +7,7 @@ import { getCreditReport, getDisputes, CreditReport, CreditDispute } from '../li
 import { CreditBoostEngine } from './CreditBoostEngine';
 import { ApprovalSimulator } from './ApprovalSimulator';
 import { supabase } from '../lib/supabase';
+import { ClientPageShell, EmptyStateUpgrade, NexusWidget } from './client/ClientDesignSystem';
 
 function scoreBandColor(band: string | null) {
   switch (band?.toLowerCase()) {
@@ -100,7 +101,28 @@ export function CreditAnalysis({ onNavigate }: { onNavigate?: (tab: string) => v
   const scoreOffset = score > 0 ? circumference - (circumference * score) / 850 : circumference;
 
   return (
-    <div className="p-4 max-w-6xl mx-auto space-y-4 h-full flex flex-col overflow-y-auto no-scrollbar">
+    <ClientPageShell
+      title="Credit Improvement Cockpit"
+      subtitle="AI-guided dispute and utilization intelligence to improve approval odds."
+      rail={
+        <>
+          <NexusWidget title="Approval Odds Focus">
+            <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: '#627294', lineHeight: 1.45 }}>
+              <li>Target utilization below 10%</li>
+              <li>Resolve highest-impact negative items first</li>
+              <li>Upload fresh reports after major changes</li>
+            </ul>
+          </NexusWidget>
+          {!hasReport ? (
+            <EmptyStateUpgrade
+              title="No report uploaded"
+              body="Upload your latest report and Nexus will generate dispute tasks, utilization guidance, and funding impact simulation."
+            />
+          ) : null}
+        </>
+      }
+    >
+    <div className="space-y-4 h-full flex flex-col overflow-y-auto no-scrollbar">
       <div className="flex flex-col space-y-3 shrink-0">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h1 className="text-xl font-black text-[#1A2244]">Credit Analysis</h1>
@@ -395,5 +417,6 @@ export function CreditAnalysis({ onNavigate }: { onNavigate?: (tab: string) => v
         </div>
       ))}
     </div>
+    </ClientPageShell>
   );
 }

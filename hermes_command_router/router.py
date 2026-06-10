@@ -685,11 +685,20 @@ def _read_nexus_artifact(glob_pattern: str, max_chars: int = 600) -> str:
 def _run_nexus_status() -> tuple[str, list[str], str]:
     text = _read_nexus_artifact("docs/reports/ceo_review/NEXUS_MONETIZATION_CEO_PACKET_*.md")
     if "artifact_missing" in text:
-        return "unknown", ["No CEO packet found in nexus-ai"], (
+        return "unknown", ["No CEO packet found — no verified artifact to report from"], (
             "Run: python scripts/run_nexus_monetization_operating_cycle.py "
             "--mode validation --cost free --require-artifacts true"
         )
     lines = [l.strip() for l in text.splitlines() if l.strip() and not l.startswith("#")][:8]
+    # Augment with live evidence index
+    try:
+        nexus_lib = os.path.join(_nexus_ai_root(), "lib")
+        if nexus_lib not in sys.path:
+            sys.path.insert(0, os.path.dirname(nexus_lib))
+        from lib.hermes_evidence_mode import verified_status_block
+        lines.append(verified_status_block())
+    except Exception:
+        pass
     return "healthy", lines, "See full packet at nexus-ai/docs/reports/ceo_review/"
 
 
@@ -727,13 +736,17 @@ def _run_decision_log() -> tuple[str, list[str], str]:
 
 
 def _run_demo_broker_status() -> tuple[str, list[str], str]:
-    import json, glob as _glob
-    from datetime import date
-    reports_dir = os.path.join(_nexus_ai_root(), "integrations/oanda_demo/reports")
+    import json
     enabled = os.getenv("OANDA_DEMO_ENABLED", "false")
     env = os.getenv("OANDA_ENVIRONMENT", "practice")
+    # Safety: reject if live environment is somehow set
+    if env == "live" or os.getenv("OANDA_ALLOW_LIVE", "false").lower() == "true":
+        return "critical", [
+            "⛔ BLOCKED: OANDA_ENVIRONMENT=live or OANDA_ALLOW_LIVE=true detected.",
+            "Live trading is prohibited. Set OANDA_ENVIRONMENT=practice.",
+        ], "Do NOT place any orders. Fix env vars before proceeding."
     packet = _latest_nexus_file("integrations/oanda_demo/reports/demo_execution_packet_*.json")
-    evidence = [f"Environment: {env} | DEMO_ENABLED: {enabled}"]
+    evidence = [f"Environment: {env} (practice only) | DEMO_ENABLED: {enabled}"]
     if packet and os.path.exists(packet):
         try:
             data = json.loads(open(packet).read())
@@ -742,11 +755,13 @@ def _run_demo_broker_status() -> tuple[str, list[str], str]:
             order = data.get("order_result") or {}
             if order:
                 evidence.append(f"Last order: {'✅ filled' if order.get('ok') else '❌ ' + order.get('error','failed')}")
+            evidence.append(f"Artifact: {os.path.basename(packet)}")
         except Exception:
             pass
     else:
-        evidence.append("No demo execution packet found — run with --include-demo-broker-test")
-    return "healthy", evidence, "OANDA practice adapter is practice-only. Set OANDA_DEMO_ENABLED=true (Ray approval) to place orders."
+        evidence.append("No demo execution packet — artifact_missing. NO CLAIMS without this artifact.")
+    evidence.append("⚠ Hermes will NOT report trade execution without a verified order artifact.")
+    return "healthy", evidence, "OANDA practice-only. Requires Ray approval + OANDA_DEMO_ENABLED=true to place orders."
 
 
 def _run_premium_blocker_resolver() -> tuple[str, list[str], str]:
@@ -785,6 +800,130 @@ def _run_notification_log() -> tuple[str, list[str], str]:
     return "healthy", recent or ["No recent notifications."], "Full log at nexus-ai/docs/reports/hermes_proactive_notifications.jsonl"
 
 
+def _run_source_intake(raw_text: str) -> tuple[str, list[str], str]:
+    """Process a Telegram message containing a URL — register and dispatch."""
+    try:
+        sys.path.insert(0, _nexus_ai_root())
+        from lib.hermes_telegram_source_intake import process_telegram_message
+        from lib.hermes_scout_dispatcher import dispatch_from_intake
+        record = process_telegram_message(raw_text)
+        dispatch = dispatch_from_intake(record)
+        evidence = [
+            f"Intake ID: {record.intake_id}",
+            f"Type: {record.source_type}",
+            f"URL: {record.url or '(text message)'}",
+            f"Assigned scout: {dispatch.primary_scout}",
+            f"Status: {dispatch.status}",
+        ]
+        status = "queued" if dispatch.status == "queued" else "needs_review"
+        rec = (
+            f"Scout handoff created: {dispatch.handoff_path}\n"
+            f"Next: run `python scripts/run_youtube_intelligence_cycle.py --source-id {record.intake_id}`"
+            if record.source_type.startswith("youtube")
+            else f"Dispatch created. Check handoff: {dispatch.handoff_path}"
+        )
+        return status, evidence, rec
+    except Exception as e:
+        return "warning", [f"Source intake error: {e}"], (
+            "Source could not be registered. Check lib/hermes_telegram_source_intake.py"
+        )
+
+
+def _run_source_intake_status() -> tuple[str, list[str], str]:
+    """Show recent Telegram source intake registrations."""
+    try:
+        sys.path.insert(0, _nexus_ai_root())
+        from lib.hermes_telegram_source_intake import get_intake_summary, get_recent_intakes
+        recent = get_recent_intakes(limit=10)
+        summary = get_intake_summary()
+        evidence = [
+            f"Total registered: {summary.get('total', 0)}",
+            f"Pending: {summary.get('pending', 0)}",
+            f"Processed: {summary.get('processed', 0)}",
+            f"Failed: {summary.get('failed', 0)}",
+        ]
+        for r in recent[:5]:
+            evidence.append(f"  [{r.get('source_type','?')}] {r.get('url','(text)')[:60]} — {r.get('status','?')}")
+        return "healthy", evidence, "Full intake log: docs/reports/intake/telegram_source_intake.jsonl"
+    except Exception as e:
+        return "unknown", [f"Source intake status error: {e}"], (
+            "Check lib/hermes_telegram_source_intake.py"
+        )
+
+
+def _run_artifact_registry_status() -> tuple[str, list[str], str]:
+    """Show recent entries from the Nexus artifact registry."""
+    try:
+        sys.path.insert(0, _nexus_ai_root())
+        from lib.nexus_artifact_registry import latest_artifacts, create_registry_summary
+        artifacts = latest_artifacts(limit=10)
+        summary = create_registry_summary()
+        evidence = [
+            f"Total artifacts: {summary.get('total', 0)}",
+            f"Verified: {summary.get('verified', 0)}",
+            f"Unverified claims: {summary.get('unverified', 0)}",
+        ]
+        for a in artifacts[:5]:
+            d = a.to_dict() if hasattr(a, "to_dict") else a
+            evidence.append(
+                f"  [{d.get('agent_name','?')}] {d.get('title','?')[:50]} — {d.get('evidence_level','?')}"
+            )
+        return "healthy", evidence, "Full registry: docs/reports/artifact_registry/nexus_artifact_registry.jsonl"
+    except Exception as e:
+        return "unknown", [f"Artifact registry error: {e}"], "Check lib/nexus_artifact_registry.py"
+
+
+def _run_youtube_source_status() -> tuple[str, list[str], str]:
+    """Show YouTube source registry status."""
+    try:
+        sys.path.insert(0, _nexus_ai_root())
+        from lib.youtube_source_registry import registry_counts, registry_summary
+        counts = registry_counts()
+        summary = registry_summary()
+        evidence = [
+            f"Total YouTube sources: {counts.get('total', 0)}",
+            f"Pending transcript: {counts.get('pending_transcript', 0)}",
+            f"Research complete: {counts.get('research_complete', 0)}",
+            f"Failed: {counts.get('failed', 0)}",
+        ]
+        if summary:
+            evidence.append(f"Registry: {summary}")
+        return "healthy", evidence, "Run `python scripts/run_youtube_intelligence_cycle.py --all` to process pending."
+    except Exception as e:
+        return "unknown", [f"YouTube source registry error: {e}"], "Check lib/youtube_source_registry.py"
+
+
+def _run_provider_status() -> tuple[str, list[str], str]:
+    """Report live provider availability and policy."""
+    try:
+        import sys
+        sys.path.insert(0, _nexus_ai_root())
+        from lib.hermes_provider_policy import get_policy
+        policy = get_policy(refresh=True)
+        summary = policy.summary_dict()
+        evidence = [
+            f"strategic_provider: {summary['best_for_strategic']}",
+            f"summary_provider:   {summary['best_for_summary']}",
+            f"best_available:     {summary['best_available']}",
+            f"openrouter_allowed: {summary['openrouter_allowed']}",
+            f"priority_order:     {', '.join(summary['priority'])}",
+        ]
+        for p in summary["providers"]:
+            icon = "✅" if p["available"] else "❌"
+            note = f" ({p['reason']})" if p["reason"] and not p["available"] else ""
+            evidence.append(f"{icon} {p['provider']}{note}")
+        status = "healthy" if summary["best_for_strategic"] != "evidence_only" else "degraded"
+        rec = (
+            f"Active brain: {summary['best_for_strategic']}. "
+            "OpenRouter is DISABLED unless HERMES_ALLOW_OPENROUTER_FALLBACK=true."
+            if not summary["openrouter_allowed"]
+            else f"Active brain: {summary['best_for_strategic']}. OpenRouter fallback is ENABLED."
+        )
+        return status, evidence, rec
+    except Exception as e:
+        return "unknown", [f"provider_policy error: {e}"], "Check lib/hermes_provider_policy.py"
+
+
 # ── Routing table ──────────────────────────────────────────────────────────────
 
 def _run_ceo_digest() -> tuple[str, list[str], str]:
@@ -820,6 +959,13 @@ _INTENT_HANDLERS = {
     "premium_blocker_resolver":  _run_premium_blocker_resolver,
     "save_ray_feedback":         _run_save_ray_feedback,
     "notification_log":          _run_notification_log,
+    # ── YouTube source accountability ────────────────────────────────────────
+    "research_task":             _run_youtube_source_status,
+    # ── Source intake / artifact registry ────────────────────────────────────
+    "source_intake_status":      _run_source_intake_status,
+    "artifact_registry_status":  _run_artifact_registry_status,
+    # ── Provider / brain status ───────────────────────────────────────────────
+    "provider_status":           _run_provider_status,
 }
 
 _SCRIPT_ROUTES = {
@@ -836,6 +982,29 @@ def run_command(raw_text: str, source: str = "cli", sender: str = "raymond") -> 
       code intents          → Codex CLI task brief (no model writes code)
       unknown               → one clarifying question
     """
+    # ── Evidence gate: block fake trading execution claims before any routing ──
+    try:
+        from lib.hermes_evidence_mode import is_fake_trading_claim
+        if is_fake_trading_claim(raw_text):
+            return build_report(
+                status="blocked",
+                what_happened="Fake trading execution claim detected.",
+                evidence=[
+                    "No verified broker artifact (order ID / execution packet) exists.",
+                    "Hermes does not report trade execution without a real OANDA order artifact.",
+                    f"Blocked phrase detected in: '{raw_text[:80]}'",
+                ],
+                recommendation=(
+                    "To see real demo status, run:\n"
+                    "`python scripts/test_oanda_demo_execution_loop.py --dry-run`\n"
+                    "Or ask: 'show me oanda demo status'"
+                ),
+                action_needed="none",
+                command=raw_text,
+            )
+    except ImportError:
+        pass
+
     cmd    = normalize(raw_text, source=source, sender=sender)
     intent = cmd["intent"]
     mc     = model_class_for(intent)
@@ -908,6 +1077,18 @@ def run_command(raw_text: str, source: str = "cli", sender: str = "raymond") -> 
             evidence=evidence,
             recommendation=rec,
             action_needed="none" if ok else "investigate",
+            command=raw_text,
+        )
+
+    # ── Source intake: URL registration (needs raw_text) ─────────────────────
+    if intent == "source_intake":
+        status, evidence, det_rec = _run_source_intake(raw_text)
+        return build_report(
+            status=status,
+            what_happened="Source URL registered and dispatched to scout.",
+            evidence=evidence,
+            recommendation=det_rec,
+            action_needed="none" if status in ("healthy", "queued") else "investigate",
             command=raw_text,
         )
 

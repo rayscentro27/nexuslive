@@ -8,6 +8,7 @@ import { BotAvatar } from './BotAvatar';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthProvider';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { ClientPageShell, NexusWidget } from './client/ClientDesignSystem';
 
 interface Referral {
   id: string;
@@ -83,7 +84,12 @@ export function Referral() {
   const convertedCount        = referrals.filter(r => r.status === 'converted').length;
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto h-full flex flex-col">
+    <ClientPageShell
+      title="Referral Growth"
+      subtitle="Track milestones, rewards, and referral momentum."
+      rail={<NexusWidget title="Program Benefits"><p style={{ margin: 0, fontSize: 12, color: '#627294' }}>Unlock higher rewards by increasing converted referrals and consistent invite activity.</p></NexusWidget>}
+    >
+    <div className="space-y-6 h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div className="space-y-0.5">
@@ -327,5 +333,6 @@ export function Referral() {
         </div>
       </div>
     </div>
+    </ClientPageShell>
   );
 }

@@ -81,7 +81,21 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
 
     (["pending handoff", "what needs my approval",
       "waiting on me", "show handoffs", "what do you need",
-      "need my sign", "approval required"],                         "handoff_check",             "high",   False),
+      "need my sign", "approval required",
+      "needs approval", "what is pending my"],                      "handoff_check",             "high",   False),
+
+    (["what evidence do you have", "show verified status",
+      "show me verified", "verified status only",
+      "what is verified", "show evidence",
+      "evidence only", "what artifacts do you have"],               "nexus_status",              "high",   False),
+
+    (["what youtube videos did i send", "what youtube did i send today",
+      "youtube videos today", "which youtube did i send",
+      "what links did i send today", "what videos did i send"],     "source_intake_status",      "medium", False),
+
+    (["what happened to the last link", "last link i sent",
+      "what did you do with the link", "did you process the link",
+      "what happened to the link i sent"],                          "source_intake_status",      "medium", False),
 
     (["hermes decided", "decision log", "what did hermes decide",
       "autonomous decision", "hermes own decision"],                "decision_log",              "medium", False),
@@ -89,7 +103,10 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
     (["demo order", "oanda demo", "demo broker",
       "demo trade", "last trade demo", "practice order"],           "demo_broker_status",        "medium", False),
 
-    (["beehiiv alternative", "premium blocker",
+    (["beehiiv", "beehive", "bee hive", "bee-hive", "behive", "behiiv",
+      "newsletter alternative", "newsletter platform",
+      "email platform alternative", "newsletter tool alternative",
+      "premium blocker",
       "free alternative", "replace beehiiv",
       "cheap alternative", "tool blocker"],                         "premium_blocker_resolver",  "low",    False),
 
@@ -138,11 +155,34 @@ _INTENT_MAP: list[tuple[list[str], str, Priority, bool]] = [
       "user profile", "user readiness", "who are my users"],       "user_intelligence_status",  "medium", False),
     (["platform analytics", "usage stats",
       "how many users", "user count", "active users"],             "platform_analytics",        "medium", False),
+    # ── Source intake status queries ─────────────────────────────────────────
+    (["show source intake", "what links did i send", "what youtube did i send",
+      "what happened to the last link", "show failed source", "continue processing",
+      "reroute this source", "assign this to claude", "assign to youtube",
+      "show pending source", "source intake queue",
+      "what artifacts did nexus create", "what did claude code finish",
+      "what did codex finish", "show unregistered artifacts",
+      "backfill the artifact registry"],                           "source_intake_status",       "medium", False),
+    (["show artifact registry", "artifact registry", "show all artifacts",
+      "what artifacts exist"],                                     "artifact_registry_status",   "low",    False),
 
+    # ── Provider / brain status ──────────────────────────────────────────────
+    (["what brain are you using", "which brain",
+      "are you using chatgpt", "chatgpt auth", "are you using openai",
+      "are you using openrouter", "is openrouter enabled", "openrouter status",
+      "show provider status", "provider status", "which llm", "what llm",
+      "what model are you using", "which model", "brain status",
+      "disable openrouter", "disable open router",
+      "show evidence mode status", "evidence mode status",
+      "what provider", "which provider"],                          "provider_status",             "low",    False),
 ]
 
 
 def classify_intent(text: str) -> tuple[str, Priority, bool]:
+    import re as _re
+    # Detect any URL → source intake
+    if _re.search(r'https?://[^\s]+', text):
+        return "source_intake", "medium", False
     lowered = text.lower()
     for keywords, intent, priority, requires_approval in _INTENT_MAP:
         if any(kw in lowered for kw in keywords):

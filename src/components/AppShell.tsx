@@ -130,12 +130,12 @@ export function AppShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#eaebf6' }}>
+    <div className="flex h-screen overflow-hidden" style={{ background: 'linear-gradient(165deg, #f4f7ff 0%, #eef2fb 45%, #e8edf9 100%)' }}>
 
       {/* Desktop sidebar */}
       <aside
-        className="w-52 h-screen fixed left-0 top-0 z-40 hidden md:flex flex-col"
-        style={{ background: '#fff', borderRight: '1px solid #e8e9f2' }}
+        className="w-56 h-screen fixed left-0 top-0 z-40 hidden md:flex flex-col"
+        style={{ background: 'rgba(255,255,255,0.82)', borderRight: '1px solid #e8e9f2', backdropFilter: 'blur(16px)' }}
       >
         <SidebarContent />
       </aside>
@@ -160,7 +160,7 @@ export function AppShell() {
       )}
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden md:ml-[208px]">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden md:ml-[224px]">
 
         {/* Mobile top bar */}
         <div className="flex md:hidden items-center gap-3 px-4 py-3 bg-white border-b border-slate-100 shrink-0">
@@ -170,15 +170,12 @@ export function AppShell() {
           <span className="text-sm font-black text-[#1a1c3a]">Nexus</span>
         </div>
 
-        <div className="flex-1 overflow-y-auto scrollbar-hide pb-16 md:pb-0">
+        <div className="flex-1 overflow-y-auto scrollbar-hide pb-24 md:pb-8">
           <Outlet />
         </div>
 
-        <footer
-          className="hidden md:block p-3 text-center text-[8px] font-bold uppercase tracking-widest shrink-0"
-          style={{ color: '#8b8fa8', borderTop: '1px solid #e8e9f2', background: '#fff' }}
-        >
-          © 2026 Nexus · All rights reserved · Paper trading only
+        <footer className="hidden md:block p-2 text-center text-[8px] font-bold uppercase tracking-widest shrink-0" style={{ color: '#8b8fa8' }}>
+          Nexus AI Operating System · Client Portal
         </footer>
 
         {/* Mobile persistent bottom navigation */}

@@ -5,6 +5,7 @@ import { getChatResponse } from '../services/geminiService';
 import { botConfig, BotType } from './BotAvatar';
 import { useAuth } from './AuthProvider';
 import { getOrCreateConversation, getMessages, sendMessage, ChatMessage, getProfile } from '../lib/db';
+import { ClientPageShell, NexusWidget } from './client/ClientDesignSystem';
 
 interface Message {
   id: string;
@@ -158,7 +159,20 @@ export function Messages({ onNavigate }: { onNavigate?: (tab: string) => void })
   }
 
   return (
-    <div className="h-full flex overflow-hidden">
+    <ClientPageShell
+      title="AI Command Chat"
+      subtitle="Coordinate with specialists and get next best actions in real time."
+      rail={
+        <NexusWidget title="Suggested Prompts" subtitle="Quick start">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {['What should I do next?', 'How do I improve funding readiness?', 'Review my credit report', 'Find grants for my business'].map((prompt) => (
+              <button key={prompt} onClick={() => setMsgInput(prompt)} style={{ border: '1px solid #d9e5fb', background: '#f8fbff', color: '#2f58c8', borderRadius: 999, padding: '5px 10px', fontSize: 11, fontWeight: 700 }}>{prompt}</button>
+            ))}
+          </div>
+        </NexusWidget>
+      }
+    >
+    <div className="h-full flex overflow-hidden rounded-[20px] border border-white/70 shadow-[0_16px_32px_rgba(39,65,120,0.12)]">
 
       {/* Contacts List — full screen on mobile when mobileView==='contacts', sidebar on desktop */}
       <div className={cn(
@@ -364,5 +378,6 @@ export function Messages({ onNavigate }: { onNavigate?: (tab: string) => void })
         </div>
       </div>
     </div>
+    </ClientPageShell>
   );
 }
