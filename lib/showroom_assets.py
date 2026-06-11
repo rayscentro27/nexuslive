@@ -100,3 +100,42 @@ def by_status(status: str) -> list[dict]:
 
 def recent(n: int = 20) -> list[dict]:
     return sorted(load()["assets"].values(), key=lambda a: a.get("updated_at", ""), reverse=True)[:n]
+
+
+BATCH_STATUSES = ["approved_with_notes", "approved_for_manual_use_only", "needs_revision",
+                  "blocked", "needs_review", "approved"]
+
+
+def review_batch(package_id: str, status: str, notes: str = "", asset_ids: list | None = None,
+                 apply_to_all: bool = False, reviewer: str = "ray", source: str = "telegram") -> dict:
+    """Batch-review assets in a package (asset_type == package_id). Never auto-approves
+    without an explicit package_id. Preserves prior status in history; logs the event."""
+    if not package_id:
+        return {"ok": False, "error": "package_id required (no blanket approval)"}
+    if status not in BATCH_STATUSES:
+        return {"ok": False, "error": f"invalid status {status!r}; allowed: {BATCH_STATUSES}"}
+    reg = load()
+    assets = reg.get("assets", {})
+    # package = assets whose asset_type matches package_id (e.g. 'proof_credit', 'monetization_pack_v2')
+    targets = [a for a in assets.values() if a.get("asset_type") == package_id]
+    if asset_ids and not apply_to_all:
+        targets = [a for a in targets if a["asset_id"] in set(asset_ids)]
+    if not targets:
+        return {"ok": False, "error": f"no assets found for package '{package_id}'"}
+    changed = []
+    for a in targets:
+        a.setdefault("status_history", []).append({"from": a.get("status"), "to": status,
+                                                    "notes": notes, "reviewer": reviewer,
+                                                    "source": source, "at": _now()})
+        a["status"] = status
+        a["updated_at"] = _now()
+        a.setdefault("feedback", []).append({"at": _now(), "status": status, "note": notes,
+                                             "reviewer": reviewer, "source": source, "batch": True})
+        changed.append(a["asset_id"])
+    reg.setdefault("batch_events", []).append({
+        "package_id": package_id, "status": status, "notes": notes, "reviewer": reviewer,
+        "source": source, "asset_ids": changed, "count": len(changed), "at": _now()})
+    save(reg)
+    return {"ok": True, "summary": f"{status}: {len(changed)} assets in package '{package_id}'"
+            + (f" with notes: {notes}" if notes else ""),
+            "package_id": package_id, "status": status, "count": len(changed), "asset_ids": changed}

@@ -5985,6 +5985,27 @@ def api_showroom_package_status(package_id):
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+@app.route("/api/showroom/packages/<package_id>/review-batch", methods=["POST"])
+def api_showroom_review_batch(package_id):
+    """Batch-review all (or selected) assets in a package. Never auto-approves without
+    an explicit package id. Notes saved to every asset; prior status kept in history."""
+    from lib.showroom_assets import review_batch
+    try:
+        d = request.get_json(force=True) or {}
+    except Exception:
+        d = {}
+    res = review_batch(
+        package_id,
+        d.get("status", "needs_review"),
+        notes=d.get("notes", ""),
+        asset_ids=d.get("asset_ids"),
+        apply_to_all=bool(d.get("apply_to_all", False)),
+        reviewer=d.get("reviewer", "ray"),
+        source=d.get("source", "telegram"),
+    )
+    return jsonify(res), (200 if res.get("ok") else 400)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 
