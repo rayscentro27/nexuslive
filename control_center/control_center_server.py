@@ -5997,6 +5997,182 @@ def index():
     return response
 
 
+# ─── Nexus Proof Automation Engine API + Admin UI ────────────────────────────
+def _pa():
+    from lib import proof_automation as PA
+    return PA
+
+
+@app.route("/api/proof-automation/projects", methods=["GET", "POST"])
+def api_pa_projects():
+    PA = _pa()
+    try:
+        if request.method == "POST":
+            d = request.get_json(force=True) or {}
+            proj = PA.create_project(d.get("track", "opportunity"), d.get("goal", ""),
+                                     d.get("audience", ""), d.get("offer", ""),
+                                     d.get("channel", ""), d.get("mode", "draft_only"))
+            return jsonify({"ok": True, "project": proj})
+        return jsonify({"ok": True, "projects": PA.load().get("projects", [])})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/proof-automation/projects/<pid>")
+def api_pa_project(pid):
+    PA = _pa()
+    proj = next((p for p in PA.load().get("projects", []) if p["id"] == pid), None)
+    if not proj:
+        return jsonify({"ok": False, "error": "project not found"}), 404
+    return jsonify({"ok": True, "project": proj})
+
+
+@app.route("/api/proof-automation/projects/<pid>/run-scouts", methods=["POST"])
+def api_pa_run_scouts(pid):
+    PA = _pa()
+    try:
+        return jsonify({"ok": True, "findings": PA.run_scouts(pid)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/proof-automation/projects/<pid>/generate-assets", methods=["POST"])
+def api_pa_generate_assets(pid):
+    PA = _pa()
+    try:
+        return jsonify({"ok": True, "assets": PA.generate_assets(pid)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/proof-automation/projects/<pid>/feedback", methods=["POST"])
+def api_pa_feedback(pid):
+    PA = _pa()
+    d = request.get_json(force=True) or {}
+    try:
+        return jsonify({"ok": True, "feedback": PA.record_feedback(pid, d.get("feedback", ""))})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/proof-automation/simulate", methods=["POST"])
+def api_pa_simulate():
+    PA = _pa()
+    d = request.get_json(force=True) or {}
+    try:
+        return jsonify({"ok": True, "result": PA.simulate(d.get("message", ""), d.get("identity", "simulator"))})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/proof-automation/metrics")
+def api_pa_metrics():
+    PA = _pa()
+    return jsonify({"ok": True, "metrics": PA.load().get("metrics", []), "summary": PA.summary()})
+
+
+@app.route("/api/proof-automation/metrics/manual-entry", methods=["POST"])
+def api_pa_metric_manual():
+    PA = _pa()
+    d = request.get_json(force=True) or {}
+    try:
+        return jsonify({"ok": True, "metric": PA.log_metric(d.get("project_id", ""), d.get("name", ""), d.get("value"))})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/proof-automation/recommendations")
+def api_pa_recs():
+    PA = _pa()
+    return jsonify({"ok": True, "recommendations": PA.load().get("recommendations", [])})
+
+
+@app.route("/api/proof-automation/recommendations/run", methods=["POST"])
+def api_pa_recs_run():
+    PA = _pa()
+    d = request.get_json(force=True) or {}
+    try:
+        return jsonify({"ok": True, "recommendation": PA.hermes_decision(d.get("project_id", ""))})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/ai-improvements/items")
+def api_ai_items():
+    PA = _pa()
+    return jsonify({"ok": True, "items": PA.load().get("ai_research_items", [])})
+
+
+@app.route("/api/ai-improvements/recommendations", methods=["GET"])
+def api_ai_recs():
+    PA = _pa()
+    return jsonify({"ok": True, "recommendations": PA.load().get("ai_improvement_recommendations", [])})
+
+
+@app.route("/api/ai-improvements/recommendations/run", methods=["POST"])
+def api_ai_recs_run():
+    PA = _pa()
+    d = request.get_json(force=True) or {}
+    try:
+        return jsonify({"ok": True, "recommendation": PA.ai_improvement_scout(d.get("tool", "Postiz"))})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/ai-improvements/watchlist", methods=["GET", "POST"])
+def api_ai_watchlist():
+    PA = _pa()
+    if request.method == "POST":
+        d = request.get_json(force=True) or {}
+        return jsonify({"ok": True, "recommendation": PA.ai_improvement_scout(d.get("tool", "Postiz"))})
+    return jsonify({"ok": True, "watchlist": PA.load().get("ai_feature_watchlist", [])})
+
+
+@app.route("/admin/proof-automation")
+def admin_proof_automation():
+    PA = _pa()
+    s = PA.load()
+    summ = PA.summary()
+    flags = "".join(f"<li>{k} = <b>{v}</b></li>" for k, v in PA.FLAGS.items())
+    projects = "".join(
+        f"<tr><td>{p['track']}</td><td>{p['goal'][:60]}</td><td>{p['status']}</td>"
+        f"<td>{p['automation_mode']}</td><td>{len(p.get('generated_assets', []))}</td></tr>"
+        for p in s.get("projects", [])[:30])
+    airecs = "".join(
+        f"<tr><td>{r['tool']}</td><td>{r['recommended_action']}</td><td>{r['benefit_score']}</td>"
+        f"<td>{r['risk_score']}</td><td>{r['ray_approval_status']}</td></tr>"
+        for r in s.get("ai_improvement_recommendations", [])[:30])
+    tabs = ["Command Center", "Projects", "Scouts", "Automation Loops", "Generated Assets", "Simulator",
+            "Leads/Clients", "Metrics", "Hermes Learning", "AI Improvements", "Showroom", "Activation/Safety Gates"]
+    tabhtml = " · ".join(tabs)
+    html = """<!doctype html><html><head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Nexus Proof Automation Engine</title>
+<style>body{font-family:system-ui;margin:24px;color:#1f2937;max-width:1100px}
+h1{font-size:22px} table{border-collapse:collapse;width:100%;margin:8px 0}
+td,th{border:1px solid #e5e7eb;padding:6px;font-size:13px;text-align:left}
+.tabs{background:#f3f4f6;padding:8px;border-radius:8px;font-size:12px;margin-bottom:12px}
+.gate{background:#fef3c7;padding:8px;border-radius:8px} .card{border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin:10px 0}</style></head>
+<body>
+<h1>Nexus Proof Automation Engine <small style='color:#6b7280'>(V1 - test_only / draft_only)</small></h1>
+<div class='tabs'>""" + tabhtml + """</div>
+<div class='card'><b>Command Center</b> - summary: """ + json.dumps(summ) + """</div>
+<div class='card'><b>Projects (""" + str(summ.get('projects', 0)) + """)</b>
+<table><tr><th>Track</th><th>Goal</th><th>Status</th><th>Mode</th><th>Assets</th></tr>""" + projects + """</table></div>
+<div class='card'><b>AI Improvements (""" + str(summ.get('ai_improvement_recommendations', 0)) + """)</b>
+<table><tr><th>Tool</th><th>Action</th><th>Benefit</th><th>Risk</th><th>Approval</th></tr>""" + airecs + """</table></div>
+<div class='card'><b>Simulator</b> - POST /api/proof-automation/simulate<br>
+<input id='m' style='width:60%' placeholder='I need help fixing my credit.'>
+<button onclick='sim()'>Run</button><pre id='out'></pre></div>
+<div class='gate'><b>Activation / Safety Gates</b><ul>""" + flags + """</ul>
+APPROVED_LIVE is OFF. No publish, email, payment, cold outreach, or live trading. Assets are needs_review only.</div>
+<script>async function sim(){const m=document.getElementById('m').value;
+const r=await fetch('/api/proof-automation/simulate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:m})});
+document.getElementById('out').textContent=JSON.stringify(await r.json(),null,2);}</script>
+</body></html>"""
+    return make_response(render_template_string(html))
+
+
 if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser()
