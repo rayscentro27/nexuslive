@@ -5848,6 +5848,146 @@ def api_circuit_breakers():
     return jsonify({"error": "method not allowed"}), 405
 
 
+# ─── Showroom Review API ────────────────────────────────────────────────────
+
+
+@app.route("/api/showroom/assets")
+def api_showroom_assets():
+    from lib.showroom_assets import load as sa_load, recent as sa_recent, by_status as sa_by_status
+    status = request.args.get("status")
+    asset_type = request.args.get("asset_type")
+    try:
+        if status:
+            assets = sa_by_status(status)
+        else:
+            assets = sa_recent(100)
+        if asset_type:
+            assets = [a for a in assets if a.get("asset_type") == asset_type]
+        return jsonify({"ok": True, "assets": assets, "count": len(assets)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/showroom/assets/<asset_id>")
+def api_showroom_asset(asset_id):
+    from lib.showroom_assets import load as sa_load
+    try:
+        reg = sa_load()
+        asset = reg.get("assets", {}).get(asset_id)
+        if not asset:
+            return jsonify({"ok": False, "error": "asset not found"}), 404
+        preview = _read_asset_preview(asset.get("file_path", ""))
+        return jsonify({"ok": True, "asset": {**asset, "preview": preview}})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+def _read_asset_preview(file_path: str, max_chars: int = 2000) -> str:
+    p = Path(__file__).resolve().parent.parent / file_path
+    if p.exists():
+        text = p.read_text()
+        return text[:max_chars] + ("..." if len(text) > max_chars else "")
+    return ""
+
+
+@app.route("/api/showroom/assets/<asset_id>/review", methods=["POST"])
+def api_showroom_asset_review(asset_id):
+    from lib.showroom_assets import set_status as sa_set_status
+    from scripts.review_showroom_asset import append_feedback_memory
+    try:
+        data = request.get_json(force=True) or {}
+    except Exception:
+        data = {}
+    status = data.get("status", "needs_review")
+    feedback = data.get("feedback", "")
+    try:
+        rec = sa_set_status(asset_id, status, feedback=feedback or None)
+        if rec is None:
+            return jsonify({"ok": False, "error": "asset not found"}), 404
+        lesson = append_feedback_memory(rec, status, feedback)
+        sa_set_status(asset_id, status, lesson_memory="recorded")
+        return jsonify({"ok": True, "asset": rec, "lesson": lesson})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/showroom/packages")
+def api_showroom_packages():
+    from lib.showroom_assets import load as sa_load
+    try:
+        reg = sa_load()
+        assets = list(reg.get("assets", {}).values())
+        pkgs: dict[str, dict] = {}
+        for a in assets:
+            pkg_key = a.get("asset_type", "uncategorized")
+            if pkg_key not in pkgs:
+                pkgs[pkg_key] = {
+                    "package_id": pkg_key,
+                    "count": 0,
+                    "title": pkg_key.replace("_", " ").title(),
+                    "status_summary": {},
+                }
+            pkgs[pkg_key]["count"] += 1
+            s = a.get("status", "unknown")
+            pkgs[pkg_key]["status_summary"][s] = pkgs[pkg_key]["status_summary"].get(s, 0) + 1
+        pkg_meta = reg.get("packages", {})
+        for pkg_id in pkgs:
+            if pkg_id in pkg_meta:
+                pkgs[pkg_id]["package_status"] = pkg_meta[pkg_id].get("status", "needs_review")
+            else:
+                pkgs[pkg_id]["package_status"] = "needs_review"
+        return jsonify({"ok": True, "packages": list(pkgs.values()), "count": len(pkgs)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/showroom/packages/<package_id>")
+def api_showroom_package_detail(package_id):
+    from lib.showroom_assets import load as sa_load
+    try:
+        reg = sa_load()
+        assets = [a for a in reg.get("assets", {}).values()
+                  if a.get("asset_type") == package_id]
+        pkg_meta = reg.get("packages", {}).get(package_id, {})
+        return jsonify({
+            "ok": True,
+            "package_id": package_id,
+            "meta": pkg_meta,
+            "assets": assets,
+            "count": len(assets),
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/showroom/packages/<package_id>/status", methods=["PUT"])
+def api_showroom_package_status(package_id):
+    from lib.showroom_assets import load as sa_load, save as sa_save
+    from datetime import datetime, timezone
+    try:
+        data = request.get_json(force=True) or {}
+    except Exception:
+        data = {}
+    pkg_status = data.get("status", "needs_review")
+    note = data.get("note", "")
+    try:
+        reg = sa_load()
+        if "packages" not in reg:
+            reg["packages"] = {}
+        reg["packages"][package_id] = {
+            "status": pkg_status,
+            "note": note,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        sa_save(reg)
+        return jsonify({"ok": True, "package_id": package_id, "status": pkg_status})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 @app.route("/")
 def index():
     response = make_response(render_template_string(TERMINAL_HTML))
