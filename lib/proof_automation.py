@@ -279,19 +279,24 @@ def hermes_decision(project_id: str) -> dict:
     if not proj:
         return {}
     track = proj["track"]
+    prof = TRACK_PROFILE.get(track, TRACK_PROFILE["opportunity"])
+    metric = prof["metric"]
     rec = {
         "id": _id("rec", project_id), "project_id": project_id,
-        "decision_summary": f"Best next move for the {track} track: ship one educational, review-only deliverable + landing page draft, then measure.",
-        "recommended_action": "generate_assets then simulate", "reason": "Fastest path to a reviewable proof artifact reusing Nexus content + showroom + feedback loop.",
+        "what_understood": f"User is in the {track} track: {prof['audience']}. Goal: {proj.get('goal','')[:80]}.",
+        "what_created": f"A {track} package: {', '.join(prof['deliverables'][:4])} + landing page, posts, and a proof report (all needs_review).",
+        "decision_summary": f"Ship the {track} deliverables as review-only drafts, run the test campaign, and measure {metric}.",
+        "recommended_action": "Review the landing page + lead magnet, then run the simulator/test and watch the metric.",
+        "reason": "Fastest path to a concrete, track-specific proof artifact reusing Nexus content + showroom + feedback loop.",
         "evidence": [f"{f['scout_name']}: {f['recommended_angle']}" for f in s["scout_findings"] if f["project_id"] == project_id][:4],
         "risk_flags": _risk_flags(track),
-        "asset_instructions": f"Produce {', '.join(_assets_for_track(track)[:5])} — compliance-safe, no guarantees.",
-        "metric_to_track": {"credit": "intake completions", "funding": "readiness plans created",
-                            "opportunity": "clicks→replies", "trading": "paper-test plans created",
-                            "ai_improvement": "recommendations created"}.get(track, "assets created"),
-        "next_test": "Run the simulator scenario for this track and review the generated assets.",
+        "asset_instructions": f"Produce {', '.join(prof['deliverables'][:5])} — specific, action-oriented, compliance-safe, no guarantees.",
+        "metric_to_track": metric, "metric_that_matters": metric,
+        "what_to_test_next": f"Run the {track} simulator scenario and review the top assets (landing page, lead magnet, posts).",
+        "next_test": f"Simulate the {track} scenario; review assets.",
+        "improve_if_weak": f"If the response is weak, sharpen '{prof['deliverables'][0]}' and the headline/CTA first; re-test one variable at a time.",
         "improvement_task": "Apply Ray feedback to v2 of the weakest asset.",
-        "confidence": 0.72, "at": _now(),
+        "confidence": 0.74, "at": _now(),
     }
     _append("recommendations", rec)
     proj["hermes_recommendation"] = rec["id"]; proj["status"] = "decided"; proj["next_action"] = "generate_assets"
@@ -351,24 +356,153 @@ def generate_assets(project_id: str) -> list[dict]:
     return out
 
 
+# Track-specific content profiles — drive impressive, specific, compliance-safe assets.
+TRACK_PROFILE = {
+    "credit": dict(
+        audience="people who want to understand and improve their credit",
+        headline="Know exactly where your credit stands — and the next 30 days of moves that actually matter.",
+        sub="A clear credit readiness assessment, an issue checklist, a dispute/document-prep checklist, and a simple 30-day action plan. Education, not promises.",
+        problem="Most people guess at credit: they don't know what's hurting them, which items to address first, or what documents to gather.",
+        deliverables=["Credit readiness assessment", "Issue checklist", "Dispute/document-prep checklist",
+                      "30-day action plan", "Educational explainer", "Progress tracker"],
+        steps=["Assess where you stand (utilization, history, mix, recent activity)",
+               "List the issues to review (errors, high balances, missing info)",
+               "Prep documents + dispute letters the correct way (no shortcuts)",
+               "Follow a 30-day plan and track each step"],
+        hooks=["The 3 things hurting most credit profiles (and what to do first)",
+               "What a dispute letter should actually say",
+               "Your 30-day credit readiness plan, one step at a time"],
+        lead_title="Credit Readiness Checklist", cta="Get your free credit readiness check",
+        metric="intake completions"),
+    "funding": dict(
+        audience="business owners preparing to seek funding",
+        headline="See exactly what's missing before you apply for business funding.",
+        sub="A business funding readiness review, a business-foundation checklist, a document-gap list, and a lender-readiness action plan. Education, not approvals.",
+        problem="Owners apply for funding before they're 'bankable' — inconsistent business info, missing docs, weak credibility — and get slowed down.",
+        deliverables=["Funding readiness score", "Business foundation checklist", "Document gap list",
+                      "Bankability / business-credibility review", "Lender-readiness action plan", "Funding pathway recommendation"],
+        steps=["Score your funding readiness (entity, banking, docs, credibility)",
+               "Fix the business foundation gaps (name/address/phone/EIN consistency)",
+               "Close the document gaps lenders commonly expect",
+               "Follow a next-step funding-prep plan and re-score"],
+        hooks=["The inconsistency that quietly stalls funding applications",
+               "The 'Funding Docs' folder every owner should have ready",
+               "What 'bankable' actually means before you apply"],
+        lead_title="Business Funding Readiness Checklist", cta="Get your free funding readiness review",
+        metric="readiness plans created"),
+    "opportunity": dict(
+        audience="people turning an interest into a real, testable online income idea",
+        headline="Turn your interest into one testable offer — and filter out the internet noise.",
+        sub="Idea-to-offer research, a scam/noise filter, a monetization path, a landing page + posts, a test campaign with metrics, and an improvement loop.",
+        problem="Beginners drown in hype and chase 10 ideas at once instead of testing one real offer with real metrics.",
+        deliverables=["Opportunity research summary", "Scam/noise filter", "Monetization path + offer recommendation",
+                      "Landing page + social posts", "Lead magnet", "Test campaign + metrics tracker", "Improvement loop"],
+        steps=["Research the idea → a specific, legitimate offer",
+               "Filter scams/noise (avoid 'guaranteed income' traps)",
+               "Pick ONE testable monetization path",
+               "Create landing page + posts → run a test campaign → track metrics → improve"],
+        hooks=["Stop chasing 10 ideas — test ONE offer the right way",
+               "How to spot an online 'opportunity' scam in 30 seconds",
+               "From interest to offer to first test campaign"],
+        lead_title="Idea-to-Offer Starter Kit", cta="Get your free idea-to-offer plan",
+        metric="clicks → replies"),
+    "trading": dict(
+        audience="people who want to structure and paper-test a trading idea safely",
+        headline="Turn a trading idea into a structured, paper-tested strategy — with real risk rules.",
+        sub="Strategy rules extraction, a backtest + paper-test plan, explicit risk rules, a performance tracker, and an improvement recommendation. Paper/demo only.",
+        problem="People copy a YouTube strategy with no rules, no risk plan, and no way to judge if it actually works.",
+        deliverables=["Extracted strategy rules", "Strategy checklist", "Backtest plan", "Paper-test plan",
+                      "Risk rules / notes", "Performance tracker", "Improvement recommendation"],
+        steps=["Extract the exact rules from the idea/source (entry, exit, filters)",
+               "Define risk rules (stop, size, R-multiple) — before any test",
+               "Build a backtest + paper-test plan",
+               "Track demo performance and recommend improvements"],
+        hooks=["Don't trade a YouTube strategy until it has these rules",
+               "The risk rules that come BEFORE any entry",
+               "How to judge a demo strategy honestly"],
+        lead_title="Strategy Structuring Checklist", cta="Get your free paper-test plan",
+        metric="paper-test plans created"),
+    "ai_improvement": dict(
+        audience="Ray / Nexus, evaluating tools that could improve the system",
+        headline="Should Nexus adopt this tool? A scored evaluation with cost, effort, benefit, and risk.",
+        sub="Tool/repo/feature evaluation with a cost estimate, implementation effort, benefit/risk scores, a recommended action, and an upgrade backlog.",
+        problem="It's easy to chase every shiny AI tool; Nexus needs scored, Nexus-fit decisions — adapter-first, no auto-install.",
+        deliverables=["Tool/repo/feature evaluation", "Cost estimate", "Implementation effort estimate",
+                      "Benefit + risk scores", "Recommended action", "Upgrade backlog entry"],
+        steps=["Evaluate the tool/repo/feature against Nexus needs",
+               "Estimate cost + implementation effort",
+               "Score benefit vs risk and assign an action (implement/test/adapter/monitor/defer/avoid)",
+               "Add to the AI upgrade backlog; build a disabled adapter first"],
+        hooks=["Is this AI tool worth it for Nexus? Here's the score.",
+               "Adapter-first: how Nexus evaluates new tools safely",
+               "The Nexus AI upgrade backlog, ranked by benefit"],
+        lead_title="AI Tool Evaluation Scorecard", cta="See the scored recommendation",
+        metric="recommendations created"),
+}
+
+
+def _reply(track: str, proj: dict) -> str:
+    """Track-specific, impressive, compliance-safe reply preview."""
+    p = TRACK_PROFILE[track]
+    deliv = ", ".join(p["deliverables"][:5])
+    disc = _disclaimer(track)
+    intros = {
+        "credit": f"Here's how Nexus can help: a credit readiness assessment, an issue checklist, a dispute/document-prep checklist, and a 30-day action plan — all educational guidance, with no guaranteed score increase or deletion.",
+        "funding": f"Here's how Nexus can help: a business funding readiness review, a business-foundation checklist, a document-gap list, a bankability/business-credibility review, and a next-step funding-prep plan — educational, with no approval guarantee.",
+        "opportunity": f"Here's how Nexus can help: idea-to-offer research, a scam/noise filter, a clear monetization path, a landing page + posts, a test campaign with metrics, and an improvement loop.",
+        "trading": f"Here's how Nexus can help: strategy rules extraction, a backtest/paper-test plan, explicit risk rules, a performance tracker, and an improvement recommendation — paper/demo only, no live trading or profit guarantee.",
+        "ai_improvement": f"Here's how Nexus evaluates it: a tool/repo/feature evaluation with a cost estimate, implementation effort, benefit/risk scores, a recommended action, and an entry on the upgrade backlog.",
+    }
+    return f"{intros[track]} Want me to send the {p['lead_title']} and your plan?  ({disc})"
+
+
+def _bullets(items):
+    return "\n".join(f"- {x}" for x in items)
+
+
+def _numbered(items):
+    return "\n".join(f"{i}. {x}" for i, x in enumerate(items, 1))
+
+
 def _asset_body(track: str, atype: str, proj: dict) -> str:
+    p = TRACK_PROFILE.get(track, TRACK_PROFILE["opportunity"])
     goal = proj.get("goal", "")
     disc = _disclaimer(track)
+    aud = p["audience"]
     head = f"# {atype.replace('_',' ').title()} — {track} track (DRAFT / needs_review)\n_Goal: {goal}_\n"
     bodies = {
-        "landing_page": f"## Headline\nUnderstand where you stand and exactly what to do next.\n## Subheadline\nA clear, educational plan for {proj.get('audience') or 'your situation'} — no hype, no guarantees.\n## CTA\nGet your free readiness check.\n## FAQ\nQ: Is this guaranteed? A: No — it's education + a plan.\n## Disclaimer\n{disc}",
-        "facebook_post": f"Most people guess at {track}. Here's a clearer way: understand your starting point, see what's blocking you, and follow a simple plan. Comment 'PLAN' for the free checklist.\n\n_{disc}_",
-        "instagram_post": f"3 steps to get {track}-ready (save this 📌): 1) know where you stand 2) find the blockers 3) follow a plan. Free checklist in bio.\n\n_{disc}_",
-        "linkedin_post": f"A practical, no-hype approach to {track} readiness: assess → identify gaps → act on a plan → track progress. Education first.\n\n_{disc}_",
-        "short_video_script": f"Hook (0-3s): 'Stop guessing about {track}.'\nBody (3-30s): Know your starting point, see the blockers, follow a simple plan, track progress.\nCTA: 'Grab the free checklist — link in bio.'\nCompliance: {disc}",
-        "lead_magnet": f"# {track.title()} Readiness Checklist\nA short, educational checklist covering your starting point, common blockers, documents, and next steps. {disc}",
-        "dm_reply": f"Thanks for reaching out! I can send you a free {track} readiness checklist and a simple plan — it's educational (no guarantees). Want me to send it?\n_{disc}_",
-        "email_reply": f"Subject: Your {track} readiness next steps\n\nHi [First Name], here's a clear, educational plan to move forward on {track}. No promises — just the steps and a checklist.\n\n_{disc}_",
+        "landing_page":
+            f"## Headline\n{p['headline']}\n\n## Subheadline\n{p['sub']}\n\n## Who it's for\n{aud.capitalize()}.\n\n"
+            f"## The problem\n{p['problem']}\n\n## What you get\n{_bullets(p['deliverables'])}\n\n"
+            f"## How it works\n{_numbered(p['steps'])}\n\n## CTA\n**{p['cta']}**\n\n"
+            f"## FAQ\nQ: Is this guaranteed? A: No — it's education + a clear plan you act on.\n\n## Disclaimer\n{disc}",
+        "facebook_post":
+            f"{p['hooks'][0]}\n\n{p['problem']} Here's a clearer way:\n{_numbered(p['steps'])}\n\nComment 'PLAN' and I'll send the free {p['lead_title']}.\n\n_{disc}_",
+        "instagram_post":
+            f"{p['hooks'][1]} (save this 📌)\n\n{_numbered(p['steps'][:3])}\n\nFree {p['lead_title']} in bio.\n\n_{disc}_",
+        "linkedin_post":
+            f"{p['hooks'][2]}\n\nA practical, no-hype approach for {aud}:\n{_bullets(p['deliverables'][:5])}\n\nEducation first — you stay in control. DM 'PLAN' for the checklist.\n\n_{disc}_",
+        "short_video_script":
+            f"Hook (0-3s): \"{p['hooks'][0]}\"\nBody (3-35s): {p['problem']} Do this instead — {('; '.join(p['steps']))}.\n"
+            f"CTA (35-45s): \"{p['cta']} — link in bio.\"\nCompliance note: {disc}",
+        "lead_magnet":
+            f"# {p['lead_title']}\n_{p['sub']}_\n\n## Steps\n{_numbered(p['steps'])}\n\n## What's included\n{_bullets(p['deliverables'])}\n\n_{disc}_",
+        "dm_reply": _reply(track, proj),
+        "email_reply":
+            f"Subject: Your next steps — {p['lead_title']}\n\nHi [First Name],\n\n{p['problem']}\n\nHere's the plan Nexus put together for you:\n{_numbered(p['steps'])}\n\nYou'll get: {', '.join(p['deliverables'][:5])}. Reply 'YES' and I'll send the {p['lead_title']}.\n\n— Ray @ Nexus\n_{disc}_",
         "intake_questions": _intake_questions(track),
-        "follow_up_sequence": f"Day 1: deliver checklist. Day 3: 'any questions?'. Day 7: offer a readiness review (educational).\n_{disc}_",
-        "metrics_plan": "Track: views → clicks → replies → intake starts → intake completions → plans created → proof reports. Improvement triggers: low click→revise headline; low reply→revise CTA; high drop-off→simplify intake.",
-        "proof_report": f"# Proof Report — {track} (template)\n- Starting point: [filled from intake]\n- Blockers: [...]\n- Plan delivered: yes\n- Progress: [tracked]\n- Outcome: [education + next steps]\n{disc}",
-        "improvement_recommendation": "If results are weak: revise headline/CTA first, then offer, then audience, then channel. Re-test one variable at a time.",
+        "follow_up_sequence":
+            f"Day 1: deliver the {p['lead_title']} + summarize their starting point.\nDay 3: 'Any questions on step 1?'\n"
+            f"Day 5: share one relevant tip from the plan.\nDay 7: offer a free readiness review (educational).\n_{disc}_",
+        "metrics_plan":
+            f"Funnel: views → clicks → replies → intake starts → intake completions → {p['metric']} → proof reports.\n"
+            f"Primary metric: **{p['metric']}**.\nImprovement triggers: low clicks → revise headline; low replies → revise CTA/hook; high intake drop-off → simplify questions; weak deliverable → revise the plan content.",
+        "proof_report":
+            f"# Proof Report — {track} (template)\n- Audience: {aud}\n- Starting point: [from intake]\n- Top blockers: [identified]\n"
+            f"- Deliverables provided: {', '.join(p['deliverables'][:4])}\n- Plan steps completed: [tracked]\n- Outcome: education + clear next steps (no guarantees)\n\n_{disc}_",
+        "improvement_recommendation":
+            f"If results are weak, re-test ONE variable at a time in this order: 1) headline/hook 2) CTA 3) offer framing 4) audience 5) channel. "
+            f"For the {track} track specifically, sharpen the first deliverable ('{p['deliverables'][0]}') to be more concrete before changing the offer.",
     }
     return head + "\n" + bodies.get(atype, "(draft)")
 
@@ -439,15 +573,24 @@ def simulate(message: str, identity: str = "simulator") -> dict:
         ai_rec = ai_improvement_scout(_extract_tool(message))
     else:
         ai_rec = None
-    reply = compliance_scrub(_asset_body(track, "dm_reply", proj).split("\n", 2)[-1])
+    reply = compliance_scrub(_reply(track, proj))
     _append("messages", {"id": _id("msg", f"{conv['id']}:out"), "conversation_id": conv["id"],
                          "direction": "outbound", "text": reply, "mode": "test_only", "at": _now()})
     log_metric(proj["id"], "ideas_submitted", 1)
     log_metric(proj["id"], "intake_starts", 1)
     pkg = register_showroom_package(track, proj["id"])
+    prof = TRACK_PROFILE.get(track, TRACK_PROFILE["opportunity"])
+    # top 3 generated assets (landing page, lead magnet, and the lead-channel post)
+    top_types = ["landing_page", "lead_magnet", "facebook_post"]
+    top3 = [{"asset_type": a["asset_type"], "file_path": a["file_path"], "status": a["status"]}
+            for a in assets if a["asset_type"] in top_types]
     return {"track": track, "project_id": proj["id"], "lead_id": lead["id"], "findings": len(findings),
-            "hermes_recommendation": rec.get("id"), "assets": len(assets), "ai_recommendation": ai_rec,
-            "reply_preview": reply[:160], "showroom_package": pkg.get("package_id"), "mode": "test_only"}
+            "reply_preview": reply, "next_recommended_action": rec.get("recommended_action"),
+            "top_assets": top3, "showroom_package": pkg.get("package_id"),
+            "hermes_recommendation": rec.get("id"),
+            "hermes_recommendation_summary": rec.get("decision_summary"),
+            "metric_to_watch": prof["metric"], "assets": len(assets),
+            "ai_recommendation": ai_rec, "mode": "test_only"}
 
 
 def _extract_tool(message: str) -> str:
