@@ -959,7 +959,10 @@ class NexusTelegramBot:
             logger.warning(f"Report email skipped/failed: {result.get('error')}")
         return result
 
-    def get_updates(self, timeout: int = 20) -> list[dict]:
+    def get_updates(self, timeout: int = 0) -> list[dict]:
+        # SHORT polling (timeout=0): the local network proxy resets long-held
+        # connections, which silently broke inbound polling. The monitor loop sleeps
+        # ~2s between calls to pace short polling.
         if not self.connected:
             return []
 
@@ -4919,6 +4922,7 @@ def monitor():
         except Exception as e:
             logger.warning(f"Telegram command poll error: {e}")
 
+        time.sleep(2)  # pace short polling (timeout=0 getUpdates)
         now = time.time()
         if now - last_heartbeat >= HEARTBEAT_INTERVAL:
             last_heartbeat = now
