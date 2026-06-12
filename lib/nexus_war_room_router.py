@@ -35,6 +35,53 @@ ADVISOR_LEADS = ("hermes", "explain", "should we", "should i", "what do you thin
                  "find the best", "can thechoseone", "what can thechoseone", "what command")
 
 
+# Operational TheChoseone commands -> their canonical form (typo handling below).
+OPERATIONAL_CANONICAL = {
+    "status": "status", "system status": "status", "what is running": "status",
+    "raw status": "raw status", "details status": "raw status", "full status": "raw status",
+    "scout status": "scouts status", "scouts status": "scouts status", "scout statuses": "scouts status",
+    "scouts": "scouts status", "scout report": "scouts status", "scout reports": "scouts status",
+    "status scouts": "scouts status", "status scout": "scouts status",
+    "what did nexus produce": "what did nexus produce", "what did you produce": "what did nexus produce",
+    "daily report": "daily report", "safety status": "status", "trading status": "status",
+    "worker bridge status": "status", "command routing audit": "status",
+}
+
+
+def _dedupe(s: str) -> str:
+    """Collapse consecutive duplicate letters so 'approvals'/'aprrovals'/'apprrovals'
+    all normalize to the same string ('aprovals')."""
+    return re.sub(r"(.)\1+", r"\1", s or "")
+
+
+def is_approval_phrase(text: str) -> bool:
+    """Typo-tolerant detection of approval-QUEUE phrasings (not batch-approve actions)."""
+    low = (text or "").strip().lower().rstrip("?!. ")
+    # batch-approve / revision commands are separate actions, not the queue view
+    if low.startswith(("approve all", "approve package", "request revision")):
+        return False
+    d = _dedupe(low)
+    if "aprov" in d:          # approve, approval(s), aprovals, aprrovals, pending approvals…
+        return True
+    return any(k in d for k in ("review que", "review queue", "review cue", "showroom queue"))
+
+
+def canonical_command(text: str) -> str | None:
+    """The exact TheChoseone command for an operational/approval phrase, else None."""
+    low = (text or "").strip().lower().rstrip("?!. ")
+    if is_approval_phrase(low):
+        return "what needs approval"
+    return OPERATIONAL_CANONICAL.get(low)
+
+
+def looks_like_command(text: str) -> bool:
+    """True if the message is a TheChoseone command (verb, prefix, or operational/
+    approval alias incl. typos). Used to keep Hermes out of TheChoseone's lane."""
+    if canonical_command(text):
+        return True
+    return route(text).get("is_command", False)
+
+
 def route(message: str) -> dict:
     """Return {target, reason, is_command, command_text?}. target in
     {'thechoseone','hermes_mobile'}. Command always wins the tie-break, except
@@ -47,6 +94,12 @@ def route(message: str) -> dict:
         if low.startswith(lead):
             return {"target": "hermes_mobile", "is_command": False,
                     "reason": f"advisor lead '{lead.strip()}'"}
+
+    # operational/approval alias (typo-tolerant) -> TheChoseone
+    canon = canonical_command(low)
+    if canon:
+        return {"target": "thechoseone", "is_command": True,
+                "command_text": canon, "reason": "operational/approval alias"}
 
     # explicit prefix -> command bot, strip the prefix for execution
     for p in COMMAND_PREFIXES:

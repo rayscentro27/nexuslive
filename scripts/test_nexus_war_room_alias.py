@@ -55,6 +55,30 @@ check("Hermes 'what needs to be approved' -> drafts 'what needs approval'",
 r = HM.respond("explain the status report")
 check("'explain the status report' is NOT an op handoff", r["intent"] != "op_handoff")
 
+print("\n=== TASK 1: typo-tolerant approval aliases ===")
+for p in ["pending aprrovals", "pending approval", "pending approvals", "pending aprovals",
+          "pending apprrovals", "aprrovals", "aprovals", "approvals", "approval",
+          "approve queue", "approval que", "approval cue", "review que", "review cue"]:
+    out = R.report(p)
+    ok = out is not None and "approve all assets in package" in out
+    check(f"report({p!r}) -> approval queue", ok)
+    check(f"router routes {p!r} -> thechoseone", RT.route(p)["target"] == "thechoseone")
+
+print("\n=== TASK 2: Hermes stays silent on commands (looks_like_command) ===")
+for p in ["what needs to be approved", "scout status", "pending aprrovals", "status",
+          "scouts status", "review queue", "what did nexus produce"]:
+    check(f"looks_like_command({p!r}) True -> Hermes skips in group", RT.looks_like_command(p) is True)
+# advisory questions are NOT commands -> Hermes answers
+for p in ["what should I do next", "how do we make money in 30 days", "explain the status report"]:
+    check(f"looks_like_command({p!r}) False -> Hermes answers", RT.looks_like_command(p) is False)
+
+print("\n=== TASK 3: explain the status report -> plain English (no handoff) ===")
+e = HM.respond("explain the status report")
+check("explain is conversational (not op_handoff)", e["intent"] != "op_handoff")
+check("explain mentions review queue / Credit-Funding / $97",
+      ("review" in e["answer"].lower() or "showroom" in e["answer"].lower())
+      and "credit/funding" in e["answer"].lower() and "$97" in e["answer"])
+
 print("\n=== safety ===")
 check("Hermes cannot execute", HM.CAPABILITIES["execute_commands"] is False)
 

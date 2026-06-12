@@ -244,7 +244,11 @@ def report(text: str) -> str | None:
     if low.startswith("status ") and "scout" in low and low not in SCOUTS_ALIASES:
         nm = low.replace("status", "", 1).replace("scout", "").strip()
         return scout_status(nm or "credit")
-    if low in APPROVAL_ALIASES:
+    try:
+        from lib.nexus_war_room_router import is_approval_phrase as _is_appr
+    except Exception:
+        _is_appr = lambda s: False  # noqa: E731
+    if low in APPROVAL_ALIASES or _is_appr(low):
         return approval_queue()
     if low in ("what did nexus produce", "what did you produce", "produced", "details produced"):
         return produced()

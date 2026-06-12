@@ -164,6 +164,9 @@ def respond(text: str) -> dict:
     """Main entry. Returns conversational answer + summary + proposed_action +
     optional command_draft / prompt_draft / memory_suggestion. READ-ONLY."""
     intent = classify(text)
+    # "explain …" is always conversational — beat the generic 'status' keyword match.
+    if (text or "").strip().lower().startswith("explain"):
+        intent = "explain"
     ctx = context_snapshot()
     out = {
         "intent": intent,
@@ -179,14 +182,20 @@ def respond(text: str) -> dict:
 
     # ── Operational-command handoff ──────────────────────────────────────────
     # Hermes must NOT invent live operational state. If it receives a TheChoseone
-    # status/operational command, hand off the exact command (unless the ask is to
-    # EXPLAIN a report, which is conversational).
+    # status/operational/approval command (typo-tolerant), hand off the exact
+    # command — unless the ask is to EXPLAIN a report (conversational).
     _low = (text or "").strip().lower().rstrip("?!. ")
     if not _low.startswith(("explain", "what do you think")):
-        canonical = OP_HANDOFF_MAP.get(_low)
+        try:
+            from lib import nexus_war_room_router as _RT
+            # Only hand off if the router itself classifies this as a TheChoseone
+            # command — advisor-lead questions ("how do I approve…") route to Hermes.
+            canonical = _RT.canonical_command(text) if _RT.route(text).get("target") == "thechoseone" else None
+        except Exception:
+            canonical = OP_HANDOFF_MAP.get(_low)
         if canonical:
             out["intent"] = "op_handoff"
-            out["answer"] = f"That's a TheChoseone command — it has the verified live data. Send this:"
+            out["answer"] = "That's a TheChoseone command — it has the verified live data. Send this:"
             out["command_draft"] = canonical
             out["proposed_action"] = "Paste it to TheChoseone; I won't invent the status myself."
             out["summary"] = f"Handed off to TheChoseone: {canonical}"
@@ -326,18 +335,16 @@ def respond(text: str) -> dict:
         out["command_draft"] = "status credit scout"
 
     elif intent == "explain":
-        rpt = _read(REPORTS / "nexus_continuous_operations_status.md", 1500)
+        n = ctx.get("needs_review", 0)
         out["answer"] = (
-            "In plain English: Nexus ran one full pass of the whole system. It drafted assets for 5 "
-            "scenarios, kept email locked to your two addresses (two test emails went out, a stranger "
-            "address was blocked), queued an IG test instead of sending it, and only read Oanda in demo "
-            "mode — no trade. The rest is waiting on your review. Nothing went public."
+            f"That status means Nexus is online and safe, but waiting on your review. The important part "
+            f"isn't the services — it's the {n} Showroom assets waiting for approval. Your next move is to "
+            f"inspect the Credit/Funding pack first, because that's the fastest path to a manual $97–$297 "
+            f"readiness offer. Nothing public, paid, traded, or sent is enabled."
         )
-        out["summary"] = "One safe pass: drafts made, sends gated, nothing public, review pending."
-        out["proposed_action"] = "Skim the status report, then approve or give feedback."
-        out["links"].append("reports/showroom/nexus_continuous_operations_status.md")
-        if not rpt:
-            out["answer"] += " (Tip: run the daily report generator to refresh the file.)"
+        out["summary"] = "Status = online + safe; the real signal is the review queue."
+        out["proposed_action"] = "Inspect the Credit/Funding pack first."
+        out["command_draft"] = "what needs approval"
 
     elif intent == "decide":
         out["answer"] = (

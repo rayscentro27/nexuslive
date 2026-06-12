@@ -309,7 +309,9 @@ def run_live(max_seconds: int | None = None, max_messages: int | None = None) ->
                              or low_raw.strip().startswith("hermes"))
                 if not mentioned:
                     try:
-                        if ROUTER.route(_strip_mention(text)).get("is_command"):
+                        # Skip ANY TheChoseone command (verb/alias/typo) so Hermes
+                        # never double-replies after TheChoseone handled it.
+                        if ROUTER.looks_like_command(_strip_mention(text)):
                             continue
                     except Exception:
                         pass
