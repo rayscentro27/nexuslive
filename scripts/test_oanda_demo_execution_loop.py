@@ -108,10 +108,17 @@ def main(dry_run: bool = False) -> None:
     if eval_result["pass"] and not dry_run:
         adapter = OandaDemoAdapter()
         try:
+            pricing = adapter.get_pricing(eval_result["instrument"])
+            price = (pricing.get("prices") or [{}])[0]
+            bid = float((price.get("bids") or [{}])[0].get("price") or 0.0)
+            ask = float((price.get("asks") or [{}])[0].get("price") or 0.0)
+            entry = ask if eval_result["side"] == "buy" else bid
             order_result = adapter.place_demo_order(
                 instrument=eval_result["instrument"],
                 side=eval_result["side"],
                 units=1,
+                stop_loss=round(entry - 0.0010, 5) if eval_result["side"] == "buy" else round(entry + 0.0010, 5),
+                take_profit=round(entry + 0.0020, 5) if eval_result["side"] == "buy" else round(entry - 0.0020, 5),
                 reason=f"demo_exec_loop_{ts}: {eval_result['reason']}",
             )
             status = "✅ PLACED" if order_result["ok"] else f"❌ FAILED: {order_result.get('error')}"

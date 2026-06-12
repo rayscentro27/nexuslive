@@ -18,6 +18,7 @@ import { AdminInviteUsers } from './AdminInviteUsers';
 import { AdminGrantReviews } from './AdminGrantReviews';
 import { AdminCEOMode } from './AdminCEOMode';
 import { NexusOS } from './NexusOS';
+import { ShowroomReview } from './ShowroomReview';
 
 const ADMIN_DOCK = [
   { id: 'dashboard',     emoji: '🏠', label: 'Overview' },
@@ -35,6 +36,7 @@ const ADMIN_DOCK = [
   { id: 'reports',       emoji: '📋', label: 'Reports' },
   { id: 'subscriptions', emoji: '💳', label: 'Plans' },
   { id: 'grants-review', emoji: '🔬', label: 'Grants' },
+  { id: 'showroom',      emoji: '📦', label: 'Showroom' },
   { id: 'ceo-mode',      emoji: '🧠', label: 'CEO Mode' },
   { id: 'nexus-os',      emoji: '🖥️', label: 'Nexus OS' },
   { id: 'settings',      emoji: '⚙️', label: 'Settings' },
@@ -102,8 +104,8 @@ function AdminBottomDock({ activeTab, setActiveTab }: {
   );
 }
 
-export function AdminPortal() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+export function AdminPortal({ initialTab }: { initialTab?: string }) {
+  const [activeTab, setActiveTab] = useState(initialTab || 'dashboard');
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#eaebf6' }}>
@@ -128,6 +130,7 @@ export function AdminPortal() {
           {activeTab === 'reports'       && <AdminReports />}
           {activeTab === 'subscriptions' && <AdminSubscriptionSettings />}
           {activeTab === 'grants-review' && <AdminGrantReviews />}
+          {activeTab === 'showroom'      && <ShowroomReview />}
           {activeTab === 'ceo-mode'      && <AdminCEOMode />}
           {activeTab === 'nexus-os'      && <NexusOS />}
           {activeTab === 'settings'      && <AdminSettings onNavigate={setActiveTab} />}

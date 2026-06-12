@@ -43,7 +43,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger('MemoryWorker')
 
-from memory_store_service import store_memory, expire_old_memories
+# Ensure the project root is importable regardless of cwd (cron/launchd safe)
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from memory_engine.memory_store_service import store_memory, expire_old_memories
 
 SUPABASE_URL = os.getenv('SUPABASE_URL', '')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY', '')

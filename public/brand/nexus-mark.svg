@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Nexus mark">
+  <rect width="128" height="128" rx="28" fill="#E2E8F0"/>
+  <path d="M30 92V36h14l24 31V36h14v56H68L44 60v32z" fill="#1E3A8A"/>
+  <path d="M24 102c24-14 56-14 80 0" fill="none" stroke="#0EA5E9" stroke-width="5" stroke-linecap="round"/>
+</svg>

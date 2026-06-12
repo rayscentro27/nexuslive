@@ -12,10 +12,15 @@ def main():
     print("[oanda_order_test] Placing 1-unit EUR_USD BUY on practice account…")
     adapter = OandaDemoAdapter()
     try:
+        pricing = adapter.get_pricing("EUR_USD")
+        price = (pricing.get("prices") or [{}])[0]
+        ask = float((price.get("asks") or [{}])[0].get("price") or 0.0)
         result = adapter.place_demo_order(
             instrument="EUR_USD",
             side="buy",
             units=1,
+            stop_loss=round(ask - 0.0010, 5),
+            take_profit=round(ask + 0.0020, 5),
             reason="integration_test",
         )
     except OandaSafetyError as e:

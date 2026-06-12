@@ -97,13 +97,22 @@ def main() -> int:
     # 11. Telegram plain-language status
     report["telegram_status"] = TG.status_text()
 
-    # write op state
-    op = ROOT / "logs" / "proof_automation" / "continuous_ops_latest.json"
-    op.write_text(json.dumps(report, indent=2, default=str))
+    # write op state (latest + history)
+    log_dir = ROOT / "logs" / "proof_automation"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    latest = log_dir / "continuous_ops_latest.json"
+    latest.write_text(json.dumps(report, indent=2, default=str))
+    history = log_dir / "continuous_operations_history.jsonl"
+    with history.open("a") as fh:
+        fh.write(json.dumps({"ts": report["at"], "mode": report["mode"], "simulator_count": len(report.get("simulator", [])),
+                             "email_drafted": sum(1 for e in report.get("email", {}).get("sends", []) if e.get("status") == "drafted"),
+                             "negative_test_blocked": report.get("email", {}).get("negative_test_blocked"),
+                             "instagram_queued": 1 if report.get("instagram", {}).get("status") == "queued" else 0,
+                             "oanda_status": report.get("oanda", {}).get("broker_mode", "unknown")}) + "\n")
     print(json.dumps({k: (v if k not in ("scouts",) else f"{len(v)} scouts") for k, v in report.items()
                       if k in ("mode", "simulator", "email", "instagram", "oanda", "telegram_status")},
                      indent=2, default=str)[:1800])
-    print(f"\n[ops] state: {op.relative_to(ROOT)}")
+    print(f"\n[ops] state: {latest.relative_to(ROOT)}")
     return 0
 
 

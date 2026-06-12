@@ -1,0 +1,150 @@
+{
+  "plan_id": "plan_1780429586",
+  "latest_daily_plan": [
+    "Funding workflow review",
+    "Telegram routing verification",
+    "Pilot operations simulation",
+    "Credit workflow checkpoint"
+  ],
+  "active_priorities": [
+    "Funding workflow review",
+    "Telegram routing verification",
+    "Pilot operations simulation",
+    "Credit workflow checkpoint"
+  ],
+  "recent_recommendations": [
+    "Funding workflow review",
+    "Telegram routing verification",
+    "Pilot operations simulation",
+    "Credit workflow checkpoint"
+  ],
+  "task_lifecycle": {
+    "07bf1b82-967a-4898-86ce-72390bf0471a": "ignored",
+    "0e69baab-41b7-4ead-a7ad-5d5fd8206396": "ignored",
+    "1a42af5e-14e8-4705-ba57-30f6843d5bc4": "ignored",
+    "1fbfaf8c-07d0-4661-ad1d-0a5e974d1cf4": "ignored",
+    "370e0f58-6c1e-4ead-b071-8291c0c53b5e": "ignored",
+    "3cdedf35-65a7-4c4c-86e3-7bec30b732a2": "ignored",
+    "4be5b07b-96f7-4526-8cfc-4e5305ac1abb": "ignored",
+    "5111c291-ceda-4b94-bd85-1ae82d3a99a8": "ignored",
+    "5f6af760-8c60-4be6-b129-07834bd51807": "ignored",
+    "5fca75bc-33fb-48fd-8501-7716b8bd203f": "routing",
+    "60e13494-71fc-4ba4-a097-95e3cd4d67a2": "ignored",
+    "647cef5c-68d2-4ed6-ae99-e5d73ec5bbe7": "ignored",
+    "64a36037-21f6-41f0-a512-c2f3c583eb51": "routing",
+    "65da5eab-9beb-4af6-b956-ca30da2fc20d": "ignored",
+    "67e5d7ca-92d3-402d-b29f-e7dde2e1855a": "ignored",
+    "7a9fbf5d-9294-41e2-bf0a-5fd820cf97f2": "ignored",
+    "93baa5e4-f35b-43bf-b848-2f3afc4ab0e9": "ignored",
+    "947362fa-2f90-46e0-bceb-de87e1e06e08": "ignored",
+    "9dcc816c-7e3f-4ebb-b108-6b59e9df5e18": "ignored",
+    "a7929ea3-4131-4906-a1e2-aa0b6734911e": "queued",
+    "b675d097-0bf6-41bd-a119-7e11846047be": "ignored",
+    "c37eb943-f3fb-413a-bf92-10bf5e8437f8": "ignored",
+    "cdc216fa-ea97-464c-b730-1794c938f37b": "ignored",
+    "ce1bd5b7-7d7f-4385-9222-5a610ac001bf": "ignored",
+    "d9565d27-93a1-4691-b792-c1841fa4b1bf": "ignored",
+    "e41a5ccd-bf53-44c0-b0e1-6264d103aca7": "ignored",
+    "e73ebb35-b766-405d-b022-32d6c5fc5405": "queued",
+    "ed121a5a-f7fa-4381-bae9-c250d3cda48c": "ignored",
+    "edcc7a37-22dd-4d67-b02a-ef80fa26d790": "ignored",
+    "fa419d1a-bbff-47ef-af68-87d498956337": "ignored"
+  },
+  "task_lifecycle_summary": {
+    "queued": 2,
+    "running": 0,
+    "completed": 0,
+    "failed": 0,
+    "canceled": 0,
+    "blocked": 0
+  },
+  "recent_completed": [],
+  "recent_failed": [],
+  "blocked_priorities": [],
+  "completed_priorities": [],
+  "pending_approval": {
+    "task": "chief_of_staff_recommendation",
+    "reason": "Pending owner approval."
+  },
+  "pending_approval_refs": [
+    {
+      "id": "9d97cc6d-45fc-454b-8904-ca154a6b0045",
+      "status": "pending",
+      "action_type": "apply_affiliate_program",
+      "created_at": "2026-06-08T05:23:21.132786+00:00"
+    },
+    {
+      "id": "81efdce1-3d94-4a83-91ed-7805a97e39d7",
+      "status": "pending",
+      "action_type": "update_broker_credentials",
+      "created_at": "2026-06-08T05:23:21.132786+00:00"
+    },
+    {
+      "id": "b0307508-35eb-41f2-9b74-46071e31f9b8",
+      "status": "pending",
+      "action_type": "publish_content",
+      "created_at": "2026-06-08T16:29:25.878658+00:00"
+    },
+    {
+      "id": "790e77ee-6f96-4ad8-a145-7a08b719b361",
+      "status": "pending",
+      "action_type": "publish_content",
+      "created_at": "2026-06-08T16:29:26.056576+00:00"
+    },
+    {
+      "id": "7044836a-7618-4a34-aa73-9b0ebd64dd3a",
+      "status": "pending",
+      "action_type": "tool_evaluation",
+      "created_at": "2026-06-08T16:38:37.525512+00:00"
+    },
+    {
+      "id": "6358679b-25a3-4b0c-bfd2-467f136009b1",
+      "status": "pending",
+      "action_type": "tool_evaluation",
+      "created_at": "2026-06-08T16:38:37.525512+00:00"
+    },
+    {
+      "id": "3d85c0a3-b674-4c50-9bcf-4425b02db73b",
+      "status": "pending",
+      "action_type": "tool_evaluation",
+      "created_at": "2026-06-08T16:38:37.525512+00:00"
+    },
+    {
+      "id": "9e0c60c2-7445-4f0e-bb16-7caac16acac6",
+      "status": "pending",
+      "action_type": "setup_tiktok_upload",
+      "created_at": "2026-06-08T17:16:42.718463+00:00"
+    },
+    {
+      "id": "090a7ed3-e1b7-4e9c-9d08-7331675b68e2",
+      "status": "pending",
+      "action_type": "setup_instagram_upload",
+      "created_at": "2026-06-08T17:16:42.718463+00:00"
+    },
+    {
+      "id": "93df8524-e450-4df0-9c54-8dd665f99cbe",
+      "status": "pending",
+      "action_type": "evaluate_postiz",
+      "created_at": "2026-06-08T17:16:42.718463+00:00"
+    }
+  ],
+  "updated_at": "2026-06-11T23:10:34.483222+00:00",
+  "updated_by": "telegram_user_instruction",
+  "last_user_instruction": "status on research queue",
+  "work_sessions": [],
+  "active_work_session_id": null,
+  "latest_ops_monitor_run": {
+    "read_only": true,
+    "timestamp": "2026-05-29T20:53:19.985252+00:00",
+    "queue_summary": {
+      "completed": 2
+    },
+    "recent_failures_count": 0,
+    "worker_status_summary": {
+      "idle": 2,
+      "running": 2
+    },
+    "pending_approvals_count": 6,
+    "recommended_next_action": "Review pending approvals first."
+  }
+}

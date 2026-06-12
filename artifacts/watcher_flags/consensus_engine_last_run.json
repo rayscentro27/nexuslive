@@ -1,0 +1,93 @@
+{
+  "ran_at": "2026-06-11T22:54:59.071664+00:00",
+  "ranked_count": 5,
+  "critical_count": 5,
+  "high_count": 0,
+  "top_opportunity": {
+    "type": "content_llm_fix",
+    "title": "Fix content engine LLM (Ollama offline \u2192 route to OpenRouter)",
+    "summary": "Content engine generating templates only. Fix = 11 real pieces/day.",
+    "roi_potential": 80,
+    "traffic_potential": 90,
+    "ease_of_execution": 75,
+    "urgency": 95,
+    "scout_confidence": 99,
+    "scout_alignment": 3,
+    "source": "infrastructure_scout+content_engine+affiliate_scout",
+    "consensus_score": 99.2,
+    "priority": "CRITICAL"
+  },
+  "top_5": [
+    {
+      "type": "content_llm_fix",
+      "title": "Fix content engine LLM (Ollama offline \u2192 route to OpenRouter)",
+      "summary": "Content engine generating templates only. Fix = 11 real pieces/day.",
+      "roi_potential": 80,
+      "traffic_potential": 90,
+      "ease_of_execution": 75,
+      "urgency": 95,
+      "scout_confidence": 99,
+      "scout_alignment": 3,
+      "source": "infrastructure_scout+content_engine+affiliate_scout",
+      "consensus_score": 99.2,
+      "priority": "CRITICAL"
+    },
+    {
+      "type": "newsletter_launch",
+      "title": "Complete Beehiiv newsletter setup and launch first broadcast",
+      "summary": "Newsletter = primary affiliate + membership funnel. Zero subscribers = zero revenue.",
+      "roi_potential": 90,
+      "traffic_potential": 85,
+      "ease_of_execution": 70,
+      "urgency": 90,
+      "scout_confidence": 95,
+      "scout_alignment": 3,
+      "source": "newsletter_growth_scout+affiliate_scout+revenue_consensus",
+      "consensus_score": 99.0,
+      "priority": "CRITICAL"
+    },
+    {
+      "type": "affiliate_integration",
+      "title": "Integrate Lendio affiliate CTA into content",
+      "summary": "Lendio has roi_score 94 and no integration yet. Every article = missed revenue.",
+      "roi_potential": 94,
+      "traffic_potential": 70,
+      "ease_of_execution": 85,
+      "urgency": 90,
+      "scout_confidence": 95,
+      "scout_alignment": 2,
+      "source": "affiliate_scout+revenue_consensus_engine",
+      "consensus_score": 94.5,
+      "priority": "CRITICAL"
+    },
+    {
+      "type": "youtube_setup",
+      "title": "Complete YouTube channel setup (6 links + contact email)",
+      "summary": "Channel branding incomplete. Completing it is 15 minutes = professional presence.",
+      "roi_potential": 75,
+      "traffic_potential": 95,
+      "ease_of_execution": 90,
+      "urgency": 80,
+      "scout_confidence": 99,
+      "scout_alignment": 2,
+      "source": "youtube_growth_scout",
+      "consensus_score": 93.4,
+      "priority": "CRITICAL"
+    },
+    {
+      "type": "seo_article_batch",
+      "title": "Publish 5 SEO articles targeting 'business funding 2026' keyword cluster",
+      "summary": "Low competition, high buying intent, Lendio affiliate naturally fits.",
+      "roi_potential": 85,
+      "traffic_potential": 80,
+      "ease_of_execution": 70,
+      "urgency": 75,
+      "scout_confidence": 88,
+      "scout_alignment": 2,
+      "source": "seo_scout+affiliate_scout",
+      "consensus_score": 87.8,
+      "priority": "CRITICAL"
+    }
+  ],
+  "evidence_file": "/Users/raymonddavis/nexus-ai/state/opportunity_rankings/20260611_1554_opportunity_rankings.json"
+}

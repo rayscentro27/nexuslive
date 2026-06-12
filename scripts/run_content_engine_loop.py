@@ -45,6 +45,7 @@ CR_DIR = ROOT / "reports" / "tool_lab" / "creative_renders"
 
 BANNED = ["guarantee", "guaranteed", "get approved", "make $", "instant approval", "get rich"]
 LOOP_SAFE_STATUSES = {"Drafted", "Video Packet Ready", "Video Rendered", "Needs Ray Review", "Improve / Retry"}
+FEEDBACK_LOG = ROOT / "logs" / "content_feedback_latest.json"
 
 
 # ----------------------------- topic ingestion -----------------------------
@@ -263,6 +264,16 @@ def score_topic(topic: dict, has_render: bool, scenes_n: int) -> tuple[float, di
     return overall, dims, compliant
 
 
+def load_feedback_context(limit: int = 5) -> list[dict]:
+    if not FEEDBACK_LOG.exists():
+        return []
+    try:
+        items = json.loads(FEEDBACK_LOG.read_text()).get("items", [])
+    except Exception:
+        return []
+    return list(reversed(items[-limit:]))
+
+
 # ----------------------------- main pass -----------------------------
 def main() -> int:
     ap = argparse.ArgumentParser(description="Run one safe internal content engine pass")
@@ -285,9 +296,12 @@ def main() -> int:
     topics = gather_topics()[: args.limit]
     no_new = not topics
     results = []
+    feedback_context = load_feedback_context()
 
     print(f"=== content engine loop ({'DRY-RUN' if dry else 'LIVE'}) · "
           f"source={args.topic_source} · limit={args.limit} · topics={len(topics)} ===")
+    if feedback_context:
+        print(f"feedback memory loaded: {len(feedback_context)} recent lesson(s)")
 
     for topic in topics:
         assets = render_ready_assets(topic["short"])
@@ -379,6 +393,16 @@ def main() -> int:
         f"repurpose: {args.repurpose} · telegram: {'suppressed' if args.no_telegram else 'gated'}",
         "",
     ]
+    if feedback_context:
+        report_lines += [
+            "## Feedback Memory Read",
+        ]
+        for item in feedback_context:
+            report_lines.append(
+                f"- {item.get('asset_type', 'asset')} / {item.get('category', 'general')}: "
+                f"{item.get('feedback', '')[:140]}"
+            )
+        report_lines.append("")
     if no_new:
         report_lines.append("**No structured topics found** — nothing processed. "
                             "(fcf087ea fallback applies only when zero topics exist.)")

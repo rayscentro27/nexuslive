@@ -128,6 +128,19 @@ def route_conversational_intent(user_message: str) -> str | None:
     """
     from lib.hermes_knowledge_gap_logger import log_knowledge_gap, format_gap_logged_response
 
+    # ── 0. User-provided source + monetization intent → Monetization Scout ──
+    #   If Ray pasted a transcript/article/notes AND asked a strategic/monetization
+    #   question, treat the pasted content as PRIMARY evidence and return a Nexus-first
+    #   revenue plan. Runs BEFORE any evidence/artifact/opportunities path so Hermes
+    #   never falls into verified-artifact/evidence-dump mode on a supplied source.
+    try:
+        from lib.hermes_monetization_scout import should_handle as _scout_should_handle, run_scout
+        if _scout_should_handle(user_message):
+            logger.info("conversational_router route=monetization_scout (user-provided source)")
+            return run_scout(user_message)
+    except Exception:
+        logger.exception("monetization_scout layer failed; continuing to normal routing")
+
     intent = classify_conversational_intent(user_message)
     logger.info("conversational_router intent=%s message=%r", intent, user_message[:60])
 

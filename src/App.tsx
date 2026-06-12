@@ -498,6 +498,11 @@ export default function App() {
             <AdminPortal />
           </ProtectedRoute>
         } />
+        <Route path="/admin/showroom" element={
+          <ProtectedRoute requireAdmin>
+            <AdminPortal initialTab="showroom" />
+          </ProtectedRoute>
+        } />
 
         {/* ── public + legacy SPA (tab-based) ───────────────────────────── */}
         <Route path="/*" element={<AppContent />} />

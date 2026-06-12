@@ -21,6 +21,8 @@ import logging
 import os
 import re
 from collections import Counter
+import json
+from pathlib import Path
 
 from .env_loader import load_nexus_env
 from .nexus_semantic_concepts import expand_query, detect_hype, get_related_concepts
@@ -1362,6 +1364,64 @@ def _handle_retrieval_query(text: str) -> str | None:
         lines = ["Recent ingested videos:"]
         for r in videos[:10]:
             lines.append(f"• [{r.get('domain','general')}] {r.get('title','video')} ({r.get('status','unknown')})")
+        return "\n".join(lines)
+
+    if any(
+        phrase in t for phrase in [
+            "what youtube strategies did nexus find",
+            "which youtube strategies are testable",
+            "which ones were added to supabase",
+            "which ones are ready for tournament",
+            "which strategy videos were reviewed",
+        ]
+    ):
+        artifact_path = Path(__file__).resolve().parent.parent / "logs" / "youtube_strategy_research_latest.json"
+        if not artifact_path.exists():
+            return "No YouTube strategy research artifact exists yet."
+        try:
+            artifact = json.loads(artifact_path.read_text())
+        except Exception:
+            return "The latest YouTube strategy research artifact could not be read."
+        strategies = artifact.get("strategies") or []
+        reviewed = artifact.get("videos_transcripts_reviewed") or []
+        testable = [row for row in strategies if row.get("status") == "testable_candidate"]
+        tournament_ready = artifact.get("handoff", {}).get("tournament_dry_run", {}).get("ok")
+        if "which strategy videos were reviewed" in t:
+            if not reviewed:
+                return "No YouTube videos or transcripts were reviewed in the latest scout run."
+            return "Latest YouTube strategy sources reviewed:\n" + "\n".join(f"• {item}" for item in reviewed[:10])
+        if "which youtube strategies are testable" in t:
+            if not testable:
+                return "No testable YouTube strategies were extracted in the latest scout run."
+            return "Testable YouTube strategies:\n" + "\n".join(
+                f"• {row.get('strategy_name')} [{','.join(row.get('symbols') or [])} {row.get('timeframe')}]"
+                for row in testable[:10]
+            )
+        if "which ones were added to supabase" in t:
+            rows_written = artifact.get("rows_inserted", 0)
+            table_used = artifact.get("table_used", "unknown")
+            return f"YouTube strategy Supabase write status:\n• Rows inserted: {rows_written}\n• Table: {table_used}"
+        if "which ones are ready for tournament" in t:
+            ready = [row for row in testable if row.get("status") == "testable_candidate"]
+            if not ready:
+                return "No YouTube strategies are ready for tournament yet."
+            lines = [f"Tournament handoff ready: {'yes' if tournament_ready else 'no'}"]
+            lines.extend(
+                f"• {row.get('strategy_name')} [{row.get('strategy_family')}]"
+                for row in ready[:10]
+            )
+            return "\n".join(lines)
+        lines = [
+            f"YouTube strategies found: {len(strategies)}",
+            f"Testable: {len(testable)}",
+            f"Reviewed videos/transcripts: {len(reviewed)}",
+            f"Rows inserted to Supabase: {artifact.get('rows_inserted', 0)}",
+            f"Tournament dry-run ready: {'yes' if tournament_ready else 'no'}",
+        ]
+        for row in strategies[:5]:
+            lines.append(
+                f"• {row.get('strategy_name')} [{','.join(row.get('symbols') or [])} {row.get('timeframe')}] {row.get('status')}"
+            )
         return "\n".join(lines)
 
     return None

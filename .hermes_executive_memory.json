@@ -1,0 +1,20 @@
+{
+  "monetization_priorities": [],
+  "business_goals": [],
+  "affiliate_campaigns": [],
+  "content_backlog": [],
+  "unfinished_systems": [],
+  "infrastructure_problems": [],
+  "active_workers": [],
+  "operational_philosophy": [
+    "NEXUS_DRY_RUN=true always \u2014 never publish, bill, or deploy without approval",
+    "Evidence-first: no task marked complete without evidence_ref",
+    "Safe autonomous mode: workers generate drafts, human approves publication",
+    "Paper trading only \u2014 6-month verified performance minimum before live",
+    "No guaranteed income claims or financial guarantees in any output"
+  ],
+  "execution_priorities": [],
+  "updated_at": "2026-05-26T04:32:19.70616+00:00",
+  "version": 1,
+  "source": "empty_safe_fallback"
+}

@@ -1,0 +1,95 @@
+{
+  "ran_at": "2026-06-11T14:23:11.455746+00:00",
+  "total_due": 8,
+  "processed": 8,
+  "total_findings": 0,
+  "evidence_count": 3,
+  "results": [
+    {
+      "source_id": "niche_site_x38zy",
+      "division": "monetization_intelligence",
+      "scout": "seo_scout",
+      "tier": "B",
+      "videos_processed": 1,
+      "findings": 0,
+      "evidence_refs": [],
+      "skipped": false
+    },
+    {
+      "source_id": "luuk_alleman_channel",
+      "division": "monetization_intelligence",
+      "scout": "content_trend_scout",
+      "tier": "B",
+      "videos_processed": 5,
+      "findings": 0,
+      "evidence_refs": [
+        "source_extractions:9fa436eb-e171-4353-acd3-61a6ca4a6e12"
+      ],
+      "skipped": false
+    },
+    {
+      "source_id": "stedman_waiters_channel",
+      "division": "monetization_intelligence",
+      "scout": "affiliate_scout",
+      "tier": "B",
+      "videos_processed": 5,
+      "findings": 0,
+      "evidence_refs": [
+        "source_extractions:fddb284a-ede2-424a-863a-87c5b617ad02"
+      ],
+      "skipped": false
+    },
+    {
+      "source_id": "jj_simon_news_trading_8lbkj0",
+      "division": "market_intelligence",
+      "scout": "strategy_lab_scout",
+      "tier": "A",
+      "videos_processed": 1,
+      "findings": 0,
+      "evidence_refs": [],
+      "skipped": false
+    },
+    {
+      "source_id": "jj_simon_channel",
+      "division": "market_intelligence",
+      "scout": "strategy_lab_scout",
+      "tier": "A",
+      "videos_processed": 5,
+      "findings": 0,
+      "evidence_refs": [
+        "source_extractions:6bffac36-4b22-4466-b43c-3c27a6b732db"
+      ],
+      "skipped": false
+    },
+    {
+      "source_id": "the_one_lance_b_channel",
+      "division": "market_intelligence",
+      "scout": "strategy_lab_scout",
+      "tier": "A",
+      "videos_processed": 0,
+      "findings": 0,
+      "evidence_refs": [],
+      "skipped": false
+    },
+    {
+      "source_id": "macro_strategy_zspMXJ",
+      "division": "market_intelligence",
+      "scout": "macro_scout",
+      "tier": "A",
+      "videos_processed": 1,
+      "findings": 0,
+      "evidence_refs": [],
+      "skipped": false
+    },
+    {
+      "source_id": "volatility_strategy_flZA58",
+      "division": "market_intelligence",
+      "scout": "volatility_scout",
+      "tier": "A",
+      "videos_processed": 1,
+      "findings": 0,
+      "evidence_refs": [],
+      "skipped": false
+    }
+  ]
+}

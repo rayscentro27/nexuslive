@@ -29,7 +29,16 @@ from integrations.oanda_demo import OandaDemoAdapter
 
 adapter = OandaDemoAdapter()
 status = adapter.connection_status()
-result = adapter.place_demo_order("EUR_USD", "buy", units=1, reason="RSI oversold test")
+pricing = adapter.get_pricing("EUR_USD")
+ask = float(pricing["prices"][0]["asks"][0]["price"])
+result = adapter.place_demo_order(
+    "EUR_USD",
+    "buy",
+    units=1,
+    stop_loss=round(ask - 0.0010, 5),
+    take_profit=round(ask + 0.0020, 5),
+    reason="RSI oversold test",
+)
 ```
 
 ## Files

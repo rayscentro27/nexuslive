@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Hermes avatar">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1E3A8A"/>
+      <stop offset="100%" stop-color="#0EA5E9"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="120" fill="#F8FAFC"/>
+  <circle cx="128" cy="128" r="88" fill="url(#g)" opacity="0.14"/>
+  <path d="M84 164V92h18l26 34V92h18v72h-18l-26-34v34z" fill="#1E3A8A"/>
+  <path d="M72 184c34-20 78-20 112 0" fill="none" stroke="#0EA5E9" stroke-width="6" stroke-linecap="round"/>
+</svg>

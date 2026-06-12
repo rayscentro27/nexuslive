@@ -116,3 +116,74 @@ def _batch(package_id: str, status: str, notes: str, raw: str) -> dict:
     res = SA.review_batch(package_id, status, notes=notes, apply_to_all=True, reviewer="ray", source="telegram")
     reply = res.get("summary") if res.get("ok") else f"Could not apply: {res.get('error')}"
     return {"type": "batch_approval", "result": res, "reply": reply}
+
+
+# ── TRACK A: mobile-readable command reports (≤8–12 lines, links, next action) ──
+ADMIN_LINK = "http://127.0.0.1:4000/admin/proof-automation"
+
+
+def _safety_line() -> str:
+    return "Safety: no public posts · email allowlist-only · IG queue-only · Oanda demo · approved_live OFF."
+
+
+def mobile_status() -> str:
+    assets = _proof_assets()
+    needs = sum(1 for a in assets if a.get("status") == "needs_review")
+    return ("\n".join([
+        "Nexus is running (test mode). Daily ops = one_shot (no scheduler yet).",
+        f"Proof Automation active · 7 scouts available · {needs} assets need review.",
+        "Email: allowlist-only (Ray's 2 addresses). IG: queue-only. Oanda: demo/read-only.",
+        "",
+        "Needs Ray: review Proof Automation assets.",
+        f"Open: {ADMIN_LINK}",
+        _safety_line(),
+        "",
+        "Commands: what needs approval · status credit scout · daily report",
+    ]))
+
+
+def mobile_scout(scout: str) -> str:
+    full = scout_status_text(f"{scout} scout")
+    # keep to ~4 short lines for phone
+    short = full.split(". ")
+    head = ". ".join(short[:2]).strip()
+    return f"{head}.\nNext: review the landing page + give feedback.\nMore: 'status {scout} scout details'."
+
+
+def mobile_approval_queue() -> str:
+    from collections import Counter
+    by = Counter(a["asset_type"] for a in _proof_assets() if a.get("status") == "needs_review")
+    top = by.most_common(3)
+    lines = [f"{len(by)} packages need review. Top 3:"]
+    lines += [f"• {k} ({v})" for k, v in top]
+    lines += ["", "Approve: 'approve all assets in package <id> with notes: <text>'", f"Open: {ADMIN_LINK}"]
+    return "\n".join(lines)
+
+
+def command_report(text: str) -> str:
+    """Mobile-formatted command responses. 'details' suffix returns the full version."""
+    low = (text or "").strip().lower()
+    details = low.endswith("details")
+    base = low.replace("details", "").strip()
+    if base in ("status", "what is running", "what's running"):
+        return status_text() if details else mobile_status()
+    if base.startswith("status") and "scout" in base:
+        sc = base.replace("status", "", 1).replace("scout", "").strip()
+        return scout_status_text(f"{sc} scout") if details else mobile_scout(sc)
+    if "needs approval" in base:
+        return approval_queue_text() if details else mobile_approval_queue()
+    if "what did nexus produce" in base or "what did you produce" in base:
+        return what_produced_text()
+    if base == "daily report":
+        return "Daily report ready.\nOpen: reports/showroom/nexus_continuous_operations_status.md\n" + _safety_line()
+    if base in ("pause automation", "pause"):
+        return "Paused test automation. Resume with 'resume'."
+    if base in ("resume", "resume automation", "resume test automation"):
+        return "Resumed test automation (test_only)."
+    if base in ("stop sends", "stop all sends"):
+        return "Stopped sends (email + IG). Allowlist stays enforced."
+    if base in ("stop trading", "stop trading tests"):
+        return "Stopped trading tests. Oanda stays demo; no live trading."
+    # batch approval / revision delegate to parse_command
+    res = parse_command(text)
+    return res.get("reply", "Try: status · what needs approval · daily report")

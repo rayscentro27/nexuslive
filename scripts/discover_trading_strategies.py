@@ -289,6 +289,51 @@ def _discover_from_local_youtube() -> list[dict[str, Any]]:
     return candidates
 
 
+def _discover_from_youtube_strategy_research() -> list[dict[str, Any]]:
+    artifact = _load_json(ROOT / "logs" / "youtube_strategy_research_latest.json")
+    candidates: list[dict[str, Any]] = []
+    for row in artifact.get("strategies") or []:
+        strategy_id = str(row.get("strategy_id") or "youtube_strategy")
+        symbol = str((row.get("symbols") or ["EURUSD"])[0]).upper().replace("_", "")
+        asset_class = str(row.get("asset_class") or ("forex" if symbol in {"EURUSD", "USDJPY", "GBPUSD"} else "unknown"))
+        candidates.append(
+            {
+                "strategy_id": strategy_id,
+                "strategy_name": row.get("strategy_name") or strategy_id.replace("_", " ").title(),
+                "asset_class": asset_class,
+                "symbols": [symbol],
+                "timeframe": str(row.get("timeframe") or "H1"),
+                "strategy_family": str(row.get("strategy_family") or "technical_indicator"),
+                "trigger_type": str(row.get("trigger_type") or "continuous_indicator"),
+                "execution_style": str(row.get("execution_style") or "always_on"),
+                "source_type": str(row.get("source_type") or "youtube_transcript"),
+                "source_url": str(row.get("source_url") or ""),
+                "source_title": str(row.get("source_title") or "YouTube strategy research"),
+                "source_channel": str(row.get("source_channel") or ""),
+                "summary": str(row.get("raw_summary") or ""),
+                "entry_rules": row.get("entry_rules"),
+                "exit_rules": row.get("exit_rules"),
+                "stop_loss_rules": row.get("stop_loss_rules"),
+                "take_profit_rules": row.get("take_profit_rules"),
+                "risk_management_rules": row.get("risk_management_rules"),
+                "session_rules": row.get("session_rules"),
+                "news_event_rules": row.get("news_event_rules"),
+                "indicators_used": row.get("indicators_used") or [],
+                "invalidation_rules": row.get("invalidation_rules"),
+                "required_data": row.get("required_data") or ["candles"],
+                "testability_score": float(row.get("testability_score") or 0),
+                "clarity_score": float(row.get("clarity_score") or 0),
+                "risk_score": round((1.0 - min(float(row.get("confidence_score") or 0.5), 1.0)) * 100, 2),
+                "confidence_score": float(row.get("confidence_score") or 0),
+                "status": str(row.get("status") or "needs_research"),
+                "notes": "YouTube strategy research scout artifact.",
+                "raw_extracted_text": str(row.get("raw_summary") or ""),
+                "created_at": artifact.get("generated_at") or _now(),
+            }
+        )
+    return candidates
+
+
 def _dedupe(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
     seen: set[tuple[str, str]] = set()
     deduped: list[dict[str, Any]] = []
@@ -378,6 +423,7 @@ def main() -> int:
     if args.source in {"all", "local"}:
         discovered.extend(_discover_from_local_reports())
         discovered.extend(_discover_from_local_youtube())
+        discovered.extend(_discover_from_youtube_strategy_research())
     if args.keywords.strip():
         for keyword in [part.strip() for part in args.keywords.split(",") if part.strip()]:
             strategy_id = keyword.lower().replace(" ", "_")[:64]
@@ -406,7 +452,7 @@ def main() -> int:
         "source_mode": args.source,
         "dry_run": args.dry_run,
         "registry_sources": len(registry),
-        "youtube_search_adapter_available": False,
+        "youtube_search_adapter_available": True,
         "google_search_adapter_available": False,
         "supabase_mining_available": True,
         "local_mining_available": True,

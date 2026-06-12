@@ -1,0 +1,9 @@
+{
+  "source_id": "stedman_waiters_channel",
+  "last_run": "2026-06-11T14:21:03.401627+00:00",
+  "videos_processed": 5,
+  "findings": 0,
+  "evidence_refs": [
+    "source_extractions:fddb284a-ede2-424a-863a-87c5b617ad02"
+  ]
+}

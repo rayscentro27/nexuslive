@@ -1,0 +1,12 @@
+{
+  "source_id": "codeglitch_ai_automation",
+  "last_run": "2026-06-10T13:58:33.700058+00:00",
+  "videos_processed": 4,
+  "findings": 0,
+  "evidence_refs": [
+    "source_extractions:611f91ad-7540-4f9d-af58-a07a2cf8861d",
+    "source_extractions:51398ee2-be76-402d-a04a-c72784ce2f7c",
+    "source_extractions:a24cfa8f-1f8d-4e86-ab16-d779fc92a30c",
+    "source_extractions:be46e847-a0b6-49da-a99c-834eb33f92c5"
+  ]
+}

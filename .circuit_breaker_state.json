@@ -1,0 +1,65 @@
+{
+  "active_breakers": {},
+  "history": [
+    {
+      "id": "operator_halt_2026-05-12T21:38:26.350478+00:00",
+      "trigger_type": "operator_halt",
+      "trigger_value": null,
+      "strategy_id": null,
+      "triggered_at": "2026-05-12T21:38:26.350780+00:00",
+      "resolved": true,
+      "resolved_at": "2026-05-12T21:38:26.358637+00:00",
+      "resolved_by": "test_operator",
+      "auto_reset": false,
+      "auto_reset_hours": null,
+      "halt_all": true,
+      "description": "Manual halt by operator",
+      "notes": "test halt"
+    },
+    {
+      "id": "consecutive_losses_2026-05-12T22:47:44.729417+00:00",
+      "trigger_type": "consecutive_losses",
+      "trigger_value": 4,
+      "strategy_id": "test_strat",
+      "triggered_at": "2026-05-12T22:47:44.729446+00:00",
+      "resolved": false,
+      "resolved_at": null,
+      "resolved_by": null,
+      "auto_reset": true,
+      "auto_reset_hours": 4,
+      "halt_all": false,
+      "description": "Consecutive loss threshold breached",
+      "notes": "unit test"
+    },
+    {
+      "id": "consecutive_losses_2026-05-12T22:48:10.906252+00:00",
+      "trigger_type": "consecutive_losses",
+      "trigger_value": 4,
+      "strategy_id": "test_strat",
+      "triggered_at": "2026-05-12T22:48:10.906264+00:00",
+      "resolved": true,
+      "resolved_at": "2026-05-12T22:48:10.907140+00:00",
+      "resolved_by": "unit_test",
+      "auto_reset": true,
+      "auto_reset_hours": 4,
+      "halt_all": false,
+      "description": "Consecutive loss threshold breached",
+      "notes": "unit test"
+    },
+    {
+      "id": "daily_loss_exceeded_2026-05-12T22:48:10.907874+00:00",
+      "trigger_type": "daily_loss_exceeded",
+      "trigger_value": -500,
+      "strategy_id": null,
+      "triggered_at": "2026-05-12T22:48:10.907883+00:00",
+      "resolved": false,
+      "resolved_at": null,
+      "resolved_by": null,
+      "auto_reset": true,
+      "auto_reset_hours": 24,
+      "halt_all": true,
+      "description": "Daily loss limit exceeded",
+      "notes": ""
+    }
+  ]
+}

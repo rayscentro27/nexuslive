@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Nexus app icon">
+  <rect width="512" height="512" rx="112" fill="#F8FAFC"/>
+  <rect x="96" y="96" width="320" height="320" rx="80" fill="#E2E8F0"/>
+  <path d="M170 356V156h42l76 99V156h42v200h-42l-76-99v99z" fill="#1E3A8A"/>
+  <path d="M136 392c76-46 164-46 240 0" fill="none" stroke="#0EA5E9" stroke-width="16" stroke-linecap="round"/>
+</svg>

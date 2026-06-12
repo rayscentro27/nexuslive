@@ -127,6 +127,13 @@ def main() -> int:
             discovery = json.loads(discovery_file.read_text())
         except Exception:
             discovery = {}
+    youtube_research_file = ROOT / "logs" / "youtube_strategy_research_latest.json"
+    youtube_research = {}
+    if youtube_research_file.exists():
+        try:
+            youtube_research = json.loads(youtube_research_file.read_text())
+        except Exception:
+            youtube_research = {}
     watch_file = ROOT / "logs" / "live_watch" / "trading_watch_session_latest.json"
     watch = {}
     if watch_file.exists():
@@ -134,6 +141,20 @@ def main() -> int:
             watch = json.loads(watch_file.read_text())
         except Exception:
             watch = {}
+    safe_loop_file = ROOT / "logs" / "safe_learning_loop_latest.json"
+    safe_loop = {}
+    if safe_loop_file.exists():
+        try:
+            safe_loop = json.loads(safe_loop_file.read_text())
+        except Exception:
+            safe_loop = {}
+    learning_memory_file = ROOT / "logs" / "learning_memory_latest.json"
+    learning_memory = {}
+    if learning_memory_file.exists():
+        try:
+            learning_memory = json.loads(learning_memory_file.read_text())
+        except Exception:
+            learning_memory = {}
     replay_path = ROOT / "logs" / "charts" / "trade_replay_latest.html"
     dashboard_path = ROOT / "logs" / "charts" / "trading_dashboard_latest.html"
     report_status = (
@@ -152,6 +173,20 @@ def main() -> int:
     blocker_summary = ", ".join(dict.fromkeys(item for item in blocker_items if item)) or "none"
 
     next_cap_reset_command = "python3 scripts/run_nexus_demo_trading_loop.py --mode paper"
+    safe_loop_summary = safe_loop.get("summary") or {}
+    safe_loops = safe_loop.get("loops") or []
+    safe_loop_names = ", ".join(loop.get("lane", "unknown") for loop in safe_loops) or "none"
+    zero_result_lanes = ", ".join(safe_loop_summary.get("zero_result_lanes") or []) or "none"
+    next_safe_commands = ", ".join(
+        action.get("next_safe_command", "unknown")
+        for action in (safe_loop.get("next_safe_actions") or [])[:4]
+    ) or "none"
+    learning_records = learning_memory.get("records") or []
+    latest_lessons = " | ".join(
+        f"{record.get('lane')}: {record.get('lesson_learned')}"
+        for record in learning_records[:4]
+        if record.get("lesson_learned")
+    ) or "none"
 
     lines = [
         "NEXUS TRADING STATUS",
@@ -189,6 +224,22 @@ def main() -> int:
         f"Supabase candidate duplicates skipped: {promotion.get('duplicates_skipped', 'unknown')}",
         f"Discovery candidates discovered: {discovery.get('candidates_discovered', 'unknown')}",
         f"Discovery candidates testable: {discovery.get('candidates_testable', 'unknown')}",
+        f"YouTube strategy videos/transcripts reviewed: {youtube_research.get('documents_reviewed', 'unknown')}",
+        f"YouTube strategies extracted: {youtube_research.get('strategies_extracted', 'unknown')}",
+        f"YouTube strategies testable: {youtube_research.get('testable_strategies', 'unknown')}",
+        f"YouTube strategy seeds found: {youtube_research.get('seeds_found', 'unknown')}",
+        f"YouTube Supabase rows written: {'yes' if youtube_research.get('rows_written') else 'no'}",
+        f"YouTube ready for tournament: {'yes' if youtube_research.get('handoff', {}).get('tournament_dry_run', {}).get('ok') else 'no'}",
+        f"YouTube result meaning: {youtube_research.get('result_interpretation', 'unknown')}",
+        f"YouTube next safe action: {youtube_research.get('next_safe_action', 'unknown')}",
+        f"Safe loops ran: {safe_loop_names}",
+        f"Safe loop zero-result lanes: {zero_result_lanes}",
+        f"Safe loop seeds found: {safe_loop_summary.get('seed_total', 'unknown')}",
+        f"Safe loop variants created: {safe_loop_summary.get('variants_total', 'unknown')}",
+        f"Safe loop tests run: {safe_loop_summary.get('tests_total', 'unknown')}",
+        f"Learning lessons: {latest_lessons}",
+        f"Next safe commands: {next_safe_commands}",
+        "Ray approval required for: live trading, paid APIs, public publishing, email/outreach, production deploys, real-money broker activity",
         f"Top candidate for next cap reset: {top_candidate.get('strategy_name', 'none')}",
         f"Top candidate win rate: {top_candidate.get('win_rate', 'n/a')}",
         f"Top candidate profit factor: {top_candidate.get('profit_factor', 'n/a')}",

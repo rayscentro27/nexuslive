@@ -46,6 +46,9 @@ state/
 memory/
 reports/
 
+# Local results showroom (draft copies — browse locally, never commit)
+outputs/
+
 # Pre-migration backups (may contain Supabase table data — never commit)
 backups/
 

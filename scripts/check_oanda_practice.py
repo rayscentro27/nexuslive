@@ -38,6 +38,19 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _demo_brackets(adapter: OandaDemoAdapter, instrument: str, side: str) -> tuple[float, float]:
+    pricing = adapter.get_pricing(instrument)
+    prices = pricing.get("prices") or []
+    price = prices[0] if prices else {}
+    bid = float((price.get("bids") or [{}])[0].get("price") or 0.0)
+    ask = float((price.get("asks") or [{}])[0].get("price") or 0.0)
+    entry = ask if side.lower() == "buy" else bid
+    pip = 0.0001 if instrument != "USD_JPY" else 0.01
+    if side.lower() == "buy":
+        return round(entry - (10 * pip), 5), round(entry + (20 * pip), 5)
+    return round(entry + (10 * pip), 5), round(entry - (20 * pip), 5)
+
+
 def env_presence() -> dict[str, bool]:
     return {name: bool(os.getenv(name)) for name in REQUIRED_ENV_NAMES}
 
@@ -118,13 +131,17 @@ def main() -> int:
 
     try:
         adapter = OandaDemoAdapter()
+        report["endpoint_info"] = adapter.practice_endpoint_info()
         status = adapter.connection_status()
         report["connection_status"] = {
             "ok": bool(status.get("ok")),
             "environment": status.get("environment"),
+            "api_base": status.get("api_base"),
+            "endpoint_host": status.get("endpoint_host"),
             "currency": status.get("currency"),
             "balance_available": bool(status.get("balance")),
             "nav_available": bool(status.get("nav")),
+            "dns_preflight": status.get("dns_preflight"),
             "error": status.get("error"),
         }
         if not status.get("ok"):
@@ -172,10 +189,13 @@ def main() -> int:
         try:
             if not demo_enabled:
                 os.environ["OANDA_DEMO_ENABLED"] = "true"
+            stop_loss, take_profit = _demo_brackets(adapter, "EUR_USD", "buy")
             order = adapter.place_demo_order(
                 instrument="EUR_USD",
                 side="buy",
                 units=1,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
                 reason="nexus_oanda_practice_check",
             )
             report["practice_order_placed"] = bool(order.get("ok"))
