@@ -656,7 +656,7 @@ class NexusTelegramBot:
         except Exception:
             pass
 
-    def _send_message_once(self, message: str, parse_mode: str = "HTML") -> bool:
+    def _send_message_once(self, message: str, parse_mode: str = "HTML", chat_id: str | None = None) -> bool:
         text = self._truncate_response(message or "")
         if not text:
             return False
@@ -671,7 +671,7 @@ class NexusTelegramBot:
             logger.info("telegram dedup reply_suppressed=true")
             emit_metric("telegram_duplicate_reply_suppressed", payload={"domain": "telegram"})
             return True
-        sent = self.send_message(text, parse_mode=parse_mode)
+        sent = self.send_message(text, parse_mode=parse_mode, chat_id=chat_id)
         if sent:
             self._last_reply_hash = digest
             self._last_reply_ts = now
@@ -858,8 +858,9 @@ class NexusTelegramBot:
                 pass
             return "Hermes is online — conversational model unavailable right now. Try /status, /models, or ask a specific operational question."
 
-    def send_message(self, message: str, parse_mode: str = "HTML") -> bool:
-        """Send message to Telegram"""
+    def send_message(self, message: str, parse_mode: str = "HTML", chat_id: str | None = None) -> bool:
+        """Send message to Telegram. Replies to `chat_id` when given (e.g. the chat
+        a command came from); otherwise the configured DM (for proactive sends)."""
         if not self.connected:
             logger.warning("Telegram not connected")
             return False
@@ -869,7 +870,7 @@ class NexusTelegramBot:
                 self._truncate_response(message),
                 event_type='direct_chat_reply',
                 bot_token=self.bot_token,
-                chat_id=self.chat_id,
+                chat_id=(chat_id or self.chat_id),
                 parse_mode=parse_mode,
             )
 
@@ -4625,7 +4626,7 @@ class NexusTelegramBot:
                 self._memory_command_intent = ""
                 self._send_memory_command_response(rendered, intent=_intent)
             else:
-                self._send_message_once(rendered)
+                self._send_message_once(rendered, chat_id=self._current_chat_id)
             emit_metric(
                 "telegram_reply_success",
                 payload={
@@ -4665,7 +4666,8 @@ class NexusTelegramBot:
             status="failed",
             payload={"domain": "telegram", "command": command, "duration_ms": int((time.time() - started) * 1000)},
         )
-        self._send_message_once(response or self._fallback_response_for_command(command))
+        self._send_message_once(response or self._fallback_response_for_command(command),
+                                chat_id=self._current_chat_id)
         self._structured_log(
             update_id=update_id,
             chat_id=chat_id,
