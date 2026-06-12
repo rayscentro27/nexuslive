@@ -18,6 +18,10 @@ COMMAND_VERBS = (
     "status", "approve", "pause", "resume", "stop", "run",
     "what needs approval", "needs approval", "daily report",
     "request revision", "scouts status",
+    # approval-queue phrasings — these belong to TheChoseone (it has live data)
+    "what needs to be approved", "what do i need to approve", "approval queue",
+    "show approvals", "pending approvals", "what assets need review",
+    "what packages need review",
 )
 
 

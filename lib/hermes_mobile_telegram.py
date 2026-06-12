@@ -298,14 +298,21 @@ def run_live(max_seconds: int | None = None, max_messages: int | None = None) ->
                 continue
             if not text:
                 continue
-            # In group chats, stay in our lane: answer conversation only, never
-            # commands (TheChoseone handles those) — prevents double replies. DMs: all.
+            # Group lane rules:
+            #  - If Ray explicitly @mentions/addresses Hermes, always answer (for a
+            #    command ask, we DRAFT the command, never execute).
+            #  - Otherwise stay in our lane: conversation only; skip commands so
+            #    TheChoseone handles them (prevents double replies). DMs: answer all.
             if chat.get("type") in ("group", "supergroup"):
-                try:
-                    if ROUTER.route(_strip_mention(text)).get("is_command"):
-                        continue
-                except Exception:
-                    pass
+                low_raw = (text or "").lower()
+                mentioned = ("@nexushermesmobilebot" in low_raw
+                             or low_raw.strip().startswith("hermes"))
+                if not mentioned:
+                    try:
+                        if ROUTER.route(_strip_mention(text)).get("is_command"):
+                            continue
+                    except Exception:
+                        pass
             try:
                 _send(str(chat.get("id")), _reply_for(text))
             except Exception as e:

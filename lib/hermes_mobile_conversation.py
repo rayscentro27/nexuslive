@@ -94,6 +94,14 @@ UNSUPPORTED_LIVE = [
 
 INTENTS = [
     ("unsupported_live", UNSUPPORTED_LIVE),
+    ("greeting", ["good morning", "good afternoon", "good evening", "morning hermes",
+                  "hey hermes", "hi hermes", "hello hermes", "gm "]),
+    ("approval_queue", ["what needs approval", "what needs to be approved", "what do i need to approve",
+                        "approval queue", "show approvals", "pending approvals",
+                        "what assets need review", "what packages need review"]),
+    ("what_think", ["what do you think about the nexus", "what do you think about nexus",
+                    "what do you think of nexus", "is nexus any good", "thoughts on nexus",
+                    "what do you think about the nexus program"]),
     ("how_approve", ["how do i approve", "how to approve", "approve the credit", "approve this",
                      "approve the funding", "how do i approve the"]),
     ("can_run_codex", ["can thechoseone run codex", "can it run codex", "can thechoseone run claude",
@@ -163,6 +171,34 @@ def respond(text: str) -> dict:
         )
         out["summary"] = "No live external-data tool connected; answered honestly."
         out["proposed_action"] = "Ask me about Nexus, or say 'what needs my attention?'"
+        return out
+
+    if intent == "greeting":
+        out["answer"] = ("Good morning Ray. Nexus is in War Room mode. Best first move today: check "
+                         "approvals, then decide whether the Credit/Funding pack is ready for manual use.")
+        out["proposed_action"] = "Want the exact TheChoseone command? It's: what needs approval"
+        out["command_draft"] = "what needs approval"
+        out["summary"] = "Greeting + concrete first move."
+        return out
+
+    if intent == "approval_queue":
+        out["answer"] = ("Approval queue is a TheChoseone command — it has the live data, not me. "
+                         "Send this to TheChoseone:")
+        out["command_draft"] = "what needs approval"
+        out["proposed_action"] = ("It'll list the packages + exact approve/revise commands. Approving "
+                                  "means manual-use only (no auto-publish/send/charge).")
+        out["summary"] = "Routed to TheChoseone's approval queue."
+        return out
+
+    if intent == "what_think":
+        out["answer"] = ("Honestly? Nexus has real value now: 7 scouts producing assets, a Showroom with "
+                         "approval controls, hard safety boundaries, and a clean command/advisor split in "
+                         "Telegram. The risk isn't the idea — it's execution: making assets specific enough "
+                         "and converting them into a paid offer. The fix is concrete, not a rebuild.")
+        out["proposed_action"] = ("Next move: approve or revise the Credit/Funding pack, then package it as "
+                                  "a manual paid readiness review ($97–$297).")
+        out["command_draft"] = "what needs approval"
+        out["summary"] = "Constructive: real value; gap is execution + monetization."
         return out
 
     if intent == "how_approve":
@@ -239,12 +275,14 @@ def respond(text: str) -> dict:
 
     elif intent == "attention":
         out["answer"] = (
-            f"Two things really want you: (1) {ctx['needs_review']} proof assets sitting in needs_review "
-            f"— mostly {_pkg_phrase(ctx)} — and (2) deciding whether to turn on a scheduler so the loop "
-            f"runs without you. Nothing is on fire; nothing external has gone out."
+            "Your attention should go to the review queue first, not new features.\n\n"
+            "1. Credit/Funding pack — approve or revise first.\n"
+            f"2. Showroom queue — {ctx['needs_review']} assets need triage.\n"
+            "3. War Room test — confirm TheChoseone approval commands work.\n"
+            "4. Monetization offer — turn approved assets into a manual $97–$297 offer."
         )
-        out["summary"] = "Approvals pending + scheduler decision."
-        out["proposed_action"] = "Approve the credit package (your strongest track), then decide on scheduling."
+        out["summary"] = "Review queue first: approve pack, triage Showroom, test commands, build the offer."
+        out["proposed_action"] = "Start with the approval queue."
         out["command_draft"] = "what needs approval"
 
     elif intent == "scouts":
@@ -284,26 +322,30 @@ def respond(text: str) -> dict:
 
     elif intent == "money30":
         out["answer"] = (
-            "A realistic 30-day path, no hype: Week 1 — finalize the credit-readiness offer + landing page "
-            "and your two-address email test becomes a real opt-in list. Week 2 — soft outreach to people "
-            "who already know you (no cold outreach), offer the readiness review. Week 3 — deliver, collect "
-            "one real testimonial/case study. Week 4 — add funding-readiness as the upsell. Revenue comes "
-            "from a paid readiness review/consult — not from any automated payment yet (that stays gated)."
+            "Pick ONE revenue lane first: Credit/Funding Readiness. Why — it's closest to the assets you "
+            "already have, it's warm-audience friendly, and it's safe to sell as manual-use (no automation "
+            "needed yet), so you can charge before everything's perfect.\n\n"
+            "Next 3 actions:\n"
+            "1. Ask TheChoseone: what needs approval\n"
+            "2. Approve or revise the Credit/Funding Consultant Pack for manual use only.\n"
+            "3. Prepare a simple warm-lead offer: $97–$297 readiness review, no guarantees, manual fulfillment.\n\n"
+            "Trading stays secondary — research/demo only, not your first 30-day money lane."
         )
-        out["summary"] = "Focus one paid offer (credit readiness), warm audience, prove → upsell funding."
-        out["proposed_action"] = "Approve the credit package so it's ready to show a warm lead."
-        out["memory_suggestion"] = "30-day plan: credit readiness paid offer first, funding upsell wk4, warm audience only."
+        out["summary"] = "Lane 1 = Credit/Funding Readiness → approve pack → $97–$297 manual review."
+        out["proposed_action"] = "Start with: what needs approval"
+        out["command_draft"] = "what needs approval"
+        out["memory_suggestion"] = "30-day money: Credit/Funding Readiness first; $97–$297 manual review; trading is secondary/demo."
 
     elif intent == "improve":
         out["answer"] = (
-            "Weakest part right now: the scouts are template-driven, so findings say 'needs live "
-            "verification' — there's no real research feeding them yet. Second weakest: no scheduler, so "
-            "everything is manual one_shot. Third: the conversation layer (me) is read-only and not on "
-            "Telegram. The highest-leverage fix is wiring ONE scout (credit) to real, approved sources so "
-            "its claims are trustworthy."
+            "The specific weak spots (not the idea): 1) scout findings are template-driven, so they say "
+            "'needs live verification' — no real research feeds them yet. 2) The assets are generic; they "
+            "need to be specific enough that someone would pay for them. 3) Nothing is packaged as a paid "
+            "offer yet. Highest-leverage fix: approve/revise the credit pack and turn it into a manual "
+            "$97–$297 readiness review."
         )
-        out["summary"] = "Weakest: template-only scouts (no live research). Fix credit scout first."
-        out["proposed_action"] = "Approve a small, free research source for the credit scout."
+        out["summary"] = "Weak spots: generic assets, no live research, no paid offer — all fixable."
+        out["proposed_action"] = "Approve/revise the credit pack, then package the paid review."
         out["memory_suggestion"] = "Nexus weak spot 2026-06: scouts are template-only; prioritize live research for credit scout."
 
     elif intent == "recall":
@@ -366,13 +408,13 @@ def respond(text: str) -> dict:
 
     elif intent == "next":
         out["answer"] = (
-            "Next best move: approve the credit package (it's your strongest and most-ready), then decide "
-            "whether to enable a scheduler so the loop runs on its own. After that, point one scout at real "
-            "research so its findings stop saying 'needs verification'."
+            "Next best move: 1) review the approval queue, 2) approve or revise the Credit/Funding pack "
+            "for manual use, 3) package it as a manual $97–$297 readiness review for a warm lead. That turns "
+            "today's assets into money — no automation or trading needed first."
         )
-        out["summary"] = "1) approve credit  2) decide scheduler  3) wire one scout to real research."
+        out["summary"] = "Approve the credit/funding pack → package a manual paid review."
         out["command_draft"] = "what needs approval"
-        out["proposed_action"] = "Start with the credit approval."
+        out["proposed_action"] = "Start with the approval queue."
 
     else:  # open / unknown
         out["answer"] = (
@@ -426,10 +468,10 @@ def respond_llm(text: str) -> dict:
     when available, keeping all deterministic safety fields (proposed_action,
     command_draft, links). Read-only. Falls back to template answer if offline."""
     base = respond(text)
-    # Intents that must stay deterministic: exact commands / honest no-tool answers
-    # the model must not paraphrase or fabricate.
-    if base["intent"] in ("unsupported_live", "how_approve", "can_run_codex",
-                           "stop_help", "research", "command_help"):
+    # Only truly open/unmatched chit-chat goes to the local model. Every recognized
+    # intent returns its crafted, specific answer — the small model otherwise emits
+    # vague "analyze the assets" filler on high-value questions.
+    if base["intent"] != "open":
         base["provider"] = "deterministic"
         base["used_fallback"] = False
         return base

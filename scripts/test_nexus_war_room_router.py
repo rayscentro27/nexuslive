@@ -29,6 +29,12 @@ CASES = [
     ("Should we use Postiz?", "hermes_mobile"),
     ("Explain TheChoseone report", "hermes_mobile"),
     ("run monetization scout", "thechoseone"),
+    ("what needs to be approved", "thechoseone"),
+    ("what do I need to approve", "thechoseone"),
+    ("pending approvals", "thechoseone"),
+    ("what packages need review", "thechoseone"),
+    ("good morning", "hermes_mobile"),
+    ("what do you think about the nexus program", "hermes_mobile"),
 ]
 
 
