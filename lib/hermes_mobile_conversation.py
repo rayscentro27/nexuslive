@@ -92,13 +92,27 @@ UNSUPPORTED_LIVE = [
     "sports score", "game score", "what time is it", "current time", "today's date",
 ]
 
+# Operational commands Hermes must hand off (never invent state). Maps the phrase
+# Ray typed -> the exact canonical TheChoseone command to send.
+OP_HANDOFF_MAP = {
+    "status": "status", "system status": "status", "what is running": "status",
+    "raw status": "raw status", "details status": "raw status", "full status": "raw status",
+    "scout status": "scouts status", "scouts status": "scouts status", "scout statuses": "scouts status",
+    "scouts": "scouts status", "scout report": "scouts status", "scout reports": "scouts status",
+    "status scouts": "scouts status", "status scout": "scouts status",
+    "what did nexus produce": "what did nexus produce", "what did you produce": "what did nexus produce",
+    "worker bridge status": "status", "command routing audit": "status",
+    "trading status": "status", "safety status": "status",
+}
+
 INTENTS = [
     ("unsupported_live", UNSUPPORTED_LIVE),
     ("greeting", ["good morning", "good afternoon", "good evening", "morning hermes",
                   "hey hermes", "hi hermes", "hello hermes", "gm "]),
     ("approval_queue", ["what needs approval", "what needs to be approved", "what do i need to approve",
-                        "approval queue", "show approvals", "pending approvals",
-                        "what assets need review", "what packages need review"]),
+                        "what needs my approval", "approval queue", "show approvals", "pending approvals",
+                        "what assets need review", "what packages need review", "review queue",
+                        "showroom queue"]),
     ("what_think", ["what do you think about the nexus", "what do you think about nexus",
                     "what do you think of nexus", "is nexus any good", "thoughts on nexus",
                     "what do you think about the nexus program"]),
@@ -162,6 +176,21 @@ def respond(text: str) -> dict:
         "memory_suggestion": None,
         "links": [ADMIN_LINK],
     }
+
+    # ── Operational-command handoff ──────────────────────────────────────────
+    # Hermes must NOT invent live operational state. If it receives a TheChoseone
+    # status/operational command, hand off the exact command (unless the ask is to
+    # EXPLAIN a report, which is conversational).
+    _low = (text or "").strip().lower().rstrip("?!. ")
+    if not _low.startswith(("explain", "what do you think")):
+        canonical = OP_HANDOFF_MAP.get(_low)
+        if canonical:
+            out["intent"] = "op_handoff"
+            out["answer"] = f"That's a TheChoseone command — it has the verified live data. Send this:"
+            out["command_draft"] = canonical
+            out["proposed_action"] = "Paste it to TheChoseone; I won't invent the status myself."
+            out["summary"] = f"Handed off to TheChoseone: {canonical}"
+            return out
 
     if intent == "unsupported_live":
         out["answer"] = (

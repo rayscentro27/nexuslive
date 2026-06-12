@@ -17,11 +17,14 @@ COMMAND_PREFIXES = ("!", "/run", "/cmd")
 COMMAND_VERBS = (
     "status", "approve", "pause", "resume", "stop", "run",
     "what needs approval", "needs approval", "daily report",
-    "request revision", "scouts status",
+    "request revision",
     # approval-queue phrasings — these belong to TheChoseone (it has live data)
-    "what needs to be approved", "what do i need to approve", "approval queue",
-    "show approvals", "pending approvals", "what assets need review",
-    "what packages need review",
+    "what needs to be approved", "what do i need to approve", "what needs my approval",
+    "approvals", "approval queue", "show approvals", "pending approvals",
+    "what assets need review", "what packages need review", "review queue", "showroom queue",
+    # scout-status phrasings (singular + plural)
+    "scouts status", "scout status", "scout statuses", "scouts", "scout report",
+    "scout reports", "status scouts", "status scout",
 )
 
 

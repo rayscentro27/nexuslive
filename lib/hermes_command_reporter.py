@@ -218,6 +218,19 @@ def controls(kind: str) -> str:
 
 
 # ── dispatcher ───────────────────────────────────────────────────────────────
+# Alias sets so every natural phrasing maps to the canonical handler.
+APPROVAL_ALIASES = {
+    "what needs approval", "what needs to be approved", "what do i need to approve",
+    "what needs my approval", "approvals", "approval queue", "show approvals",
+    "pending approvals", "what assets need review", "what packages need review",
+    "review queue", "showroom queue", "needs approval", "details approval queue",
+}
+SCOUTS_ALIASES = {
+    "scout status", "scouts status", "scout statuses", "scouts", "scout report",
+    "scout reports", "status scouts", "status scout", "details scouts",
+}
+
+
 def report(text: str) -> str | None:
     """Return a polished report for a recognized war-room command, else None."""
     low = (text or "").strip().lower().rstrip("?!. ")
@@ -225,12 +238,13 @@ def report(text: str) -> str | None:
         return polished_status(raw=True)
     if low in ("status", "system status", "what is running", "what's running"):
         return polished_status()
-    if low in ("scouts status", "scout status", "details scouts"):
+    if low in SCOUTS_ALIASES:
         return scouts_status()
-    if low.startswith("status ") and "scout" in low:
+    # "status credit scout" (one named scout) — but not the bare aliases above
+    if low.startswith("status ") and "scout" in low and low not in SCOUTS_ALIASES:
         nm = low.replace("status", "", 1).replace("scout", "").strip()
         return scout_status(nm or "credit")
-    if low in ("what needs approval", "needs approval", "approval queue", "details approval queue"):
+    if low in APPROVAL_ALIASES:
         return approval_queue()
     if low in ("what did nexus produce", "what did you produce", "produced", "details produced"):
         return produced()
