@@ -23,6 +23,12 @@ CASES = [
     ("Explain the daily report in plain English.", "hermes_mobile"),
     ("What is the weakest part of Nexus?", "hermes_mobile"),
     ("Research Postiz and tell me if we should use it.", "hermes_mobile"),
+    # Part 7 war-room quality cases
+    ("Hermes, what should I do next?", "hermes_mobile"),
+    ("how do I approve this?", "hermes_mobile"),
+    ("Should we use Postiz?", "hermes_mobile"),
+    ("Explain TheChoseone report", "hermes_mobile"),
+    ("run monetization scout", "thechoseone"),
 ]
 
 

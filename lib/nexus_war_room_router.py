@@ -21,11 +21,25 @@ COMMAND_VERBS = (
 )
 
 
+# Unambiguous conversation openers — these are never TheChoseone commands, so they
+# route to the advisor even if a command-ish word appears later in the sentence.
+ADVISOR_LEADS = ("hermes", "explain", "should we", "should i", "what do you think",
+                 "help me decide", "how do i", "how should", "why ", "research ",
+                 "find the best", "can thechoseone", "what can thechoseone", "what command")
+
+
 def route(message: str) -> dict:
     """Return {target, reason, is_command, command_text?}. target in
-    {'thechoseone','hermes_mobile'}. Command always wins the tie-break."""
+    {'thechoseone','hermes_mobile'}. Command always wins the tie-break, except
+    explicit advisor-address openers (e.g. 'Hermes, ...', 'how do I approve ...')."""
     t = (message or "").strip()
     low = t.lower()
+
+    # explicit advisor address -> conversation (e.g. "how do I approve this?")
+    for lead in ADVISOR_LEADS:
+        if low.startswith(lead):
+            return {"target": "hermes_mobile", "is_command": False,
+                    "reason": f"advisor lead '{lead.strip()}'"}
 
     # explicit prefix -> command bot, strip the prefix for execution
     for p in COMMAND_PREFIXES:

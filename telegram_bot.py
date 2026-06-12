@@ -3898,6 +3898,22 @@ class NexusTelegramBot:
                 self.ops_memory,
                 updated_by="telegram_user_instruction",
             )
+        # ── War-room polished reports + gated batch approvals (additive) ──────
+        # Intercept the polished command set; unrecognized commands fall through.
+        try:
+            _wr = (normalized_key or normalized).lstrip("/")
+            if _wr.startswith(("approve all assets in package", "approve package",
+                               "request revision for package")):
+                from lib import nexus_telegram_ops as _TG
+                return _TG.parse_command(text).get("reply", "Could not process that approval.")
+            from lib.hermes_command_reporter import report as _wr_report
+            _polished = _wr_report(_wr)
+            if _polished is not None:
+                logger.info("telegram route=war_room_polished cmd=%r", _wr[:40])
+                return _polished
+        except Exception as _e:
+            logger.warning("war_room reporter error: %s", _e)
+
         from hermes_command_router.intake import classify_intent as _classify_intent
         from hermes_command_router.router import run_command as _run_command
         intent, _, _ = _classify_intent(normalized_key or normalized)

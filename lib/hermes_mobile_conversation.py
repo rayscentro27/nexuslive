@@ -94,6 +94,17 @@ UNSUPPORTED_LIVE = [
 
 INTENTS = [
     ("unsupported_live", UNSUPPORTED_LIVE),
+    ("how_approve", ["how do i approve", "how to approve", "approve the credit", "approve this",
+                     "approve the funding", "how do i approve the"]),
+    ("can_run_codex", ["can thechoseone run codex", "can it run codex", "can thechoseone run claude",
+                       "can the bot run codex", "does thechoseone run codex"]),
+    ("stop_help", ["how do i stop trading", "how to stop trading", "how do i stop sends",
+                   "how to stop sends", "how do i stop automation", "how do i pause"]),
+    ("research", ["research ", "find affiliate", "affiliate offers", "best affiliate",
+                  "look up", "search the web", "web research", "find the best"]),
+    ("command_help", ["what can thechoseone do", "what commands", "what command should i send",
+                      "what should i send thechoseone", "tell thechoseone to", "what command",
+                      "which command", "how do i ask thechoseone"]),
     ("status", ["status", "what is nexus doing", "what's nexus doing", "what is running"]),
     ("attention", ["needs my attention", "what needs my attention", "what should i look at"]),
     ("scouts", ["scouts find", "scouts produce", "what did the scouts", "scout findings"]),
@@ -152,6 +163,67 @@ def respond(text: str) -> dict:
         )
         out["summary"] = "No live external-data tool connected; answered honestly."
         out["proposed_action"] = "Ask me about Nexus, or say 'what needs my attention?'"
+        return out
+
+    if intent == "how_approve":
+        pkg = "proof_funding" if "funding" in text.lower() else "proof_credit"
+        out["answer"] = (f"Send this to TheChoseone — it batch-approves the {pkg.replace('proof_','')} "
+                         "package for manual use (it does NOT auto-publish, send, or charge):")
+        out["command_draft"] = f"approve all assets in package {pkg} with notes: Approved for manual use only."
+        out["proposed_action"] = (f"To revise instead: request revision for package {pkg} with notes: "
+                                  "Make this more specific and less generic.")
+        out["summary"] = "Drafted the exact approval command (manual-use only)."
+        return out
+
+    if intent == "can_run_codex":
+        out["answer"] = ("Not live yet. TheChoseone can RECEIVE a Codex task, but the CLI bridge is OFF "
+                         "— so it queues the task and hands you a copy/paste prompt instead of running "
+                         "Codex automatically. Honest receipt, no fake execution.")
+        out["command_draft"] = "task for codex: build a landing page for the credit track"
+        out["proposed_action"] = "Send a 'task for codex: …' to TheChoseone; you'll get a queued receipt + a prompt to paste into Codex."
+        out["summary"] = "Codex bridge is off; TheChoseone queues + drafts a prompt."
+        return out
+
+    if intent == "stop_help":
+        low = text.lower()
+        cmd = "stop trading" if "trad" in low else ("stop sends" if "send" in low else "pause automation")
+        out["answer"] = (f"Send '{cmd}' to TheChoseone. (stop sends = halt email+IG; stop trading = halt "
+                         "trading tests, Oanda stays demo; pause automation = pause test loops.)")
+        out["command_draft"] = cmd
+        out["proposed_action"] = f"Paste '{cmd}' to TheChoseone."
+        out["summary"] = "Drafted the safety-control command."
+        return out
+
+    if intent == "research":
+        topic = re.sub(r"(?i)^(research|find|look up|search the web for|web research|find the best)\s*", "", text).strip()
+        topic = topic or "affiliate offers for the credit/funding pack"
+        try:
+            from lib import hermes_advisor_web_research as WR
+            r = WR.research(topic)
+            out["answer"] = r["message"]
+            out["command_draft"] = r["command_draft"]
+        except Exception:
+            out["answer"] = "I can't browse directly from this bot yet. I can draft a research task for TheChoseone."
+            out["command_draft"] = f"run web research: {topic} and return source links, summary, payout/cost, approval requirements, risk, and recommended next step."
+        out["proposed_action"] = "Send that research task to TheChoseone (it logs source + results)."
+        out["summary"] = "No live browsing here — drafted a safe research task."
+        return out
+
+    if intent == "command_help":
+        low = text.lower()
+        if "monetization" in low or "scout" in low or "affiliate" in low:
+            out["answer"] = "Send this to TheChoseone:"
+            out["command_draft"] = ("run web research: monetization offers for the credit/funding pack and "
+                                    "return top 5 affiliate offers with source links, payout, approval "
+                                    "requirements, risk, and recommended next step.")
+            out["proposed_action"] = "Paste it to TheChoseone — I won't execute it."
+        else:
+            out["answer"] = ("Most useful TheChoseone commands: status · what needs approval · scouts status · "
+                             "status credit scout · what did nexus produce · daily report · "
+                             "approve all assets in package <id> with notes: <notes>. "
+                             "Tell me the goal and I'll draft the exact one.")
+            out["proposed_action"] = "Tell me what you want to do; I'll write the command."
+        out["summary"] = "Explained commands / drafted the exact one."
         return out
 
     if intent == "status":
@@ -325,7 +397,10 @@ def format_for_telegram(resp: dict) -> str:
         lines += ["", f"✏️ Prompt:\n  {resp['prompt_draft']}"]
     if resp.get("memory_suggestion"):
         lines += ["", f"🧠 Remember? {resp['memory_suggestion']}"]
-    lines += ["", "_read-only · proposes, never executes_"]
+    # Only remind that it won't execute when a command is actually drafted — don't
+    # repeat the disclaimer on every message.
+    if resp.get("command_draft"):
+        lines += ["", "_I won't run this — paste it to TheChoseone when ready._"]
     return "\n".join(lines)
 
 
@@ -351,9 +426,10 @@ def respond_llm(text: str) -> dict:
     when available, keeping all deterministic safety fields (proposed_action,
     command_draft, links). Read-only. Falls back to template answer if offline."""
     base = respond(text)
-    # Intents that must stay deterministic (never hand to the model to avoid
-    # hallucinating live facts the bot has no source for).
-    if base["intent"] in ("unsupported_live",):
+    # Intents that must stay deterministic: exact commands / honest no-tool answers
+    # the model must not paraphrase or fabricate.
+    if base["intent"] in ("unsupported_live", "how_approve", "can_run_codex",
+                           "stop_help", "research", "command_help"):
         base["provider"] = "deterministic"
         base["used_fallback"] = False
         return base

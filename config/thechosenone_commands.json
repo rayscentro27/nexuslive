@@ -1,0 +1,50 @@
+{
+  "_meta": {
+    "bot": "TheChoseone (@Nexuschosenbot)",
+    "advisor": "Hermes Mobile Advisor (@NexusHermesMobileBot)",
+    "note": "Advisor may SUGGEST/DRAFT any command but NEVER executes. Execution is TheChoseone only, with safety gates.",
+    "advisor_can_execute_any": false
+  },
+  "categories": {
+    "status": [
+      {"command": "status", "aliases": ["system status", "what is running"], "purpose": "Polished system status (services + queue).", "example": "status", "risk": "none", "requires_approval": false, "handled_by": "thechoseone", "output": "report", "advisor_can_suggest": true, "advisor_can_execute": false},
+      {"command": "raw status", "aliases": ["details status", "full status"], "purpose": "Raw key/value service probes.", "example": "raw status", "risk": "none", "requires_approval": false, "handled_by": "thechoseone", "output": "raw", "advisor_can_suggest": true, "advisor_can_execute": false}
+    ],
+    "scouts": [
+      {"command": "scouts status", "aliases": ["scout status", "details scouts"], "purpose": "Overview of the 7 scouts + queue.", "example": "scouts status", "risk": "none", "requires_approval": false, "handled_by": "thechoseone", "output": "report", "advisor_can_suggest": true, "advisor_can_execute": false},
+      {"command": "status <name> scout", "aliases": ["status credit scout", "status funding scout", "status opportunity scout", "status trading scout", "status ai scout"], "purpose": "One scout's status + strongest assets.", "example": "status credit scout", "risk": "none", "requires_approval": false, "handled_by": "thechoseone", "output": "report", "advisor_can_suggest": true, "advisor_can_execute": false}
+    ],
+    "showroom_approvals": [
+      {"command": "what needs approval", "aliases": ["needs approval", "approval queue", "details approval queue"], "purpose": "Packages awaiting review + exact approve/revise commands.", "example": "what needs approval", "risk": "none", "requires_approval": false, "handled_by": "thechoseone", "output": "report", "advisor_can_suggest": true, "advisor_can_execute": false},
+      {"command": "show package <id>", "aliases": [], "purpose": "Show a package's assets + status counts.", "example": "show package proof_credit", "risk": "none", "requires_approval": false, "handled_by": "thechoseone", "output": "report", "advisor_can_suggest": true, "advisor_can_execute": false},
+      {"command": "approve all assets in package <id> with notes: <notes>", "aliases": ["approve package <id> for manual use with notes: <notes>"], "purpose": "Batch-approve a package for MANUAL USE/REVIEW (not auto-publish/send/charge).", "example": "approve all assets in package proof_credit with notes: Approved for manual use only.", "risk": "medium", "requires_approval": true, "handled_by": "thechoseone", "output": "confirmation", "advisor_can_suggest": true, "advisor_can_execute": false},
+      {"command": "request revision for package <id> with notes: <notes>", "aliases": [], "purpose": "Send a package back for revision with notes.", "example": "request revision for package proof_funding with notes: Make this more specific and less generic.", "risk": "low", "requires_approval": false, "handled_by": "thechoseone", "output": "confirmation", "advisor_can_suggest": true, "advisor_can_execute": false}
+    ],
+    "proof_automation": [
+      {"command": "run proof automation test", "aliases": [], "purpose": "Queue a proof-automation run (internal; honest receipt, not auto-executed from chat).", "example": "run proof automation test", "risk": "low", "requires_approval": false, "handled_by": "thechoseone", "output": "confirmation", "advisor_can_suggest": true, "advisor_can_execute": false},
+      {"command": "what did nexus produce", "aliases": ["produced", "details produced"], "purpose": "Summary of assets produced by track.", "example": "what did nexus produce", "risk": "none", "requires_approval": false, "handled_by": "thechoseone", "output": "report", "advisor_can_suggest": true, "advisor_can_execute": false}
+    ],
+    "research_queue": [
+      {"command": "status research queue", "aliases": ["research queue"], "purpose": "Monetization/keyword research status.", "example": "status research queue", "risk": "none", "requires_approval": false, "handled_by": "thechoseone", "output": "report", "advisor_can_suggest": true, "advisor_can_execute": false},
+      {"command": "run web research: <topic>", "aliases": [], "purpose": "Queue a web-research task (drafted by Advisor; run/logged by TheChoseone or worker).", "example": "run web research: best affiliate offers for funding checklist", "risk": "low", "requires_approval": false, "handled_by": "thechoseone_or_worker", "output": "report", "advisor_can_suggest": true, "advisor_can_execute": false}
+    ],
+    "daily_reports": [
+      {"command": "daily report", "aliases": ["daily ops report"], "purpose": "Daily operations summary.", "example": "daily report", "risk": "none", "requires_approval": false, "handled_by": "thechoseone", "output": "report", "advisor_can_suggest": true, "advisor_can_execute": false}
+    ],
+    "safety_controls": [
+      {"command": "stop sends", "aliases": [], "purpose": "Stop email + IG sends (allowlist stays enforced).", "example": "stop sends", "risk": "low", "requires_approval": false, "handled_by": "thechoseone", "output": "confirmation", "advisor_can_suggest": true, "advisor_can_execute": false},
+      {"command": "stop trading", "aliases": [], "purpose": "Stop trading tests (Oanda stays demo).", "example": "stop trading", "risk": "low", "requires_approval": false, "handled_by": "thechoseone", "output": "confirmation", "advisor_can_suggest": true, "advisor_can_execute": false},
+      {"command": "pause automation", "aliases": ["pause"], "purpose": "Pause test automation loops.", "example": "pause automation", "risk": "low", "requires_approval": false, "handled_by": "thechoseone", "output": "confirmation", "advisor_can_suggest": true, "advisor_can_execute": false},
+      {"command": "resume automation", "aliases": ["resume"], "purpose": "Resume test automation.", "example": "resume automation", "risk": "low", "requires_approval": false, "handled_by": "thechoseone", "output": "confirmation", "advisor_can_suggest": true, "advisor_can_execute": false}
+    ],
+    "worker_tasks": [
+      {"command": "task for codex: <prompt>", "aliases": ["task for claude: <prompt>", "task for opencode: <prompt>", "run this prompt: <prompt>"], "purpose": "Queue a coding/research task. Today the CLI bridge is OFF, so it queues + prepares a copy/paste prompt (no live execution).", "example": "task for codex: build a landing page for the credit track", "risk": "medium", "requires_approval": true, "handled_by": "thechoseone_worker_router", "output": "queued_or_handoff", "advisor_can_suggest": true, "advisor_can_execute": false}
+    ],
+    "trading_demo": [
+      {"command": "stop trading", "aliases": [], "purpose": "Trading is demo/read-only; this halts tests.", "example": "stop trading", "risk": "low", "requires_approval": false, "handled_by": "thechoseone", "output": "confirmation", "advisor_can_suggest": true, "advisor_can_execute": false}
+    ],
+    "advisor_commands": [
+      {"command": "Hermes, <question>", "aliases": ["@NexusHermesMobileBot <question>"], "purpose": "Ask the read-only advisor for strategy, explanations, command drafts, or research.", "example": "Hermes, what should I do next?", "risk": "none", "requires_approval": false, "handled_by": "hermes_advisor", "output": "conversation", "advisor_can_suggest": true, "advisor_can_execute": false}
+    ]
+  }
+}
