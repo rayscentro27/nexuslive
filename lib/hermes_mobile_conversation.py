@@ -85,7 +85,15 @@ def context_snapshot() -> dict:
 
 
 # ── intent classification ─────────────────────────────────────────────────────
+# Things this bot has NO live tool/source for — answer honestly, never hallucinate.
+UNSUPPORTED_LIVE = [
+    "weather", "temperature", "forecast", "how hot", "how cold", "raining", "rain today",
+    "news today", "headlines", "stock price", "stock market", "crypto price", "bitcoin price",
+    "sports score", "game score", "what time is it", "current time", "today's date",
+]
+
 INTENTS = [
+    ("unsupported_live", UNSUPPORTED_LIVE),
     ("status", ["status", "what is nexus doing", "what's nexus doing", "what is running"]),
     ("attention", ["needs my attention", "what needs my attention", "what should i look at"]),
     ("scouts", ["scouts find", "scouts produce", "what did the scouts", "scout findings"]),
@@ -135,6 +143,16 @@ def respond(text: str) -> dict:
         "memory_suggestion": None,
         "links": [ADMIN_LINK],
     }
+
+    if intent == "unsupported_live":
+        out["answer"] = (
+            "I don't have live weather/news/markets access in this Telegram bot yet — so I "
+            "won't guess. What I'm good at: Nexus status, explaining reports, strategy, and "
+            "drafting commands for TheChoseone. Want me to add a weather/tool adapter later?"
+        )
+        out["summary"] = "No live external-data tool connected; answered honestly."
+        out["proposed_action"] = "Ask me about Nexus, or say 'what needs my attention?'"
+        return out
 
     if intent == "status":
         out["answer"] = (
@@ -333,6 +351,12 @@ def respond_llm(text: str) -> dict:
     when available, keeping all deterministic safety fields (proposed_action,
     command_draft, links). Read-only. Falls back to template answer if offline."""
     base = respond(text)
+    # Intents that must stay deterministic (never hand to the model to avoid
+    # hallucinating live facts the bot has no source for).
+    if base["intent"] in ("unsupported_live",):
+        base["provider"] = "deterministic"
+        base["used_fallback"] = False
+        return base
     try:
         from lib import hermes_mobile_provider as MP
         from lib import hermes_mobile_context as MC
