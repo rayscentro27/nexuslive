@@ -27,10 +27,21 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _git_commit() -> str:
+    """Read HEAD commit from .git directly (no subprocess — git CLI can hang here)."""
     try:
-        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=str(ROOT),
-                             capture_output=True, text=True, timeout=5)
-        return out.stdout.strip() or "unknown"
+        head = (ROOT / ".git" / "HEAD").read_text().strip()
+        if head.startswith("ref:"):
+            ref = head.split(" ", 1)[1].strip()
+            rp = ROOT / ".git" / ref
+            if rp.exists():
+                return rp.read_text().strip()[:7]
+            packed = (ROOT / ".git" / "packed-refs")
+            if packed.exists():
+                for line in packed.read_text().splitlines():
+                    if line.endswith(ref):
+                        return line.split()[0][:7]
+            return "unknown"
+        return head[:7]
     except Exception:
         return "unknown"
 
