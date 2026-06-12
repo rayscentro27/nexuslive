@@ -105,22 +105,30 @@ def approval_queue() -> str:
     if not by:
         return _fmt("Approval queue", "Nothing is waiting for review right now.", [],
                     "Nothing — you're clear.", ["what did nexus produce", "status"])
-    facts = []
     name = {"proof_credit": "Credit Readiness Pack", "proof_funding": "Funding Readiness Pack",
             "proof_opportunity": "Opportunity Pack", "proof_trading": "Trading Education Pack",
             "proof_ai_improvement": "AI Improvement Pack"}
-    for pkg, n in by.most_common(3):
-        facts.append(f"{name.get(pkg, pkg)} ({pkg}) — needs review, {n} assets")
-    top_pkg = by.most_common(1)[0][0]
+    # Top facts: still by size/status (shows the real queue).
+    facts = [f"{name.get(pkg, pkg)} ({pkg}) — needs review, {n} assets" for pkg, n in by.most_common(3)]
+    # Recommendation: by MONETIZATION priority, not size — fastest path to revenue.
+    MONEY_PRIORITY = ["proof_credit", "proof_funding", "proof_opportunity",
+                      "proof_trading", "proof_ai_improvement"]
+    rec = next((p for p in MONEY_PRIORITY if by.get(p)), by.most_common(1)[0][0])
+    if rec in ("proof_credit", "proof_funding"):
+        needs = (f"Review the {name.get(rec, rec)} first because it is the fastest path to a "
+                 "manual $97–$297 readiness review offer.")
+    else:
+        needs = f"Review the {name.get(rec, rec)} first — it's the closest to a manual paid offer."
     return _fmt(
         "Approval queue",
         f"{len(by)} packages need review. Approving means \"manual use/review approved\" — "
         "it does NOT auto-publish, send, or charge.",
         facts,
-        f"Approve or revise the top package ({top_pkg}).",
-        [f"approve all assets in package {top_pkg} with notes: Approved for manual use only.",
-         f"request revision for package {top_pkg} with notes: Make this more specific and less generic.",
-         f"show package {top_pkg}",
+        needs,
+        [f"approve all assets in package {rec} with notes: Approved for manual use only.",
+         f"request revision for package {rec} with notes: Make this more specific, practical, "
+         "and ready for a paid readiness review.",
+         f"show package {rec}",
          "details approval queue"],
         f"Approval = manual-use approval only. Open Showroom: {SHOWROOM_LINK} {LOCAL_NOTE}",
     )
