@@ -4520,6 +4520,26 @@ class NexusTelegramBot:
         except Exception as e:
             return f"⚠️ CEO routing error: {e}"
 
+    def _allowed_chat_ids(self) -> set:
+        """Chats this bot will answer: its configured DM plus any in
+        TELEGRAM_ALLOWED_CHATS (comma-separated, e.g. the war-room group)."""
+        ids = {str(self.chat_id)}
+        extra = os.getenv("TELEGRAM_ALLOWED_CHATS", "")
+        ids |= {c.strip() for c in extra.split(",") if c.strip()}
+        return ids
+
+    def _group_should_handle(self, text: str) -> bool:
+        """In group chats, TheChoseone only handles COMMANDS; conversation is left
+        to the Hermes Mobile advisor so the two bots don't both reply."""
+        try:
+            from lib.nexus_war_room_router import route as _route
+            return bool(_route(text).get("is_command"))
+        except Exception:
+            low = (text or "").strip().lower()
+            return low.startswith(("/", "!", "status", "approve", "pause", "resume",
+                                   "stop", "run", "what needs approval", "daily report",
+                                   "request revision", "scouts status"))
+
     def handle_update(self, update: dict) -> None:
         started = time.time()
         update_id = update.get("update_id")
@@ -4550,11 +4570,15 @@ class NexusTelegramBot:
                 status="self_ignored",
             )
             return
-        if str(self.chat_id) != chat_id:
+        if chat_id not in self._allowed_chat_ids():
             return
 
         text = (message.get("text") or "").strip()
         if not text:
+            return
+        # In group chats, only act on commands; leave conversation to Hermes Mobile
+        # so both bots don't reply to the same message. DMs are unchanged.
+        if chat.get("type") in ("group", "supergroup") and not self._group_should_handle(text):
             return
         command, _ = self.parse_command(text)
         emit_metric("telegram_inbound", payload={"domain": "telegram", "command": command})

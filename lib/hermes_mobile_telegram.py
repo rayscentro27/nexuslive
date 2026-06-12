@@ -298,6 +298,14 @@ def run_live(max_seconds: int | None = None, max_messages: int | None = None) ->
                 continue
             if not text:
                 continue
+            # In group chats, stay in our lane: answer conversation only, never
+            # commands (TheChoseone handles those) — prevents double replies. DMs: all.
+            if chat.get("type") in ("group", "supergroup"):
+                try:
+                    if ROUTER.route(_strip_mention(text)).get("is_command"):
+                        continue
+                except Exception:
+                    pass
             try:
                 _send(str(chat.get("id")), _reply_for(text))
             except Exception as e:
