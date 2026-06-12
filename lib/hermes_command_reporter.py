@@ -172,6 +172,48 @@ def scout_status(name: str) -> str:
     )
 
 
+def show_package(pkg: str) -> str:
+    name = {"proof_credit": "Credit Readiness Pack", "proof_funding": "Funding Readiness Pack",
+            "proof_opportunity": "Opportunity Pack", "proof_trading": "Trading Education Pack",
+            "proof_ai_improvement": "AI Improvement Pack"}
+    try:
+        from lib import showroom_assets as SA
+        assets = [a for a in SA.load().get("assets", {}).values() if a.get("asset_type") == pkg]
+    except Exception:
+        assets = []
+    title = name.get(pkg, pkg)
+    if not assets:
+        if pkg == "proof_funding":
+            return _fmt(title, "No verified funding package id is available yet.", [],
+                        "Pick another package or run the funding scout.",
+                        ["what needs approval", "scouts status"])
+        return _fmt(f"Package {pkg}", f"No package '{pkg}' found.", [],
+                    "Use 'what needs approval' for valid package ids.", ["what needs approval"])
+    statuses = Counter(a.get("status") for a in assets)
+    status_str = statuses.most_common(1)[0][0].replace("_", " ")
+    best_use = ("manual $97–$297 Credit/Funding Readiness Review"
+                if pkg in ("proof_credit", "proof_funding") else "manual review / repurposing")
+    facts = [f"Package id: {pkg}", f"Assets: {len(assets)}", f"Best use: {best_use}"]
+    titles = [a.get("title") for a in assets if a.get("title")][:5]
+    if titles:
+        facts.append("Includes: " + ", ".join(titles))
+    else:
+        facts.append(f"Asset list not in this summary — use: details package {pkg}")
+    out = _fmt(
+        title,
+        f"Status: {status_str}.",
+        facts,
+        "Review whether this is specific enough for a paid manual readiness review.",
+        [f"approve all assets in package {pkg} with notes: Approved for manual use only.",
+         f"request revision for package {pkg} with notes: Make this more specific, practical, "
+         "and ready for a paid readiness review.",
+         f"details package {pkg}",
+         "what needs approval"],
+        "Manual-use review only. This does not publish, send, charge, or approve automation.",
+    )
+    return out
+
+
 def produced() -> str:
     counts = Counter(a["asset_type"] for a in _proof_assets())
     facts = [f"{k.replace('proof_','')}: {v} assets" for k, v in counts.most_common(3)]
@@ -253,9 +295,14 @@ def report(text: str) -> str | None:
         nm = low.replace("status", "", 1).replace("scout", "").strip()
         return scout_status(nm or "credit")
     try:
-        from lib.nexus_war_room_router import is_approval_phrase as _is_appr
+        from lib.nexus_war_room_router import is_approval_phrase as _is_appr, resolve_package_id as _pkg
     except Exception:
         _is_appr = lambda s: False  # noqa: E731
+        _pkg = lambda s: None        # noqa: E731
+    # show/view/details package <id> (and aliases like "credit package")
+    pid = _pkg(low)
+    if pid:
+        return show_package(pid)
     if low in APPROVAL_ALIASES or _is_appr(low):
         return approval_queue()
     if low in ("what did nexus produce", "what did you produce", "produced", "details produced"):

@@ -66,12 +66,40 @@ def is_approval_phrase(text: str) -> bool:
     return any(k in d for k in ("review que", "review queue", "review cue", "showroom queue"))
 
 
+# Package name aliases -> canonical package id (multiword first).
+PKG_ALIASES = [
+    ("credit readiness", "proof_credit"), ("ai improvement", "proof_ai_improvement"),
+    ("credit", "proof_credit"), ("funding", "proof_funding"),
+    ("opportunity", "proof_opportunity"), ("trading", "proof_trading"),
+    ("ai", "proof_ai_improvement"),
+]
+
+
+def resolve_package_id(text: str) -> str | None:
+    """Resolve a 'show package' style phrase to a canonical package id, else None."""
+    low = (text or "").strip().lower().rstrip("?!. ")
+    if not ("package" in low or low.startswith(("show ", "view ", "details "))):
+        return None
+    m = re.search(r"\b(proof_[a-z_]+)\b", low)
+    if m:
+        return m.group(1)
+    for alias, pid in PKG_ALIASES:
+        if alias in low:
+            return pid
+    return None
+
+
 def canonical_command(text: str) -> str | None:
-    """The exact TheChoseone command for an operational/approval phrase, else None."""
+    """The exact TheChoseone command for an operational/approval/package phrase, else None."""
     low = (text or "").strip().lower().rstrip("?!. ")
     if is_approval_phrase(low):
         return "what needs approval"
-    return OPERATIONAL_CANONICAL.get(low)
+    if low in OPERATIONAL_CANONICAL:
+        return OPERATIONAL_CANONICAL[low]
+    pid = resolve_package_id(low)
+    if pid:
+        return f"show package {pid}"
+    return None
 
 
 def looks_like_command(text: str) -> bool:

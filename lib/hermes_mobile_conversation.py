@@ -195,9 +195,13 @@ def respond(text: str) -> dict:
             canonical = OP_HANDOFF_MAP.get(_low)
         if canonical:
             out["intent"] = "op_handoff"
-            out["answer"] = "That's a TheChoseone command — it has the verified live data. Send this:"
+            if canonical.startswith("show package"):
+                out["answer"] = "That is a TheChoseone Showroom command. Send this:"
+                out["proposed_action"] = "I can help you review the package after TheChoseone shows it."
+            else:
+                out["answer"] = "That's a TheChoseone command — it has the verified live data. Send this:"
+                out["proposed_action"] = "Paste it to TheChoseone; I won't invent the status myself."
             out["command_draft"] = canonical
-            out["proposed_action"] = "Paste it to TheChoseone; I won't invent the status myself."
             out["summary"] = f"Handed off to TheChoseone: {canonical}"
             return out
 
