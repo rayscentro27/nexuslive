@@ -94,6 +94,13 @@ def allowed_chat_id() -> str | None:
     return _env(ALLOWED_CHAT_ENV)
 
 
+def allowed_chat_ids() -> set[str]:
+    """Set of allowed chat ids (comma-separated in HERMES_MOBILE_CHAT_ID).
+    Supports the war-room group AND Ray's private 1:1 chat."""
+    raw = _env(ALLOWED_CHAT_ENV) or ""
+    return {c.strip() for c in raw.split(",") if c.strip()}
+
+
 def detect_owner_chat_id() -> dict:
     """Read recent updates and return the most recent PRIVATE chat id (Ray's).
     Read-only. Requires Ray to have messaged the bot first."""
@@ -237,7 +244,8 @@ def run_live(max_seconds: int | None = None, max_messages: int | None = None) ->
         print("[hermes_mobile] BLOCKED: no dedicated token.\n" + setup_instructions())
         return 1
     allowed = allowed_chat_id()
-    if not allowed:
+    allowed_set = allowed_chat_ids()
+    if not allowed_set:
         print("[hermes_mobile] BLOCKED: no allowed chat id (Ray-only required). "
               "Run detect_owner_chat_id() after messaging the bot.")
         return 1
@@ -266,21 +274,27 @@ def run_live(max_seconds: int | None = None, max_messages: int | None = None) ->
         if max_seconds and time.time() - start > max_seconds:
             print("[hermes_mobile] max_seconds reached; stopping.")
             return 0
+        # SHORT polling (timeout=0): long-poll connections were being reset by the
+        # local network proxy ("connection reset by peer"). Short requests survive.
         try:
-            d = _api("getUpdates", {"offset": offset, "timeout": 25})
+            d = _api("getUpdates", {"offset": offset, "timeout": 0}, timeout=15)
         except Exception as e:
             print("[hermes_mobile] getUpdates error:", str(e)[:80])
             time.sleep(3)
             continue
-        for u in d.get("result", []):
+        ups = d.get("result", [])
+        if not ups:
+            time.sleep(2)
+            continue
+        for u in ups:
             offset = u["update_id"] + 1
             OFFSET_FILE.write_text(str(offset))
             msg = u.get("message") or {}
             chat = msg.get("chat", {})
             text = msg.get("text", "")
-            # Locked to the single allowed chat (a private chat OR the configured
-            # war-room group). Every other chat is ignored.
-            if str(chat.get("id")) != str(allowed):
+            # Locked to the allowed chats (war-room group + Ray's private chat).
+            # Every other chat is ignored.
+            if str(chat.get("id")) not in allowed_set:
                 continue
             if not text:
                 continue
