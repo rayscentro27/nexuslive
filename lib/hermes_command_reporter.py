@@ -28,7 +28,12 @@ showroom path.
 """
 from __future__ import annotations
 
+import hashlib
+import subprocess
 from collections import Counter
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parent.parent
 
 ADMIN_LINK = "http://127.0.0.1:4000/admin/proof-automation"
 SHOWROOM_LINK = "http://127.0.0.1:4000/admin/showroom"
@@ -172,6 +177,36 @@ def scout_status(name: str) -> str:
     )
 
 
+def _git_commit() -> str:
+    try:
+        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=str(_ROOT),
+                             capture_output=True, text=True, timeout=5)
+        return out.stdout.strip() or "unknown"
+    except Exception:
+        return "unknown"
+
+
+def _file_hash(rel: str) -> str:
+    try:
+        return hashlib.sha1((_ROOT / rel).read_bytes()).hexdigest()[:8]
+    except Exception:
+        return "?"
+
+
+def war_room_version() -> str:
+    """Read-only diagnostic: prove which code version is live."""
+    return _fmt(
+        "War Room version",
+        "Active code version of the live TheChoseone process.",
+        [f"Git commit: {_git_commit()}",
+         f"Router version: {_file_hash('lib/nexus_war_room_router.py')}",
+         f"TheChoseone reporter version: {_file_hash('lib/hermes_command_reporter.py')}"],
+        "Use this if routing behaves strangely (e.g. a command slips to Hermes).",
+        ["status", "what needs approval", "show package proof_credit"],
+        "Read-only diagnostic. No execution.",
+    )
+
+
 def show_package(pkg: str) -> str:
     name = {"proof_credit": "Credit Readiness Pack", "proof_funding": "Funding Readiness Pack",
             "proof_opportunity": "Opportunity Pack", "proof_trading": "Trading Education Pack",
@@ -284,6 +319,8 @@ SCOUTS_ALIASES = {
 def report(text: str) -> str | None:
     """Return a polished report for a recognized war-room command, else None."""
     low = (text or "").strip().lower().rstrip("?!. ")
+    if low in ("war room version", "warroom version", "version", "war room status"):
+        return war_room_version()
     if low in ("raw status", "details status", "full status"):
         return polished_status(raw=True)
     if low in ("status", "system status", "what is running", "what's running"):

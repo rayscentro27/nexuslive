@@ -15,13 +15,31 @@ then everything is template + live-state composition.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+import subprocess
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def _git_commit() -> str:
+    try:
+        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=str(ROOT),
+                             capture_output=True, text=True, timeout=5)
+        return out.stdout.strip() or "unknown"
+    except Exception:
+        return "unknown"
+
+
+def _file_hash(rel: str) -> str:
+    try:
+        return hashlib.sha1((ROOT / rel).read_bytes()).hexdigest()[:8]
+    except Exception:
+        return "?"
 REPORTS = ROOT / "reports" / "showroom"
 LOGS = ROOT / "logs" / "proof_automation"
 DOCS = ROOT / "docs" / "hermes_mobile"
@@ -179,6 +197,30 @@ def respond(text: str) -> dict:
         "memory_suggestion": None,
         "links": [ADMIN_LINK],
     }
+
+    # ── Hermes self-version (answer directly when asked, even though it's also a
+    #    TheChoseone command — Hermes reports ITS OWN active version) ───────────
+    if (text or "").strip().lower().rstrip("?!. ") in ("war room version", "warroom version", "version"):
+        out["intent"] = "version"
+        out["answer"] = ("Hermes Mobile active version:\n"
+                         f"• Git commit: {_git_commit()}\n"
+                         f"• Conversation module: {_file_hash('lib/hermes_mobile_conversation.py')}\n"
+                         f"• Router: {_file_hash('lib/nexus_war_room_router.py')}\n"
+                         "I'm read-only/advisory. For the command bot's version, send 'war room version' to TheChoseone.")
+        out["summary"] = "Hermes active version (read-only)."
+        return out
+
+    # ── help / identity: the ONLY place the capabilities intro is used ────────
+    if (text or "").strip().lower().rstrip("?!. ") in (
+            "help", "/help", "what can you do", "who are you", "hermes help", "start", "/start"):
+        out["intent"] = "help"
+        out["answer"] = (
+            "I'm your read-only Nexus advisor. I explain reports, recommend next moves, draft "
+            "TheChoseone commands, and help you turn assets into a paid offer — I never execute. "
+            "Try: 'what should I do next?', 'how do we make money in 30 days?', or 'explain the status report'."
+        )
+        out["summary"] = "Capabilities/help."
+        return out
 
     # ── Operational-command handoff ──────────────────────────────────────────
     # Hermes must NOT invent live operational state. If it receives a TheChoseone
@@ -456,14 +498,14 @@ def respond(text: str) -> dict:
         out["command_draft"] = "what needs approval"
         out["proposed_action"] = "Start with the approval queue."
 
-    else:  # open / unknown
+    else:  # open / unknown — a short, useful nudge (NOT the identity blurb;
+           # the capabilities intro is reserved for help/who-are-you).
         out["answer"] = (
-            "I'm your conversation-side Hermes — I can explain what Nexus is doing, help you decide, draft "
-            "tasks/commands for TheChoseone, or write you a prompt. I don't execute anything myself. "
-            "Try: 'what needs my attention?', 'how do we make money in 30 days?', or 'turn this into a task.'"
+            "Happy to help. The highest-value move right now is the review queue → a manual paid "
+            "readiness offer. Want me to suggest your next step or draft a TheChoseone command?"
         )
-        out["summary"] = "Conversational, read-only assistant. Proposes; never executes."
-        out["proposed_action"] = "Ask a question or say 'what needs my attention?'"
+        out["summary"] = "Open question — nudged toward the next concrete move."
+        out["proposed_action"] = "Try 'what should I do next?' or 'what needs my attention?'"
 
     return out
 

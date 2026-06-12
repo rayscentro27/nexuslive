@@ -45,6 +45,7 @@ OPERATIONAL_CANONICAL = {
     "what did nexus produce": "what did nexus produce", "what did you produce": "what did nexus produce",
     "daily report": "daily report", "safety status": "status", "trading status": "status",
     "worker bridge status": "status", "command routing audit": "status",
+    "war room version": "war room version", "warroom version": "war room version",
 }
 
 
