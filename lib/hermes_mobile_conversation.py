@@ -312,9 +312,39 @@ def format_for_telegram(resp: dict) -> str:
 
 
 def generate(prompt: str, provider: str | None = None) -> str:
-    """Stub for a future Ray-approved model/provider. Disabled by default so the
-    bot stays free + offline. Wiring a provider requires explicit approval."""
-    raise NotImplementedError(
-        "Model provider not wired. V1 is deterministic + free. "
-        "Enable a provider only with Ray's approval (see provider recommendation report)."
-    )
+    """Generate a conversational reply via the LOCAL gateway/Ollama (read-only).
+    Ray-approved: local-only, no paid APIs. Falls back to the deterministic
+    template if the local backend is offline. Never raises on backend failure."""
+    try:
+        from lib import hermes_mobile_provider as MP
+        from lib import hermes_mobile_context as MC
+        ctx = MC.summarize_context_for_prompt(user_message=prompt)
+        res = MP.generate_mobile_reply(prompt, context=ctx, mode="read_only")
+        if not res.get("used_fallback") and res.get("text"):
+            return res["text"]
+    except Exception:
+        pass
+    # deterministic, always-safe fallback
+    return respond(prompt)["answer"]
+
+
+def respond_llm(text: str) -> dict:
+    """Like respond(), but uses the LOCAL model for the conversational 'answer'
+    when available, keeping all deterministic safety fields (proposed_action,
+    command_draft, links). Read-only. Falls back to template answer if offline."""
+    base = respond(text)
+    try:
+        from lib import hermes_mobile_provider as MP
+        from lib import hermes_mobile_context as MC
+        ctx = MC.summarize_context_for_prompt(user_message=text)
+        res = MP.generate_mobile_reply(text, context=ctx, mode="read_only")
+        base["provider"] = res.get("provider")
+        base["model"] = res.get("model")
+        base["used_fallback"] = res.get("used_fallback", True)
+        if not res.get("used_fallback") and res.get("text"):
+            base["answer"] = res["text"].strip()
+    except Exception as e:
+        base["provider"] = "fallback"
+        base["used_fallback"] = True
+        base["provider_error"] = str(e)[:60]
+    return base
