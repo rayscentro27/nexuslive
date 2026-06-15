@@ -23,6 +23,9 @@ def _receipt() -> dict:
 
 
 class TestLiveDelegationWiring(unittest.TestCase):
+    def setUp(self):
+        LATEST.unlink(missing_ok=True)
+
     # 1) run web research -> research, dry_run_only, receipt, provider note,
     #    and NOT the old "I do not have verified state" message.
     def test_run_web_research(self):
