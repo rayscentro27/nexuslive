@@ -18,9 +18,12 @@ which requires an explicit token + Ray-only chat allowlist.
 """
 from __future__ import annotations
 
+import atexit
+import ctypes
 import json
 import os
 import ssl
+import struct
 import time
 import urllib.parse
 import urllib.request
@@ -28,6 +31,8 @@ from pathlib import Path
 
 from lib import hermes_mobile_conversation as HM
 from lib import nexus_war_room_router as ROUTER
+from lib import hermes_intelligent_layer as IL
+from lib import hermes_live_action_guard as GUARD
 
 ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = ROOT / ".env"
@@ -71,18 +76,142 @@ def _api(method: str, params: dict | None = None, timeout: int = 35) -> dict:
 
 LOCK_FILE = ROOT / "logs" / "thechosenone" / ".hermes_mobile.lock"
 
+# A lock is only honored if the recorded PID's command line contains one of these.
+# This is what tells a real Hermes Mobile loop apart from a reused PID (e.g. a macOS
+# CommerceKit process that inherited the number after a reboot).
+HERMES_MOBILE_MARKERS = ("run_hermes_mobile_telegram", "hermes_mobile", "NexusHermesMobileBot")
+
+
+def _process_cmdline(pid: int) -> str | None:
+    """Best-effort 'exec-path + argv' for a PID, or None if the process is gone /
+    unreadable. Single seam used by the lock logic (mocked in tests).
+
+    Implemented with the sysctl KERN_PROCARGS2 syscall via ctypes — deliberately NO
+    subprocess fork, because forking can hang in this working directory (the same
+    pathology the war-room _git_commit fix avoids). Only the executable path and argv
+    are returned; the process environment block is parsed past and discarded, so no
+    env vars / tokens are ever included."""
+    try:
+        libc = ctypes.CDLL("libc.dylib", use_errno=True)
+        CTL_KERN, KERN_PROCARGS2, KERN_ARGMAX = 1, 49, 8
+        # 1) how big can the args blob be?
+        argmax = ctypes.c_int(0)
+        sz = ctypes.c_size_t(ctypes.sizeof(argmax))
+        mib2 = (ctypes.c_int * 2)(CTL_KERN, KERN_ARGMAX)
+        if libc.sysctl(mib2, 2, ctypes.byref(argmax), ctypes.byref(sz), None, 0) != 0:
+            return None
+        # 2) fetch KERN_PROCARGS2 for the pid
+        buf = ctypes.create_string_buffer(argmax.value)
+        sz = ctypes.c_size_t(argmax.value)
+        mib3 = (ctypes.c_int * 3)(CTL_KERN, KERN_PROCARGS2, int(pid))
+        if libc.sysctl(mib3, 3, buf, ctypes.byref(sz), None, 0) != 0:
+            return None                       # ESRCH (gone) / EINVAL / EPERM
+        raw = buf.raw[:sz.value]
+        if len(raw) < 4:
+            return None
+        # layout: int argc | exec_path\0 | \0-padding | argc * (argv\0) | env...
+        argc = struct.unpack("i", raw[:4])[0]
+        rest = raw[4:]
+        nul = rest.find(b"\0")
+        if nul < 0:
+            return None
+        exec_path = rest[:nul]
+        i = nul
+        while i < len(rest) and rest[i] == 0:  # skip NUL padding
+            i += 1
+        args = []
+        for _ in range(max(argc, 0)):          # read exactly argc argv strings; stop
+            if i >= len(rest):                 # before the environment block
+                break
+            end = rest.find(b"\0", i)
+            if end < 0:
+                end = len(rest)
+            args.append(rest[i:end])
+            i = end + 1
+        text = b" ".join(p for p in [exec_path, *args] if p).decode("utf-8", "replace")
+        return text or None
+    except Exception:
+        return None
+
+
+def _read_lock() -> dict | None:
+    """Parse the lock file. Accepts the new structured JSON format AND the legacy
+    bare-PID format. Returns a dict with at least {'pid': int}, or None if the lock
+    is missing/empty/unparseable."""
+    try:
+        raw = LOCK_FILE.read_text().strip()
+    except (FileNotFoundError, OSError):
+        return None
+    if not raw:
+        return None
+    if raw.startswith("{"):                       # new structured format
+        try:
+            d = json.loads(raw)
+            d["pid"] = int(d.get("pid"))
+            return d
+        except (ValueError, TypeError, json.JSONDecodeError):
+            return None
+    try:                                          # legacy bare-PID format
+        return {"pid": int(raw)}
+    except ValueError:
+        return None
+
+
+def _write_lock() -> None:
+    """Write a structured, secret-free lock record. No token, env, chat id, or
+    message text — only operational identity fields. (Readers still accept the
+    legacy bare-PID format for backward compatibility.)"""
+    record = {
+        "pid": os.getpid(),
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "process_name": "hermes_mobile",
+        "runner": "scripts/run_hermes_mobile_telegram.py",
+        "repo_path": str(ROOT),
+        "owner": "hermes_mobile",
+    }
+    LOCK_FILE.write_text(json.dumps(record))
+
+
+def _release_lock() -> None:
+    """Remove the lock only if WE still own it (pid matches). Best-effort, runs on
+    clean interpreter exit. (launchd SIGKILL won't run this, which is why stale-lock
+    detection — not release — is the real safeguard.)"""
+    rec = _read_lock()
+    if rec is not None and rec.get("pid") == os.getpid():
+        try:
+            LOCK_FILE.unlink()
+        except FileNotFoundError:
+            pass
+
 
 def _acquire_lock() -> bool:
-    """Allow only one live loop. Returns False if another live process holds it."""
+    """Allow only one live Hermes Mobile loop.
+
+    Returns True if we took the lock, False only if a *real* Hermes Mobile process
+    already holds it. A recorded PID is honored as a live holder ONLY when it is
+    alive AND its command line looks like the Hermes Mobile runner. A dead PID, or a
+    PID the OS has reused for some other program (the post-reboot CommerceKit case),
+    is treated as a stale lock and reclaimed so the advisor can start."""
     LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
-    if LOCK_FILE.exists():
-        try:
-            pid = int(LOCK_FILE.read_text().strip())
-            os.kill(pid, 0)        # raises if pid is dead
-            return False           # a live process holds the lock
-        except (ValueError, ProcessLookupError, PermissionError):
-            pass                   # stale lock — take it over
-    LOCK_FILE.write_text(str(os.getpid()))
+    rec = _read_lock()
+    if rec is not None:
+        pid = rec.get("pid")
+        if isinstance(pid, int) and pid != os.getpid():
+            cmd = _process_cmdline(pid)
+            if cmd and any(m in cmd for m in HERMES_MOBILE_MARKERS):
+                return False                      # a real Hermes Mobile loop holds it
+            if cmd:
+                print("[hermes_mobile] Removed stale Hermes Mobile lock: "
+                      "PID existed but was not Hermes Mobile.")
+            else:
+                print("[hermes_mobile] Removed stale Hermes Mobile lock: "
+                      "recorded PID is no longer running.")
+            try:
+                LOCK_FILE.unlink()
+            except FileNotFoundError:
+                pass
+    _write_lock()
+    atexit.register(_release_lock)
     return True
 
 
@@ -138,15 +267,48 @@ def setup_instructions() -> str:
     )
 
 
+def _intelligent_reply(text: str) -> dict | None:
+    """Flag-gated advisor brain. Returns an IL result dict ONLY when:
+      - HERMES_INTELLIGENT_LAYER_ENABLED=true, AND
+      - the war-room router keeps the message with hermes_mobile (NOT an
+        operational command — those stay with TheChoseone), AND
+      - the message is advisor-style (opinion / research / prompt-building).
+    Otherwise None, so existing behavior is unchanged. Never executes."""
+    if not IL.enabled():
+        return None
+    if ROUTER.route(text).get("target") != "hermes_mobile":
+        return None  # operational command — leave to existing routing / TheChoseone
+    return IL.handle(text)
+
+
 def handle_message(text: str, chat_id: str | None = None) -> dict:
     """Process one inbound message. READ-ONLY. Returns what WOULD be sent.
     Does not execute anything. Respects the war-room router (won't answer
     messages that belong to TheChoseone)."""
     r = ROUTER.route(text)
     if r["target"] != "hermes_mobile":
-        # command-routed message: Hermes Mobile stays silent (TheChoseone handles it)
+        # command-routed message: Hermes Mobile stays silent (TheChoseone handles it).
+        # Live actions / worker requests route here -> Hermes never initiates them.
         return {"will_reply": False, "routed_to": r["target"], "reason": r["reason"],
                 "command_text": r.get("command_text"), "executed": False}
+
+    # ── HARD SAFETY GUARD (flag-independent): if the message is still in Hermes's
+    # lane (e.g. "hermes, send emails to leads") but is a live action, refuse +
+    # hand off safely. Runs BEFORE the intelligent layer and the model fallback.
+    guard = GUARD.refusal_if_live_action(text)
+    if guard is not None:
+        return {"will_reply": True, "routed_to": "hermes_mobile",
+                "reply_text": guard, "provider": "live_action_guard",
+                "safety_guard": True, "executed": False, "read_only": True}
+
+    il = _intelligent_reply(text)
+    if il:
+        return {"will_reply": True, "routed_to": "hermes_mobile",
+                "reply_text": il["reply_text"], "provider": "intelligent_layer",
+                "model": None, "used_fallback": False,
+                "command_draft": il.get("command_draft"),
+                "intelligent_layer": True, "intent": il.get("intent"),
+                "executed": False, "read_only": True}
 
     resp = HM.respond_llm(text)
     reply = HM.format_for_telegram(resp)
@@ -213,6 +375,17 @@ def _reply_for(raw_text: str) -> str:
     text = _strip_mention(raw_text)
     if not text:                       # only a bare @mention, nothing else
         return HELP_TEXT
+    # ── HARD SAFETY GUARD (flag-independent): _reply_for is the live send path and
+    # is only reached when Hermes is directly addressed (DM or @mention). Never let
+    # a live action reach the intelligent layer or the model fallback.
+    guard = GUARD.refusal_if_live_action(text)
+    if guard is not None:
+        _log_message(text, guard, provider="live_action_guard")
+        return guard
+    il = _intelligent_reply(text)      # flag-gated; None when off or operational cmd
+    if il:
+        _log_message(text, il["reply_text"], provider="intelligent_layer")
+        return il["reply_text"]
     resp = HM.respond_llm(text)
     out = HM.format_for_telegram(resp)
     r = ROUTER.route(text)

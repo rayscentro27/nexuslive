@@ -90,11 +90,16 @@ def _normalize_telegram_command(text: str) -> str:
     ])
     while t and t[0] in LEAD_STRIP:
         t = t[1:].strip()
-    # 2. Strip em dash / en dash and everything after it
+    # 2. Strip em/en dash menu suffix ONLY when it is a real separator:
+    #    a space immediately precedes the dash AND the text after it is not a
+    #    price/number. This cleans copied menu items ("status \u2014 description")
+    #    while preserving price ranges like "$97\u2013$297" (and "$97 \u2013 $297").
     for dash in ["\u2014", "\u2013"]:
         idx = t.find(dash)
-        if idx != -1:
-            t = t[:idx].strip()
+        if idx > 0 and t[idx - 1] == " ":
+            after = t[idx + 1:].lstrip()
+            if after[:1] != "$" and not after[:1].isdigit():
+                t = t[:idx].strip()
     # 3. Strip surrounding quote chars (ASCII and Unicode)
     QUOTES = set([chr(0x27), chr(0x22), chr(0x2018), chr(0x2019), chr(0x201c), chr(0x201d), chr(0xab), chr(0xbb)])
     while t and t[0] in QUOTES:
@@ -3898,6 +3903,24 @@ class NexusTelegramBot:
                 self.ops_memory,
                 updated_by="telegram_user_instruction",
             )
+        # ── Delegation router + safety blocks (additive, read-only) ──────────
+        # MUST run BEFORE the war-room polished/package-summary reporter so that
+        # explicit delegation commands ("create monetization task from package …",
+        # "turn package … into offer", "send this to codex: …") and unsafe
+        # imperatives ("send emails to leads") OUTRANK package summaries. Fires
+        # ONLY for explicit triggers; everything else returns None and falls
+        # through unchanged. Classifies, writes an execution-truth receipt, and
+        # returns a mobile-readable status — it NEVER executes a backend action.
+        if not normalized.startswith("/"):
+            try:
+                from lib import thechosenone_command_delegation as _DELEG
+                _deleg_reply = _DELEG.maybe_handle(text)
+                if _deleg_reply is not None:
+                    logger.info("telegram route=delegation_router")
+                    return _deleg_reply
+            except Exception as _deleg_exc:
+                logger.warning("delegation router error text=%r exc=%s", (text or "")[:60], _deleg_exc)
+
         # ── War-room polished reports + gated batch approvals (additive) ──────
         # Intercept the polished command set; unrecognized commands fall through.
         try:

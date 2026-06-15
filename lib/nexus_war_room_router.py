@@ -49,6 +49,18 @@ OPERATIONAL_CANONICAL = {
 }
 
 
+# Worker-execution requests and unsafe live actions ALWAYS belong to TheChoseone
+# (gated). This keeps Hermes Mobile out of these lanes entirely.
+_WORKER_DELEG = re.compile(r"(?i)^(send this to|route to|ask)\s+(codex|claude|opencode)\b")
+_UNSAFE_ACTION = re.compile(
+    r"(?i)^(please\s+)?("
+    r"send (an? )?emails?|email (the )?leads|send (a )?dms?|dm (the )?(prospects|leads)|"
+    r"publish (this|the)? ?post|post this publicly|charge (the )?customers?|"
+    r"create (a )?checkout link|process (a )?payment|deploy to (production|prod)|"
+    r"place (a )?live trade|approve all packages( automatically)?|auto[- ]approve all|"
+    r"use (a )?paid api)\b")
+
+
 def _dedupe(s: str) -> str:
     """Collapse consecutive duplicate letters so 'approvals'/'aprrovals'/'apprrovals'
     all normalize to the same string ('aprovals')."""
@@ -117,6 +129,13 @@ def route(message: str) -> dict:
     explicit advisor-address openers (e.g. 'Hermes, ...', 'how do I approve ...')."""
     t = (message or "").strip()
     low = t.lower()
+
+    # worker delegation / unsafe live action -> ALWAYS TheChoseone (gated).
+    # Checked before advisor leads so "send emails to leads" can never land on
+    # Hermes via a stray opener; "hermes, ..." is handled by the guard downstream.
+    if _WORKER_DELEG.search(low) or _UNSAFE_ACTION.search(low):
+        return {"target": "thechoseone", "is_command": True, "command_text": t,
+                "reason": "worker/unsafe -> TheChoseone (gated)"}
 
     # explicit advisor address -> conversation (e.g. "how do I approve this?")
     for lead in ADVISOR_LEADS:
