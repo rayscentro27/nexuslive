@@ -131,21 +131,63 @@ def detect_risks(source: str) -> list[str]:
     return found
 
 
+# ── Preferred offers (Nexus-first, executable now with existing systems) ──────
+_CONTENT_PACK_OFFER = {
+    "name": "30-Day AI Content Growth Pack",
+    "target": "small business owners, coaches, consultants, funding/credit pros, local service businesses, and agencies that need consistent marketing content",
+    "deliverables": [
+        "4 newsletter drafts", "8 short-form video scripts", "4 social posts",
+        "1 landing page draft", "1 lead magnet outline", "1 content strategy summary",
+    ],
+    "pricing": ["$197 beta", "or $297 setup + $497/month recurring after validation"],
+    "why": "Reuses Nexus's existing content engine, landing page drafts, showroom, feedback memory, Postiz planning, and HyperFrames packet workflow — fastest path to cash with no new build.",
+    "landing_angle": "\"Consistent, on-brand marketing content every month — without hiring a team or learning AI tools. We draft your newsletters, short-video scripts, and posts; you approve.\"",
+    "lead_magnet": "\"The 30-Day AI Content Starter Kit\" — 1 sample newsletter + 2 short-video scripts + a 7-day posting calendar (free), delivered via the content engine to capture leads.",
+    "showroom_asset": "1 sample 30-Day Pack (4 newsletters, 8 scripts, 4 posts, 1 landing draft, 1 lead-magnet outline, 1 strategy summary)",
+    "next_action": "Create ONE sample 30-Day AI Content Growth Pack for GoClear/Nexus, add it to the showroom, notify Ray (Ray-only), and use Ray's feedback to improve v2. Do NOT publish publicly without Ray approval.",
+    "next_command": "python3 scripts/run_monetization_scout.py --build-sample-pack --notify --dry-run",
+}
+
+# Ray's preferred FIRST money offer for the current 30-day goal (proof_credit exists).
+_CREDIT_FUNDING_OFFER = {
+    "name": "Credit/Funding Readiness Review",
+    "target": "new and existing business owners, entrepreneurs, and credit-repair/funding clients who want to qualify for business funding",
+    "deliverables": [
+        "business credit + fundability assessment", "Paydex / vendor-tradeline readiness checklist",
+        "lender-readiness report (gaps + next steps)", "30-day action plan to improve fundability",
+    ],
+    "pricing": ["$97 starter review", "or $197–$297 full readiness review + report"],
+    "why": "Reuses Nexus's proof_credit package, showroom, and report/checklist workflows; high-intent buyers; education-only (no guarantees) — fastest cash for Ray's current 30-day goal with assets that already exist.",
+    "landing_angle": "\"Find out if your business is fundable — and exactly what to fix first. A clear readiness review + 30-day action plan. Education only, no guarantees, no hard pull.\"",
+    "lead_magnet": "\"The Business Funding Readiness Checklist\" — a free self-scoring checklist (Paydex, business credit file, fundability gaps) that captures leads into the review offer.",
+    "showroom_asset": "1 sample Credit/Funding Readiness Review (assessment + checklist + lender-readiness report + 30-day plan)",
+    "next_action": "Create ONE sample Credit/Funding Readiness Review from the proof_credit package, add it to the showroom (needs_review), notify Ray (Ray-only). Draft outreach + intake checklist + report outline as APPROVAL-GATED tasks. Do NOT contact customers or take payment without Ray approval.",
+    "next_command": "python3 scripts/run_monetization_scout.py --build-sample-pack --notify --dry-run",
+}
+
+# Credit/Funding signals — when present, Ray's preferred money-now offer ranks first.
+_CREDIT_FUNDING_SIGNALS = (
+    "credit", "funding", "fundability", "paydex", "tradeline", "lender", "loan",
+    "business credit", "llc", "capital", "underwriting", "net 30", "vendor credit",
+    "proof_credit",
+)
+
+
+def _select_offer(source: str) -> dict:
+    """Pick the Nexus-first offer. Credit/Funding Readiness ranks first for Ray's
+    current 30-day money goal whenever the source signals credit/funding; otherwise
+    the content pack. The content pack is never removed — only re-ranked."""
+    s = (source or "").lower()
+    if any(sig in s for sig in _CREDIT_FUNDING_SIGNALS):
+        return _CREDIT_FUNDING_OFFER
+    return _CONTENT_PACK_OFFER
+
+
 def analyze_source(source: str) -> dict:
     ideas = extract_ideas(source)
     best = ideas[0]
     risks = detect_risks(source)
-    # The Nexus-first preferred offer (executable now with existing systems).
-    offer = {
-        "name": "30-Day AI Content Growth Pack",
-        "target": "small business owners, coaches, consultants, funding/credit pros, local service businesses, and agencies that need consistent marketing content",
-        "deliverables": [
-            "4 newsletter drafts", "8 short-form video scripts", "4 social posts",
-            "1 landing page draft", "1 lead magnet outline", "1 content strategy summary",
-        ],
-        "pricing": ["$197 beta", "or $297 setup + $497/month recurring after validation"],
-        "why": "Reuses Nexus's existing content engine, landing page drafts, showroom, feedback memory, Postiz planning, and HyperFrames packet workflow — fastest path to cash with no new build.",
-    }
+    offer = _select_offer(source)
     return {"ideas": ideas, "best_idea": best, "offer": offer, "risks": risks,
             "source_chars": len(source or "")}
 
@@ -187,12 +229,10 @@ def format_scout_response(a: dict) -> str:
         f"   Why: {offer['why']}\n",
 
         "5) LANDING PAGE ANGLE",
-        "   \"Consistent, on-brand marketing content every month — without hiring a team or learning AI tools. "
-        "We draft your newsletters, short-video scripts, and posts; you approve.\"\n",
+        f"   {offer['landing_angle']}\n",
 
         "6) LEAD MAGNET IDEA",
-        "   \"The 30-Day AI Content Starter Kit\" — 1 sample newsletter + 2 short-video scripts + a 7-day "
-        "posting calendar (free), delivered via the content engine to capture leads.\n",
+        f"   {offer['lead_magnet']}\n",
 
         "7) CONTENT ANGLES",
         "   - \"What I'd post for 30 days if I ran your business\"",
@@ -201,7 +241,7 @@ def format_scout_response(a: dict) -> str:
         "   - Niche cuts for funding/credit pros, coaches, local services.\n",
 
         "8) SHOWROOM ASSETS TO CREATE",
-        "   - 1 sample 30-Day Pack (4 newsletters, 8 scripts, 4 posts, 1 landing draft, 1 lead-magnet outline, 1 strategy summary)",
+        f"   - {offer['showroom_asset']}",
         "   - Each registered as a reviewable asset (needs_review) for Ray feedback.\n",
 
         "9) POSTIZ / HYPERFRAMES USE",
@@ -212,9 +252,8 @@ def format_scout_response(a: dict) -> str:
         risk_block, "",
 
         "11) NEXT SAFE ACTION",
-        "   Create ONE sample 30-Day AI Content Growth Pack for GoClear/Nexus, add it to the showroom, "
-        "notify Ray (Ray-only), and use Ray's feedback to improve v2. Do NOT publish publicly without Ray approval.",
-        "   Command: python3 scripts/run_monetization_scout.py --build-sample-pack --notify --dry-run\n",
+        f"   {offer['next_action']}",
+        f"   Command: {offer['next_command']}\n",
 
         "12) MEMORY LESSONS",
         "   - Pasted source = primary evidence; analyze it before any artifact/evidence lookup.",
