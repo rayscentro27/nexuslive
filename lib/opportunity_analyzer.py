@@ -516,9 +516,12 @@ def create_dispatch_task(opp_name: str, score: int, category: str) -> dict:
     """
     Create a Supabase dispatch task when an opportunity is analyzed.
     Returns the created task dict or empty dict on failure.
+    Safe by default: no write unless NEXUS_DRY_RUN is explicitly disabled.
     """
+    import os
+    if os.getenv("NEXUS_DRY_RUN", "true").strip().lower() != "false":
+        return {"dry_run": True, "wrote": False}
     try:
-        import os
         import requests as _req
         from datetime import datetime, timezone
 

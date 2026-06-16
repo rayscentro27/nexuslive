@@ -143,6 +143,9 @@ def _now() -> str:
 
 
 def _sb_insert(table: str, payload: dict) -> dict:
+    # Safe by default: persist only when NEXUS_DRY_RUN is explicitly disabled.
+    if os.getenv("NEXUS_DRY_RUN", "true").strip().lower() != "false":
+        return {"error": "dry_run", "dry_run": True, "wrote": False, "table": table}
     url = (os.getenv("SUPABASE_URL") or "").strip()
     key = (
         os.getenv("SUPABASE_SERVICE_ROLE_KEY")
