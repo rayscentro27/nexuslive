@@ -19,6 +19,7 @@ import { AdminGrantReviews } from './AdminGrantReviews';
 import { AdminCEOMode } from './AdminCEOMode';
 import { NexusVirtualOffice } from './NexusVirtualOffice';
 import { NexusWorkforceCommand } from './NexusWorkforceCommand';
+import { Showroom } from '../Showroom';
 import { supabase } from '../../lib/supabase';
 
 const ADMIN_DOCK = [
@@ -37,6 +38,7 @@ const ADMIN_DOCK = [
   { id: 'trading',       emoji: '📈', label: 'Trading' },
   { id: 'my-business',   emoji: '🏢', label: 'Business' },
   { id: 'reports',       emoji: '📋', label: 'Reports' },
+  { id: 'showroom',      emoji: '🛍️', label: 'Showroom' },
   { id: 'subscriptions', emoji: '💳', label: 'Plans' },
   { id: 'grants-review', emoji: '🔬', label: 'Grants' },
   { id: 'ceo-mode',      emoji: '🧠', label: 'CEO Mode' },
@@ -221,6 +223,7 @@ export function AdminPortal() {
           {activeTab === 'trading'           && <AdminTrading />}
           {activeTab === 'my-business'       && <AdminMyBusiness />}
           {activeTab === 'reports'           && <AdminReports />}
+          {activeTab === 'showroom'          && <Showroom />}
           {activeTab === 'subscriptions'     && <AdminSubscriptionSettings />}
           {activeTab === 'grants-review'     && <AdminGrantReviews />}
           {activeTab === 'ceo-mode'          && <AdminCEOMode />}

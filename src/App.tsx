@@ -36,6 +36,7 @@ import { NotificationToasts } from './components/NotificationToasts';
 import { Zap, Lock, AlertCircle, Bell } from 'lucide-react';
 import InstallPrompt from './components/InstallPrompt';
 import { OpportunityDashboard } from './components/OpportunityDashboard';
+import { Showroom } from './components/Showroom';
 
 const DOCK_ITEMS = [
   { id: 'home',          emoji: '🏠', label: 'Home' },
@@ -48,6 +49,7 @@ const DOCK_ITEMS = [
   { id: 'messages',      emoji: '💬', label: 'Messages' },
   { id: 'documents',     emoji: '📄', label: 'Docs' },
   { id: 'referral',      emoji: '🎁', label: 'Refer' },
+  { id: 'showroom',      emoji: '🛍️', label: 'Showroom' },
   { id: 'account',       emoji: '👤', label: 'Account' },
   { id: 'settings',      emoji: '⚙️', label: 'Settings' },
 ];
@@ -300,6 +302,7 @@ function AppContent() {
           {activeTab === 'business-setup' && <BusinessSetup />}
           {activeTab === 'messages'       && <Messages onNavigate={setActiveTab} />}
           {activeTab === 'documents'      && <Documents />}
+          {activeTab === 'showroom'       && <Showroom />}
           {activeTab === 'account'        && <Account onNavigate={setActiveTab} />}
           {activeTab === 'settings'       && <Settings onNavigate={setActiveTab} />}
           {activeTab === 'auth'           && <Auth onBackToDashboard={() => setActiveTab('home')} />}
@@ -456,6 +459,7 @@ export default function App() {
           <Route path="documents"  element={<Documents />} />
           <Route path="readiness"  element={<BusinessSetup />} />
           <Route path="account"    element={<Account />} />
+          <Route path="showroom"   element={<Showroom />} />
           <Route path="settings"   element={<Settings />} />
 
           <Route path="funding" element={
