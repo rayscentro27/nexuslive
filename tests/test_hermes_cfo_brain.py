@@ -64,5 +64,88 @@ class TestCfoBrain(unittest.TestCase):
         self.assertEqual(intent, "money_strategy_question")
 
 
+class TestCfoBrainOptionalDeps(unittest.TestCase):
+    """Optional helper modules (hermes_tool_chooser, hermes_failure_learning) may not
+    be present yet. Handlers must degrade deterministically, never raise ImportError,
+    and never claim a tool ran or a failure was saved when the module is absent."""
+
+    @staticmethod
+    def _force_absent(modname):
+        """Context-like helper: make `from <modname> import ...` raise ImportError.
+        Returns a restore() callable."""
+        sentinel = object()
+        saved = sys.modules.get(modname, sentinel)
+        sys.modules[modname] = None  # Python raises ImportError on import of a None entry
+
+        def restore():
+            if saved is sentinel:
+                sys.modules.pop(modname, None)
+            else:
+                sys.modules[modname] = saved
+        return restore
+
+    def test_tool_chooser_returns_none_when_absent(self):
+        restore = self._force_absent("lib.hermes_tool_chooser")
+        try:
+            self.assertIsNone(CB._tool_chooser())
+        finally:
+            restore()
+
+    def test_morning_activity_fallback_when_tool_chooser_absent(self):
+        restore = self._force_absent("lib.hermes_tool_chooser")
+        try:
+            out = CB.handle_morning_activity("what did you do this morning", {})
+            self.assertIsInstance(out, str)               # no ImportError
+            self.assertIn("Tool chooser unavailable", out)  # deterministic, honest
+        finally:
+            restore()
+
+    def test_queue_status_fallback_when_tool_chooser_absent(self):
+        restore = self._force_absent("lib.hermes_tool_chooser")
+        try:
+            out = CB.handle_queue_status("what tasks are in the queue", {})
+            self.assertIsInstance(out, str)
+            self.assertIn("Tool chooser unavailable", out)
+        finally:
+            restore()
+
+    def test_morning_activity_uses_tool_chooser_when_present(self):
+        import types
+        fake = types.ModuleType("lib.hermes_tool_chooser")
+        fake.execute_chosen_tool = lambda tool, msg, ctx: (
+            "SENTINEL_MORNING" if tool == "morning_activity" else "")
+        sentinel = object()
+        saved = sys.modules.get("lib.hermes_tool_chooser", sentinel)
+        sys.modules["lib.hermes_tool_chooser"] = fake
+        try:
+            out = CB.handle_morning_activity("what did you do this morning", {})
+            self.assertIsInstance(out, str)
+            self.assertNotIn("Tool chooser unavailable", out)  # present path preserved
+        finally:
+            if saved is sentinel:
+                sys.modules.pop("lib.hermes_tool_chooser", None)
+            else:
+                sys.modules["lib.hermes_tool_chooser"] = saved
+
+    def test_log_failed_response_safe_noop_when_absent(self):
+        restore = self._force_absent("lib.hermes_failure_learning")
+        try:
+            res = CB._log_failed_response_safe(message="m", response="r", reason="x")
+            self.assertIsInstance(res, dict)
+            self.assertFalse(res.get("logged"))            # never claims a save
+            self.assertIn("unavailable", res.get("status", ""))
+        finally:
+            restore()
+
+    def test_failure_feedback_no_import_error_when_absent(self):
+        restore = self._force_absent("lib.hermes_failure_learning")
+        try:
+            out = CB.handle_failure_feedback(
+                "that is not what i meant", {"last_user_message": "do x"})
+            self.assertIsInstance(out, str)               # no ImportError raised
+        finally:
+            restore()
+
+
 if __name__ == "__main__":
     unittest.main()

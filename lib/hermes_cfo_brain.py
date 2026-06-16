@@ -17,6 +17,31 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+
+# ── Optional helper modules (degrade gracefully if not yet extracted) ─────────
+def _tool_chooser():
+    """Return the optional execute_chosen_tool callable, or None if unavailable.
+    Never fakes a tool run — callers must handle a None result deterministically."""
+    try:
+        from lib.hermes_tool_chooser import execute_chosen_tool
+        return execute_chosen_tool
+    except Exception:
+        return None
+
+
+def _log_failed_response_safe(**kwargs) -> dict:
+    """Record a failure example if hermes_failure_learning is available; otherwise a
+    no-op that reports it was NOT saved (never claims a save that did not happen)."""
+    try:
+        from lib.hermes_failure_learning import log_failed_response
+    except Exception:
+        return {"status": "failure learning unavailable", "logged": False}
+    try:
+        return log_failed_response(**kwargs)
+    except Exception:
+        return {"status": "failure learning unavailable", "logged": False}
+
+
 _SAFETY_BOUNDARY = (
     "I will not publish, email subscribers, sell, deploy, spend money, "
     "apply to affiliate programs, activate Stripe, run live trading, or "
@@ -510,11 +535,17 @@ def handle_task_reference(message: str, context: dict) -> str:
 
 def handle_morning_activity(message: str, context: dict) -> str:
     """Handle: 'WHAT DID YOU DO THIS MORNING'"""
-    from lib.hermes_tool_chooser import execute_chosen_tool
+    _ect = _tool_chooser()
+    if _ect is None:
+        return format_cfo_brain_response(
+            header="MORNING SUMMARY",
+            answer="Tool chooser unavailable — I can't pull this morning's activity right now.",
+            approval_boundary=True,
+        )
 
     # Get while-out summary + research queue
-    while_out = execute_chosen_tool("morning_activity", message, context) or ""
-    research_q = execute_chosen_tool("research_queue", message, context) or ""
+    while_out = _ect("morning_activity", message, context) or ""
+    research_q = _ect("research_queue", message, context) or ""
 
     parts = ["MORNING SUMMARY", "", "Here is what happened:"]
 
@@ -542,9 +573,15 @@ def handle_morning_activity(message: str, context: dict) -> str:
 
 def handle_queue_status(message: str, context: dict) -> str:
     """Handle: 'WHAT TASK ARE IN THE QUEUE'"""
-    from lib.hermes_tool_chooser import execute_chosen_tool
+    _ect = _tool_chooser()
+    if _ect is None:
+        return format_cfo_brain_response(
+            header="TASK QUEUE",
+            answer="Tool chooser unavailable. Say 'show approval queue' for pending approvals.",
+            approval_boundary=True,
+        )
 
-    result = execute_chosen_tool("task_queue_status", message, context) or ""
+    result = _ect("task_queue_status", message, context) or ""
 
     if not result or len(result.strip()) < 10:
         return format_cfo_brain_response(
@@ -581,9 +618,15 @@ def handle_money_strategy(message: str, context: dict) -> str:
     Response uses numbered items so conversation state can resolve
     'LETS DO 1', 'WHAT WAS OPTION 2', etc. in follow-up messages.
     """
-    from lib.hermes_tool_chooser import execute_chosen_tool
+    _ect = _tool_chooser()
+    if _ect is None:
+        return format_cfo_brain_response(
+            header="WEEKLY MONEY PLAN",
+            answer="Tool chooser unavailable — I can't build the weekly money plan right now.",
+            approval_boundary=True,
+        )
 
-    packet_result = execute_chosen_tool("revenue_asset_packet", message, context) or ""
+    packet_result = _ect("revenue_asset_packet", message, context) or ""
 
     parts = ["WEEKLY MONEY PLAN", ""]
 
@@ -652,11 +695,11 @@ def _extract_money_options(packet_result: str) -> list[str]:
 
 def handle_failure_feedback(message: str, context: dict) -> str:
     """Handle: 'THAT IS NOT WHAT I MEANT'"""
-    from lib.hermes_failure_learning import log_failed_response
     from lib.hermes_conversation_state import get_last_response_full
 
     last_response = get_last_response_full() or ""
-    log_failed_response(
+    # Failure learning is optional; this no-ops (without claiming a save) if absent.
+    _log_failed_response_safe(
         message=context.get("last_user_message", message),
         response=last_response,
         reason="lost_context",
@@ -746,9 +789,9 @@ def handle_recommendation_question(message: str, context: dict) -> str:
             approval_boundary=True,
         )
 
-    # No prior recommendation — build one from daily cycle
-    from lib.hermes_tool_chooser import execute_chosen_tool
-    daily = execute_chosen_tool("daily_operating_cycle", message, context) or ""
+    # No prior recommendation — build one from daily cycle (tool chooser optional)
+    _ect = _tool_chooser()
+    daily = (_ect("daily_operating_cycle", message, context) or "") if _ect else ""
     rec_match = re.search(r'(?:recommendation|priority)[:\s]+(.+)', daily, re.IGNORECASE)
     if rec_match:
         rec_text = rec_match.group(1).strip()[:200]
@@ -854,9 +897,8 @@ def log_cfo_failure_example(
     bad_response: Optional[str] = None,
     reason: Optional[str] = None,
 ) -> dict:
-    """Log a CFO brain failure example."""
-    from lib.hermes_failure_learning import log_failed_response
-    return log_failed_response(
+    """Log a CFO brain failure example (no-op if failure learning unavailable)."""
+    return _log_failed_response_safe(
         message=message,
         response=bad_response or "",
         reason=reason,
