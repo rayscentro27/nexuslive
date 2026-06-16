@@ -272,6 +272,44 @@ Think of it like a human reviewing their journal and updating their mental model
 
 The goal: Be helpful without being annoying. Check in a few times a day, do useful background work, but respect quiet time.
 
+## 🧹 Repo Hygiene Guardrails (binding)
+
+These rules exist because this repo once accumulated a 1,700-file branch full of
+runtime and generated files. Do not let that happen again. See
+[docs/REPO_HYGIENE_POLICY.md](docs/REPO_HYGIENE_POLICY.md) for the full policy.
+
+### Staging & commits
+
+- **Never run `git add .`** — it sweeps in runtime/generated clutter.
+- **Never run `git add -A`** — same reason.
+- **Always stage explicit paths only**, e.g. `git add path/to/file.py other.py`.
+- **Never commit runtime or generated files.**
+- **Never commit** logs, reports, artifacts, transcripts, or generated content.
+- **Never commit** `.env`, `*.lock`, `*.pid`, caches, screenshots, or generated
+  `*.summary` / `*.vtt` files. Templates like `.env.example` are fine.
+- **Always run `scripts/check_repo_hygiene.sh`** before every commit.
+- **Always run `scripts/check_pr_size.sh`** before opening a PR.
+- **Stop if the changed-file count exceeds 60** unless Ray explicitly approves
+  (then `scripts/check_pr_size.sh --override`).
+
+### Scope & purpose
+
+- **One branch = one PR = one purpose.** No mixed-concern branches.
+- Archive/source branches (e.g. `feature/vibe-trading-hermes-adapter`) are
+  **extraction sources, never merge targets**.
+- Every clean PR must include a validation summary and an explicit list of the
+  files it stages.
+
+### Live actions & infrastructure
+
+- **Do not touch `~/nexus-ai-worker`** (stable runtime checkout) unless asked.
+- **Do not edit launchd** plists/jobs unless explicitly approved.
+- **Do not restart services** unless explicitly approved.
+- **Do not kill processes** as part of routine work.
+- **Do not send Telegram / email / DMs**, publish posts, deploy, trade, move
+  money, or use paid APIs without explicit approval.
+- **Do not expose secrets.** Never print key/token/password values.
+
 ## Make It Yours
 
 This is a starting point. Add your own conventions, style, and rules as you figure out what works.
