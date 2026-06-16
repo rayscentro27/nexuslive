@@ -18,6 +18,7 @@ import hashlib
 import json
 import logging
 import os
+import ssl
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta
@@ -234,6 +235,25 @@ def record_digest_item(digest_type: str, summary: str, payload: dict | None = No
 
 # ── Telegram send ──────────────────────────────────────────────────────────────
 
+_TELEGRAM_SSL_CTX: Optional[ssl.SSLContext] = None
+
+
+def _telegram_ssl_ctx() -> ssl.SSLContext:
+    """SSL context for Telegram HTTPS, preferring the certifi CA bundle.
+
+    This box's default trust store fails Telegram TLS (self-signed cert in chain),
+    so certifi is required for reliable delivery. Cached after first build.
+    """
+    global _TELEGRAM_SSL_CTX
+    if _TELEGRAM_SSL_CTX is None:
+        try:
+            import certifi
+            _TELEGRAM_SSL_CTX = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            _TELEGRAM_SSL_CTX = ssl.create_default_context()
+    return _TELEGRAM_SSL_CTX
+
+
 def _telegram_send(text: str, bot_token: str, chat_id: str, parse_mode: str = 'HTML') -> bool:
     """Raw Telegram API call."""
     url  = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -244,7 +264,7 @@ def _telegram_send(text: str, bot_token: str, chat_id: str, parse_mode: str = 'H
     }).encode()
     req = urllib.request.Request(url, data=body, headers={'Content-Type': 'application/json'})
     try:
-        with urllib.request.urlopen(req, timeout=10) as _:
+        with urllib.request.urlopen(req, timeout=10, context=_telegram_ssl_ctx()) as _:
             return True
     except urllib.error.HTTPError as e:
         try:
@@ -258,7 +278,7 @@ def _telegram_send(text: str, bot_token: str, chat_id: str, parse_mode: str = 'H
             }).encode()
             retry_req = urllib.request.Request(url, data=fallback, headers={'Content-Type': 'application/json'})
             try:
-                with urllib.request.urlopen(retry_req, timeout=10) as _:
+                with urllib.request.urlopen(retry_req, timeout=10, context=_telegram_ssl_ctx()) as _:
                     logger.warning('Telegram HTML parse failed; resent message without parse_mode')
                     return True
             except Exception as retry_err:
