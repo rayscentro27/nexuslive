@@ -14,6 +14,9 @@ LATEST = ROOT / "logs" / "thechosenone" / "latest_command_receipt.json"
 
 
 class TestDelegationRouter(unittest.TestCase):
+    def setUp(self):
+        LATEST.unlink(missing_ok=True)
+
     def test_research_classification(self):
         # (6.6) "run web research: Nav affiliate requirements" -> research
         cls = DR.classify_prompt("run web research: Nav affiliate requirements")
