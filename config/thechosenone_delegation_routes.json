@@ -1,0 +1,55 @@
+{
+  "_comment": "TheChoseone delegation routes. Each route declares trigger phrases, the honest worker target, the default execution mode when no live worker bridge exists, and a safety note. Nothing here grants execution; codex/claude/opencode stay dry_run_only until a bridge is verified at runtime.",
+  "version": 1,
+  "default_execution_mode_when_no_bridge": "dry_run_only",
+  "routes": {
+    "research": {
+      "worker_target": "none",
+      "triggers": ["run web research:", "research ", "look up", "find the best", "competitor", "affiliate offers"],
+      "execution_mode": "report_ready",
+      "safety_note": "Drafts a research task / cites sources only. No browsing with paid APIs, no applying, no activating links."
+    },
+    "showroom": {
+      "worker_target": "showroom",
+      "triggers": ["create monetization task from package", "turn package", "into offer", "review package", "create showroom package from", "monetiz"],
+      "execution_mode": "queued",
+      "safety_note": "Builds/records a draft offer for showroom review. Never publishes, charges, emails, or auto-approves."
+    },
+    "proof_automation": {
+      "worker_target": "proof_automation",
+      "triggers": ["run proof automation dry run", "proof automation", "dry run"],
+      "execution_mode": "dry_run_only",
+      "safety_note": "Proof automation runs in dry-run only; produces receipts, takes no outward action."
+    },
+    "codex": {
+      "worker_target": "codex",
+      "triggers": ["send this to codex:", "task for codex:"],
+      "execution_mode": "dry_run_only",
+      "safety_note": "No verified Codex bridge -> recorded as dry_run_only with a copy/paste prompt. Never claims it ran."
+    },
+    "claude": {
+      "worker_target": "claude",
+      "triggers": ["send this to claude:", "task for claude:"],
+      "execution_mode": "dry_run_only",
+      "safety_note": "No verified Claude bridge -> recorded as dry_run_only with a copy/paste prompt. Never claims it ran."
+    },
+    "opencode": {
+      "worker_target": "opencode",
+      "triggers": ["send this to opencode:", "task for opencode:"],
+      "execution_mode": "dry_run_only",
+      "safety_note": "No verified OpenCode bridge -> recorded as dry_run_only with a copy/paste prompt. Never claims it ran."
+    },
+    "trading": {
+      "worker_target": "internal_script",
+      "triggers": ["backtest strategy idea:", "analyze trading strategy:", "backtest", "strategy idea"],
+      "execution_mode": "report_ready",
+      "safety_note": "Education/demo analysis only. No live trades, no money movement, no account changes."
+    },
+    "blocked": {
+      "worker_target": "none",
+      "triggers": ["send email", "send dm", "publish", "post to", "pay ", "charge", "deploy", "go live", "approve all", "wire money", "place live trade", "live trading"],
+      "execution_mode": "blocked",
+      "safety_note": "Outward/irreversible action without approval -> blocked. Nothing runs."
+    }
+  }
+}
