@@ -182,8 +182,8 @@ def save_handoff(title: str, body: str) -> str:
         return "(could not write handoff)"
 
 
-# ── The brain: partner-style answers per mode (deterministic, honest) ──
-def answer_with_advisor_mode(message: str) -> str:
+# ── Deterministic, honest per-mode answers (used as the safe fallback) ──
+def answer_deterministic(message: str) -> str:
     ctx = build_advisor_context(message)
     intent = ctx["intent"]
     prof = ctx["profile"]
@@ -307,3 +307,167 @@ def answer_with_advisor_mode(message: str) -> str:
         f"- If I were you, my one next move: {nxt[0] if nxt else 'approve the offer + outreach today'}.",
         "Want me to draft that as a handoff for TheChosenOne?",
     ])
+
+
+# ── Recent conversation memory (short-term; local, no secrets) ──
+_RECENT = ROOT / "logs" / "hermes_advisor_recent.json"
+
+
+def remember(role: str, text: str) -> None:
+    try:
+        _RECENT.parent.mkdir(parents=True, exist_ok=True)
+        hist = json.loads(_RECENT.read_text()) if _RECENT.exists() else []
+        hist.append({"role": role, "text": (text or "")[:500],
+                     "ts": datetime.now(timezone.utc).isoformat()})
+        _RECENT.write_text(json.dumps(hist[-10:]))
+    except Exception:
+        pass
+
+
+def recent_context(n: int = 6) -> str:
+    try:
+        hist = json.loads(_RECENT.read_text())[-n:]
+        return "\n".join(f"{h['role']}: {h['text']}" for h in hist)
+    except Exception:
+        return ""
+
+
+# ── Local Ollama (localhost only; skip *-cloud; no paid APIs) ──
+def _pick_local_model():
+    import os, urllib.request
+    host = os.environ.get("OLLAMA_HOST", "http://localhost:11434").rstrip("/")
+    try:
+        from lib.hermes_mobile_provider import validate_provider_is_local
+        ok, _ = validate_provider_is_local(host)
+        if not ok:
+            return None, host
+    except Exception:
+        if "localhost" not in host and "127.0.0.1" not in host:
+            return None, host
+    try:
+        with urllib.request.urlopen(host + "/api/tags", timeout=5) as r:
+            names = [m.get("name") for m in json.loads(r.read()).get("models", [])]
+    except Exception:
+        return None, host
+    local = [n for n in names if n and not n.endswith("-cloud")]  # never cloud
+    if not local:
+        return None, host
+    pref = os.environ.get("HERMES_ADVISOR_MODEL") or os.environ.get("HERMES_MOBILE_MODEL")
+    if pref and pref in local:
+        return pref, host
+    for cand in ("gemma3:1b", "qwen2.5:0.5b"):
+        if cand in local:
+            return cand, host
+    return local[0], host
+
+
+# Circuit breaker: if Ollama is too slow once, skip it for a cooldown so the bot
+# stays snappy and falls back to the deterministic advisor instantly.
+_OLLAMA_STATE = ROOT / "logs" / "hermes_advisor_ollama.json"
+_OLLAMA_COOLDOWN_SEC = 1800
+
+
+def _ollama_skip() -> bool:
+    try:
+        until = json.loads(_OLLAMA_STATE.read_text()).get("slow_until", 0)
+        return datetime.now(timezone.utc).timestamp() < float(until)
+    except Exception:
+        return False
+
+
+def _ollama_mark_slow() -> None:
+    try:
+        _OLLAMA_STATE.parent.mkdir(parents=True, exist_ok=True)
+        _OLLAMA_STATE.write_text(json.dumps(
+            {"slow_until": datetime.now(timezone.utc).timestamp() + _OLLAMA_COOLDOWN_SEC}))
+    except Exception:
+        pass
+
+
+def _ollama_generate(system: str, prompt: str, timeout: float = 15.0, max_tokens: int = 320):
+    import urllib.request
+    model, host = _pick_local_model()
+    if not model:
+        return None
+    body = json.dumps({"model": model, "system": system, "prompt": prompt, "stream": False,
+                       "options": {"num_predict": max_tokens, "temperature": 0.6}}).encode()
+    try:
+        req = urllib.request.Request(host + "/api/generate", data=body,
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return (json.loads(r.read()).get("response") or "").strip() or None
+    except Exception:
+        return None
+
+
+def _grounded_system(ctx: dict) -> str:
+    prof = ctx["profile"]; st = ctx["operator"]
+    op = ""
+    if st:
+        m = st.get("monetization", {}); o = st.get("oanda_demo", {})
+        op = (f"Operator Core: overall={st.get('overall_status')}; offer={m.get('primary_offer')} "
+              f"{' / '.join(m.get('prices', []))}; approval_queue={st.get('automation', {}).get('approval_queue_count')}; "
+              f"ready_assets={len(m.get('assets', []))}; oanda={o.get('latest_result')} (practice, live blocked); "
+              f"blockers={len(st.get('blockers', []))}.")
+    return (
+        "You are Hermes Advisor — Ray's personal/business AI partner. Direct, useful, opinionated, honest. "
+        "You are NOT a command bot. Talk naturally like a partner, not a template.\n"
+        f"RAY: {prof['full_name']} (call him {prof['name']}). Top goal: {prof['primary_goal']}. "
+        f"Preferred offer: {prof['preferred_offer']}. He wants decisive recommendations + proof, not vague answers.\n"
+        f"{op}\n"
+        "HARD TRUTH (never violate): you CANNOT search the web, watch YouTube, execute commands, send messages, "
+        "publish, charge payments, or trade. Never claim you did any of those. If asked, say honestly you can't from "
+        "here and offer to draft a handoff for TheChosenOne. Do NOT say 'paste this to TheChosenOne' by default — only "
+        "draft a handoff when execution is genuinely needed. Be concise (a few sentences). Ask at most one question."
+    )
+
+
+_FAKE_PATTERNS = [
+    r"\bi (searched|googled|looked it up|found (it )?online)\b",
+    r"\baccording to (my|a|the) (search|google|web)\b",
+    r"\bi watched (the|this) video\b", r"\bin (the|this) video\b", r"\bthe video (says|shows|is about)\b",
+    r"\bi (executed|ran the command|sent the email|sent it|posted|published|placed the trade|charged)\b",
+    r"\btrending (right )?now\b", r"\bhere are the (latest|current) (trends|search results)\b",
+]
+
+
+def _honesty_violation(text: str) -> bool:
+    low = (text or "").lower()
+    return any(re.search(p, low) for p in _FAKE_PATTERNS)
+
+
+def _strip_paste(text: str) -> str:
+    return re.sub(r"(?i)paste (this|it)( in| into)? to the ?chose?n? ?one\.?",
+                  "I can draft a handoff for TheChosenOne.", text or "")
+
+
+# ── Blended entry: local Ollama reasoning, grounded, with honest fallback ──
+def answer_with_advisor_mode(message: str) -> str:
+    ctx = build_advisor_context(message)
+    intent = ctx["intent"]
+    deterministic = answer_deterministic(message)
+    remember("Ray", message)
+    # Honesty/structure-critical modes stay deterministic (guaranteed honest + handoff structure).
+    if intent in ("capability_truth", "research_request", "execution_handoff"):
+        remember("Hermes", deterministic)
+        return deterministic
+    # Reasoning/conversation modes -> local Ollama, grounded; fall back if weak/unsafe.
+    # Circuit breaker: if Ollama was recently too slow, skip it (instant deterministic).
+    if _ollama_skip():
+        remember("Hermes", deterministic)
+        return deterministic
+    system = _grounded_system(ctx)
+    convo = recent_context()
+    prompt = (f"Recent conversation:\n{convo}\n\n" if convo else "") + f"Ray: {message}\nHermes:"
+    llm = _ollama_generate(system, prompt)
+    if not llm:
+        _ollama_mark_slow()  # too slow / unavailable -> cool down
+        remember("Hermes", deterministic)
+        return deterministic
+    if len(llm) < 12 or _honesty_violation(llm):
+        remember("Hermes", deterministic)
+        return deterministic
+    out = _strip_paste(llm)
+    remember("Hermes", out)
+    return out
+
