@@ -41,51 +41,76 @@ def env_state(name: str) -> dict[str, Any]:
     return {"present": True, "empty": not bool(text), "placeholder": placeholder, "source": source}
 
 
-def connector_status() -> dict[str, Any]:
-    postiz_ready = all(env_state(k)["present"] and not env_state(k)["empty"] for k in ("POSTIZ_URL", "POSTIZ_API_KEY"))
-    fb_token = env_state("META_PAGE_ACCESS_TOKEN")["present"] or env_state("FACEBOOK_ACCESS_TOKEN")["present"]
-    fb_page_present = env_state("FACEBOOK_PAGE_ID")["present"]
-    fb_ready = fb_page_present and fb_token
-    ig_token = env_state("INSTAGRAM_ACCESS_TOKEN")["present"] or env_state("META_PAGE_ACCESS_TOKEN")["present"]
-    ig_business_present = env_state("INSTAGRAM_BUSINESS_ID")["present"]
-    ig_ready = ig_business_present and ig_token
+def connector_status(*, check_network: bool = False) -> dict[str, Any]:
+    """Resolve connector readiness via lib.social_connection_resolver.
+
+    The resolver maps the real Meta connection (META_PAGE_ID / META_PAGE_ACCESS_TOKEN /
+    META_INSTAGRAM_ACCOUNT_ID — the names content_employee/publisher.py already uses) as
+    aliases for the FACEBOOK_PAGE_ID / INSTAGRAM_BUSINESS_ID names the new automation
+    originally hard-coded. Never returns raw token values.
+    """
+    from lib import social_connection_resolver as resolver
+
+    fb = resolver.resolve("facebook", check_network=check_network)
+    ig = resolver.resolve("instagram", check_network=check_network)
+
+    postiz_url_present = env_state("POSTIZ_URL")["present"]
+    postiz_key_present = env_state("POSTIZ_API_KEY")["present"]
+    postiz_ready = postiz_url_present and postiz_key_present
     postiz_blockers = []
-    if not env_state("POSTIZ_URL")["present"]:
+    if not postiz_url_present:
         postiz_blockers.append("POSTIZ_URL missing")
-    if not env_state("POSTIZ_API_KEY")["present"]:
+    if not postiz_key_present:
         postiz_blockers.append("POSTIZ_API_KEY missing")
-    facebook_blockers = []
-    if not fb_page_present:
-        facebook_blockers.append("FACEBOOK_PAGE_ID missing")
-    if not fb_token:
-        facebook_blockers.append("META_PAGE_ACCESS_TOKEN or FACEBOOK_ACCESS_TOKEN missing")
-    instagram_blockers = []
-    if not ig_business_present:
-        instagram_blockers.append("INSTAGRAM_BUSINESS_ID missing")
-    if not ig_token:
-        instagram_blockers.append("INSTAGRAM_ACCESS_TOKEN or META_PAGE_ACCESS_TOKEN missing")
+
+    def _blockers(res: dict) -> list[str]:
+        return [f"{m} missing" for m in res.get("missing_fields", [])]
+
     return {
         "postiz": {
             "status": "ready" if postiz_ready else "blocked",
-            "url_present": env_state("POSTIZ_URL")["present"],
-            "api_key_present": env_state("POSTIZ_API_KEY")["present"],
+            "account_connected": "yes" if postiz_ready else "no",
+            "publishing_ready": "yes" if postiz_ready else "no",
+            "url_present": postiz_url_present,
+            "api_key_present": postiz_key_present,
             "network_checked": False,
             "blockers": postiz_blockers,
+            "note": "Postiz is not configured for Nexus; Meta is connected directly via Graph API.",
         },
         "facebook": {
-            "status": "ready" if fb_ready else "blocked",
-            "page_id_present": fb_page_present,
-            "token_present": fb_token,
-            "network_checked": False,
-            "blockers": facebook_blockers,
+            "status": "ready" if fb["publishing_ready"] == "yes" else "blocked",
+            "account_connected": fb["account_connected"],
+            "publishing_ready": fb["publishing_ready"],
+            "connection_source": fb["connection_source"],
+            "page_id_present": fb["page_id_present"] == "yes",
+            "page_id_alias": fb["id_matched_alias"],
+            "token_present": fb["token_present"] == "yes",
+            "token_alias": fb["token_matched_alias"],
+            "token_not_printed": True,
+            "permission_check_done": fb["permission_check_done"],
+            "permission_check": fb["permission_check"],
+            "network_checked": check_network,
+            "missing_fields": fb["missing_fields"],
+            "blockers": _blockers(fb),
         },
         "instagram": {
-            "status": "ready" if ig_ready else "blocked",
-            "business_id_present": ig_business_present,
-            "token_present": ig_token,
-            "network_checked": False,
-            "media_requirements": "Instagram publishing usually requires media/container workflow; text-only captions are not enough for feed/Reels.",
-            "blockers": instagram_blockers,
+            "status": "ready" if ig["publishing_ready"] == "yes" else "blocked",
+            "account_connected": ig["account_connected"],
+            "publishing_ready": ig["publishing_ready"],
+            "connection_source": ig["connection_source"],
+            "instagram_account_id_present": ig["ig_business_id_present"] == "yes",
+            "business_id_present": ig["ig_business_id_present"] == "yes",
+            "instagram_account_id_alias": ig["id_matched_alias"],
+            "token_present": ig["token_present"] == "yes",
+            "token_alias": ig["token_matched_alias"],
+            "token_not_printed": True,
+            "permission_check_done": ig["permission_check_done"],
+            "permission_check": ig["permission_check"],
+            "network_checked": check_network,
+            "missing_fields": ig["missing_fields"],
+            "media_flow_implemented": False,
+            "media_requirements": "Instagram feed/Reels publishing requires the media/container workflow (upload -> create container -> poll status -> media_publish). content_employee/publisher.py implements this; the social_queue dry-run path does not publish.",
+            "blockers": _blockers(ig),
         },
         "real_publish_enabled": os.getenv("SOCIAL_PUBLISHING_ENABLED", "false").lower() == "true",
         "dry_run": os.getenv("SOCIAL_DRY_RUN", "true").lower() != "false",
@@ -102,14 +127,25 @@ class DryRunPublisher:
             blockers.append("item is not approved_by_ray")
         if item.get("platform") == "instagram" and not item.get("media_path"):
             blockers.append("instagram real publishing would require media_path; dry-run only")
+        # Attach real connector readiness (resolved from existing Meta connection) so the
+        # receipt reflects whether a real publish would be gated. Tokens are never included.
+        platform = item.get("platform")
+        conn = connector_status().get(platform, {}) if platform in {"facebook", "instagram"} else {}
+        connector_summary = {
+            "account_connected": conn.get("account_connected"),
+            "publishing_ready": conn.get("publishing_ready"),
+            "connection_source": conn.get("connection_source"),
+            "connector_blockers": conn.get("blockers"),
+        } if conn else {}
         receipt = {
             "item_id": item.get("id"),
-            "platform": item.get("platform"),
+            "platform": platform,
             "caption_preview": str(item.get("caption") or "")[:240],
             "content_path": item.get("content_path"),
             "dry_run": True,
             "would_publish": False,
             "blockers": blockers,
+            "connector": connector_summary,
         }
         receipt_path = social_queue.write_receipt("dry_run", str(item.get("id")), receipt)
         updated = social_queue.update_item(
