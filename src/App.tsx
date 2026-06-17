@@ -491,7 +491,7 @@ export default function App() {
         </Route>
 
         {/* ── legacy /admin shortcut ─────────────────────────────────────── */}
-        <Route path="/admin" element={
+        <Route path="/admin/*" element={
           <ProtectedRoute requireAdmin>
             <AdminPortal />
           </ProtectedRoute>

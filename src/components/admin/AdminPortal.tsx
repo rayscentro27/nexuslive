@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminHeader } from './AdminHeader';
 import { AdminDashboard } from './AdminDashboard';
@@ -28,8 +29,9 @@ const ADMIN_DOCK = [
   { id: 'funding',           emoji: '💰', label: 'Funding' },
   { id: 'opportunities',     emoji: '💡', label: 'Opps' },
   { id: 'ai-workforce',      emoji: '🤖', label: 'AI Team' },
-  { id: 'workforce-command', emoji: '⚡', label: 'Command' },
+  { id: 'showroom',          emoji: '🛍️', label: 'Showroom' },
   // overflow items
+  { id: 'workforce-command', emoji: '⚡', label: 'Command' },
   { id: 'invites',       emoji: '✉️', label: 'Invites' },
   { id: 'pipeline',      emoji: '📊', label: 'Pipeline' },
   { id: 'credit',        emoji: '🛡️', label: 'Credit' },
@@ -38,7 +40,6 @@ const ADMIN_DOCK = [
   { id: 'trading',       emoji: '📈', label: 'Trading' },
   { id: 'my-business',   emoji: '🏢', label: 'Business' },
   { id: 'reports',       emoji: '📋', label: 'Reports' },
-  { id: 'showroom',      emoji: '🛍️', label: 'Showroom' },
   { id: 'subscriptions', emoji: '💳', label: 'Plans' },
   { id: 'grants-review', emoji: '🔬', label: 'Grants' },
   { id: 'ceo-mode',      emoji: '🧠', label: 'CEO Mode' },
@@ -183,8 +184,22 @@ function AdminBottomDock({
 }
 
 export function AdminPortal() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
+  const pathTab = location.pathname.replace(/^\/admin\/?/, '').split('/')[0] || 'dashboard';
+  const initialTab = ADMIN_DOCK.some(item => item.id === pathTab) ? pathTab : 'dashboard';
+  const [activeTab, setActiveTabState] = useState(initialTab);
   const [pendingApprovals, setPendingApprovals] = useState(0);
+
+  useEffect(() => {
+    const nextTab = ADMIN_DOCK.some(item => item.id === pathTab) ? pathTab : 'dashboard';
+    setActiveTabState(nextTab);
+  }, [pathTab]);
+
+  const setActiveTab = (tab: string) => {
+    setActiveTabState(tab);
+    navigate(tab === 'dashboard' ? '/admin' : `/admin/${tab}`);
+  };
 
   // Poll approval count every 30s for red badge
   useEffect(() => {
