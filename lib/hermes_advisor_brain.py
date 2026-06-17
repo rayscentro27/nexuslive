@@ -109,7 +109,9 @@ def classify_advisor_intent(message: str) -> str:
         "prospect list", "without a list", "no list", "$97 review", "97 review",
         "post today", "comments ready", "comment ready", "dm workflow",
         "social publishing", "facebook publishing", "instagram publishing",
-        "first paid client"
+        "first paid client", "first paid subscriber", "monthly subscription",
+        "subscription", "fully automated", "posts are queued", "posts are ready",
+        "what did ray already post", "safest next automated test", "approve next"
     )):
         return "social_first_funnel"
 
@@ -280,17 +282,60 @@ def answer_deterministic(message: str) -> str:
         funnel_report = ROOT / "reports" / "value_test" / "social_first_funnel_plan_20260617.md"
         dm_report = ROOT / "reports" / "value_test" / "social_first_dm_comment_workflow_20260617.md"
         post_plan = ROOT / "reports" / "value_test" / "facebook_posting_plan_97_starter_20260617.md"
+        social = (st or {}).get("social", {}) if isinstance(st, dict) else {}
+        latest_items = social.get("latest_items") or []
 
-        if "blocking" in t or "blocked" in t or "social publishing" in t or "facebook publishing" in t or "instagram publishing" in t:
+        if "blocking" in t or "blocked" in t or "fully automated" in t or "social publishing" in t or "facebook publishing" in t or "instagram publishing" in t:
+            connectors = social.get("connector_status") or {}
+            fb = connectors.get("facebook", {})
+            ig = connectors.get("instagram", {})
+            postiz = connectors.get("postiz", {})
             return "\n".join([
-                "Social publishing is still blocked for real outbound posting.",
-                "- Facebook: no usable Page ID/publishing implementation confirmed.",
-                "- Instagram: no Instagram Business ID/feed/Reels publisher confirmed.",
-                "- Postiz: no POSTIZ_URL or POSTIZ_API_KEY configured.",
+                "Full automation is still blocked; the launch should run manually for now.",
+                f"- Facebook: {fb.get('status', 'blocked')} ({', '.join(fb.get('blockers') or ['connector/account not ready'])}).",
+                f"- Instagram: {ig.get('status', 'blocked')} ({', '.join(ig.get('blockers') or ['connector/account not ready'])}).",
+                f"- Postiz: {postiz.get('status', 'blocked')} ({', '.join(postiz.get('blockers') or ['connector not ready'])}).",
+                "- Newsletter/lead capture: no confirmed public capture/send workflow.",
+                "- Billing: live Stripe/subscriptions are not approved or active.",
+                "- Credit workflow: secure report intake and dispute tracking still need guardrails.",
                 "- Meta: app credentials are partial, but publishing/account config is incomplete.",
                 "- Safe path today: local dry-run queue + manual posting after Ray approves the exact account and post.",
                 f"Report: {social_report.relative_to(ROOT) if social_report.exists() else 'social report not generated yet'}",
             ])
+
+        if "queued" in t or "posts are ready" in t:
+            lines = [
+                f"Social queue count: {social.get('queue_count', 0)}.",
+                f"Pending review: {social.get('pending_review_count', 0)}; approved: {social.get('approved_count', 0)}; dry-run ready: {social.get('dry_run_ready_count', 0)}; published receipts: {social.get('published_count', 0)}.",
+                "Queued/latest items:",
+            ]
+            lines += [
+                f"- {item.get('id')} | {item.get('platform')} | {item.get('status')} | {item.get('title')}"
+                for item in latest_items[-5:]
+            ] or ["- none yet"]
+            lines.append("I will not claim anything was published unless there is a published receipt.")
+            return "\n".join(lines)
+
+        if "ray already post" in t:
+            return "\n".join([
+                "Ray said he already manually posted the Credit/Funding/Nexus offer.",
+                "I do not have a platform receipt for that manual post, so I treat it as a user-reported manual post, not an automated Nexus publish.",
+                "Next step: queue future posts in Nexus, approve one exact item, run dry-run, then only real-publish after connector/account approval.",
+            ])
+
+        if "safest next automated test" in t or "approve next" in t:
+            candidate = next((item for item in latest_items if item.get("status") == "queued_for_review"), None)
+            if not candidate:
+                candidate = next((item for item in latest_items if item.get("status") in {"approved", "dry_run_ready"}), None)
+            if candidate:
+                return "\n".join([
+                    "Safest next automated test: approve one queued item and run the dry-run publisher only.",
+                    f"Candidate: {candidate.get('id')} | {candidate.get('platform')} | {candidate.get('title')}",
+                    f"Approve command: python3 scripts/social_queue_approve.py --item-id {candidate.get('id')} --ray-approved",
+                    f"Dry-run command: python3 scripts/social_publish_dry_run.py --item-id {candidate.get('id')}",
+                    "Real publish still requires exact account/post approval and connector readiness.",
+                ])
+            return "Safest next automated test: create one queue item, approve it with --ray-approved, then dry-run. No real publishing yet."
 
         if "dm workflow" in t or "comment" in t or "ready" in t:
             return "\n".join([
@@ -309,6 +354,18 @@ def answer_deterministic(message: str) -> str:
                 "'The worst time to get funding-ready is the day you need cash. I am testing a $97 Credit/Funding Readiness Starter Review this week. You get a readiness scorecard, top 5 gaps, and a 1-page next-step checklist. No credit pull. No funding application. No approval guarantee. Comment READY or DM READY for the checklist.'",
                 "Use it on Ray-owned Facebook profile/page first, then Instagram story/reel adaptation.",
                 f"Posting plan: {post_plan.relative_to(ROOT) if post_plan.exists() else 'Facebook plan not generated yet'}",
+            ])
+
+        if "subscription" in t or "subscriber" in t:
+            return "\n".join([
+                "The $97 review leads to subscription by turning the buyer's gaps into a monthly support recommendation:",
+                "1. Public post/newsletter gets the READY lead.",
+                "2. Checklist and intake qualify the problem.",
+                "3. $97 Starter Review diagnoses top gaps.",
+                "4. Delivery recommends one path: self-serve, $97/mo Basic, $197/mo Guided, or $297/mo Concierge.",
+                "5. First paid subscriber path: manually post today, close one $97 review, deliver fast, then offer the matching monthly tier.",
+                "No live billing is active; Ray must approve payment/subscription setup before charging.",
+                f"Plan: {funnel_report.relative_to(ROOT) if funnel_report.exists() else 'funnel report not generated yet'}",
             ])
 
         return "\n".join([

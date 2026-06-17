@@ -29,7 +29,9 @@ BRIEF_MD = OUT_DIR / "nexus_operator_brief.md"
 COMMANDS = [
     "how do we make money today", "what needs approval", "show money pipeline",
     "show oanda status", "show showroom", "show automation status",
-    "what is blocked", "run daily operator",
+    "what is blocked", "show social queue", "what social posts are ready",
+    "what is blocking social publishing", "what should I post today",
+    "run daily operator",
 ]
 
 
@@ -195,6 +197,46 @@ def collect() -> dict:
         "followups": ["read-only /api/showroom endpoint for live asset counts + approve/revise wiring"],
     }
 
+    # ── Social automation ──
+    try:
+        import sys
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        from lib import social_queue
+        from lib.social_publishers import connector_status
+        sq_summary = social_queue.summarize()
+        connectors = connector_status()
+        social_queue.write_status_reports(connectors)
+    except Exception as exc:
+        sq_summary = {
+            "total": 0,
+            "pending_review_count": 0,
+            "approved_count": 0,
+            "dry_run_ready_count": 0,
+            "published_count": 0,
+            "failed_count": 0,
+            "latest_items": [],
+            "error": str(exc)[:160],
+        }
+        connectors = {"error": str(exc)[:160]}
+    social = {
+        "status": "WORKING (local queue/dry-run)" if not sq_summary.get("error") else "PARTIAL",
+        "queue_path": sq_summary.get("queue_path", "outputs/social_queue/social_queue.jsonl"),
+        "queue_count": sq_summary.get("total", 0),
+        "pending_review_count": sq_summary.get("pending_review_count", 0),
+        "approved_count": sq_summary.get("approved_count", 0),
+        "dry_run_ready_count": sq_summary.get("dry_run_ready_count", 0),
+        "published_count": sq_summary.get("published_count", 0),
+        "failed_count": sq_summary.get("failed_count", 0),
+        "latest_items": sq_summary.get("latest_items", []),
+        "connector_status": connectors,
+        "next_social_action": "Ray reviews queued posts, approves one exact item, then runs dry-run; real publish remains blocked until connector/account approval.",
+        "reports": {
+            "queue_status": "reports/social/social_queue_status_latest.md",
+            "connector_status": "reports/social/social_connector_status_latest.md",
+        },
+    }
+
     # ── Options guard ──
     of = _env_flags(ROOT / ".env", ["OPTIONS_REPORTS_ENABLED", "OPTIONS_TELEGRAM_REPORTS_ENABLED",
                                      "OPTIONS_TRADING_ENABLED", "OPTIONS_LIVE_TRADING"])
@@ -240,6 +282,7 @@ def collect() -> dict:
         "money_pipeline": money_pipeline,
         "oanda_demo": oanda,
         "showroom": showroom,
+        "social": social,
         "options_guard": options_guard,
         "blockers": blockers,
         "top_3_next_actions": next_actions,
@@ -257,6 +300,9 @@ def write_brief(st: dict) -> None:
         f"- Oanda demo: {o['status']} (practice, live blocked={o['live_funded_blocked']}, auto_trading={o['raw_auto_trading']})",
         f"- Options guard: {g['status']}",
         f"- Showroom: {st['showroom']['status']} (route {st['showroom']['route']})",
+        f"- Social queue: {st.get('social', {}).get('status', 'unknown')} "
+        f"(queued={st.get('social', {}).get('queue_count', 0)}, pending={st.get('social', {}).get('pending_review_count', 0)}, "
+        f"approved={st.get('social', {}).get('approved_count', 0)}, dry-run={st.get('social', {}).get('dry_run_ready_count', 0)})",
         "",
         "## 2. Partial",
         f"- Monetization: {m['status']}",
@@ -281,6 +327,12 @@ def write_brief(st: dict) -> None:
         "", "## 7. Showroom status",
         f"- component_exists={st['showroom']['component_exists']} pushed={st['showroom']['pushed']} deployed={st['showroom']['deployed']}",
         f"- registry: {st['showroom']['asset_registry']} | follow-up: {st['showroom']['followups'][0]}",
+        "", "## 7b. Social automation status",
+        f"- queue_count={st.get('social', {}).get('queue_count', 0)} pending_review={st.get('social', {}).get('pending_review_count', 0)} "
+        f"approved={st.get('social', {}).get('approved_count', 0)} dry_run_ready={st.get('social', {}).get('dry_run_ready_count', 0)} "
+        f"published={st.get('social', {}).get('published_count', 0)} failed={st.get('social', {}).get('failed_count', 0)}",
+        f"- connector report: {st.get('social', {}).get('reports', {}).get('connector_status', 'reports/social/social_connector_status_latest.md')}",
+        f"- next: {st.get('social', {}).get('next_social_action', 'review queue')}",
         "", "## 8. Commands Ray can type",
     ]
     lines += [f"- {c}" for c in COMMANDS]
@@ -326,6 +378,38 @@ def answer(intent: str, st: dict | None = None) -> str:
         return (f"SHOWROOM\nroute {s['route']} | component={s['component_exists']} | "
                 f"local_commit {s['local_commit']} pushed={s['pushed']} deployed={s['deployed']}\n"
                 f"registry: {s['asset_registry']}\nfollow-up: {s['followups'][0]}")
+    if "social queue" in q or "social posts" in q:
+        s = st.get("social", {})
+        items = s.get("latest_items") or []
+        lines = [
+            "SOCIAL QUEUE",
+            f"queue_count={s.get('queue_count', 0)} pending={s.get('pending_review_count', 0)} approved={s.get('approved_count', 0)} dry_run_ready={s.get('dry_run_ready_count', 0)} published={s.get('published_count', 0)} failed={s.get('failed_count', 0)}",
+            f"next: {s.get('next_social_action', 'review queue')}",
+            "latest:",
+        ]
+        lines += [
+            f"- {item.get('id')} | {item.get('platform')} | {item.get('status')} | {item.get('title')}"
+            for item in items[-5:]
+        ] or ["- none"]
+        return "\n".join(lines)
+    if "blocking social publishing" in q:
+        s = st.get("social", {})
+        c = s.get("connector_status") or {}
+        return ("SOCIAL PUBLISHING BLOCKERS\n"
+                f"Facebook: {(c.get('facebook') or {}).get('status', 'unknown')} - {', '.join((c.get('facebook') or {}).get('blockers') or [])}\n"
+                f"Instagram: {(c.get('instagram') or {}).get('status', 'unknown')} - {', '.join((c.get('instagram') or {}).get('blockers') or [])}\n"
+                f"Postiz: {(c.get('postiz') or {}).get('status', 'unknown')} - {', '.join((c.get('postiz') or {}).get('blockers') or [])}\n"
+                "Real publishing also requires Ray approval of exact item/account and --confirm-real-publish.")
+    if "post today" in q:
+        s = st.get("social", {})
+        items = s.get("latest_items") or []
+        candidate = next((item for item in items if item.get("status") in {"queued_for_review", "approved", "dry_run_ready"}), None)
+        if candidate:
+            return (f"POST TODAY CANDIDATE\n{candidate.get('title')}\nPlatform: {candidate.get('platform')}\n"
+                    f"Caption: {candidate.get('caption')}\nCTA: {candidate.get('cta')}\n"
+                    "Manual post only unless Ray approves connector/account and real publish.")
+        return ("POST TODAY\nUse the first approved manual Facebook post from "
+                "reports/value_test/manual_social_posting_package_20260617.md. Manual post only.")
     if "automation" in q:
         a = st["automation"]
         return (f"AUTOMATION STATUS: {a['status']}\nscheduled jobs: {', '.join(a['scheduled_jobs'])}\n"
