@@ -39,8 +39,15 @@ def strategy_templates() -> list[dict[str, Any]]:
         {"strategy_name": "Momentum Breakout", "market_type": "crypto", "symbol_or_pair": "ETHUSD", "timeframe": "M30", "best_session": "US overlap", "indicators": ["range expansion", "volume"], "entry_rules": ["breakout with volume"], "exit_rules": ["failed follow-through"]},
         {"strategy_name": "Funding Rate Reversal", "market_type": "crypto", "symbol_or_pair": "BTCUSD", "timeframe": "H4", "best_session": "24h", "indicators": ["funding rate", "open interest"], "entry_rules": ["extreme funding divergence"], "exit_rules": ["normalization complete"]},
     ]
+    # Options content is gated OFF by default (Ray approval required). When
+    # OPTIONS_REPORTS_ENABLED is false, options templates are excluded from all
+    # downstream reports, digests, paper lanes, and Telegram summaries. Templates
+    # are preserved (not deleted) — set OPTIONS_REPORTS_ENABLED=true to re-enable.
+    options_enabled = _flag("OPTIONS_REPORTS_ENABLED", "false")
     out = []
     for row in rows:
+        if not options_enabled and str(row.get("market_type", "")).lower() == "options":
+            continue
         merged = dict(base)
         merged.update(row)
         out.append(merged)

@@ -2385,6 +2385,14 @@ class NexusTelegramBot:
                 self.ops_memory,
                 updated_by="telegram_user_instruction",
             )
+        # Nexus Operator Core commands — answer from reports/operator/nexus_operator_status.json
+        # (real state, not memory). Guarded so it never breaks normal message handling.
+        try:
+            from lib.nexus_operator_commands import is_operator_command, answer_operator_command
+            if normalized and is_operator_command(normalized):
+                return answer_operator_command(normalized)
+        except Exception:
+            pass
         continuity = {
             "run demo readiness check": self._cmd_demo_readiness_check,
             "demo ready?": self._cmd_demo_readiness_check,
