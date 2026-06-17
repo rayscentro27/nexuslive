@@ -169,6 +169,12 @@ def resolve(platform: str, *, check_network: bool = False) -> dict[str, Any]:
         if permission_check.get("ok") is False:
             publishing_ready = "no"
             account_connected = "unknown"
+            gerr = permission_check.get("graph_error") or {}
+            if gerr.get("code") == 190:
+                # Token is structurally present but rejected by Meta (expired / invalid).
+                missing_fields.append("valid_access_token (current token expired or invalid — re-auth needed)")
+            else:
+                missing_fields.append(f"network_check_failed ({permission_check.get('detail')})")
 
     summary = (
         f"{platform}: account_connected={account_connected}, publishing_ready={publishing_ready}, "
@@ -221,22 +227,53 @@ def _network_identity_check(node_id: str, token: str, platform: str) -> dict[str
     Never returns the token. On any error, returns ok=False with a redacted detail.
     """
     import json
+    import ssl
     import urllib.parse
     import urllib.request
+
+    # Use certifi's CA bundle if available — this Mac's default Python trust store is
+    # incomplete (same reason the Telegram senders were patched to use certifi).
+    try:
+        import certifi
+
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        ctx = ssl.create_default_context()
 
     fields = "id,name" if platform == "facebook" else "id,username"
     url = (
         f"https://graph.facebook.com/v19.0/{urllib.parse.quote(str(node_id))}"
         f"?fields={fields}&access_token={urllib.parse.quote(str(token))}"
     )
+    def _redact(text: str) -> str:
+        return (text or "").replace(token, "<redacted-token>")[:400]
+
     try:
         req = urllib.request.Request(url, method="GET", headers={"User-Agent": "nexus-connector-status"})
-        with urllib.request.urlopen(req, timeout=12) as resp:
+        with urllib.request.urlopen(req, timeout=12, context=ctx) as resp:
             payload = json.loads(resp.read().decode("utf-8", errors="ignore"))
         identity = {k: payload.get(k) for k in ("id", "name", "username") if k in payload}
         return {"done": "yes", "ok": True, "detail": "read-only identity GET succeeded", "identity": identity}
-    except Exception as exc:  # network/auth/permission errors
-        detail = str(exc)
-        if token in detail:
-            detail = detail.replace(token, "<redacted-token>")
-        return {"done": "yes", "ok": False, "detail": detail[:300], "identity": None}
+    except urllib.error.HTTPError as exc:  # Graph API returned a structured error body
+        graph_error: dict[str, Any] = {}
+        try:
+            body = json.loads(exc.read().decode("utf-8", errors="ignore"))
+            err = body.get("error", {}) if isinstance(body, dict) else {}
+            # Only surface non-secret diagnostic fields.
+            graph_error = {
+                "message": _redact(str(err.get("message", ""))),
+                "type": err.get("type"),
+                "code": err.get("code"),
+                "error_subcode": err.get("error_subcode"),
+            }
+        except Exception:
+            pass
+        return {
+            "done": "yes",
+            "ok": False,
+            "detail": _redact(f"HTTP {exc.code}: {exc.reason}"),
+            "graph_error": graph_error,
+            "identity": None,
+        }
+    except Exception as exc:  # network/SSL errors
+        return {"done": "yes", "ok": False, "detail": _redact(str(exc)), "identity": None}
