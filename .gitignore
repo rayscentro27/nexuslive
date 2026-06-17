@@ -28,6 +28,11 @@ npm-debug.log*
 
 # Logs
 logs/
+*.pid
+*.lock
+.telegram_bot.lock
+.telegram_update_offset
+operations_center/scheduler.pid
 *.log
 signal-router.log
 telegram-integration.log
