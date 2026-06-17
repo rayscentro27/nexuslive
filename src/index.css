@@ -20,6 +20,95 @@
   --color-nexus-950: #1A2244;
 }
 
+/* Nexus OS theme tokens. The OS is dark by default and can switch locally. */
+:root, [data-nexus-theme="dark"] {
+  --nexus-bg: #050816;
+  --nexus-bg-soft: #080d1f;
+  --nexus-surface: rgba(15, 23, 42, 0.72);
+  --nexus-surface-strong: rgba(17, 24, 39, 0.92);
+  --nexus-border: rgba(148, 163, 184, 0.16);
+  --nexus-text: #f8fafc;
+  --nexus-text-muted: #94a3b8;
+  --nexus-purple: #7c3aed;
+  --nexus-blue: #3b82f6;
+  --nexus-cyan: #06b6d4;
+  --nexus-success: #22c55e;
+  --nexus-warning: #f59e0b;
+  --nexus-danger: #ef4444;
+  --nexus-glow: 0 0 0 1px rgba(124, 58, 237, 0.10), 0 18px 48px -12px rgba(59, 130, 246, 0.28);
+}
+
+[data-nexus-theme="light"] {
+  --nexus-bg: #f6f8fb;
+  --nexus-bg-soft: #eef2f7;
+  --nexus-surface: rgba(255, 255, 255, 0.88);
+  --nexus-surface-strong: #ffffff;
+  --nexus-border: rgba(15, 23, 42, 0.10);
+  --nexus-text: #0f172a;
+  --nexus-text-muted: #64748b;
+  --nexus-purple: #7c3aed;
+  --nexus-blue: #3b82f6;
+  --nexus-cyan: #06b6d4;
+  --nexus-success: #16a34a;
+  --nexus-warning: #d97706;
+  --nexus-danger: #dc2626;
+  --nexus-glow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 16px 40px -16px rgba(59, 130, 246, 0.18);
+}
+
+.nexus-canvas { background: var(--nexus-bg); color: var(--nexus-text); }
+.nexus-glass {
+  background: var(--nexus-surface);
+  border: 1px solid var(--nexus-border);
+  border-radius: 20px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: var(--nexus-glow);
+}
+.nexus-glass-strong {
+  background: var(--nexus-surface-strong);
+  border: 1px solid var(--nexus-border);
+  border-radius: 20px;
+}
+.nexus-ink { color: var(--nexus-text); }
+.nexus-muted { color: var(--nexus-text-muted); }
+.nexus-accent-grad { background: linear-gradient(135deg, var(--nexus-purple), var(--nexus-blue)); }
+.nexus-accent-text {
+  background: linear-gradient(135deg, var(--nexus-purple), var(--nexus-cyan));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+[data-nexus-theme="dark"] .nexus-canvas .bg-white {
+  background-color: var(--nexus-surface-strong) !important;
+}
+[data-nexus-theme="dark"] .nexus-canvas .bg-slate-50,
+[data-nexus-theme="dark"] .nexus-canvas .bg-slate-50\/50,
+[data-nexus-theme="dark"] .nexus-canvas .bg-slate-100 {
+  background-color: rgba(148, 163, 184, 0.08) !important;
+}
+[data-nexus-theme="dark"] .nexus-canvas .text-\[\#1A2244\],
+[data-nexus-theme="dark"] .nexus-canvas .text-\[\#1a2244\],
+[data-nexus-theme="dark"] .nexus-canvas .text-slate-900,
+[data-nexus-theme="dark"] .nexus-canvas .text-slate-800,
+[data-nexus-theme="dark"] .nexus-canvas .text-slate-700 {
+  color: var(--nexus-text) !important;
+}
+[data-nexus-theme="dark"] .nexus-canvas .text-slate-600,
+[data-nexus-theme="dark"] .nexus-canvas .text-slate-500,
+[data-nexus-theme="dark"] .nexus-canvas .text-slate-400 {
+  color: var(--nexus-text-muted) !important;
+}
+[data-nexus-theme="dark"] .nexus-canvas .border-slate-200,
+[data-nexus-theme="dark"] .nexus-canvas .border-slate-100,
+[data-nexus-theme="dark"] .nexus-canvas .border-slate-100\/50 {
+  border-color: var(--nexus-border) !important;
+}
+[data-nexus-theme="dark"] .nexus-canvas .input-base {
+  background-color: #f8fafc !important;
+  color: #1a2244 !important;
+}
+
 @layer base {
   body {
     margin: 0;
@@ -80,6 +169,11 @@
 
   .nexus-gradient-text {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-[#3d5af1] to-[#5b8ef5];
+  }
+
+  .input-base {
+    @apply w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-[#1a2244] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#5B7CFA]/20 focus:border-[#5B7CFA]/40 transition-all;
+    caret-color: #5B7CFA;
   }
 
   .nexus-button-primary {

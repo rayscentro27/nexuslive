@@ -20,6 +20,7 @@ import { AdminGrantReviews } from './AdminGrantReviews';
 import { AdminCEOMode } from './AdminCEOMode';
 import { NexusVirtualOffice } from './NexusVirtualOffice';
 import { NexusWorkforceCommand } from './NexusWorkforceCommand';
+import { NexusOS } from './NexusOS';
 import { Showroom } from '../Showroom';
 import { supabase } from '../../lib/supabase';
 
@@ -29,6 +30,7 @@ const ADMIN_DOCK = [
   { id: 'funding',           emoji: '💰', label: 'Funding' },
   { id: 'opportunities',     emoji: '💡', label: 'Opps' },
   { id: 'ai-workforce',      emoji: '🤖', label: 'AI Team' },
+  { id: 'nexus-os',          emoji: '🖥️', label: 'Nexus OS' },
   { id: 'showroom',          emoji: '🛍️', label: 'Showroom' },
   // overflow items
   { id: 'workforce-command', emoji: '⚡', label: 'Command' },
@@ -47,8 +49,8 @@ const ADMIN_DOCK = [
   { id: 'settings',      emoji: '⚙️', label: 'Settings' },
 ];
 
-const DOCK_PRIMARY = ADMIN_DOCK.slice(0, 6);
-const DOCK_OVERFLOW = ADMIN_DOCK.slice(6);
+const DOCK_PRIMARY = ADMIN_DOCK.slice(0, 7);
+const DOCK_OVERFLOW = ADMIN_DOCK.slice(7);
 
 function AdminDockButton({
   item, isActive, onClick, badge, badgeColor,
@@ -235,6 +237,7 @@ export function AdminPortal() {
           {activeTab === 'documents'         && <AdminDocuments />}
           {activeTab === 'messages'          && <AdminMessaging />}
           {activeTab === 'ai-workforce'      && <AdminAIWorkforce />}
+          {activeTab === 'nexus-os'          && <NexusOS />}
           {activeTab === 'trading'           && <AdminTrading />}
           {activeTab === 'my-business'       && <AdminMyBusiness />}
           {activeTab === 'reports'           && <AdminReports />}
@@ -248,11 +251,13 @@ export function AdminPortal() {
         </div>
       </main>
 
-      <AdminBottomDock
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        pendingApprovals={pendingApprovals}
-      />
+      {activeTab !== 'nexus-os' && (
+        <AdminBottomDock
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          pendingApprovals={pendingApprovals}
+        />
+      )}
     </div>
   );
 }

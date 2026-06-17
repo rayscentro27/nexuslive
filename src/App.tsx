@@ -37,6 +37,7 @@ import { Zap, Lock, AlertCircle, Bell } from 'lucide-react';
 import InstallPrompt from './components/InstallPrompt';
 import { OpportunityDashboard } from './components/OpportunityDashboard';
 import { Showroom } from './components/Showroom';
+import { NexusOS } from './components/admin/NexusOS';
 
 const DOCK_ITEMS = [
   { id: 'home',          emoji: '🏠', label: 'Home' },
@@ -460,6 +461,11 @@ export default function App() {
           <Route path="readiness"  element={<BusinessSetup />} />
           <Route path="account"    element={<Account />} />
           <Route path="showroom"   element={<Showroom />} />
+          <Route path="nexus-os" element={
+            <ProtectedRoute requireAdmin>
+              <NexusOS />
+            </ProtectedRoute>
+          } />
           <Route path="settings"   element={<Settings />} />
 
           <Route path="funding" element={
