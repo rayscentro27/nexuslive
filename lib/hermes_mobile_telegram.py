@@ -382,6 +382,18 @@ def _reply_for(raw_text: str) -> str:
     if guard is not None:
         _log_message(text, guard, provider="live_action_guard")
         return guard
+    # ── Hermes Advisor Brain v1 (partner-first): handles conversation, advice,
+    # research-framing, approval handoffs, operator interpretation, and capability
+    # truth — using Ray's profile + read-only Operator Core. Never a canned command
+    # dump. Legacy pipeline below remains only as a safety fallback if the brain errors.
+    try:
+        from lib import hermes_advisor_brain as ADV
+        reply = ADV.answer_with_advisor_mode(text)
+        if reply and reply.strip():
+            _log_message(text, reply, provider="advisor_brain")
+            return reply
+    except Exception:
+        pass
     il = _intelligent_reply(text)      # flag-gated; None when off or operational cmd
     if il:
         _log_message(text, il["reply_text"], provider="intelligent_layer")
