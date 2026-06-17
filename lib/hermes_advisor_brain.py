@@ -104,6 +104,15 @@ def classify_advisor_intent(message: str) -> str:
                             "let's go", "lets go")):
         return "execution_handoff"
 
+    # social-first first-dollar funnel questions
+    if any(k in t for k in (
+        "prospect list", "without a list", "no list", "$97 review", "97 review",
+        "post today", "comments ready", "comment ready", "dm workflow",
+        "social publishing", "facebook publishing", "instagram publishing",
+        "first paid client"
+    )):
+        return "social_first_funnel"
+
     # money question -> advisory blend (handled specially)
     if "make money" in t or "money today" in t or "money pipeline" in t:
         return "money_advisory"
@@ -264,6 +273,55 @@ def answer_deterministic(message: str) -> str:
             "Risk: it stalls if nothing gets approved — drafts don't make money until outreach goes out.",
             f"Next move: {nxt[0] if nxt else 'approve the offer, then approve outreach.'}",
             "Want me to draft the outreach handoff for TheChosenOne?",
+        ])
+
+    if intent == "social_first_funnel":
+        social_report = ROOT / "reports" / "capability_map" / "social_publishing_capability_20260617.md"
+        funnel_report = ROOT / "reports" / "value_test" / "social_first_funnel_plan_20260617.md"
+        dm_report = ROOT / "reports" / "value_test" / "social_first_dm_comment_workflow_20260617.md"
+        post_plan = ROOT / "reports" / "value_test" / "facebook_posting_plan_97_starter_20260617.md"
+
+        if "blocking" in t or "blocked" in t or "social publishing" in t or "facebook publishing" in t or "instagram publishing" in t:
+            return "\n".join([
+                "Social publishing is still blocked for real outbound posting.",
+                "- Facebook: no usable Page ID/publishing implementation confirmed.",
+                "- Instagram: no Instagram Business ID/feed/Reels publisher confirmed.",
+                "- Postiz: no POSTIZ_URL or POSTIZ_API_KEY configured.",
+                "- Meta: app credentials are partial, but publishing/account config is incomplete.",
+                "- Safe path today: local dry-run queue + manual posting after Ray approves the exact account and post.",
+                f"Report: {social_report.relative_to(ROOT) if social_report.exists() else 'social report not generated yet'}",
+            ])
+
+        if "dm workflow" in t or "comment" in t or "ready" in t:
+            return "\n".join([
+                "If someone comments READY, use a manual DM workflow:",
+                "1. Public reply: 'Got it. I will send the Credit/Funding Readiness Checklist. Readiness education only, no funding or approval guarantee.'",
+                "2. DM the checklist bullets: formation docs, EIN letter, recent bank statements, business identity consistency, funding goal.",
+                "3. Offer the $97 Starter Review: readiness scorecard, top 5 gaps, 1-page next-step checklist.",
+                "4. Send intake questions only after they show interest.",
+                "5. Send payment instructions only after Ray approves the payment method.",
+                f"Workflow: {dm_report.relative_to(ROOT) if dm_report.exists() else 'DM workflow report not generated yet'}",
+            ])
+
+        if "post today" in t or "what should we post" in t:
+            return "\n".join([
+                "Post this today, manually, after Ray approves the exact account:",
+                "'The worst time to get funding-ready is the day you need cash. I am testing a $97 Credit/Funding Readiness Starter Review this week. You get a readiness scorecard, top 5 gaps, and a 1-page next-step checklist. No credit pull. No funding application. No approval guarantee. Comment READY or DM READY for the checklist.'",
+                "Use it on Ray-owned Facebook profile/page first, then Instagram story/reel adaptation.",
+                f"Posting plan: {post_plan.relative_to(ROOT) if post_plan.exists() else 'Facebook plan not generated yet'}",
+            ])
+
+        return "\n".join([
+            "Because Ray has no prospect list, sell the $97 review through a social-first funnel:",
+            "1. Post educational readiness content on Ray-owned Facebook/Instagram.",
+            "2. CTA: comment or DM READY for the Credit/Funding Readiness Checklist.",
+            "3. Manually reply with the checklist and compliance boundary.",
+            "4. Ask intake questions.",
+            "5. Offer the $97 Starter Review.",
+            "6. Collect payment only through Ray-approved manual payment or separately approved live Stripe.",
+            "7. Fulfill manually, then upsell $197/$297 only if the buyer wants a deeper review.",
+            "Fastest path: one approved Facebook profile post today + story prompt + manual READY replies.",
+            f"Plan: {funnel_report.relative_to(ROOT) if funnel_report.exists() else 'funnel report not generated yet'}",
         ])
 
     if intent == "operator_interpretation":
@@ -470,4 +528,3 @@ def answer_with_advisor_mode(message: str) -> str:
     out = _strip_paste(llm)
     remember("Hermes", out)
     return out
-
