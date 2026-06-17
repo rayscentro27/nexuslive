@@ -228,9 +228,12 @@ def collect() -> dict:
         "dry_run_ready_count": sq_summary.get("dry_run_ready_count", 0),
         "published_count": sq_summary.get("published_count", 0),
         "failed_count": sq_summary.get("failed_count", 0),
+        "needs_revision_count": sq_summary.get("needs_revision_count", 0),
+        "average_quality_score": sq_summary.get("average_quality_score", 0),
+        "last_published": sq_summary.get("last_published"),
         "latest_items": sq_summary.get("latest_items", []),
         "connector_status": connectors,
-        "next_social_action": "Ray reviews queued posts, approves one exact item, then runs dry-run; real publish remains blocked until connector/account approval.",
+        "next_social_action": "Ray reviews the top queued Facebook posts, approves one exact item, then runs dry-run; real publish remains approval-gated.",
         "reports": {
             "queue_status": "reports/social/social_queue_status_latest.md",
             "connector_status": "reports/social/social_connector_status_latest.md",
@@ -302,7 +305,8 @@ def write_brief(st: dict) -> None:
         f"- Showroom: {st['showroom']['status']} (route {st['showroom']['route']})",
         f"- Social queue: {st.get('social', {}).get('status', 'unknown')} "
         f"(queued={st.get('social', {}).get('queue_count', 0)}, pending={st.get('social', {}).get('pending_review_count', 0)}, "
-        f"approved={st.get('social', {}).get('approved_count', 0)}, dry-run={st.get('social', {}).get('dry_run_ready_count', 0)})",
+        f"approved={st.get('social', {}).get('approved_count', 0)}, dry-run={st.get('social', {}).get('dry_run_ready_count', 0)}, "
+        f"avg_quality={st.get('social', {}).get('average_quality_score', 0)})",
         "",
         "## 2. Partial",
         f"- Monetization: {m['status']}",
@@ -331,6 +335,9 @@ def write_brief(st: dict) -> None:
         f"- queue_count={st.get('social', {}).get('queue_count', 0)} pending_review={st.get('social', {}).get('pending_review_count', 0)} "
         f"approved={st.get('social', {}).get('approved_count', 0)} dry_run_ready={st.get('social', {}).get('dry_run_ready_count', 0)} "
         f"published={st.get('social', {}).get('published_count', 0)} failed={st.get('social', {}).get('failed_count', 0)}",
+        f"- creative quality gate: active avg_score={st.get('social', {}).get('average_quality_score', 0)} needs_revision={st.get('social', {}).get('needs_revision_count', 0)}",
+        f"- last published: {(st.get('social', {}).get('last_published') or {}).get('post_id', 'none')} "
+        f"{(st.get('social', {}).get('last_published') or {}).get('permalink', '')}",
         f"- connector report: {st.get('social', {}).get('reports', {}).get('connector_status', 'reports/social/social_connector_status_latest.md')}",
         f"- next: {st.get('social', {}).get('next_social_action', 'review queue')}",
         "", "## 8. Commands Ray can type",

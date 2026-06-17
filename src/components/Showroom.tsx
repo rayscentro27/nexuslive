@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Store, FileCheck2, Sparkles, Package, Eye, Check, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Store, FileCheck2, Sparkles, Package, Eye, Check, RefreshCw, ShieldCheck, Send } from 'lucide-react';
+import { showroomSocialApprovalManifest } from '../data/showroomSocialApprovalManifest';
 
 /**
  * Showroom — proof assets, demos, generated packages, and review-ready outputs.
@@ -63,6 +64,73 @@ export function Showroom() {
             <div className="text-[11px] text-slate-400">count loads with registry API</div>
           </button>
         ))}
+      </div>
+
+      {/* Social approval manifest */}
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <h2 className="text-base font-black text-slate-800">Social Approval Queue</h2>
+            <p className="text-sm text-slate-500">
+              Facebook approval items staged for Clear Credentials. Real publishing remains Ray-approved only.
+            </p>
+          </div>
+          <div className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 shrink-0">
+            <ShieldCheck size={13} /> Safe Manifest
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {showroomSocialApprovalManifest.map(item => (
+            <div key={item.id} className="rounded-xl border border-slate-100 bg-white/70 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-black text-slate-800">{item.title}</div>
+                  <div className="text-[11px] text-slate-400 mt-0.5">
+                    {item.queueItemId} · {item.platform} · {item.channel}
+                  </div>
+                </div>
+                <div className={`text-[11px] font-bold px-2 py-1 rounded-full border shrink-0 ${
+                  item.approvalStatus === 'published'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : 'border-amber-200 bg-amber-50 text-amber-700'
+                }`}>
+                  {item.approvalStatus.replaceAll('_', ' ')}
+                </div>
+              </div>
+              <p className="mt-2 text-sm text-slate-600">{item.captionPreview}</p>
+              <div className="mt-2 text-xs font-semibold text-[#3d5af1]">{item.cta}</div>
+              {typeof item.qualityScore === 'number' && (
+                <div className="mt-1 text-[11px] font-bold text-slate-500">
+                  Quality score: {item.qualityScore}/100
+                </div>
+              )}
+              {item.proofPermalink && (
+                <a
+                  href={item.proofPermalink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-[#3d5af1]"
+                >
+                  <Send size={13} /> Published proof: {item.proofPostId}
+                </a>
+              )}
+              {item.approveCommand && (
+                <div className="mt-3 grid gap-1.5 text-[11px] text-slate-500">
+                  <code className="rounded bg-slate-50 border border-slate-100 px-2 py-1 overflow-x-auto">
+                    {item.approveCommand}
+                  </code>
+                  <code className="rounded bg-slate-50 border border-slate-100 px-2 py-1 overflow-x-auto">
+                    {item.dryRunCommand}
+                  </code>
+                  <code className="rounded bg-slate-50 border border-slate-100 px-2 py-1 overflow-x-auto">
+                    DO NOT RUN UNTIL APPROVED: {item.publishCommand}
+                  </code>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Asset Registry */}

@@ -16,11 +16,15 @@ VALID_PLATFORMS = {"facebook", "instagram", "newsletter"}
 VALID_STATUSES = {
     "draft",
     "queued_for_review",
+    "queued_for_publish",
     "approved",
     "dry_run_ready",
     "published",
     "failed",
+    "failed_retry_allowed",
     "blocked",
+    "needs_revision",
+    "blocked_compliance",
     "rejected",
 }
 
@@ -102,6 +106,11 @@ def create_item(
     source_report: str = "",
     scheduled_for: str = "",
     status: str = "queued_for_review",
+    quality_score: int | None = None,
+    quality_pass: bool | None = None,
+    compliance_pass: bool | None = None,
+    banned_claims_found: list[str] | None = None,
+    needs_revision_reason: str = "",
 ) -> dict[str, Any]:
     if platform not in VALID_PLATFORMS:
         raise ValueError(f"invalid platform: {platform}")
@@ -129,8 +138,22 @@ def create_item(
         "source_report": source_report,
         "publish_result": {},
         "receipt_path": "",
+        "quality_score": quality_score,
+        "quality_pass": quality_pass,
+        "compliance_pass": compliance_pass,
+        "banned_claims_found": banned_claims_found or [],
+        "needs_revision_reason": needs_revision_reason,
     }
     blockers = validate_item_fields(item)
+    if banned_claims_found:
+        item["status"] = "blocked_compliance"
+        item["publish_result"] = {"blockers": ["banned compliance claim found"]}
+    elif quality_score is not None and quality_score < 75:
+        item["status"] = "needs_revision"
+        item["needs_revision_reason"] = needs_revision_reason or "quality score below 75"
+    elif quality_pass is False or compliance_pass is False:
+        item["status"] = "needs_revision" if compliance_pass is not False else "blocked_compliance"
+        item["needs_revision_reason"] = needs_revision_reason or "quality/compliance gate did not pass"
     if blockers:
         item["status"] = "blocked"
         item["publish_result"] = {"blockers": blockers}
@@ -204,11 +227,22 @@ def summarize(items: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     items = load_items() if items is None else items
     counts = {status: 0 for status in sorted(VALID_STATUSES)}
     by_platform: dict[str, int] = {}
+    last_published: dict[str, Any] | None = None
     for item in items:
         status = item.get("status") or "unknown"
         counts[status] = counts.get(status, 0) + 1
         platform = item.get("platform") or "unknown"
         by_platform[platform] = by_platform.get(platform, 0) + 1
+        if status == "published":
+            last_published = item
+    next_action = "Queue a social post for Ray review."
+    if counts.get("queued_for_review", 0):
+        next_action = "Ray reviews and approves the next queued post; run dry-run before any real publish."
+    elif counts.get("approved", 0) or counts.get("dry_run_ready", 0) or counts.get("queued_for_publish", 0):
+        next_action = "Run a dry-run or publish only after Ray approves the exact post/account."
+    elif counts.get("failed", 0) or counts.get("blocked", 0):
+        next_action = "Review failed/blocked receipts before retrying."
+    last_result = (last_published or {}).get("publish_result") or {}
     return {
         "queue_path": _rel(QUEUE_PATH),
         "total": len(items),
@@ -219,6 +253,25 @@ def summarize(items: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         "dry_run_ready_count": counts.get("dry_run_ready", 0),
         "published_count": counts.get("published", 0),
         "failed_count": counts.get("failed", 0),
+        "blocked_count": counts.get("blocked", 0),
+        "needs_revision_count": counts.get("needs_revision", 0),
+        "blocked_compliance_count": counts.get("blocked_compliance", 0),
+        "queued_for_publish_count": counts.get("queued_for_publish", 0),
+        "failed_retry_allowed_count": counts.get("failed_retry_allowed", 0),
+        "average_quality_score": round(
+            sum(int(item.get("quality_score") or 0) for item in items if item.get("quality_score") is not None)
+            / max(1, sum(1 for item in items if item.get("quality_score") is not None)),
+            1,
+        ),
+        "next_recommended_action": next_action,
+        "last_published": {
+            "id": (last_published or {}).get("id"),
+            "platform": (last_published or {}).get("platform"),
+            "title": (last_published or {}).get("title"),
+            "post_id": last_result.get("post_id"),
+            "permalink": last_result.get("permalink"),
+            "receipt_path": (last_published or {}).get("receipt_path"),
+        } if last_published else None,
         "latest_items": items[-10:],
     }
 
@@ -238,9 +291,29 @@ def write_status_reports(connector_status: dict[str, Any] | None = None) -> dict
         f"- Pending review: {summary['pending_review_count']}",
         f"- Approved: {summary['approved_count']}",
         f"- Dry-run ready: {summary['dry_run_ready_count']}",
+        f"- Queued for publish: {summary['queued_for_publish_count']}",
         f"- Published: {summary['published_count']}",
         f"- Failed: {summary['failed_count']}",
+        f"- Blocked: {summary['blocked_count']}",
+        f"- Needs revision: {summary['needs_revision_count']}",
+        f"- Blocked compliance: {summary['blocked_compliance_count']}",
+        f"- Average quality score: {summary['average_quality_score']}",
+        f"- Next recommended action: {summary['next_recommended_action']}",
         "",
+        "## Last Published",
+    ]
+    last = summary.get("last_published")
+    if last:
+        lines += [
+            f"- Item: {last.get('id')}",
+            f"- Post ID: {last.get('post_id')}",
+            f"- Permalink: {last.get('permalink')}",
+            f"- Receipt: {last.get('receipt_path')}",
+            "",
+        ]
+    else:
+        lines += ["- None", ""]
+    lines += [
         "## Latest Items",
     ]
     for item in summary["latest_items"]:

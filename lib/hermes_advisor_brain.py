@@ -99,6 +99,8 @@ def classify_advisor_intent(message: str) -> str:
         return "research_request"
 
     # execution approval
+    if any(k in t for k in ("what should i approve", "what should we approve", "what do i approve", "what to approve")):
+        return "social_first_funnel"
     if any(k in t for k in ("i approve", "approve this", "move forward", "let's move forward",
                             "lets move forward", "go ahead", "do it", "make it happen", "ship it",
                             "let's go", "lets go")):
@@ -111,7 +113,9 @@ def classify_advisor_intent(message: str) -> str:
         "social publishing", "facebook publishing", "instagram publishing",
         "first paid client", "first paid subscriber", "monthly subscription",
         "subscription", "fully automated", "posts are queued", "posts are ready",
-        "what did ray already post", "safest next automated test", "approve next"
+        "what did ray already post", "safest next automated test", "approve next",
+        "first facebook post weak", "improve nexus creativity", "top 3 facebook",
+        "short video", "landing page", "creative"
     )):
         return "social_first_funnel"
 
@@ -301,6 +305,49 @@ def answer_deterministic(message: str) -> str:
                 "- Meta: app credentials are partial, but publishing/account config is incomplete.",
                 "- Safe path today: local dry-run queue + manual posting after Ray approves the exact account and post.",
                 f"Report: {social_report.relative_to(ROOT) if social_report.exists() else 'social report not generated yet'}",
+            ])
+
+        if "first facebook post weak" in t or ("why" in t and "weak" in t):
+            return "\n".join([
+                "The first Facebook post was safe, but it was too bland.",
+                "The gap: weak scroll-stopping hook, not enough emotional tension, too little specificity, and no formal quality gate.",
+                "Fix: Nexus now scores hook strength, pain clarity, specificity, offer alignment, CTA strength, and compliance before queueing new posts.",
+            ])
+
+        if "improve nexus creativity" in t or "creative" in t:
+            return "\n".join([
+                "Nexus added a creative operating layer: copy standards, swipe file, templates, quality scoring, rewrite critique, angle generation, source-to-draft generation, and queue quality metadata.",
+                "Future posts should score at least 75 before review; banned claims are compliance-blocked.",
+                "The goal is sharper hooks and more specific $97 review -> monthly subscription conversion without fake guarantees.",
+            ])
+
+        if "top 3 facebook" in t or "approve next" in t or "what should i approve" in t:
+            candidates = [
+                item for item in latest_items
+                if item.get("platform") == "facebook" and item.get("status") == "queued_for_review"
+            ]
+            candidates = sorted(candidates, key=lambda x: int(x.get("quality_score") or 0), reverse=True)[:3]
+            lines = ["Top Facebook posts to approve next:"]
+            for item in candidates:
+                lines.append(f"- {item.get('id')} | score {item.get('quality_score')} | {item.get('title')}")
+                lines.append(f"  {str(item.get('caption') or '')[:180]}...")
+            lines.append("Approve 1-3 at a time, dry-run each, then only real-publish after exact account/post approval.")
+            return "\n".join(lines)
+
+        if "short video" in t or "record first" in t:
+            return "\n".join([
+                "Record this first: 'Most business owners get denied before the application starts.'",
+                "Visual: show a checklist with LLC, EIN, business phone, address, website, domain email, bank statements, and credit-readiness gaps.",
+                "CTA: Comment READY for the checklist. No guaranteed funding or approvals.",
+                "Report: reports/creative/short_video_script_samples_20260617.md",
+            ])
+
+        if "landing page" in t or "$97 offer" in t:
+            return "\n".join([
+                "Use the $97 Credit/Funding Starter Review landing page first.",
+                "Hero: Find the credit and funding-readiness gaps before you apply.",
+                "Path: checklist -> $97 Starter Review -> $97/$197/$297 monthly Nexus support if execution help is needed.",
+                "Report: reports/creative/landing_page_upgrade_samples_20260617.md",
             ])
 
         if "queued" in t or "posts are ready" in t:

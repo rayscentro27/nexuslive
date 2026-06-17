@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from lib import social_queue  # noqa: E402
+from scripts.social_copy_quality_check import evaluate  # noqa: E402
 
 
 def main() -> int:
@@ -24,7 +25,15 @@ def main() -> int:
     ap.add_argument("--source", default="manual")
     ap.add_argument("--source-report", default="")
     ap.add_argument("--scheduled-for", default="")
+    ap.add_argument("--skip-quality-gate", action="store_true")
     args = ap.parse_args()
+    quality = evaluate(args.caption) if not args.skip_quality_gate else {
+        "score": None,
+        "pass": None,
+        "compliance_pass": None,
+        "banned_claims_found": [],
+        "reasons": [],
+    }
     item = social_queue.create_item(
         platform=args.platform,
         channel=args.channel,
@@ -37,6 +46,11 @@ def main() -> int:
         source=args.source,
         source_report=args.source_report,
         scheduled_for=args.scheduled_for,
+        quality_score=quality.get("score"),
+        quality_pass=quality.get("pass"),
+        compliance_pass=quality.get("compliance_pass"),
+        banned_claims_found=quality.get("banned_claims_found") or [],
+        needs_revision_reason="; ".join(quality.get("reasons") or []),
     )
     print(json.dumps(item, indent=2, sort_keys=True))
     return 0

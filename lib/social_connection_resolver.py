@@ -220,6 +220,27 @@ def resolve_all(*, check_network: bool = False) -> dict[str, Any]:
     }
 
 
+def facebook_page_credentials() -> dict[str, Any]:
+    """Return raw Facebook page credentials for publisher internals only.
+
+    This function exists so queue-native publishers can use the same alias
+    resolution as status checks without duplicating .env parsing. Callers must
+    never print the token. The returned token is intentionally only available in
+    the private ``token`` key for mutating publisher code.
+    """
+    page = _resolve_alias(_PAGE_ID_ALIASES)
+    token = _resolve_alias(_PAGE_TOKEN_ALIASES)
+    return {
+        "page_id": page.get("_value"),
+        "page_id_alias": page.get("matched_alias"),
+        "token": token.get("_value"),
+        "token_alias": token.get("matched_alias"),
+        "page_id_present": bool(page.get("present")),
+        "token_present": bool(token.get("present")),
+        "token_not_printed": True,
+    }
+
+
 def _network_identity_check(node_id: str, token: str, platform: str) -> dict[str, Any]:
     """Read-only Graph API identity check. No mutations, no publishing.
 
