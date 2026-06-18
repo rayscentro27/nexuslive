@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-06-18T00:36:51.657198+00:00",
+  "generated_at": "2026-06-18T01:50:56.186404+00:00",
   "is_live": false,
   "note": "This is a static system snapshot from the last Nexus Operator run, not a live Hermes conversation. The live Hermes AI gateway is not reachable from production.",
   "overall_status": "PARTIAL",
   "social_queue": {
     "published": 1,
-    "queued_for_review": 26,
+    "queued_for_review": 25,
     "approved": 0,
     "dry_run_ready": 0,
     "failed": 0,
@@ -21,7 +21,7 @@
       "publishing_ready": "yes"
     }
   },
-  "approvals_pending": 26,
+  "approvals_pending": 25,
   "next_social_action": "Ray reviews the top queued Facebook posts, approves one exact item, then runs dry-run; real publish remains approval-gated.",
   "next_actions": [
     "Ray review + approve the offer (BETA_LAUNCH_PACKET_INDEX.md)",
