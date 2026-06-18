@@ -35,6 +35,23 @@ BURST_MAX = int(os.getenv("TELEGRAM_GUARD_BURST_MAX", "3"))                 # 3 
 PRUNE_AFTER_SEC = 3600
 
 
+# Per-purpose overrides (seconds). Trading demo reports were spamming ~5 msgs twice a day,
+# so they get a long dedup window + a hard 1-per-6h auto cap + burst max of 1.
+PURPOSE_RULES = {
+    "demo_trading_report": {"dedup": 43200, "auto_cooldown": 21600, "burst_window": 21600, "burst_max": 1},
+}
+
+
+def _rules(purpose: str) -> dict:
+    r = PURPOSE_RULES.get(purpose, {})
+    return {
+        "dedup": r.get("dedup", DEDUP_WINDOW_SEC),
+        "auto_cooldown": r.get("auto_cooldown", AUTO_COOLDOWN_SEC),
+        "burst_window": r.get("burst_window", BURST_WINDOW_SEC),
+        "burst_max": r.get("burst_max", BURST_MAX),
+    }
+
+
 def _manual_only() -> bool:
     return os.getenv("TELEGRAM_MANUAL_ONLY", "true").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -67,21 +84,22 @@ def allow_send(text: str, chat_id: str, purpose: str = "general", *, force: bool
     if is_auto and _manual_only():
         return False, "manual_only_blocks_auto"
     now = time.time()
+    rules = _rules(purpose)
     sends = _load().get("sends", [])
     h = _hash(text, str(chat_id), purpose)
 
     for s in sends:
-        if s.get("hash") == h and now - s.get("ts", 0) < DEDUP_WINDOW_SEC:
-            return False, f"duplicate_within_{DEDUP_WINDOW_SEC}s"
+        if s.get("hash") == h and now - s.get("ts", 0) < rules["dedup"]:
+            return False, f"duplicate_within_{rules['dedup']}s"
 
     if is_auto:
         for s in sends:
-            if s.get("purpose") == purpose and s.get("auto") and now - s.get("ts", 0) < AUTO_COOLDOWN_SEC:
-                return False, f"auto_cooldown_{AUTO_COOLDOWN_SEC}s"
+            if s.get("purpose") == purpose and s.get("auto") and now - s.get("ts", 0) < rules["auto_cooldown"]:
+                return False, f"auto_cooldown_{rules['auto_cooldown']}s"
 
-    recent = [s for s in sends if s.get("purpose") == purpose and now - s.get("ts", 0) < BURST_WINDOW_SEC]
-    if len(recent) >= BURST_MAX:
-        return False, f"burst_limit_{BURST_MAX}_per_{BURST_WINDOW_SEC}s"
+    recent = [s for s in sends if s.get("purpose") == purpose and now - s.get("ts", 0) < rules["burst_window"]]
+    if len(recent) >= rules["burst_max"]:
+        return False, f"burst_limit_{rules['burst_max']}_per_{rules['burst_window']}s"
 
     return True, "allowed"
 

@@ -54,11 +54,45 @@ class TelegramNotifier:
             from lib import hermes_gate
 
             if critical:
-                hermes_gate.send_critical(text, event_type='trading_risk_violation')
+                # Cap demo-trading bursts: the guard allows at most 1 'demo_trading_report'
+                # auto send per 6h, so a 5-trade run cannot produce 5 Telegram messages.
+                try:
+                    from lib import telegram_send_guard as guard
+                    allowed, _ = guard.allow_send(text, self.chat_id, 'demo_trading_report', is_auto=True)
+                    if not allowed:
+                        return
+                    hermes_gate.send_critical(text, event_type='trading_risk_violation')
+                    guard.record_send(text, self.chat_id, 'demo_trading_report', is_auto=True)
+                except Exception:
+                    hermes_gate.send_critical(text, event_type='trading_risk_violation')
             else:
+                # Non-critical per-trade events go to the digest, never an immediate send.
                 hermes_gate.record_digest_item('trading_digest', text)
         except Exception:
             pass
+
+    def demo_summary(self, stats: dict) -> bool:
+        """Send ONE guarded summary for a demo-trading run (replaces per-trade spam)."""
+        if not self.enabled:
+            return False
+        text = (
+            "*Nexus Demo Trading Summary*\n"
+            f"Signals: {stats.get('signals', 0)} | Attempted: {stats.get('attempted', 0)} | "
+            f"Opened: {stats.get('opened', 0)} | Rejected: {stats.get('rejected', 0)}\n"
+            f"Instruments: {', '.join(stats.get('instruments', [])) or '—'}\n"
+            f"Demo P/L: ${stats.get('pnl', 0):+.2f} | Cumulative loss: "
+            f"${stats.get('cum_loss', 0):.2f} / $500 cap\n"
+            f"Blockers: {stats.get('blockers') or 'none'}"
+        )
+        try:
+            from lib import hermes_gate
+            from lib import telegram_send_guard as guard
+            return guard.guarded(
+                lambda: bool(hermes_gate._telegram_send(text, self.token, self.chat_id, parse_mode='')),
+                text, self.chat_id, purpose='demo_trading_report', is_auto=True,
+            )
+        except Exception:
+            return False
 
     def engine_started(self, mode: str, balance: float):
         self._send(
