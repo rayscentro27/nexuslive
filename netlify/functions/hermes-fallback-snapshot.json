@@ -1,0 +1,47 @@
+{
+  "generated_at": "2026-06-18T00:27:40.344674+00:00",
+  "is_live": false,
+  "note": "This is a static system snapshot from the last Nexus Operator run, not a live Hermes conversation. The live Hermes AI gateway is not reachable from production.",
+  "overall_status": "PARTIAL",
+  "social_queue": {
+    "published": 1,
+    "queued_for_review": 26,
+    "approved": 0,
+    "dry_run_ready": 0,
+    "failed": 0,
+    "average_quality_score": 89.7
+  },
+  "connectors": {
+    "facebook": {
+      "account_connected": "yes",
+      "publishing_ready": "yes"
+    },
+    "instagram": {
+      "account_connected": "yes",
+      "publishing_ready": "yes"
+    }
+  },
+  "approvals_pending": 26,
+  "next_social_action": "Ray reviews the top queued Facebook posts, approves one exact item, then runs dry-run; real publish remains approval-gated.",
+  "next_actions": [
+    "Ray review + approve the offer (BETA_LAUNCH_PACKET_INDEX.md)",
+    "Approve beta_outreach_message.md to begin outreach (approval-gated)",
+    "Publish lead_magnet + landing_page_draft to start lead capture (approval-gated)"
+  ],
+  "blockers": [
+    {
+      "area": "automation",
+      "blocker": "control-center port 4000 already in use (redundant launch)",
+      "fix": "one instance already serving; ignore or dedupe the launch"
+    },
+    {
+      "area": "monetization",
+      "blocker": "outreach/publish needs Ray approval (drafts ready)",
+      "fix": "Ray approves outreach + landing/lead-magnet publish in approval queue"
+    }
+  ],
+  "trading": {
+    "mode": "paper/demo only",
+    "note": "No live or funded trading."
+  }
+}

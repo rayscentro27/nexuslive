@@ -202,7 +202,21 @@ export function HermesChat() {
 
       const data = await res.json();
       const reply = data.choices?.[0]?.message?.content ?? 'No response from Hermes.';
-      setHealth({ status: 'live', detail: 'Hermes gateway live.' });
+      // The function returns a non-AI snapshot when the live gateway is down — render it
+      // honestly (degraded, not "live") so the pill never overstates connectivity.
+      if (data.fallback || data.live === false) {
+        const reasonMap: Record<string, string> = {
+          netlify_env_missing: 'Live AI offline (HERMES_GATEWAY_URL not set) — showing snapshot.',
+          auth_key_missing: 'Live AI offline (HERMES_API_KEY not set) — showing snapshot.',
+          auth_failed: 'Gateway rejected the key — showing snapshot.',
+          tunnel_timeout: 'Tunnel/origin timed out — showing snapshot.',
+          tunnel_unreachable: 'Tunnel or local Hermes offline — showing snapshot.',
+          origin_unhealthy: 'Gateway unhealthy — showing snapshot.',
+        };
+        setHealth({ status: 'degraded', detail: reasonMap[data.reason] ?? 'Live AI offline — showing snapshot.' });
+      } else {
+        setHealth({ status: 'live', detail: 'Hermes gateway live.' });
+      }
       setMessages(prev => [...prev, { id: `a-${Date.now()}`, role: 'assistant', content: reply, timestamp: new Date().toISOString() }]);
     } catch (err) {
       const isTimeout = String(err).includes('Timeout') || String(err).includes('abort');
