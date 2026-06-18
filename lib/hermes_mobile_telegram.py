@@ -335,7 +335,16 @@ def status() -> dict:
 
 def _send(chat_id: str, text: str) -> None:
     # Telegram hard limit ~4096 chars; trim defensively.
-    _api("sendMessage", {"chat_id": chat_id, "text": text[:3900]}, timeout=20)
+    # Duplicate-send guard: drop identical/burst replies so a looping poller can't spam.
+    def _do() -> bool:
+        _api("sendMessage", {"chat_id": chat_id, "text": text[:3900]}, timeout=20)
+        return True
+    try:
+        from lib import telegram_send_guard as _guard
+        _guard.guarded(_do, text[:3900], str(chat_id), purpose="hermes_mobile_reply")
+    except Exception:
+        # Guard import/logic must never break a legitimate reply.
+        _do()
 
 
 def _strip_mention(text: str) -> str:

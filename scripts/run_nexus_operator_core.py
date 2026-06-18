@@ -432,7 +432,7 @@ def answer(intent: str, st: dict | None = None) -> str:
     return ("Operator commands: " + " | ".join(COMMANDS))
 
 
-def send_war_room(st: dict) -> bool:
+def send_war_room(st: dict, force: bool = False) -> bool:
     try:
         import sys
         sys.path.insert(0, str(ROOT))
@@ -442,6 +442,19 @@ def send_war_room(st: dict) -> bool:
             s = ln.strip()
             if s and not s.startswith("#") and "=" in s:
                 k, val = s.split("=", 1); v[k.strip()] = val.strip().strip('"').strip("'")
+
+        def _truthy(key, default):
+            return str(v.get(key, default)).strip().lower() in {"1", "true", "yes", "on"}
+
+        # Auto War Room send is OFF unless explicitly enabled. This stops every operator
+        # run from emitting a Telegram message (a prior spam source). Manual --ask replies
+        # and force=True bypass this; the raw send is still duplicate-guarded downstream.
+        if not force:
+            manual_only = _truthy("TELEGRAM_MANUAL_ONLY", "true")
+            auto_ok = _truthy("WAR_ROOM_AUTO_SEND", "false") and _truthy("NEXUS_WAR_ROOM_SEND_ENABLED", "false")
+            if manual_only or not auto_ok:
+                st.setdefault("notes", []).append("war_room auto-send disabled (TELEGRAM_MANUAL_ONLY / WAR_ROOM flags)")
+                return False
         msg = ("Nexus Operator Core is active.\n"
                f"Overall: {st['overall_status']}\n"
                f"Money: {st['monetization']['primary_offer']} ($97 / $197-$297). "

@@ -255,6 +255,19 @@ def _telegram_ssl_ctx() -> ssl.SSLContext:
 
 
 def _telegram_send(text: str, bot_token: str, chat_id: str, parse_mode: str = 'HTML') -> bool:
+    """Guarded Telegram send. Drops exact-duplicate/burst sends so any caller that
+    bypasses send() (e.g. operator war-room) cannot spam. Falls open on guard error."""
+    try:
+        from lib import telegram_send_guard as _guard
+        return _guard.guarded(
+            lambda: _telegram_send_raw(text, bot_token, chat_id, parse_mode),
+            text, str(chat_id), purpose='hermes_gate_raw',
+        )
+    except Exception:
+        return _telegram_send_raw(text, bot_token, chat_id, parse_mode)
+
+
+def _telegram_send_raw(text: str, bot_token: str, chat_id: str, parse_mode: str = 'HTML') -> bool:
     """Raw Telegram API call."""
     url  = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     body = json.dumps({
